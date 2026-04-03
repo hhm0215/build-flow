@@ -1,0 +1,37 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# VS Code
+.vscode/
+
+# 환경변수 (절대 커밋 금지)
+.env
+application-secret.yml
+**/application-secret.yml
+
+# 로그
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# Docker volumes
+docker/volumes/
+
+# claude
+CLAUDE.MD

@@ -1,0 +1,11 @@
+rootProject.name = 'buildflow'
+
+include 'eureka-server'
+include 'config-server'
+include 'gateway-server'
+include 'auth-service'
+include 'estimate-service'
+include 'site-service'
+include 'purchase-service'
+include 'tax-service'
+include 'notification-service'
