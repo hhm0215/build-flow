@@ -1,204 +1,307 @@
-# BuildFlow — 건설 현장 관리 플랫폼
+# BuildFlow
 
-1인 개발로, 실제 아버지의 건설 용접업 사업에 적용하기 위해 만든 실사용 목적의 웹 서비스입니다.
-각 현장을 기준으로 견적서, 공내역서, 매입, 세금계산서, 하자보증보험 등
-흩어져 있던 문서와 데이터를 통합 관리하고, 현장별 수익과 비용을 기반으로 손익을 직관적으로 파악할 수 있도록 설계했습니다.
+건설·시공 소규모 업체를 위한 **현장별 문서 통합 관리 + AI 챗봇 플랫폼**
 
-또한 로컬 LLM을 활용하여 현장 상태 요약, 비용 분석, 리스크 탐지 등의 기능을 제공함으로써 사용자가 빠르게 의사결정을 내릴 수 있도록 지원합니다.
+한 현장에 대한 모든 문서(공내역서, 견적서, 세금계산서, 하자보증보험)를 묶어서 관리하고,
+현장별 손익/마진/미수금을 실시간으로 파악하며, AI 챗봇으로 자연어 질의가 가능한 시스템입니다.
 
-또한 단순 CRUD 수준을 넘어서, MSA 구조와 이벤트 기반 아키텍처(Kafka)를 적용하여 실무에서도 확장 가능한 백엔드 시스템을 구현하는 데 초점을 맞춘 프로젝트입니다.
+> 실제 사업(건설 용접업)의 업무 프로세스를 분석하여 설계한 프로젝트입니다.
+
+---
+
+## 프로젝트 개요
+
+### 배경
+
+건설·시공 소규모 업체에서는 현장별 문서를 엑셀, PDF, 카카오톡으로 분산 관리하고 있어
+현장 수익이 얼마인지, 미수금이 얼마나 남았는지, 하자보증보험이 언제 만료되는지를
+한눈에 파악하기 어려운 상황입니다.
+
+BuildFlow는 이 문제를 해결하기 위해 **현장 단위로 모든 문서와 금액 정보를 통합**하고,
+**AI가 데이터를 분석·요약**하여 빠른 의사결정을 돕는 플랫폼입니다.
+
+### 핵심 기능
+
+- **현장 중심 문서 관리** — 공내역서, 견적서, 세금계산서, 하자보증보험을 현장 단위로 묶어 관리
+- **실시간 손익 대시보드** — 현장별 매출/매입/마진/마진율/미수금을 자동 계산
+- **AI 챗봇 (RAG)** — "강남 현장 마진 얼마야?", "미수금 가장 많은 현장은?" 같은 자연어 질의
+- **알림 시스템** — 하자보증보험 만료 경고, 미수금 연체 알림
+
+---
+
+## 시스템 아키텍처
+
+```
+                          ┌──────────────────┐
+                          │   React Client   │
+                          │   :5173          │
+                          └────────┬─────────┘
+                                   │
+                          ┌────────▼─────────┐
+                          │  Spring Cloud    │
+                          │  Gateway :8080   │◄──► Redis (Rate Limiting, JWT 블랙리스트)
+                          └────────┬─────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                    │
+     ┌────────▼────────┐ ┌────────▼────────┐ ┌────────▼────────┐
+     │  auth-service   │ │estimate-service │ │  site-service   │
+     │  :8081          │ │  :8082          │ │  :8083          │
+     └─────────────────┘ └─────────────────┘ └────────┬────────┘
+                                                      │
+              ┌────────────────────┼──────────────────┤
+              │                    │                  │
+     ┌────────▼────────┐ ┌────────▼────────┐ ┌───────▼─────────┐
+     │purchase-service │ │  tax-service    │ │notification-svc │
+     │  :8084          │ │  :8085          │ │  :8086          │
+     └─────────────────┘ └─────────────────┘ └─────────────────┘
+              │                    │                  │
+              └────────────────────┼──────────────────┘
+                                   │
+                          ┌────────▼─────────┐
+                          │   Apache Kafka   │
+                          │   (이벤트 버스)    │
+                          └──────────────────┘
+
+     ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+     │chat-service │  │Eureka Server│  │Config Server│
+     │  :8087      │  │  :8761      │  │  :8888      │
+     └─────────────┘  └─────────────┘  └─────────────┘
+```
+
+### 서비스 구성
+
+| 서비스 | 역할 |
+|--------|------|
+| **gateway-server** | API 라우팅, JWT 검증, Rate Limiting |
+| **auth-service** | 회원 인증, JWT 발급/갱신, Redis 블랙리스트 |
+| **estimate-service** | 공내역서/견적서 파일 업로드·관리 |
+| **site-service** | 현장 CRUD, 손익 계산, 거래처 관리, AI 요약 |
+| **purchase-service** | 자재/서비스 매입 관리 |
+| **tax-service** | 세금계산서 CRUD, 미수금 추적, 입금 확인 |
+| **notification-service** | 알림, 하자보증보험 PDF + OCR |
+| **chat-service** | AI 챗봇 (RAG, SSE 스트리밍) |
+| **eureka-server** | 서비스 디스커버리 |
+| **config-server** | 중앙 설정 관리 |
 
 ---
 
 ## 기술 스택
 
-| 구분 | 기술 |
+### Backend
+| 기술 | 용도 |
 |------|------|
-| Language | Java 17 |
-| Framework | Spring Boot 3.3, Spring Cloud 2023.0 |
-| Service Discovery | Spring Cloud Netflix Eureka |
-| API Gateway | Spring Cloud Gateway (JWT 필터, Redis Rate Limiting) |
-| Config | Spring Cloud Config (Git 기반) |
-| 동기 통신 | OpenFeign |
-| 비동기 통신 | Apache Kafka (KRaft mode) |
-| Cache / Lock | Redis (Cache Aside, JWT 블랙리스트, Redisson 분산락) |
-| Database | MySQL 8 (Database per Service) |
-| Tracing | Zipkin + Micrometer Tracing |
-| AI | Claude API (공내역서 파싱) |
-| Frontend | React 18 + TypeScript + Vite + Ant Design |
-| 상태 관리 | Zustand (클라이언트), TanStack Query (서버 상태) |
+| Java 17 / Spring Boot 3.x | 애플리케이션 프레임워크 |
+| Spring Cloud Gateway | API Gateway, JWT 필터, Rate Limiting |
+| Spring Cloud Netflix Eureka | 서비스 디스커버리 |
+| Spring Cloud Config | Git 기반 중앙 설정 관리 |
+| Spring Cloud OpenFeign | 서비스 간 동기 통신 |
+| Apache Kafka (KRaft) | 이벤트 드리븐 비동기 통신 |
+| Redis / Redisson | 캐시(Cache Aside), JWT 블랙리스트, 분산락 |
+| Spring Data JPA / QueryDSL | ORM, 복잡한 쿼리 처리 |
+| MySQL 8 | 서비스별 스키마 분리 (Database per Service) |
+| Zipkin + Micrometer | 분산 트레이싱 |
+| Tesseract OCR | 하자보증보험 PDF 텍스트 추출 |
+
+### Frontend
+| 기술 | 용도 |
+|------|------|
+| React 18 / TypeScript | UI 프레임워크 |
+| Ant Design | UI 컴포넌트 라이브러리 |
+| Zustand | 클라이언트 상태 관리 |
+| TanStack Query | 서버 상태 관리 (캐싱, 리페치) |
+| Axios | HTTP 클라이언트 (JWT 인터셉터) |
+
+### Infra
+| 기술 | 용도 |
+|------|------|
+| Docker Compose | 로컬 개발 환경 통합 |
+| Gradle (Groovy) | 빌드 도구 |
+| GitHub Actions | CI/CD (추후) |
 
 ---
 
-## 서비스 구성
+## 아키텍처 설계 포인트
+
+### 이벤트 드리븐 아키텍처
+
+서비스 간 데이터 동기화는 Kafka를 통한 비동기 이벤트로 처리합니다.
+견적서가 업로드되면 `estimate.uploaded` 이벤트가 발행되고,
+site-service가 이를 소비하여 현장 손익을 재계산합니다.
 
 ```
-buildflow/
-├── eureka-server/        # 서비스 디스커버리          :8761
-├── config-server/        # 중앙 설정 관리             :8888
-├── gateway-server/       # API Gateway               :8080
-├── auth-service/         # 인증·인가 (JWT + Redis)    :8081
-├── estimate-service/     # 견적서 + 공내역서 AI 파싱   :8082
-├── site-service/         # 현장 관리 + 손익 계산       :8083
-├── purchase-service/     # 매입(자재·서비스) 관리      :8084
-├── tax-service/          # 세금계산서 + 미수금 관리    :8085
-├── notification-service/ # 알림 (Kafka consumer)     :8086
-├── frontend/             # React SPA                 :3000
-└── docker-compose.yml    # 로컬 인프라
+estimate-service  ──estimate.uploaded──►  site-service (손익 재계산)
+purchase-service  ──purchase.registered──►  site-service (손익 재계산)
+tax-service       ──tax.invoice.created──►  site-service (미수금 갱신)
+tax-service       ──tax.payment.confirmed──►  site-service (미수금 차감)
+```
+
+모든 Kafka 메시지에는 UUID 기반 eventId를 포함하며,
+소비자 측에서 Idempotent Consumer 패턴으로 중복 처리를 방지합니다.
+
+### Database per Service
+
+MySQL 1개 인스턴스에 서비스별 스키마를 분리하여 논리적 격리를 달성합니다.
+서비스 간 데이터 조회는 반드시 API(OpenFeign)를 통해 수행하며,
+직접 DB 접근은 금지합니다.
+
+손익 계산처럼 여러 서비스의 데이터가 필요한 경우,
+API Composition 패턴으로 site-service가 각 서비스의 API를 호출하여
+애플리케이션 레벨에서 합산합니다.
+
+### Redis 활용 (3가지 용도)
+
+| 용도 | 패턴 | 설명 |
+|------|------|------|
+| 캐시 | Cache Aside | 현장 목록/손익 데이터 캐싱 (TTL 5분) |
+| JWT 블랙리스트 | Key-Value | 로그아웃 시 토큰 무효화 (TTL = 토큰 잔여시간) |
+| 분산락 | Redisson | 동시 견적서 수정 방지 (TTL 30초) |
+
+### AI 챗봇 (RAG without Vector DB)
+
+데이터 대부분이 정형 데이터(MySQL)이므로 벡터DB를 사용하지 않습니다.
+LLM의 function calling으로 질문 의도를 파악하고,
+적절한 SQL 쿼리 결과를 LLM 컨텍스트에 주입하여 답변을 생성합니다.
+
+```
+사용자: "강남 현장 마진 얼마야?"
+  → function calling: getSiteProfit(siteName="강남")
+  → DB 조회: 매출 5,200만원, 매입 3,800만원
+  → LLM 답변: "강남 리모델링 현장은 마진 1,400만원(26.9%)입니다."
 ```
 
 ---
 
-## 핵심 플로우 — 공내역서 → 견적서 자동 생성
+## 현장 문서 라이프사이클
+
+이 시스템은 건설 현장의 실제 업무 흐름을 반영하여 설계되었습니다.
 
 ```
-1. 사용자가 엑셀(.xlsx) 업로드
-2. Apache POI로 셀 데이터 텍스트 변환
-3. Claude API 호출 → 품목 JSON 배열 추출
-4. 파싱 결과 검토 화면 표시 (사용자 수정 가능)
-5. 확정 시 estimate + estimate_item DB 저장
-6. Kafka 'estimate.parsed' 이벤트 발행
-   ├── site-service     → 현장 손익 재계산
-   └── notification-service → 알림 발송
+수주  ─►  공내역서 수신 (발주처에서 카톡/이메일)
+          견적서 작성 (우리가 직접 단가 산정 후 엑셀 업로드)
+          → 계약 확정 → 현장 생성
+
+시공  ─►  자재 매입 시 세금계산서(매입) 등록
+          발주처에 세금계산서(매출) 발행
+          추가공사 발생 시 견적서 추가 업로드
+
+정산  ─►  미수금 확인 (매출 세금계산서 vs 입금 내역)
+          입금 확인 처리 → 현장 손익 확정
+
+완료  ─►  하자보증보험 PDF 등록 + OCR 자동 추출
+          보험 만료 후 → 현장 마감
 ```
+
+> 공내역서와 견적서는 각각 독립된 문서입니다.
+> 공내역서는 발주처가 보낸 원본이고, 견적서는 우리가 직접 단가를 정해 작성합니다.
+> AI가 하나를 보고 다른 것을 자동 생성하지 않습니다.
 
 ---
 
-## 로컬 실행
+## 실행 방법
 
 ### 사전 요구사항
-- Java 17+
-- Docker Desktop
+- Java 17
 - Node.js 20+
+- Docker Desktop
 
-### 1. 환경변수 설정
-
-```bash
-cp .env.example .env
-# .env 파일을 열어 DB 비밀번호, JWT_SECRET, CLAUDE_API_KEY 값 입력
-```
-
-### 2. 인프라 기동 (MySQL, Redis, Kafka, Zipkin)
+### 실행
 
 ```bash
+# 1. 인프라 기동
 docker compose up -d
-```
 
-| 서비스 | 접속 주소 |
-|--------|----------|
-| MySQL | localhost:3306 |
-| Redis | localhost:6379 |
-| Kafka | localhost:9092 |
-| Zipkin | http://localhost:9411 |
+# 2. 인프라 서비스 (순서 중요)
+cd eureka-server && ./gradlew bootRun    # 1st
+cd config-server && ./gradlew bootRun    # 2nd
+cd gateway-server && ./gradlew bootRun   # 3rd
 
-### 3. 백엔드 서비스 실행 (순서 중요)
-
-```bash
-# 1) Eureka Server
-cd eureka-server && ./gradlew bootRun
-
-# 2) Config Server
-cd config-server && ./gradlew bootRun
-
-# 3) Gateway + 비즈니스 서비스 (순서 무관)
-cd gateway-server && ./gradlew bootRun
+# 3. 비즈니스 서비스
 cd auth-service && ./gradlew bootRun
 cd estimate-service && ./gradlew bootRun
 cd site-service && ./gradlew bootRun
 cd purchase-service && ./gradlew bootRun
 cd tax-service && ./gradlew bootRun
 cd notification-service && ./gradlew bootRun
+cd chat-service && ./gradlew bootRun
+
+# 4. 프론트엔드
+cd frontend && npm install && npm run dev
 ```
 
-### 4. 프론트엔드 실행
+### 접속
+- 프론트엔드: http://localhost:5173
+- Gateway: http://localhost:8080
+- Eureka Dashboard: http://localhost:8761
+- Zipkin: http://localhost:9411
 
-```bash
-cd frontend
-npm install
-npm run dev
-# http://localhost:3000
+---
+
+## 프로젝트 구조
+
+```
+buildflow/
+├── eureka-server/            # 서비스 디스커버리
+├── config-server/            # 중앙 설정 관리
+├── gateway-server/           # API Gateway
+├── auth-service/             # 인증/인가
+├── estimate-service/         # 견적서/공내역서
+├── site-service/             # 현장/손익/거래처
+├── purchase-service/         # 매입 관리
+├── tax-service/              # 세금계산서/미수금
+├── notification-service/     # 알림/하자보증보험
+├── chat-service/             # AI 챗봇 (RAG)
+├── frontend/                 # React + TypeScript
+├── docs/                     # 설계 문서
+│   ├── PLANNING.md           #   기획서
+│   ├── ARCHITECTURE.md       #   아키텍처 설계
+│   ├── ERD.md                #   DB 스키마 설계
+│   ├── API_SPEC.md           #   API 명세
+│   ├── DECISIONS.md          #   기술 결정 기록 (ADR)
+│   └── PROGRESS.md           #   진행 상황
+├── docker-compose.yml        # 로컬 인프라
+└── README.md
 ```
 
 ---
 
-## API 구조
+## 기술적 도전과 해결
 
-모든 요청은 Gateway(`localhost:8080`)를 통해 라우팅됩니다.
+### 1. 서비스 간 데이터 정합성
 
-```
-POST   /api/v1/auth/signup          # 회원가입
-POST   /api/v1/auth/login           # 로그인
-POST   /api/v1/auth/logout          # 로그아웃
-POST   /api/v1/auth/reissue         # 토큰 재발급
+**문제**: 견적서가 업로드되면 현장 손익이 갱신되어야 하는데, 서비스가 분리되어 있어 트랜잭션을 공유할 수 없음
 
-GET    /api/v1/sites                # 현장 목록
-POST   /api/v1/sites                # 현장 등록
+**해결**: Saga 패턴의 Choreography 방식 적용. Kafka 이벤트로 각 서비스가 자신의 상태를 독립적으로 갱신. site-service는 `site_profit_cache` 비정규화 테이블에 손익을 캐싱하여 조회 성능 확보 (CQRS 간소화)
 
-GET    /api/v1/estimates            # 견적서 목록
-POST   /api/v1/estimates/parse      # 공내역서 AI 파싱
-POST   /api/v1/estimates            # 견적서 확정 저장
+### 2. Kafka 메시지 중복 처리
 
-GET    /api/v1/purchases            # 매입 목록
-POST   /api/v1/purchases            # 매입 등록
+**문제**: 네트워크 장애 시 같은 이벤트가 두 번 전달될 수 있음
 
-GET    /api/v1/taxes                # 세금계산서 목록
-POST   /api/v1/taxes                # 세금계산서 등록
-```
+**해결**: Idempotent Consumer 패턴. 모든 메시지에 UUID eventId를 포함하고, 소비자는 `processed_events` 테이블에서 중복 여부를 확인 후 처리
 
-응답 포맷은 모든 서비스 공통:
-```json
-{
-  "success": true,
-  "data": { ... },
-  "error": null
-}
-```
+### 3. AI 챗봇 정확도
+
+**문제**: 일반적인 RAG는 벡터 유사도 검색을 사용하지만, 금액·날짜·현장명 같은 정형 데이터에서는 정확도가 떨어짐
+
+**해결**: 벡터DB 없이, LLM function calling으로 질문 의도를 파악하고 SQL 쿼리 결과를 직접 컨텍스트에 주입. 정형 데이터는 정확한 값을 반환하므로 할루시네이션 위험 최소화
+
+### 4. 분산 환경에서의 동시성 제어
+
+**문제**: MSA 환경에서 같은 견적서를 두 명이 동시에 수정하면 데이터 충돌
+
+**해결**: Redis + Redisson 분산락. 수정 시작 시 `lock:estimate:{id}` 키로 락 획득 (TTL 30초), 실패 시 "다른 사용자가 수정 중" 응답
 
 ---
 
-## Kafka 이벤트 토픽
+## 개발 환경
 
-| 토픽 | 발행 서비스 | 구독 서비스 |
-|------|-----------|-----------|
-| `estimate.parsed` | estimate-service | site-service, notification-service |
-| `purchase.registered` | purchase-service | site-service, notification-service |
-| `tax.issued` | tax-service | notification-service |
-
----
-
-## 테스트
-
-```bash
-# 단일 서비스 테스트 (권장)
-cd estimate-service && ./gradlew test
-
-# 전체 테스트
-./gradlew test
-```
+- macOS
+- IntelliJ IDEA (Backend)
+- VS Code (Frontend)
+- Docker Desktop
 
 ---
 
-## 프로젝트 배경
+## 라이선스
 
-아버지의 건설 용접업 업무를 도우며, 실제 현장 관리 과정에서 다음과 같은 비효율을 경험했습니다.
-
-견적서, 공내역서, 세금계산서, 하자보증보험 등 주요 문서들이 각각 분산되어 관리되어
-한 현장에 대한 정보를 통합적으로 파악하기 어려움
-매입과 매출 데이터가 따로 관리되어
-현장별 손익을 즉시 계산하기 어려운 구조
-엑셀 및 개별 파일 중심의 관리 방식으로 인해
-데이터 누락, 중복, 최신 정보 불일치 문제가 발생
-
-특히 특정 현장의 수익성과 비용을 확인하기 위해
-여러 문서를 직접 비교하고 계산해야 하는 과정이 반복되며
-시간 소모와 비효율이 발생했습니다.
-
-이러한 문제를 해결하기 위해,
-현장을 기준으로 모든 문서와 데이터를 통합 관리하고
-수익과 비용 흐름을 기반으로 손익을 직관적으로 파악할 수 있는 시스템을 개발하게 되었습니다.
-
-또한 로컬 LLM을 활용하여
-현장 요약, 비용 분석, 리스크 탐지 등의 기능을 제공함으로써
-사용자가 보다 빠르게 현황을 파악하고 의사결정을 내릴 수 있도록 개선하고자 했습니다.
-
-본 프로젝트는 실제 업무에 활용하기 위한 목적으로 설계된 서비스입니다.
+이 프로젝트는 학습 및 포트폴리오 목적으로 제작되었습니다.

@@ -34,4 +34,7 @@ frontend/.env.local
 docker/volumes/
 
 # claude
-CLAUDE.MD
+CLAUDE.md
+
+#docs
+docs/*
