@@ -2,6 +2,7 @@
   "name": "buildflow-frontend",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "bun@1.2.8",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -9,15 +10,17 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.5.1",
+    "@tanstack/react-query": "^5.59.0",
+    "antd": "^5.21.0",
+    "axios": "^1.7.7",
+    "dayjs": "^1.11.13",
+    "lucide-react": "^1.7.0",
+    "motion": "^12.38.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
-    "antd": "^5.21.0",
-    "@ant-design/icons": "^5.5.1",
-    "axios": "^1.7.7",
-    "zustand": "^5.0.0",
-    "@tanstack/react-query": "^5.59.0",
-    "dayjs": "^1.11.13"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.11",
@@ -27,7 +30,13 @@
     "@vitejs/plugin-react": "^4.3.2",
     "eslint": "^9.12.0",
     "eslint-plugin-react-hooks": "^5.1.0",
+    "msw": "^2.12.14",
     "typescript": "^5.6.3",
     "vite": "^5.4.8"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
   }
 }
