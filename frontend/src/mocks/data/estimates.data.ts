@@ -1,0 +1,71 @@
+import { Estimate } from '../../types/domain.types'
+
+export const mockEstimates: Estimate[] = [
+  {
+    id: 1,
+    siteId: 1,
+    siteName: '삼성 물류센터 용접',
+    title: '삼성 물류센터 1차 용접 견적',
+    status: 'CONFIRMED',
+    totalAmount: 25_000_000,
+    items: [
+      { id: 1, name: '구조용 철골 용접', unit: '식', quantity: 1, unitPrice: 15_000_000, totalPrice: 15_000_000 },
+      { id: 2, name: '배관 연결 용접', unit: 'm', quantity: 200, unitPrice: 50_000, totalPrice: 10_000_000 },
+    ],
+    createdAt: '2026-01-10T09:00:00',
+    updatedAt: '2026-01-12T14:30:00',
+  },
+  {
+    id: 2,
+    siteId: 1,
+    siteName: '삼성 물류센터 용접',
+    title: '삼성 물류센터 2차 추가공사 견적',
+    status: 'REVIEWING',
+    totalAmount: 20_000_000,
+    items: [
+      { id: 3, name: '추가 배관 설치', unit: '식', quantity: 1, unitPrice: 12_000_000, totalPrice: 12_000_000 },
+      { id: 4, name: '방청 도장', unit: '㎡', quantity: 400, unitPrice: 20_000, totalPrice: 8_000_000 },
+    ],
+    createdAt: '2026-03-05T10:00:00',
+    updatedAt: '2026-03-05T10:00:00',
+  },
+  {
+    id: 3,
+    siteId: 2,
+    siteName: '현대 오피스텔 배관',
+    title: '현대 오피스텔 배관 공사 견적',
+    status: 'CONFIRMED',
+    totalAmount: 28_000_000,
+    items: [
+      { id: 5, name: '급수 배관', unit: 'm', quantity: 500, unitPrice: 35_000, totalPrice: 17_500_000 },
+      { id: 6, name: '배수 배관', unit: 'm', quantity: 350, unitPrice: 30_000, totalPrice: 10_500_000 },
+    ],
+    createdAt: '2026-01-28T09:30:00',
+    updatedAt: '2026-02-01T11:00:00',
+  },
+  {
+    id: 4,
+    siteId: 3,
+    siteName: 'LG 공장 배관 공사',
+    title: 'LG 공장 전체 배관 견적',
+    status: 'CONFIRMED',
+    totalAmount: 62_000_000,
+    items: [
+      { id: 7, name: '고압 배관 설치', unit: 'm', quantity: 800, unitPrice: 55_000, totalPrice: 44_000_000 },
+      { id: 8, name: '밸브 설치', unit: '개', quantity: 60, unitPrice: 300_000, totalPrice: 18_000_000 },
+    ],
+    createdAt: '2025-09-20T09:00:00',
+    updatedAt: '2025-10-01T09:00:00',
+  },
+  {
+    id: 5,
+    siteId: 4,
+    siteName: '롯데 쇼핑몰 철골',
+    title: '롯데 쇼핑몰 철골 공사 초안',
+    status: 'DRAFT',
+    totalAmount: 0,
+    items: [],
+    createdAt: '2026-04-01T14:00:00',
+    updatedAt: '2026-04-01T14:00:00',
+  },
+]
