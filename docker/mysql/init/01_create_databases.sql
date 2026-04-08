@@ -4,3 +4,4 @@ CREATE DATABASE IF NOT EXISTS buildflow_estimate CHARACTER SET utf8mb4 COLLATE u
 CREATE DATABASE IF NOT EXISTS buildflow_site CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS buildflow_purchase CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS buildflow_tax CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS buildflow_notification CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
