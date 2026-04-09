@@ -34,17 +34,21 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.buildflow.*"
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
 
-claude:
+ollama:
   api:
-    key: ${CLAUDE_API_KEY}
-    model: claude-sonnet-4-6
-    url: https://api.anthropic.com/v1/messages
+    url: ${OLLAMA_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:qwen2.5:7b}
+    timeout: 120
 
 management:
   endpoints:
