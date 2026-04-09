@@ -4,9 +4,11 @@ import com.buildflow.estimate.domain.estimate.dto.*;
 import com.buildflow.estimate.domain.estimate.entity.Estimate;
 import com.buildflow.estimate.domain.estimate.entity.EstimateItem;
 import com.buildflow.estimate.domain.estimate.entity.EstimateStatus;
+import com.buildflow.estimate.domain.estimate.event.EstimateParsedPayload;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
 import com.buildflow.estimate.global.exception.BusinessException;
 import com.buildflow.estimate.global.exception.ErrorCode;
+import com.buildflow.estimate.global.kafka.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.List;
 public class EstimateService {
 
     private final EstimateRepository estimateRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     @Transactional
     public EstimateResponse create(EstimateCreateRequest request) {
@@ -90,6 +93,13 @@ public class EstimateService {
         }
 
         estimate.confirm();
+
+        kafkaProducerService.sendEstimateParsed(EstimateParsedPayload.builder()
+                .estimateId(estimate.getId())
+                .siteId(estimate.getSiteId())
+                .totalAmount(estimate.getTotalAmount())
+                .build());
+
         return EstimateResponse.from(estimate);
     }
 

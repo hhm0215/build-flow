@@ -35,6 +35,7 @@ docker/volumes/
 
 # claude
 CLAUDE.md
+.claude/*
 
 #docs
 docs/*
