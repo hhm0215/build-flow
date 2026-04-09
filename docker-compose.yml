@@ -76,6 +76,23 @@ services:
       - buildflow-net
 
   # ─────────────────────────────────────────
+  # Ollama — 로컬 LLM (공내역서 파싱, 대시보드 요약)
+  # Mac 환경: Apple Silicon GPU 활용을 위해 네이티브 실행 권장
+  #   brew install ollama && ollama serve
+  #   ollama pull qwen2.5:7b
+  # 도커로 실행 시: CPU 전용이라 속도 느림
+  # ─────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: buildflow-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - buildflow-net
+
+  # ─────────────────────────────────────────
   # Zipkin — 분산 트레이싱
   # ─────────────────────────────────────────
   zipkin:
@@ -90,6 +107,7 @@ volumes:
   mysql_data:
   redis_data:
   kafka_data:
+  ollama_data:
 
 networks:
   buildflow-net:
