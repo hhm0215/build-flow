@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Form, Input, Button } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { Zap, Mail, Lock, ArrowRight, AlertCircle, FlaskConical } from 'lucide-react'
+import { Zap, UserCog, Lock, ArrowRight, AlertCircle, FlaskConical, ShieldAlert } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import axiosInstance from '../../api/axiosInstance'
 
 interface LoginForm {
-  email: string
+  loginId: string
   password: string
 }
 
@@ -21,7 +21,10 @@ export default function LoginPage() {
     setLoading(true)
     setErrorMsg(null)
     try {
-      const response = await axiosInstance.post('/auth/login', values)
+      const response = await axiosInstance.post('/auth/login', {
+        loginId: values.loginId,
+        password: values.password,
+      })
       setTokens(response.data.data.accessToken)
       navigate('/dashboard')
     } catch (err: unknown) {
@@ -102,7 +105,7 @@ export default function LoginPage() {
             BuildFlow
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-            현장 관리 플랫폼에 오신 것을 환영합니다
+            관리자 전용 현장 관리 시스템
           </div>
         </motion.div>
 
@@ -125,7 +128,7 @@ export default function LoginPage() {
           >
             <FlaskConical size={13} color="#8b5cf6" strokeWidth={2} style={{ flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: '#a78bfa' }}>
-              <strong>Mock 모드</strong> — 이메일·비밀번호 아무거나 입력하면 로그인됩니다
+              <strong>Mock 모드</strong> — 관리자 아이디·비밀번호를 아무 값으로 입력해도 로그인됩니다
             </span>
           </motion.div>
         )}
@@ -158,17 +161,16 @@ export default function LoginPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <Form layout="vertical" onFinish={onFinish} size="large">
             <Form.Item
-              name="email"
-              label="이메일"
+              name="loginId"
+              label="관리자 아이디"
               rules={[
-                { required: true, message: '이메일을 입력하세요' },
-                { type: 'email', message: '올바른 이메일 형식이 아닙니다' },
+                { required: true, message: '관리자 아이디를 입력하세요' },
               ]}
               style={{ marginBottom: 16 }}
             >
               <Input
-                prefix={<Mail size={15} color="var(--text-muted)" strokeWidth={1.8} style={{ marginRight: 4 }} />}
-                placeholder="name@company.com"
+                prefix={<UserCog size={15} color="var(--text-muted)" strokeWidth={1.8} style={{ marginRight: 4 }} />}
+                placeholder="admin01"
               />
             </Form.Item>
 
@@ -180,9 +182,27 @@ export default function LoginPage() {
             >
               <Input.Password
                 prefix={<Lock size={15} color="var(--text-muted)" strokeWidth={1.8} style={{ marginRight: 4 }} />}
-                placeholder="비밀번호 입력"
+                placeholder="관리자 비밀번호 입력"
               />
             </Form.Item>
+
+            <div
+              style={{
+                marginBottom: 24,
+                background: 'rgba(245,158,11,0.08)',
+                border: '1px solid rgba(245,158,11,0.2)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <ShieldAlert size={13} color="#f59e0b" strokeWidth={2} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: '#fcd34d' }}>
+                관리자 계정은 별도 발급 대상이며, 현재 회원가입이나 아이디 생성은 지원하지 않습니다.
+              </span>
+            </div>
 
             <Form.Item style={{ marginBottom: 0 }}>
               <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
@@ -205,7 +225,7 @@ export default function LoginPage() {
                     boxShadow: '0 0 24px rgba(59,130,246,0.25)',
                   }}
                 >
-                  {!loading && '로그인'}
+                  {!loading && '관리자 로그인'}
                   {!loading && <ArrowRight size={15} strokeWidth={2.5} />}
                 </Button>
               </motion.div>

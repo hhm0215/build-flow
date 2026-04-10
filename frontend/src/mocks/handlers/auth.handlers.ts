@@ -12,16 +12,16 @@ import { ApiResponse, LoginResponse } from '../../types'
 // ─────────────────────────────────────────────
 
 export const authHandlers = [
-  http.post<never, { email: string; password: string }>(
+  http.post<never, { loginId: string; password: string }>(
     '/api/v1/auth/login',
     async ({ request }) => {
       const body = await request.json()
 
-      // 개발 환경 Mock: 이메일/비밀번호 아무거나 입력해도 로그인 됨
+      // 개발 환경 Mock: 관리자 아이디/비밀번호 아무거나 입력해도 로그인 됨
       // 빈 값만 막음
-      if (!body.email || !body.password) {
+      if (!body.loginId || !body.password) {
         return HttpResponse.json<ApiResponse<null>>(
-          { success: false, data: null, error: '이메일과 비밀번호를 입력하세요.' },
+          { success: false, data: null, error: '관리자 아이디와 비밀번호를 입력하세요.' },
           { status: 400 },
         )
       }
