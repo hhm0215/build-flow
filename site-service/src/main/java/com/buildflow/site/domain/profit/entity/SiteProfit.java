@@ -60,6 +60,16 @@ public class SiteProfit {
         recalculate();
     }
 
+    public void subtractEstimateAmount(BigDecimal amount) {
+        this.totalEstimateAmount = this.totalEstimateAmount.subtract(amount);
+        recalculate();
+    }
+
+    public void subtractPurchaseAmount(BigDecimal amount) {
+        this.totalPurchaseAmount = this.totalPurchaseAmount.subtract(amount);
+        recalculate();
+    }
+
     private void recalculate() {
         this.margin = this.totalEstimateAmount.subtract(this.totalPurchaseAmount);
         if (this.totalEstimateAmount.compareTo(BigDecimal.ZERO) > 0) {

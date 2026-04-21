@@ -5,6 +5,7 @@ import com.buildflow.purchase.domain.purchase.dto.PurchaseResponse;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseUpdateRequest;
 import com.buildflow.purchase.domain.purchase.entity.Purchase;
 import com.buildflow.purchase.domain.purchase.event.PurchaseRegisteredPayload;
+import com.buildflow.purchase.domain.purchase.event.PurchaseUpdatedPayload;
 import com.buildflow.purchase.domain.purchase.repository.PurchaseRepository;
 import com.buildflow.purchase.global.exception.BusinessException;
 import com.buildflow.purchase.global.exception.ErrorCode;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -65,6 +67,8 @@ public class PurchaseService {
     @Transactional
     public PurchaseResponse update(Long id, PurchaseUpdateRequest request) {
         Purchase purchase = getPurchase(id);
+        BigDecimal oldTotalAmount = purchase.getTotalAmount();
+
         purchase.update(
                 request.getItemName(),
                 request.getQuantity(),
@@ -73,12 +77,31 @@ public class PurchaseService {
                 request.getPurchaseDate(),
                 request.getMemo()
         );
+
+        kafkaProducerService.sendPurchaseUpdated(
+                PurchaseUpdatedPayload.builder()
+                        .purchaseId(purchase.getId())
+                        .siteId(purchase.getSiteId())
+                        .oldTotalAmount(oldTotalAmount)
+                        .newTotalAmount(purchase.getTotalAmount())
+                        .build()
+        );
+
         return PurchaseResponse.from(purchase);
     }
 
     @Transactional
     public void delete(Long id) {
         Purchase purchase = getPurchase(id);
+
+        kafkaProducerService.sendPurchaseDeleted(
+                PurchaseRegisteredPayload.builder()
+                        .purchaseId(purchase.getId())
+                        .siteId(purchase.getSiteId())
+                        .totalAmount(purchase.getTotalAmount())
+                        .build()
+        );
+
         purchaseRepository.delete(purchase);
     }
 

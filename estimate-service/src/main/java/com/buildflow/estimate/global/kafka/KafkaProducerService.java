@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 public class KafkaProducerService {
 
     private static final String TOPIC_ESTIMATE_PARSED = "estimate.parsed";
+    private static final String TOPIC_ESTIMATE_DELETED = "estimate.deleted";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
@@ -20,5 +21,11 @@ public class KafkaProducerService {
         KafkaEvent<EstimateParsedPayload> event = KafkaEvent.of("ESTIMATE_PARSED", payload);
         kafkaTemplate.send(TOPIC_ESTIMATE_PARSED, String.valueOf(payload.getEstimateId()), event);
         log.info("Kafka 발행: {} estimateId={}", TOPIC_ESTIMATE_PARSED, payload.getEstimateId());
+    }
+
+    public void sendEstimateDeleted(EstimateParsedPayload payload) {
+        KafkaEvent<EstimateParsedPayload> event = KafkaEvent.of("ESTIMATE_DELETED", payload);
+        kafkaTemplate.send(TOPIC_ESTIMATE_DELETED, String.valueOf(payload.getEstimateId()), event);
+        log.info("Kafka 발행: {} estimateId={}", TOPIC_ESTIMATE_DELETED, payload.getEstimateId());
     }
 }

@@ -46,6 +46,27 @@ spring:
           filters:
             - AuthorizationHeaderFilter
 
+        - id: site-service-clients
+          uri: lb://site-service
+          predicates:
+            - Path=/api/v1/clients/**
+          filters:
+            - AuthorizationHeaderFilter
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/v1/notifications/**
+          filters:
+            - AuthorizationHeaderFilter
+
+        - id: notification-service-warranties
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/v1/warranties/**
+          filters:
+            - AuthorizationHeaderFilter
+
     config:
       uri: http://localhost:8888
 

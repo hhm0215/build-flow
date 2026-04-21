@@ -46,6 +46,28 @@ public class ProfitService {
         log.info("손익 갱신 (매입): siteId={}, 추가금액={}, 총매입={}", siteId, amount, profit.getTotalPurchaseAmount());
     }
 
+    @Transactional
+    public void subtractEstimateAmount(Long siteId, BigDecimal amount) {
+        SiteProfit profit = getOrCreateProfit(siteId);
+        profit.subtractEstimateAmount(amount);
+        log.info("손익 갱신 (견적 삭제): siteId={}, 차감금액={}, 총견적={}", siteId, amount, profit.getTotalEstimateAmount());
+    }
+
+    @Transactional
+    public void updatePurchaseAmount(Long siteId, BigDecimal oldAmount, BigDecimal newAmount) {
+        SiteProfit profit = getOrCreateProfit(siteId);
+        profit.subtractPurchaseAmount(oldAmount);
+        profit.addPurchaseAmount(newAmount);
+        log.info("손익 갱신 (매입 수정): siteId={}, 이전={}, 변경={}, 총매입={}", siteId, oldAmount, newAmount, profit.getTotalPurchaseAmount());
+    }
+
+    @Transactional
+    public void subtractPurchaseAmount(Long siteId, BigDecimal amount) {
+        SiteProfit profit = getOrCreateProfit(siteId);
+        profit.subtractPurchaseAmount(amount);
+        log.info("손익 갱신 (매입 삭제): siteId={}, 차감금액={}, 총매입={}", siteId, amount, profit.getTotalPurchaseAmount());
+    }
+
     private SiteProfit getOrCreateProfit(Long siteId) {
         return siteProfitRepository.findBySiteId(siteId)
                 .orElseGet(() -> siteProfitRepository.save(

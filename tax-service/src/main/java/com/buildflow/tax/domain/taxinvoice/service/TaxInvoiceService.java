@@ -3,9 +3,11 @@ package com.buildflow.tax.domain.taxinvoice.service;
 import com.buildflow.tax.domain.taxinvoice.dto.*;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoice;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoiceType;
+import com.buildflow.tax.domain.taxinvoice.event.TaxInvoiceRegisteredPayload;
 import com.buildflow.tax.domain.taxinvoice.repository.TaxInvoiceRepository;
 import com.buildflow.tax.global.exception.BusinessException;
 import com.buildflow.tax.global.exception.ErrorCode;
+import com.buildflow.tax.global.kafka.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.List;
 public class TaxInvoiceService {
 
     private final TaxInvoiceRepository taxInvoiceRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     @Transactional
     public TaxInvoiceResponse create(TaxInvoiceCreateRequest request) {
@@ -33,7 +36,19 @@ public class TaxInvoiceService {
                 .memo(request.getMemo())
                 .build();
 
-        return TaxInvoiceResponse.from(taxInvoiceRepository.save(taxInvoice));
+        TaxInvoice saved = taxInvoiceRepository.save(taxInvoice);
+
+        kafkaProducerService.sendTaxRegistered(
+                TaxInvoiceRegisteredPayload.builder()
+                        .taxInvoiceId(saved.getId())
+                        .siteId(saved.getSiteId())
+                        .type(saved.getType().name())
+                        .totalAmount(saved.getTotalAmount())
+                        .counterparty(saved.getCounterparty())
+                        .build()
+        );
+
+        return TaxInvoiceResponse.from(saved);
     }
 
     public List<TaxInvoiceResponse> findAll(Long siteId, TaxInvoiceType type) {
@@ -77,6 +92,17 @@ public class TaxInvoiceService {
                 ? request.getPaymentDate()
                 : LocalDate.now();
         taxInvoice.confirmPayment(paymentDate);
+
+        kafkaProducerService.sendTaxPaymentConfirmed(
+                TaxInvoiceRegisteredPayload.builder()
+                        .taxInvoiceId(taxInvoice.getId())
+                        .siteId(taxInvoice.getSiteId())
+                        .type(taxInvoice.getType().name())
+                        .totalAmount(taxInvoice.getTotalAmount())
+                        .counterparty(taxInvoice.getCounterparty())
+                        .build()
+        );
+
         return TaxInvoiceResponse.from(taxInvoice);
     }
 

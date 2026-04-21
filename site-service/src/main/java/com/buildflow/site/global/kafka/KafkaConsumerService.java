@@ -63,4 +63,71 @@ public class KafkaConsumerService {
             log.error("purchase.registered 처리 실패: {}", e.getMessage(), e);
         }
     }
+
+    @KafkaListener(topics = "estimate.deleted", groupId = "site-service-group")
+    public void consumeEstimateDeleted(String message) {
+        try {
+            KafkaEvent<EstimateParsedPayload> event = objectMapper.readValue(
+                    message, new TypeReference<>() {}
+            );
+
+            EstimateParsedPayload payload = event.getPayload();
+            log.info("Kafka 수신: estimate.deleted eventId={}, estimateId={}, siteId={}",
+                    event.getEventId(), payload.getEstimateId(), payload.getSiteId());
+
+            if (payload.getSiteId() != null && payload.getTotalAmount() != null) {
+                profitService.subtractEstimateAmount(payload.getSiteId(), payload.getTotalAmount());
+            }
+        } catch (Exception e) {
+            log.error("estimate.deleted 처리 실패: {}", e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "purchase.updated", groupId = "site-service-group")
+    public void consumePurchaseUpdated(String message) {
+        try {
+            KafkaEvent<java.util.Map<String, Object>> event = objectMapper.readValue(
+                    message, new TypeReference<>() {}
+            );
+
+            java.util.Map<String, Object> payload = event.getPayload();
+            log.info("Kafka 수신: purchase.updated eventId={}", event.getEventId());
+
+            Long siteId = payload.get("siteId") != null
+                    ? Long.valueOf(payload.get("siteId").toString()) : null;
+            java.math.BigDecimal oldAmount = payload.get("oldTotalAmount") != null
+                    ? new java.math.BigDecimal(payload.get("oldTotalAmount").toString()) : null;
+            java.math.BigDecimal newAmount = payload.get("newTotalAmount") != null
+                    ? new java.math.BigDecimal(payload.get("newTotalAmount").toString()) : null;
+
+            if (siteId != null && oldAmount != null && newAmount != null) {
+                profitService.updatePurchaseAmount(siteId, oldAmount, newAmount);
+            }
+        } catch (Exception e) {
+            log.error("purchase.updated 처리 실패: {}", e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "purchase.deleted", groupId = "site-service-group")
+    public void consumePurchaseDeleted(String message) {
+        try {
+            KafkaEvent<java.util.Map<String, Object>> event = objectMapper.readValue(
+                    message, new TypeReference<>() {}
+            );
+
+            java.util.Map<String, Object> payload = event.getPayload();
+            log.info("Kafka 수신: purchase.deleted eventId={}", event.getEventId());
+
+            Long siteId = payload.get("siteId") != null
+                    ? Long.valueOf(payload.get("siteId").toString()) : null;
+            java.math.BigDecimal totalAmount = payload.get("totalAmount") != null
+                    ? new java.math.BigDecimal(payload.get("totalAmount").toString()) : null;
+
+            if (siteId != null && totalAmount != null) {
+                profitService.subtractPurchaseAmount(siteId, totalAmount);
+            }
+        } catch (Exception e) {
+            log.error("purchase.deleted 처리 실패: {}", e.getMessage(), e);
+        }
+    }
 }
