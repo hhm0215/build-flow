@@ -44,6 +44,12 @@ management:
       exposure:
         include: health, info
 
+ollama:
+  api:
+    url: ${OLLAMA_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:qwen2.5:7b}
+    timeout: ${OLLAMA_TIMEOUT:120}
+
 logging:
   level:
     com.buildflow.site: INFO

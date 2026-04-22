@@ -60,6 +60,13 @@ spring:
           filters:
             - AuthorizationHeaderFilter
 
+        - id: site-service-dashboard
+          uri: lb://site-service
+          predicates:
+            - Path=/api/v1/dashboard/**
+          filters:
+            - AuthorizationHeaderFilter
+
         - id: notification-service-warranties
           uri: lb://notification-service
           predicates:
