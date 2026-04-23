@@ -31,9 +31,7 @@ spring:
       group-id: site-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.buildflow.*"
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 eureka:
   client:
@@ -45,6 +43,12 @@ management:
     web:
       exposure:
         include: health, info
+
+ollama:
+  api:
+    url: ${OLLAMA_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:qwen2.5:7b}
+    timeout: ${OLLAMA_TIMEOUT:120}
 
 logging:
   level:

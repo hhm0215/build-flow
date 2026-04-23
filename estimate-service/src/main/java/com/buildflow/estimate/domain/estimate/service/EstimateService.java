@@ -81,6 +81,15 @@ public class EstimateService {
     @Transactional
     public void delete(Long id) {
         Estimate estimate = getEstimate(id);
+
+        if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
+            kafkaProducerService.sendEstimateDeleted(EstimateParsedPayload.builder()
+                    .estimateId(estimate.getId())
+                    .siteId(estimate.getSiteId())
+                    .totalAmount(estimate.getTotalAmount())
+                    .build());
+        }
+
         estimateRepository.delete(estimate);
     }
 

@@ -14,7 +14,10 @@ public enum ErrorCode {
 
     // Client
     CLIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "거래처를 찾을 수 없습니다."),
-    CLIENT_HAS_SITES(HttpStatus.CONFLICT, "해당 거래처에 연결된 현장이 존재합니다.");
+    CLIENT_HAS_SITES(HttpStatus.CONFLICT, "해당 거래처에 연결된 현장이 존재합니다."),
+
+    // Ollama
+    OLLAMA_API_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 요약 서비스에 연결할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
