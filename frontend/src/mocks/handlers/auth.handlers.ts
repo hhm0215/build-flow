@@ -30,6 +30,7 @@ export const authHandlers = [
         success: true,
         data: {
           accessToken: 'mock-jwt-token-buildflow',
+          refreshToken: 'mock-refresh-token-buildflow',
           tokenType: 'Bearer',
           expiresIn: 3600,
         },
