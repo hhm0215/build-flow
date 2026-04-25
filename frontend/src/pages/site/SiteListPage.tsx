@@ -18,56 +18,28 @@ import { useSites } from '../../api/sites.api'
 import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
-import { Estimate, Purchase, Site, TaxInvoice } from '../../types'
+import { Site } from '../../types'
 
 const STATUS_LABEL: Record<Site['status'], string> = {
-  PREPARATION: '준비 중',
   IN_PROGRESS: '시공 중',
-  FINISHING: '마무리',
+  SETTLING: '정산 중',
+  WARRANTY: '하자보증',
   COMPLETED: '완료',
 }
 const STATUS_COLOR: Record<Site['status'], string> = {
-  PREPARATION: '#f59e0b',
   IN_PROGRESS: '#3b82f6',
-  FINISHING: '#22c55e',
+  SETTLING: '#f59e0b',
+  WARRANTY: '#8b5cf6',
   COMPLETED: '#52525b',
 }
 
-const ESTIMATE_STATUS_LABEL: Record<Estimate['status'], string> = {
+const ESTIMATE_STATUS_LABEL: Record<string, string> = {
   DRAFT: '작성 중',
-  REVIEWING: '검토 중',
   CONFIRMED: '확정',
 }
-const ESTIMATE_STATUS_COLOR: Record<Estimate['status'], string> = {
+const ESTIMATE_STATUS_COLOR: Record<string, string> = {
   DRAFT: '#71717a',
-  REVIEWING: '#f59e0b',
   CONFIRMED: '#22c55e',
-}
-
-const TAX_STATUS_LABEL: Record<TaxInvoice['status'], string> = {
-  ISSUED: '발행',
-  RECEIVED: '수취',
-  OVERDUE: '연체',
-  PAID: '완료',
-}
-const TAX_STATUS_COLOR: Record<TaxInvoice['status'], string> = {
-  ISSUED: '#3b82f6',
-  RECEIVED: '#8b5cf6',
-  OVERDUE: '#ef4444',
-  PAID: '#22c55e',
-}
-
-const CATEGORY_LABEL: Record<Purchase['category'], string> = {
-  MATERIAL: '자재',
-  LABOR: '인건비',
-  EQUIPMENT: '장비',
-  OTHER: '기타',
-}
-const CATEGORY_COLOR: Record<Purchase['category'], string> = {
-  MATERIAL: '#3b82f6',
-  LABOR: '#8b5cf6',
-  EQUIPMENT: '#f59e0b',
-  OTHER: '#71717a',
 }
 
 function formatKRW(value: number) {
@@ -247,10 +219,10 @@ export default function SiteListPage() {
   const { data: purchasesData, isLoading: purchasesLoading } = usePurchases()
   const { data: taxesData, isLoading: taxesLoading } = useTaxes()
 
-  const sites = sitesData?.content ?? []
-  const estimates = estimatesData?.content ?? []
-  const purchases = purchasesData?.content ?? []
-  const taxes = taxesData?.content ?? []
+  const sites = sitesData ?? []
+  const estimates = estimatesData ?? []
+  const purchases = purchasesData ?? []
+  const taxes = taxesData ?? []
 
   const [query, setQuery] = useState('')
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
@@ -258,7 +230,7 @@ export default function SiteListPage() {
   const normalizedQuery = query.trim().toLowerCase()
   const filteredSites = sites.filter((site) => {
     if (!normalizedQuery) return true
-    return `${site.name} ${site.client}`.toLowerCase().includes(normalizedQuery)
+    return `${site.siteName} ${site.client?.companyName ?? ''}`.toLowerCase().includes(normalizedQuery)
   })
 
   useEffect(() => {
@@ -293,9 +265,9 @@ export default function SiteListPage() {
     : []
 
   const estimateTotal = siteEstimates.reduce((sum, estimate) => sum + estimate.totalAmount, 0)
-  const purchaseTotal = sitePurchases.reduce((sum, purchase) => sum + purchase.amount, 0)
+  const purchaseTotal = sitePurchases.reduce((sum, purchase) => sum + purchase.totalAmount, 0)
   const taxTotal = siteTaxes.reduce((sum, tax) => sum + tax.totalAmount, 0)
-  const unpaidTotal = siteTaxes.reduce((sum, tax) => sum + tax.unpaidAmount, 0)
+  const unpaidTotal = siteTaxes.filter((t) => !t.paymentConfirmed && t.type === 'SALES').reduce((sum, t) => sum + t.totalAmount, 0)
 
   return (
     <div>
@@ -442,9 +414,9 @@ export default function SiteListPage() {
                               marginBottom: 4,
                             }}
                           >
-                            {site.name}
+                            {site.siteName}
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{site.client}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{site.client?.companyName ?? '-'}</div>
                         </div>
                         <InfoBadge color={STATUS_COLOR[site.status]}>{STATUS_LABEL[site.status]}</InfoBadge>
                       </div>
@@ -455,8 +427,8 @@ export default function SiteListPage() {
                           {site.startDate} ~ {site.endDate}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                          <TrendingUp size={13} strokeWidth={2} color={site.margin >= 0 ? 'var(--success)' : 'var(--danger)'} />
-                          마진율 {site.marginRate > 0 ? `${site.marginRate.toFixed(1)}%` : '—'}
+                          <TrendingUp size={13} strokeWidth={2} color="var(--text-muted)" />
+                          {site.address || '주소 미등록'}
                         </div>
                       </div>
                     </motion.button>
@@ -505,10 +477,10 @@ export default function SiteListPage() {
                           marginBottom: 8,
                         }}
                       >
-                        {selectedSite.name}
+                        {selectedSite.siteName}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <InfoBadge color="#fafafa">{selectedSite.client}</InfoBadge>
+                        <InfoBadge color="#fafafa">{selectedSite.client?.companyName ?? '거래처 미지정'}</InfoBadge>
                         <InfoBadge color={STATUS_COLOR[selectedSite.status]}>{STATUS_LABEL[selectedSite.status]}</InfoBadge>
                       </div>
                     </div>
@@ -564,9 +536,9 @@ export default function SiteListPage() {
                   <SummaryCard
                     icon={TrendingUp}
                     title="마진"
-                    value={formatCompactKRW(selectedSite.margin)}
-                    description={selectedSite.marginRate > 0 ? `마진율 ${selectedSite.marginRate.toFixed(1)}%` : '아직 산출 전'}
-                    color={selectedSite.margin >= 0 ? '#22c55e' : '#ef4444'}
+                    value={formatCompactKRW(estimateTotal - purchaseTotal)}
+                    description={estimateTotal > 0 ? `마진율 ${((estimateTotal - purchaseTotal) / estimateTotal * 100).toFixed(1)}%` : '아직 산출 전'}
+                    color={estimateTotal - purchaseTotal >= 0 ? '#22c55e' : '#ef4444'}
                   />
                 </div>
 
@@ -678,18 +650,18 @@ export default function SiteListPage() {
                           >
                             <div>
                               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {invoice.vendor}
+                                {invoice.counterparty}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                                발행일 {invoice.issueDate} · 마감일 {invoice.dueDate}
+                                발행일 {invoice.issueDate}
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <InfoBadge color={invoice.type === 'SALES' ? '#22c55e' : '#ef4444'}>
                                 {invoice.type === 'SALES' ? '매출' : '매입'}
                               </InfoBadge>
-                              <InfoBadge color={TAX_STATUS_COLOR[invoice.status]}>
-                                {TAX_STATUS_LABEL[invoice.status]}
+                              <InfoBadge color={invoice.paymentConfirmed ? '#22c55e' : '#f59e0b'}>
+                                {invoice.paymentConfirmed ? '입금 완료' : '미입금'}
                               </InfoBadge>
                             </div>
                           </div>
@@ -709,19 +681,19 @@ export default function SiteListPage() {
                             <div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>공급가 / 세액</div>
                               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                                {formatKRW(invoice.amount)} / {formatKRW(invoice.taxAmount)}
+                                {formatKRW(invoice.supplyAmount)} / {formatKRW(invoice.taxAmount)}
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>미수금</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>입금 상태</div>
                               <div
                                 style={{
                                   fontSize: 13,
                                   fontWeight: 700,
-                                  color: invoice.unpaidAmount > 0 ? '#ef4444' : 'var(--text-secondary)',
+                                  color: invoice.paymentConfirmed ? 'var(--text-secondary)' : '#ef4444',
                                 }}
                               >
-                                {invoice.unpaidAmount > 0 ? formatKRW(invoice.unpaidAmount) : '없음'}
+                                {invoice.paymentConfirmed ? `입금일 ${invoice.paymentDate}` : '미입금'}
                               </div>
                             </div>
                           </div>
@@ -768,15 +740,12 @@ export default function SiteListPage() {
                           >
                             <div>
                               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {purchase.description}
+                                {purchase.itemName}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                                거래처 {purchase.vendor} · 매입일 {purchase.purchaseDate}
+                                거래처 {purchase.supplier || '-'} · 매입일 {purchase.purchaseDate}
                               </div>
                             </div>
-                            <InfoBadge color={CATEGORY_COLOR[purchase.category]}>
-                              {CATEGORY_LABEL[purchase.category]}
-                            </InfoBadge>
                           </div>
                           <div
                             style={{
@@ -788,13 +757,13 @@ export default function SiteListPage() {
                             <div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>금액</div>
                               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {formatKRW(purchase.amount)}
+                                {formatKRW(purchase.totalAmount)}
                               </div>
                             </div>
                             <div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>구분</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>수량 × 단가</div>
                               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                                {CATEGORY_LABEL[purchase.category]}
+                                {purchase.quantity} × {formatKRW(purchase.unitPrice)}
                               </div>
                             </div>
                           </div>

@@ -2,16 +2,14 @@ import { motion } from 'motion/react'
 import { FileText, Plus } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import { useEstimates } from '../../api/estimates.api'
-import { Estimate } from '../../types'
+import { EstimateStatus } from '../../types'
 
-const STATUS_LABEL: Record<Estimate['status'], string> = {
+const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
-  REVIEWING: '검토 중',
   CONFIRMED: '확정',
 }
-const STATUS_COLOR: Record<Estimate['status'], string> = {
+const STATUS_COLOR: Record<EstimateStatus, string> = {
   DRAFT: '#71717a',
-  REVIEWING: '#f59e0b',
   CONFIRMED: '#22c55e',
 }
 
@@ -21,7 +19,7 @@ function formatKRW(n: number) {
 
 export default function EstimateListPage() {
   const { data, isLoading } = useEstimates()
-  const estimates = data?.content ?? []
+  const estimates = data ?? []
 
   return (
     <div>
@@ -66,7 +64,7 @@ export default function EstimateListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['제목', '현장', '상태', '총액', '항목 수', '작성일'].map((h) => (
+                {['제목', '상태', '총액', '항목 수', '견적일'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -89,9 +87,6 @@ export default function EstimateListPage() {
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                     {est.title}
                   </td>
-                  <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
-                    {est.siteName}
-                  </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '3px 8px',
@@ -110,7 +105,7 @@ export default function EstimateListPage() {
                     {est.items.length}건
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)' }}>
-                    {est.createdAt.split('T')[0]}
+                    {est.estimateDate}
                   </td>
                 </motion.tr>
               ))}

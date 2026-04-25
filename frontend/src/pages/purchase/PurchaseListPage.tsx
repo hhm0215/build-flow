@@ -2,25 +2,11 @@ import { motion } from 'motion/react'
 import { ShoppingBag, Plus } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import { usePurchases } from '../../api/purchases.api'
-import { Purchase } from '../../types'
-
-const CATEGORY_LABEL: Record<Purchase['category'], string> = {
-  MATERIAL: '자재',
-  LABOR: '인건비',
-  EQUIPMENT: '장비',
-  OTHER: '기타',
-}
-const CATEGORY_COLOR: Record<Purchase['category'], string> = {
-  MATERIAL: '#3b82f6',
-  LABOR: '#8b5cf6',
-  EQUIPMENT: '#f59e0b',
-  OTHER: '#71717a',
-}
 
 export default function PurchaseListPage() {
   const { data, isLoading } = usePurchases()
-  const purchases = data?.content ?? []
-  const totalAmount = purchases.reduce((sum, p) => sum + p.amount, 0)
+  const purchases = data ?? []
+  const totalAmount = purchases.reduce((sum, p) => sum + p.totalAmount, 0)
 
   return (
     <div>
@@ -47,7 +33,6 @@ export default function PurchaseListPage() {
         }
       />
 
-      {/* 합계 카드 */}
       {!isLoading && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -83,7 +68,7 @@ export default function PurchaseListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['구분', '내용', '현장', '거래처', '금액', '일자'].map((h) => (
+                {['품목명', '수량', '단가', '금액', '거래처', '매입일'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -103,28 +88,20 @@ export default function PurchaseListPage() {
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
-                  <td style={{ padding: '14px 20px' }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, padding: '3px 8px',
-                      borderRadius: 20,
-                      background: `${CATEGORY_COLOR[p.category]}18`,
-                      color: CATEGORY_COLOR[p.category],
-                      border: `1px solid ${CATEGORY_COLOR[p.category]}30`,
-                    }}>
-                      {CATEGORY_LABEL[p.category]}
-                    </span>
-                  </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {p.description}
+                    {p.itemName}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
-                    {p.siteName}
+                    {p.quantity}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
-                    {p.vendor}
+                    ₩{p.unitPrice.toLocaleString('ko-KR')}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
-                    ₩{p.amount.toLocaleString('ko-KR')}
+                    ₩{p.totalAmount.toLocaleString('ko-KR')}
+                  </td>
+                  <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
+                    {p.supplier || '-'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)' }}>
                     {p.purchaseDate}
