@@ -1,28 +1,16 @@
 import { motion } from 'motion/react'
 import { Receipt, Plus, CheckCircle } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
-import { useTaxes, useMarkAsPaid } from '../../api/taxes.api'
-import { TaxInvoice } from '../../types'
-
-const STATUS_LABEL: Record<TaxInvoice['status'], string> = {
-  ISSUED: '발행',
-  RECEIVED: '수취',
-  OVERDUE: '연체',
-  PAID: '완료',
-}
-const STATUS_COLOR: Record<TaxInvoice['status'], string> = {
-  ISSUED: '#3b82f6',
-  RECEIVED: '#8b5cf6',
-  OVERDUE: '#ef4444',
-  PAID: '#22c55e',
-}
+import { useTaxes, useConfirmPayment } from '../../api/taxes.api'
 
 export default function TaxListPage() {
   const { data, isLoading } = useTaxes()
-  const { mutate: markAsPaid } = useMarkAsPaid()
-  const invoices = data?.content ?? []
+  const { mutate: confirmPayment } = useConfirmPayment()
+  const invoices = data ?? []
 
-  const unpaidTotal = invoices.reduce((sum, t) => sum + t.unpaidAmount, 0)
+  const unpaidTotal = invoices
+    .filter((t) => !t.paymentConfirmed && t.type === 'SALES')
+    .reduce((sum, t) => sum + t.totalAmount, 0)
 
   return (
     <div>
@@ -49,7 +37,6 @@ export default function TaxListPage() {
         }
       />
 
-      {/* 미수금 요약 */}
       {!isLoading && unpaidTotal > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -66,7 +53,7 @@ export default function TaxListPage() {
           }}
         >
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            미수금 합계 ({invoices.filter((t) => t.unpaidAmount > 0).length}건)
+            미수금 합계 ({invoices.filter((t) => !t.paymentConfirmed && t.type === 'SALES').length}건)
           </span>
           <span style={{ fontSize: 18, fontWeight: 700, color: '#ef4444', letterSpacing: '-0.03em' }}>
             ₩{unpaidTotal.toLocaleString('ko-KR')}
@@ -87,7 +74,7 @@ export default function TaxListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['구분', '거래처', '현장', '공급가', '세액', '상태', '미수금', '처리'].map((h) => (
+                {['구분', '거래처', '공급가', '세액', '합계', '입금 상태', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -119,37 +106,34 @@ export default function TaxListPage() {
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {inv.vendor}
+                    {inv.counterparty}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
-                    {inv.siteName}
-                  </td>
-                  <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
-                    ₩{inv.amount.toLocaleString('ko-KR')}
+                    ₩{inv.supplyAmount.toLocaleString('ko-KR')}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
                     ₩{inv.taxAmount.toLocaleString('ko-KR')}
+                  </td>
+                  <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
+                    ₩{inv.totalAmount.toLocaleString('ko-KR')}
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '3px 8px',
                       borderRadius: 20,
-                      background: `${STATUS_COLOR[inv.status]}18`,
-                      color: STATUS_COLOR[inv.status],
-                      border: `1px solid ${STATUS_COLOR[inv.status]}30`,
+                      background: inv.paymentConfirmed ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+                      color: inv.paymentConfirmed ? '#22c55e' : '#f59e0b',
+                      border: `1px solid ${inv.paymentConfirmed ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`,
                     }}>
-                      {STATUS_LABEL[inv.status]}
+                      {inv.paymentConfirmed ? '입금 완료' : '미입금'}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 20px', fontSize: 13, fontWeight: 600, color: inv.unpaidAmount > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-                    {inv.unpaidAmount > 0 ? `₩${inv.unpaidAmount.toLocaleString('ko-KR')}` : '—'}
-                  </td>
                   <td style={{ padding: '14px 20px' }}>
-                    {inv.unpaidAmount > 0 && (
+                    {!inv.paymentConfirmed && inv.type === 'SALES' && (
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => markAsPaid(inv.id)}
+                        onClick={() => confirmPayment(inv.id)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 4,
                           fontSize: 11, fontWeight: 600,

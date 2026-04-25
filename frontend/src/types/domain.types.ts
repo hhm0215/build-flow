@@ -5,81 +5,194 @@
 // ── Auth ──────────────────────────────────────
 export interface LoginResponse {
   accessToken: string
+  refreshToken: string
   tokenType: string
   expiresIn: number
 }
 
+// ── Client (거래처) ──────────────────────────
+export interface Client {
+  id: number
+  companyName: string
+  representative: string
+  businessNo: string
+  phone: string
+  email: string
+  address: string
+  memo: string
+  createdAt: string
+  updatedAt: string
+}
+
 // ── Site (현장) ───────────────────────────────
-export type SiteStatus = 'PREPARATION' | 'IN_PROGRESS' | 'FINISHING' | 'COMPLETED'
+export type SiteStatus = 'IN_PROGRESS' | 'SETTLING' | 'WARRANTY' | 'COMPLETED'
 
 export interface Site {
   id: number
-  name: string
-  client: string         // 발주처
+  siteName: string
+  client: Client | null
+  address: string
   status: SiteStatus
-  startDate: string      // ISO date
+  startDate: string
   endDate: string
-  totalRevenue: number   // 매출 합계 (견적서 기준)
-  totalCost: number      // 매입 합계
-  margin: number         // totalRevenue - totalCost
-  marginRate: number     // margin / totalRevenue * 100
+  memo: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SiteCreateRequest {
+  siteName: string
+  clientId?: number
+  address?: string
+  startDate?: string
+  endDate?: string
+  memo?: string
+}
+
+// ── Profit (손익) ─────────────────────────────
+export interface Profit {
+  siteId: number
+  totalEstimateAmount: number
+  totalPurchaseAmount: number
+  margin: number
+  marginRate: number
 }
 
 // ── Estimate (견적서) ─────────────────────────
-export type EstimateStatus = 'DRAFT' | 'REVIEWING' | 'CONFIRMED'
+export type EstimateStatus = 'DRAFT' | 'CONFIRMED'
 
 export interface EstimateItem {
   id: number
-  name: string           // 품목명
-  unit: string           // 단위
+  itemName: string
+  unit: string
   quantity: number
   unitPrice: number
-  totalPrice: number
+  amount: number
 }
 
 export interface Estimate {
   id: number
   siteId: number
-  siteName: string
   title: string
   status: EstimateStatus
+  estimateDate: string
   totalAmount: number
+  memo: string
   items: EstimateItem[]
   createdAt: string
   updatedAt: string
 }
 
-// ── Purchase (매입) ───────────────────────────
-export type PurchaseCategory = 'MATERIAL' | 'LABOR' | 'EQUIPMENT' | 'OTHER'
+export interface EstimateCreateRequest {
+  siteId: number
+  title: string
+  estimateDate: string
+  items: Omit<EstimateItem, 'id'>[]
+  memo?: string
+}
 
+// ── Purchase (매입) ───────────────────────────
 export interface Purchase {
   id: number
   siteId: number
-  siteName: string
-  category: PurchaseCategory
-  description: string
-  vendor: string         // 거래처
-  amount: number
+  itemName: string
+  quantity: number
+  unitPrice: number
+  totalAmount: number
+  supplier: string
   purchaseDate: string
+  memo: string
   createdAt: string
+  updatedAt: string
+}
+
+export interface PurchaseCreateRequest {
+  siteId: number
+  itemName: string
+  quantity: number
+  unitPrice: number
+  supplier?: string
+  purchaseDate?: string
+  memo?: string
 }
 
 // ── Tax Invoice (세금계산서) ───────────────────
-export type TaxType = 'SALES' | 'PURCHASE'
-export type TaxStatus = 'ISSUED' | 'RECEIVED' | 'OVERDUE' | 'PAID'
+export type TaxInvoiceType = 'SALES' | 'PURCHASE'
 
 export interface TaxInvoice {
   id: number
   siteId: number
-  siteName: string
-  type: TaxType
-  status: TaxStatus
-  vendor: string
-  amount: number
-  taxAmount: number      // 부가세
-  totalAmount: number    // amount + taxAmount
+  type: TaxInvoiceType
+  supplyAmount: number
+  taxAmount: number
+  totalAmount: number
+  counterparty: string
   issueDate: string
-  dueDate: string
-  paidDate: string | null
-  unpaidAmount: number   // 미수금
+  paymentConfirmed: boolean
+  paymentDate: string | null
+  memo: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TaxInvoiceCreateRequest {
+  siteId: number
+  type: TaxInvoiceType
+  supplyAmount: number
+  taxAmount: number
+  counterparty: string
+  issueDate: string
+  memo?: string
+}
+
+// ── Dashboard (대시보드) ──────────────────────
+export interface DashboardStats {
+  totalSites: number
+  sitesByStatus: Record<string, number>
+  totalEstimateAmount: number
+  totalPurchaseAmount: number
+  totalMargin: number
+  averageMarginRate: number
+  siteProfits: SiteProfitSummary[]
+}
+
+export interface SiteProfitSummary {
+  siteId: number
+  siteName: string
+  status: string
+  estimateAmount: number
+  purchaseAmount: number
+  margin: number
+  marginRate: number
+}
+
+export interface DashboardSummary {
+  summary: string
+  generatedAt: string
+}
+
+// ── Notification (알림) ───────────────────────
+export interface Notification {
+  id: number
+  type: string
+  message: string
+  siteId: number | null
+  read: boolean
+  createdAt: string
+}
+
+// ── Warranty (하자보증보험) ───────────────────
+export interface Warranty {
+  id: number
+  siteId: number
+  insuranceCompany: string
+  policyNumber: string
+  coverageAmount: number
+  startDate: string
+  endDate: string
+  memo: string
+  daysUntilExpiry: number
+  expired: boolean
+  createdAt: string
+  updatedAt: string
 }

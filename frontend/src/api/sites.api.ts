@@ -1,27 +1,17 @@
-// ─────────────────────────────────────────────
-// API 함수: axios로 실제 요청을 보냄 (개발 시 MSW가 가로챔)
-// Query 훅:  TanStack Query로 캐싱·로딩·에러 상태 관리
-//
-// 이 구조의 장점:
-//   - API 함수는 "어떻게 요청하나"만 담당
-//   - 훅은 "언제 fetch하고 어떻게 캐싱하나"만 담당
-//   - 컴포넌트는 useXxx() 호출 하나로 데이터 사용
-// ─────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, PagedData, Site } from '../types'
+import { ApiResponse, Site, SiteCreateRequest, Profit } from '../types'
 
-// ── Query Key 상수 ─────────────────────────────
-// 문자열 하드코딩 대신 상수로 관리 → 오타 방지, 무효화 시 일관성
 export const SITES_KEY = {
   all: ['sites'] as const,
   list: (params?: Record<string, string>) => ['sites', 'list', params] as const,
   detail: (id: number) => ['sites', 'detail', id] as const,
+  profit: (id: number) => ['sites', 'profit', id] as const,
 }
 
 // ── API 함수 ───────────────────────────────────
 const fetchSites = async (params?: Record<string, string>) => {
-  const res = await axiosInstance.get<ApiResponse<PagedData<Site>>>('/sites', { params })
+  const res = await axiosInstance.get<ApiResponse<Site[]>>('/sites', { params })
   return res.data.data
 }
 
@@ -30,13 +20,28 @@ const fetchSite = async (id: number) => {
   return res.data.data
 }
 
-const createSite = async (body: Omit<Site, 'id' | 'totalRevenue' | 'totalCost' | 'margin' | 'marginRate'>) => {
+const createSite = async (body: SiteCreateRequest) => {
   const res = await axiosInstance.post<ApiResponse<Site>>('/sites', body)
+  return res.data.data
+}
+
+const updateSite = async ({ id, ...body }: SiteCreateRequest & { id: number }) => {
+  const res = await axiosInstance.put<ApiResponse<Site>>(`/sites/${id}`, body)
   return res.data.data
 }
 
 const deleteSite = async (id: number) => {
   await axiosInstance.delete(`/sites/${id}`)
+}
+
+const updateSiteStatus = async ({ id, status }: { id: number; status: string }) => {
+  const res = await axiosInstance.patch<ApiResponse<Site>>(`/sites/${id}/status`, { status })
+  return res.data.data
+}
+
+const fetchProfit = async (siteId: number) => {
+  const res = await axiosInstance.get<ApiResponse<Profit>>(`/sites/${siteId}/profit`)
+  return res.data.data
 }
 
 // ── TanStack Query 훅 ──────────────────────────
@@ -51,7 +56,7 @@ export function useSite(id: number) {
   return useQuery({
     queryKey: SITES_KEY.detail(id),
     queryFn: () => fetchSite(id),
-    enabled: !!id, // id가 없으면 요청 안 함
+    enabled: !!id,
   })
 }
 
@@ -59,7 +64,14 @@ export function useCreateSite() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createSite,
-    // 생성 성공 시 목록 캐시를 무효화 → 자동으로 재조회
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+  })
+}
+
+export function useUpdateSite() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateSite,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
   })
 }
@@ -69,5 +81,21 @@ export function useDeleteSite() {
   return useMutation({
     mutationFn: deleteSite,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+  })
+}
+
+export function useUpdateSiteStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateSiteStatus,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+  })
+}
+
+export function useSiteProfit(siteId: number) {
+  return useQuery({
+    queryKey: SITES_KEY.profit(siteId),
+    queryFn: () => fetchProfit(siteId),
+    enabled: !!siteId,
   })
 }

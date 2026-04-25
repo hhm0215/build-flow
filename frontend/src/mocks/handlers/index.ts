@@ -4,6 +4,7 @@ import { sitesHandlers } from './sites.handlers'
 import { estimatesHandlers } from './estimates.handlers'
 import { purchasesHandlers } from './purchases.handlers'
 import { taxesHandlers } from './taxes.handlers'
+import { dashboardHandlers } from './dashboard.handlers'
 
 export const handlers = [
   ...authHandlers,
@@ -11,4 +12,5 @@ export const handlers = [
   ...estimatesHandlers,
   ...purchasesHandlers,
   ...taxesHandlers,
+  ...dashboardHandlers,
 ]

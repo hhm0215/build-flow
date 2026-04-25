@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import { mockEstimates } from '../data/estimates.data'
-import { ApiResponse, PagedData, Estimate } from '../../types'
+import { ApiResponse, Estimate, EstimateCreateRequest } from '../../types'
 
 let estimates = [...mockEstimates]
 
@@ -14,9 +14,9 @@ export const estimatesHandlers = [
     if (siteId) filtered = filtered.filter((e) => e.siteId === Number(siteId))
     if (status) filtered = filtered.filter((e) => e.status === status)
 
-    return HttpResponse.json<ApiResponse<PagedData<Estimate>>>({
+    return HttpResponse.json<ApiResponse<Estimate[]>>({
       success: true,
-      data: { content: filtered, totalElements: filtered.length, totalPages: 1, number: 0, size: 20 },
+      data: filtered,
       error: null,
     })
   }),
@@ -32,16 +32,23 @@ export const estimatesHandlers = [
     return HttpResponse.json<ApiResponse<Estimate>>({ success: true, data: estimate, error: null })
   }),
 
-  http.post<never, Partial<Estimate>>('/api/v1/estimates', async ({ request }) => {
+  http.post<never, EstimateCreateRequest>('/api/v1/estimates', async ({ request }) => {
     const body = await request.json()
+    const items = (body.items || []).map((item, idx) => ({
+      id: Date.now() + idx,
+      ...item,
+    }))
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
+
     const newEstimate: Estimate = {
       id: Math.max(...estimates.map((e) => e.id)) + 1,
-      siteId: body.siteId!,
-      siteName: body.siteName ?? '',
-      title: body.title ?? '새 견적서',
+      siteId: body.siteId,
+      title: body.title,
       status: 'DRAFT',
-      totalAmount: body.totalAmount ?? 0,
-      items: body.items ?? [],
+      estimateDate: body.estimateDate,
+      totalAmount,
+      memo: body.memo || '',
+      items,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -50,5 +57,22 @@ export const estimatesHandlers = [
       { success: true, data: newEstimate, error: null },
       { status: 201 },
     )
+  }),
+
+  http.delete<{ id: string }>('/api/v1/estimates/:id', ({ params }) => {
+    estimates = estimates.filter((e) => e.id !== Number(params.id))
+    return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
+  }),
+
+  http.patch<{ id: string }>('/api/v1/estimates/:id/confirm', ({ params }) => {
+    const index = estimates.findIndex((e) => e.id === Number(params.id))
+    if (index === -1) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '견적서를 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
+    estimates[index] = { ...estimates[index], status: 'CONFIRMED', updatedAt: new Date().toISOString() }
+    return HttpResponse.json<ApiResponse<Estimate>>({ success: true, data: estimates[index], error: null })
   }),
 ]
