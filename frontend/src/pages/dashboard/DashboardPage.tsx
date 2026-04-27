@@ -4,13 +4,91 @@ import {
   TrendingUp,
   TrendingDown,
   DollarSign,
-  FileText,
-  Receipt,
-  AlertCircle,
+  ShoppingCart,
   ArrowUpRight,
   Activity,
   Layers,
+  Percent,
+  Sparkles,
+  Loader2,
 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import { useDashboardStats, useDashboardSummary } from '../../api/dashboard.api'
+import type { SiteProfitSummary } from '../../types'
+
+// ── Helpers ──────────────────────────────────────
+
+const STATUS_LABEL: Record<string, string> = {
+  IN_PROGRESS: '시공 중',
+  SETTLING: '정산 중',
+  WARRANTY: '하자보증',
+  COMPLETED: '완료',
+}
+
+const STATUS_COLOR: Record<string, string> = {
+  IN_PROGRESS: '#3b82f6',
+  SETTLING: '#f59e0b',
+  WARRANTY: '#8b5cf6',
+  COMPLETED: '#22c55e',
+}
+
+function formatAmount(value: number): string {
+  const abs = Math.abs(value)
+  if (abs >= 1_0000_0000) return `${(value / 1_0000_0000).toFixed(1)}억`
+  if (abs >= 1_0000) return `${(value / 1_0000).toFixed(0)}만`
+  return value.toLocaleString()
+}
+
+function formatAmountTable(value: number): string {
+  const abs = Math.abs(value)
+  if (abs >= 1_0000_0000) return `${(value / 1_0000_0000).toFixed(2)}억`
+  if (abs >= 1_0000) return `${(value / 1_0000).toFixed(0)}만`
+  return value.toLocaleString()
+}
+
+// ── Skeleton ─────────────────────────────────────
+
+function SkeletonBlock({ width, height = 16 }: { width: number | string; height?: number }) {
+  return (
+    <motion.div
+      animate={{ opacity: [0.3, 0.6, 0.3] }}
+      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      style={{
+        width,
+        height,
+        borderRadius: 6,
+        background: 'rgba(255,255,255,0.06)',
+      }}
+    />
+  )
+}
+
+function StatCardSkeleton({ index }: { index: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.07 }}
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        padding: 20,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <SkeletonBlock width={80} height={12} />
+          <SkeletonBlock width={100} height={26} />
+          <SkeletonBlock width={60} height={12} />
+        </div>
+        <SkeletonBlock width={40} height={40} />
+      </div>
+    </motion.div>
+  )
+}
+
+// ── StatCard ─────────────────────────────────────
 
 interface StatCardProps {
   title: string
@@ -69,19 +147,21 @@ function StatCard({ title, value, change, changeType, icon: Icon, accentColor, i
           <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
             {value}
           </div>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            marginTop: 10,
-            color: changeType === 'up' ? 'var(--success)' : changeType === 'down' ? 'var(--danger)' : 'var(--text-muted)',
-            fontSize: 12,
-            fontWeight: 500,
-          }}>
-            {changeType === 'up' && <TrendingUp size={12} strokeWidth={2.5} />}
-            {changeType === 'down' && <TrendingDown size={12} strokeWidth={2.5} />}
-            {change}
-          </div>
+          {change && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              marginTop: 10,
+              color: changeType === 'up' ? 'var(--success)' : changeType === 'down' ? 'var(--danger)' : 'var(--text-muted)',
+              fontSize: 12,
+              fontWeight: 500,
+            }}>
+              {changeType === 'up' && <TrendingUp size={12} strokeWidth={2.5} />}
+              {changeType === 'down' && <TrendingDown size={12} strokeWidth={2.5} />}
+              {change}
+            </div>
+          )}
         </div>
         <div style={{
           width: 40,
@@ -101,92 +181,71 @@ function StatCard({ title, value, change, changeType, icon: Icon, accentColor, i
   )
 }
 
-const stats: Omit<StatCardProps, 'index'>[] = [
-  {
-    title: '진행 중인 현장',
-    value: '12',
-    change: '지난달 대비 +2',
-    changeType: 'up',
-    icon: HardHat,
-    accentColor: '#3b82f6',
-  },
-  {
-    title: '이번달 매출',
-    value: '₩84.2M',
-    change: '지난달 대비 +18.4%',
-    changeType: 'up',
-    icon: DollarSign,
-    accentColor: '#22c55e',
-  },
-  {
-    title: '이번달 매입',
-    value: '₩31.6M',
-    change: '지난달 대비 +5.2%',
-    changeType: 'down',
-    icon: TrendingDown,
-    accentColor: '#f59e0b',
-  },
-  {
-    title: '미수금',
-    value: '₩12.4M',
-    change: '3건 미결제',
-    changeType: 'neutral',
-    icon: AlertCircle,
-    accentColor: '#ef4444',
-  },
-  {
-    title: '견적서',
-    value: '28',
-    change: '이번달 +6건',
-    changeType: 'up',
-    icon: FileText,
-    accentColor: '#8b5cf6',
-  },
-  {
-    title: '세금계산서',
-    value: '19',
-    change: '처리 완료 15건',
-    changeType: 'up',
-    icon: Receipt,
-    accentColor: '#06b6d4',
-  },
-]
+// ── Helpers: build stat cards from API data ──────
 
-interface ActivityItem {
-  id: number
-  type: string
-  title: string
-  site: string
-  time: string
-  color: string
+function buildStatCards(stats: {
+  sitesByStatus: Record<string, number>
+  totalEstimateAmount: number
+  totalPurchaseAmount: number
+  totalMargin: number
+  averageMarginRate: number
+  totalSites: number
+}): Omit<StatCardProps, 'index'>[] {
+  const inProgress = stats.sitesByStatus['IN_PROGRESS'] || 0
+
+  return [
+    {
+      title: '진행 중인 현장',
+      value: `${inProgress}`,
+      change: `전체 ${stats.totalSites}개 현장`,
+      changeType: 'neutral',
+      icon: HardHat,
+      accentColor: '#3b82f6',
+    },
+    {
+      title: '총 매출 (견적)',
+      value: `\u20A9${formatAmount(stats.totalEstimateAmount)}`,
+      change: `${stats.totalSites}개 현장 합산`,
+      changeType: 'neutral',
+      icon: DollarSign,
+      accentColor: '#22c55e',
+    },
+    {
+      title: '총 매입',
+      value: `\u20A9${formatAmount(stats.totalPurchaseAmount)}`,
+      change: `매출 대비 ${stats.totalEstimateAmount > 0 ? ((stats.totalPurchaseAmount / stats.totalEstimateAmount) * 100).toFixed(0) : 0}%`,
+      changeType: 'neutral',
+      icon: ShoppingCart,
+      accentColor: '#f59e0b',
+    },
+    {
+      title: '총 마진',
+      value: `\u20A9${formatAmount(stats.totalMargin)}`,
+      change: stats.totalMargin >= 0 ? '흑자' : '적자',
+      changeType: stats.totalMargin >= 0 ? 'up' : 'down',
+      icon: TrendingUp,
+      accentColor: stats.totalMargin >= 0 ? '#22c55e' : '#ef4444',
+    },
+    {
+      title: '평균 마진율',
+      value: `${stats.averageMarginRate.toFixed(1)}%`,
+      change: stats.averageMarginRate >= 20 ? '양호' : '주의',
+      changeType: stats.averageMarginRate >= 20 ? 'up' : 'down',
+      icon: Percent,
+      accentColor: '#8b5cf6',
+    },
+  ]
 }
 
-const recentActivity: ActivityItem[] = [
-  { id: 1, type: '견적서', title: '삼성 물류창고 2차 공사 견적 확정', site: '삼성 물류센터', time: '방금 전', color: '#8b5cf6' },
-  { id: 2, type: '매입', title: '철골 자재 구매 ₩4,200,000', site: '현대 오피스텔', time: '1시간 전', color: '#f59e0b' },
-  { id: 3, type: '세금계산서', title: '매출 세금계산서 발행', site: 'LG 공장 배관', time: '3시간 전', color: '#22c55e' },
-  { id: 4, type: '현장', title: '신규 현장 등록 — 롯데 쇼핑몰', site: '롯데 쇼핑몰', time: '어제', color: '#3b82f6' },
-  { id: 5, type: '알림', title: '하자보증보험 만료 D-7', site: 'GS 아파트', time: '어제', color: '#ef4444' },
-]
-
-interface SiteRow {
-  id: number
-  name: string
-  client: string
-  progress: number
-  margin: string
-  status: string
-  statusColor: string
-}
-
-const topSites: SiteRow[] = [
-  { id: 1, name: '삼성 물류센터 용접', client: '삼성물산', progress: 75, margin: '32.4%', status: '시공 중', statusColor: '#3b82f6' },
-  { id: 2, name: '현대 오피스텔 배관', client: '현대건설', progress: 45, margin: '28.1%', status: '시공 중', statusColor: '#3b82f6' },
-  { id: 3, name: 'LG 공장 배관 공사', client: 'LG화학', progress: 92, margin: '41.2%', status: '마무리', statusColor: '#22c55e' },
-  { id: 4, name: '롯데 쇼핑몰 철골', client: '롯데건설', progress: 10, margin: '—', status: '준비 중', statusColor: '#f59e0b' },
-]
+// ── Main Component ───────────────────────────────
 
 export default function DashboardPage() {
+  const { data: stats, isLoading: statsLoading } = useDashboardStats()
+  const { data: summary, isLoading: summaryLoading } = useDashboardSummary()
+
+  const statCards = stats ? buildStatCards(stats) : []
+  const siteProfits: SiteProfitSummary[] = stats?.siteProfits ?? []
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
@@ -204,20 +263,29 @@ export default function DashboardPage() {
         <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>현장 현황 및 손익 요약</p>
       </motion.div>
 
-      {/* Stat cards */}
+      {/* Stat cards — 상단 3개 + 하단 2개 균등 배치 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: 'repeat(6, 1fr)',
         gap: 12,
       }}>
-        {stats.map((stat, i) => (
-          <StatCard key={stat.title} {...stat} index={i} />
-        ))}
+        {statsLoading
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} style={{ gridColumn: i < 3 ? 'span 2' : 'span 3' }}>
+                <StatCardSkeleton index={i} />
+              </div>
+            ))
+          : statCards.map((stat, i) => (
+              <div key={stat.title} style={{ gridColumn: i < 3 ? 'span 2' : 'span 3' }}>
+                <StatCard {...stat} index={i} />
+              </div>
+            ))
+        }
       </div>
 
       {/* Bottom section */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
-        {/* Top sites table */}
+        {/* Site profits table */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -238,7 +306,7 @@ export default function DashboardPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Layers size={15} color="var(--text-muted)" strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>진행 중인 현장</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>현장별 손익</span>
             </div>
             <button style={{
               display: 'flex', alignItems: 'center', gap: 4,
@@ -248,83 +316,101 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['현장명', '발주처', '진행률', '마진율', '상태'].map((h) => (
-                  <th key={h} style={{
-                    padding: '10px 20px',
-                    textAlign: 'left',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: 'var(--text-muted)',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {topSites.map((site, i) => (
-                <motion.tr
-                  key={site.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + i * 0.06 }}
-                  style={{
-                    borderBottom: i < topSites.length - 1 ? '1px solid var(--border)' : 'none',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-                >
-                  <td style={{ padding: '13px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {site.name}
-                  </td>
-                  <td style={{ padding: '13px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
-                    {site.client}
-                  </td>
-                  <td style={{ padding: '13px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden', maxWidth: 80 }}>
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${site.progress}%` }}
-                          transition={{ duration: 0.8, delay: 0.5 + i * 0.1, ease: 'easeOut' }}
-                          style={{
-                            height: '100%',
-                            background: site.progress > 80 ? 'var(--success)' : 'var(--accent-gradient)',
-                            borderRadius: 2,
-                          }}
-                        />
-                      </div>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 32 }}>{site.progress}%</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '13px 20px', fontSize: 13, color: site.margin !== '—' ? 'var(--success)' : 'var(--text-muted)', fontWeight: 600 }}>
-                    {site.margin}
-                  </td>
-                  <td style={{ padding: '13px 20px' }}>
-                    <span style={{
-                      display: 'inline-block',
+          {statsLoading ? (
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkeletonBlock key={i} width="100%" height={20} />
+              ))}
+            </div>
+          ) : siteProfits.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+              등록된 현장이 없습니다
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['현장명', '상태', '견적액', '매입액', '마진', '마진율'].map((h) => (
+                    <th key={h} style={{
+                      padding: '10px 16px',
+                      textAlign: h === '현장명' || h === '상태' ? 'left' : 'right',
                       fontSize: 11,
                       fontWeight: 600,
-                      padding: '3px 8px',
-                      borderRadius: 20,
-                      background: `${site.statusColor}18`,
-                      color: site.statusColor,
-                      border: `1px solid ${site.statusColor}30`,
-                    }}>
-                      {site.status}
-                    </span>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+                      color: 'var(--text-muted)',
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {siteProfits.map((site, i) => {
+                  const statusColor = STATUS_COLOR[site.status] || '#6b7280'
+                  const statusLabel = STATUS_LABEL[site.status] || site.status
+
+                  return (
+                    <motion.tr
+                      key={site.siteId}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.4 + i * 0.06 }}
+                      style={{
+                        borderBottom: i < siteProfits.length - 1 ? '1px solid var(--border)' : 'none',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                    >
+                      <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {site.siteName}
+                      </td>
+                      <td style={{ padding: '13px 16px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: '3px 8px',
+                          borderRadius: 20,
+                          background: `${statusColor}18`,
+                          color: statusColor,
+                          border: `1px solid ${statusColor}30`,
+                        }}>
+                          {statusLabel}
+                        </span>
+                      </td>
+                      <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {formatAmountTable(site.estimateAmount)}
+                      </td>
+                      <td style={{ padding: '13px 16px', fontSize: 13, color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        {formatAmountTable(site.purchaseAmount)}
+                      </td>
+                      <td style={{
+                        padding: '13px 16px',
+                        fontSize: 13,
+                        color: site.margin >= 0 ? 'var(--success)' : 'var(--danger)',
+                        fontWeight: 600,
+                        textAlign: 'right',
+                      }}>
+                        {formatAmountTable(site.margin)}
+                      </td>
+                      <td style={{
+                        padding: '13px 16px',
+                        fontSize: 13,
+                        color: site.marginRate >= 20 ? 'var(--success)' : site.marginRate >= 0 ? 'var(--text-muted)' : 'var(--danger)',
+                        fontWeight: 600,
+                        textAlign: 'right',
+                      }}>
+                        {site.marginRate.toFixed(1)}%
+                      </td>
+                    </motion.tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </motion.div>
 
-        {/* Activity feed */}
+        {/* AI Summary */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -343,57 +429,86 @@ export default function DashboardPage() {
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
+            justifyContent: 'space-between',
           }}>
-            <Activity size={15} color="var(--text-muted)" strokeWidth={2} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>최근 활동</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Sparkles size={15} color="#8b5cf6" strokeWidth={2} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>AI 요약</span>
+            </div>
+            <span style={{
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              background: 'rgba(139,92,246,0.12)',
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontWeight: 500,
+            }}>
+              Ollama
+            </span>
           </div>
-          <div style={{ padding: '8px 0', flex: 1, overflow: 'auto' }}>
-            {recentActivity.map((item, i) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.45 + i * 0.07 }}
-                style={{
-                  padding: '12px 20px',
-                  display: 'flex',
-                  gap: 12,
-                  cursor: 'default',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-              >
-                <div style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: item.color,
-                  marginTop: 5,
-                  flexShrink: 0,
-                  boxShadow: `0 0 6px ${item.color}80`,
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.4, marginBottom: 3 }}>
-                    {item.title}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: 11,
-                      color: item.color,
-                      background: `${item.color}15`,
-                      padding: '1px 6px',
-                      borderRadius: 4,
-                      fontWeight: 500,
-                    }}>
-                      {item.type}
-                    </span>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.time}</span>
-                  </div>
+
+          <div style={{ padding: 20, flex: 1, overflow: 'auto' }}>
+            {summaryLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '32px 0' }}>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+                >
+                  <Loader2 size={20} color="var(--text-muted)" strokeWidth={2} />
+                </motion.div>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  AI 요약을 생성 중입니다...
+                </span>
+              </div>
+            ) : summary?.summary ? (
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}
+                  className="dashboard-markdown"
+                >
+                  <ReactMarkdown
+                    components={{
+                      h2: ({ children }) => (
+                        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: '16px 0 6px' }}>{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', margin: '12px 0 4px' }}>{children}</h3>
+                      ),
+                      p: ({ children }) => (
+                        <p style={{ margin: '4px 0', lineHeight: 1.7 }}>{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul style={{ margin: '4px 0', paddingLeft: 16 }}>{children}</ul>
+                      ),
+                      li: ({ children }) => (
+                        <li style={{ margin: '2px 0' }}>{children}</li>
+                      ),
+                    }}
+                  >
+                    {summary.summary}
+                  </ReactMarkdown>
                 </div>
-              </motion.div>
-            ))}
+                {summary.generatedAt && (
+                  <div style={{
+                    marginTop: 16,
+                    paddingTop: 12,
+                    borderTop: '1px solid var(--border)',
+                    fontSize: 11,
+                    color: 'var(--text-muted)',
+                  }}>
+                    {new Date(summary.generatedAt).toLocaleString('ko-KR')} 기준
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '32px 0',
+                color: 'var(--text-muted)',
+                fontSize: 13,
+              }}>
+                요약 데이터가 없습니다
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
