@@ -6,6 +6,8 @@ import {
   FileText,
   ShoppingBag,
   Receipt,
+  Bell,
+  ShieldCheck,
   LogOut,
   Zap,
   ChevronRight,
@@ -18,6 +20,8 @@ const menuItems = [
   { key: '/estimates', icon: FileText, label: '견적서' },
   { key: '/purchases', icon: ShoppingBag, label: '매입 관리' },
   { key: '/taxes', icon: Receipt, label: '세금계산서' },
+  { key: '/notifications', icon: Bell, label: '알림' },
+  { key: '/warranties', icon: ShieldCheck, label: '보증보험' },
 ]
 
 export default function MainLayout() {

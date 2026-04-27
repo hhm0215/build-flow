@@ -6,6 +6,8 @@ import SiteListPage from './pages/site/SiteListPage'
 import EstimateListPage from './pages/estimate/EstimateListPage'
 import PurchaseListPage from './pages/purchase/PurchaseListPage'
 import TaxListPage from './pages/tax/TaxListPage'
+import NotificationListPage from './pages/notification/NotificationListPage'
+import WarrantyListPage from './pages/warranty/WarrantyListPage'
 import { useAuthStore } from './stores/authStore'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +33,8 @@ export default function App() {
         <Route path="estimates" element={<EstimateListPage />} />
         <Route path="purchases" element={<PurchaseListPage />} />
         <Route path="taxes" element={<TaxListPage />} />
+        <Route path="notifications" element={<NotificationListPage />} />
+        <Route path="warranties" element={<WarrantyListPage />} />
       </Route>
     </Routes>
   )
