@@ -196,3 +196,13 @@ export interface Warranty {
   createdAt: string
   updatedAt: string
 }
+
+export interface WarrantyCreateRequest {
+  siteId: number
+  insuranceCompany: string
+  policyNumber: string
+  coverageAmount: number
+  startDate: string
+  endDate: string
+  memo?: string
+}

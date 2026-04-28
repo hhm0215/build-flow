@@ -1,11 +1,17 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import { Receipt, Plus, CheckCircle } from 'lucide-react'
+import { Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd'
 import PageHeader from '../../components/PageHeader'
-import { useTaxes, useConfirmPayment } from '../../api/taxes.api'
+import { useTaxes, useConfirmPayment, useCreateTax } from '../../api/taxes.api'
+import type { TaxInvoiceCreateRequest } from '../../types'
 
 export default function TaxListPage() {
   const { data, isLoading } = useTaxes()
   const { mutate: confirmPayment } = useConfirmPayment()
+  const { mutate: createTax, isPending: isCreating } = useCreateTax()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form] = Form.useForm()
   const invoices = data ?? []
 
   const unpaidTotal = invoices
@@ -22,6 +28,7 @@ export default function TaxListPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => setModalOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px',
@@ -154,6 +161,72 @@ export default function TaxListPage() {
           </table>
         </motion.div>
       )}
+
+      <Modal
+        title="세금계산서 등록"
+        open={modalOpen}
+        okText="등록"
+        cancelText="취소"
+        confirmLoading={isCreating}
+        destroyOnClose
+        onCancel={() => { setModalOpen(false); form.resetFields() }}
+        onOk={() => {
+          form.validateFields().then((values) => {
+            const body: TaxInvoiceCreateRequest = {
+              ...values,
+              issueDate: values.issueDate.format('YYYY-MM-DD'),
+            }
+            createTax(body, {
+              onSuccess: () => {
+                setModalOpen(false)
+                form.resetFields()
+              },
+            })
+          })
+        }}
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="type" label="구분" rules={[{ required: true, message: '구분을 선택해주세요' }]}>
+            <Select
+              placeholder="매출 / 매입 선택"
+              options={[
+                { label: '매출', value: 'SALES' },
+                { label: '매입', value: 'PURCHASE' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="siteId" label="현장 ID" rules={[{ required: true, message: '현장 ID를 입력해주세요' }]}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="현장 ID" />
+          </Form.Item>
+          <Form.Item name="counterparty" label="거래처" rules={[{ required: true, message: '거래처를 입력해주세요' }]}>
+            <Input placeholder="거래처명" />
+          </Form.Item>
+          <Form.Item name="supplyAmount" label="공급가액" rules={[{ required: true, message: '공급가액을 입력해주세요' }]}>
+            <InputNumber
+              style={{ width: '100%' }}
+              min={0}
+              formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0) as any}
+              placeholder="공급가액"
+            />
+          </Form.Item>
+          <Form.Item name="taxAmount" label="세액" rules={[{ required: true, message: '세액을 입력해주세요' }]}>
+            <InputNumber
+              style={{ width: '100%' }}
+              min={0}
+              formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0) as any}
+              placeholder="세액"
+            />
+          </Form.Item>
+          <Form.Item name="issueDate" label="발행일" rules={[{ required: true, message: '발행일을 선택해주세요' }]}>
+            <DatePicker style={{ width: '100%' }} placeholder="발행일 선택" />
+          </Form.Item>
+          <Form.Item name="memo" label="메모">
+            <Input.TextArea rows={3} placeholder="메모 (선택)" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }

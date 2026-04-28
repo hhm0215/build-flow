@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
-import { FileText, Plus } from 'lucide-react'
+import { FileText, Plus, Trash2 } from 'lucide-react'
+import { Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
+import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
-import { useEstimates } from '../../api/estimates.api'
-import { EstimateStatus } from '../../types'
+import { useEstimates, useCreateEstimate } from '../../api/estimates.api'
+import type { EstimateStatus, EstimateCreateRequest } from '../../types'
 
 const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
@@ -21,6 +24,39 @@ export default function EstimateListPage() {
   const { data, isLoading } = useEstimates()
   const estimates = data ?? []
 
+  const [open, setOpen] = useState(false)
+  const [form] = Form.useForm()
+  const createMutation = useCreateEstimate()
+
+  const handleOk = () => {
+    form.validateFields().then((values) => {
+      const items = (values.items ?? []).map(
+        (item: { itemName: string; unit: string; quantity: number; unitPrice: number }) => ({
+          itemName: item.itemName,
+          unit: item.unit || 'EA',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          amount: (item.quantity ?? 0) * (item.unitPrice ?? 0),
+        }),
+      )
+
+      const body: EstimateCreateRequest = {
+        siteId: values.siteId,
+        title: values.title,
+        estimateDate: dayjs(values.estimateDate).format('YYYY-MM-DD'),
+        items,
+        memo: values.memo || undefined,
+      }
+
+      createMutation.mutate(body, {
+        onSuccess: () => {
+          setOpen(false)
+          form.resetFields()
+        },
+      })
+    })
+  }
+
   return (
     <div>
       <PageHeader
@@ -31,6 +67,7 @@ export default function EstimateListPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => setOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px',
@@ -45,6 +82,155 @@ export default function EstimateListPage() {
           </motion.button>
         }
       />
+
+      <Modal
+        title="견적서 작성"
+        open={open}
+        onOk={handleOk}
+        onCancel={() => { setOpen(false); form.resetFields() }}
+        okText="작성"
+        cancelText="취소"
+        confirmLoading={createMutation.isPending}
+        destroyOnClose
+        width={720}
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            name="siteId"
+            label="현장 ID"
+            rules={[{ required: true, message: '현장 ID를 입력하세요' }]}
+          >
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="현장 ID" />
+          </Form.Item>
+          <Form.Item
+            name="title"
+            label="견적 제목"
+            rules={[{ required: true, message: '견적 제목을 입력하세요' }]}
+          >
+            <Input placeholder="견적 제목" />
+          </Form.Item>
+          <Form.Item
+            name="estimateDate"
+            label="견적일"
+            rules={[{ required: true, message: '견적일을 선택하세요' }]}
+          >
+            <DatePicker style={{ width: '100%' }} placeholder="견적일 선택" />
+          </Form.Item>
+          <Form.Item name="memo" label="메모">
+            <Input.TextArea rows={2} placeholder="메모 (선택)" />
+          </Form.Item>
+
+          <div style={{
+            fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+            marginBottom: 12,
+            borderTop: '1px solid var(--border)',
+            paddingTop: 16,
+          }}>
+            견적 항목
+          </div>
+
+          <Form.List name="items">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map(({ key, name, ...restField }) => (
+                  <div
+                    key={key}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 70px 80px 120px auto',
+                      gap: 8,
+                      alignItems: 'start',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'itemName']}
+                      rules={[{ required: true, message: '품목명' }]}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <Input placeholder="품목명" />
+                    </Form.Item>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'unit']}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <Input placeholder="EA" />
+                    </Form.Item>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'quantity']}
+                      rules={[{ required: true, message: '수량' }]}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        min={1}
+                        placeholder="수량"
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'unitPrice']}
+                      rules={[{ required: true, message: '단가' }]}
+                      style={{ marginBottom: 8 }}
+                    >
+                      <InputNumber
+                        style={{ width: '100%' }}
+                        min={0}
+                        placeholder="단가"
+                        formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={(v) => Number(v?.replace(/,/g, '') ?? 0) as 0}
+                      />
+                    </Form.Item>
+                    <Button
+                      type="text"
+                      danger
+                      onClick={() => remove(name)}
+                      style={{ marginTop: 4 }}
+                      icon={<Trash2 size={14} />}
+                    />
+                  </div>
+                ))}
+
+                <Form.Item
+                  shouldUpdate={(prev, cur) => prev.items !== cur.items}
+                  style={{ marginBottom: 12 }}
+                >
+                  {() => {
+                    const items = form.getFieldValue('items') ?? []
+                    const total = items.reduce(
+                      (sum: number, item: { quantity?: number; unitPrice?: number } | undefined) =>
+                        sum + ((item?.quantity ?? 0) * (item?.unitPrice ?? 0)),
+                      0,
+                    )
+                    return total > 0 ? (
+                      <div style={{
+                        display: 'flex', justifyContent: 'flex-end',
+                        fontSize: 14, fontWeight: 700, color: 'var(--text-primary)',
+                        padding: '8px 0',
+                      }}>
+                        합계: {formatKRW(total)}
+                      </div>
+                    ) : null
+                  }}
+                </Form.Item>
+
+                <Button
+                  type="dashed"
+                  onClick={() => add()}
+                  block
+                  icon={<Plus size={14} />}
+                  style={{ marginBottom: 8 }}
+                >
+                  항목 추가
+                </Button>
+              </>
+            )}
+          </Form.List>
+        </Form>
+      </Modal>
 
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

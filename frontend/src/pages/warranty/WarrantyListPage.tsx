@@ -1,14 +1,42 @@
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import { ShieldCheck, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
+import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
-import { useWarranties, useExpiringWarranties, useDeleteWarranty } from '../../api/warranties.api'
+import { useWarranties, useExpiringWarranties, useDeleteWarranty, useCreateWarranty } from '../../api/warranties.api'
+import type { WarrantyCreateRequest } from '../../types/domain.types'
 
 export default function WarrantyListPage() {
   const { data, isLoading } = useWarranties()
   const { data: expiringData } = useExpiringWarranties(30)
   const { mutate: deleteWarranty } = useDeleteWarranty()
+  const { mutate: createWarranty, isPending: isCreating } = useCreateWarranty()
   const warranties = data ?? []
   const expiringCount = expiringData?.length ?? 0
+
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [form] = Form.useForm()
+
+  const handleCreateSubmit = () => {
+    form.validateFields().then((values) => {
+      const request: WarrantyCreateRequest = {
+        siteId: values.siteId,
+        insuranceCompany: values.insuranceCompany,
+        policyNumber: values.policyNumber,
+        coverageAmount: values.coverageAmount,
+        startDate: dayjs(values.startDate).format('YYYY-MM-DD'),
+        endDate: dayjs(values.endDate).format('YYYY-MM-DD'),
+        memo: values.memo || '',
+      }
+      createWarranty(request as any, {
+        onSuccess: () => {
+          setIsModalOpen(false)
+          form.resetFields()
+        },
+      })
+    })
+  }
 
   const getExpiryColor = (days: number, expired: boolean) => {
     if (expired) return '#ef4444'
@@ -32,6 +60,7 @@ export default function WarrantyListPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => setIsModalOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px',
@@ -175,6 +204,47 @@ export default function WarrantyListPage() {
           </table>
         </motion.div>
       )}
+
+      <Modal
+        title="보험 등록"
+        open={isModalOpen}
+        onOk={handleCreateSubmit}
+        onCancel={() => { setIsModalOpen(false); form.resetFields() }}
+        okText="등록"
+        cancelText="취소"
+        confirmLoading={isCreating}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="siteId" label="현장 ID" rules={[{ required: true, message: '현장 ID를 입력하세요' }]}>
+            <InputNumber style={{ width: '100%' }} placeholder="현장 ID" min={1} />
+          </Form.Item>
+          <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, message: '보험사를 입력하세요' }]}>
+            <Input placeholder="보험사명" />
+          </Form.Item>
+          <Form.Item name="policyNumber" label="증권번호" rules={[{ required: true, message: '증권번호를 입력하세요' }]}>
+            <Input placeholder="증권번호" />
+          </Form.Item>
+          <Form.Item name="coverageAmount" label="보증금액" rules={[{ required: true, message: '보증금액을 입력하세요' }]}>
+            <InputNumber
+              style={{ width: '100%' }}
+              placeholder="보증금액"
+              min={0}
+              formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '')) as any}
+            />
+          </Form.Item>
+          <Form.Item name="startDate" label="보증 시작일" rules={[{ required: true, message: '시작일을 선택하세요' }]}>
+            <DatePicker style={{ width: '100%' }} placeholder="시작일 선택" />
+          </Form.Item>
+          <Form.Item name="endDate" label="보증 종료일" rules={[{ required: true, message: '종료일을 선택하세요' }]}>
+            <DatePicker style={{ width: '100%' }} placeholder="종료일 선택" />
+          </Form.Item>
+          <Form.Item name="memo" label="메모">
+            <Input.TextArea rows={3} placeholder="메모 (선택)" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   )
 }
