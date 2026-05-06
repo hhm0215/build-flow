@@ -27,6 +27,11 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        retries: 3
     consumer:
       group-id: estimate-service-group
       auto-offset-reset: earliest
@@ -34,6 +39,10 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "com.buildflow.*"
+        isolation.level: read_committed
+      enable-auto-commit: false
+    listener:
+      ack-mode: record
   servlet:
     multipart:
       max-file-size: 10MB
