@@ -4,11 +4,12 @@ import { ShieldCheck, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
+import ErrorState from '../../components/ErrorState'
 import { useWarranties, useExpiringWarranties, useDeleteWarranty, useCreateWarranty } from '../../api/warranties.api'
 import type { WarrantyCreateRequest } from '../../types/domain.types'
 
 export default function WarrantyListPage() {
-  const { data, isLoading } = useWarranties()
+  const { data, isLoading, isError, refetch } = useWarranties()
   const { data: expiringData } = useExpiringWarranties(30)
   const { mutate: deleteWarranty } = useDeleteWarranty()
   const { mutate: createWarranty, isPending: isCreating } = useCreateWarranty()
@@ -103,7 +104,9 @@ export default function WarrantyListPage() {
         </motion.div>
       )}
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState onRetry={refetch} />
+      ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />

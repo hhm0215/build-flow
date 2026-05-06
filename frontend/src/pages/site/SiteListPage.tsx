@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
+import ErrorState from '../../components/ErrorState'
 import { useSites } from '../../api/sites.api'
 import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
@@ -214,7 +215,7 @@ function EmptyRelation({ message }: { message: string }) {
 }
 
 export default function SiteListPage() {
-  const { data: sitesData, isLoading: sitesLoading } = useSites()
+  const { data: sitesData, isLoading: sitesLoading, isError: sitesError, refetch: sitesRefetch } = useSites()
   const { data: estimatesData, isLoading: estimatesLoading } = useEstimates()
   const { data: purchasesData, isLoading: purchasesLoading } = usePurchases()
   const { data: taxesData, isLoading: taxesLoading } = useTaxes()
@@ -300,7 +301,9 @@ export default function SiteListPage() {
         }
       />
 
-      {sitesLoading ? (
+      {sitesError ? (
+        <ErrorState onRetry={sitesRefetch} />
+      ) : sitesLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="shimmer" style={{ height: i === 1 ? 180 : 88, borderRadius: 12 }} />

@@ -3,11 +3,12 @@ import { motion } from 'motion/react'
 import { Receipt, Plus, CheckCircle } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd'
 import PageHeader from '../../components/PageHeader'
+import ErrorState from '../../components/ErrorState'
 import { useTaxes, useConfirmPayment, useCreateTax } from '../../api/taxes.api'
 import type { TaxInvoiceCreateRequest } from '../../types'
 
 export default function TaxListPage() {
-  const { data, isLoading } = useTaxes()
+  const { data, isLoading, isError, refetch } = useTaxes()
   const { mutate: confirmPayment } = useConfirmPayment()
   const { mutate: createTax, isPending: isCreating } = useCreateTax()
   const [modalOpen, setModalOpen] = useState(false)
@@ -68,7 +69,9 @@ export default function TaxListPage() {
         </motion.div>
       )}
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState onRetry={refetch} />
+      ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />

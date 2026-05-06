@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import ErrorState from '../../components/ErrorState'
 import { useDashboardStats, useDashboardSummary } from '../../api/dashboard.api'
 import type { SiteProfitSummary } from '../../types'
 
@@ -240,11 +241,15 @@ function buildStatCards(stats: {
 // ── Main Component ───────────────────────────────
 
 export default function DashboardPage() {
-  const { data: stats, isLoading: statsLoading } = useDashboardStats()
+  const { data: stats, isLoading: statsLoading, isError: statsError, refetch: statsRefetch } = useDashboardStats()
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary()
 
   const statCards = stats ? buildStatCards(stats) : []
   const siteProfits: SiteProfitSummary[] = stats?.siteProfits ?? []
+
+  if (statsError) {
+    return <ErrorState message="대시보드 데이터를 불러오는 중 오류가 발생했습니다." onRetry={statsRefetch} />
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

@@ -4,6 +4,7 @@ import { FileText, Plus, Trash2 } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
+import ErrorState from '../../components/ErrorState'
 import { useEstimates, useCreateEstimate } from '../../api/estimates.api'
 import type { EstimateStatus, EstimateCreateRequest } from '../../types'
 
@@ -21,7 +22,7 @@ function formatKRW(n: number) {
 }
 
 export default function EstimateListPage() {
-  const { data, isLoading } = useEstimates()
+  const { data, isLoading, isError, refetch } = useEstimates()
   const estimates = data ?? []
 
   const [open, setOpen] = useState(false)
@@ -232,7 +233,9 @@ export default function EstimateListPage() {
         </Form>
       </Modal>
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState onRetry={refetch} />
+      ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />
