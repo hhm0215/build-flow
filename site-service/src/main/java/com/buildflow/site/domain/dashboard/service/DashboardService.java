@@ -17,6 +17,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,7 +32,12 @@ public class DashboardService {
 
     public DashboardStatsResponse getStats() {
         List<Site> sites = siteRepository.findAllByOrderByCreatedAtDesc();
-        List<SiteProfit> profits = siteProfitRepository.findAll();
+
+        Set<Long> siteIds = sites.stream()
+                .map(Site::getId)
+                .collect(Collectors.toSet());
+
+        List<SiteProfit> profits = siteProfitRepository.findBySiteIdIn(siteIds);
 
         Map<Long, SiteProfit> profitMap = profits.stream()
                 .collect(Collectors.toMap(SiteProfit::getSiteId, p -> p));
@@ -58,7 +64,7 @@ public class DashboardService {
                             .marginRate(profit != null ? profit.getMarginRate() : BigDecimal.ZERO)
                             .build();
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         for (SiteProfit profit : profits) {
             totalEstimate = totalEstimate.add(profit.getTotalEstimateAmount());

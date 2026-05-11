@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { Bell, CheckCheck, FileText, ShoppingCart, ShieldAlert } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
+import ErrorState from '../../components/ErrorState'
 import { useNotifications, useUnreadCount, useMarkAsRead, useMarkAllAsRead } from '../../api/notifications.api'
 
 const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; border: string; icon: typeof Bell }> = {
@@ -43,7 +44,7 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function NotificationListPage() {
-  const { data, isLoading } = useNotifications()
+  const { data, isLoading, isError, refetch } = useNotifications()
   const { data: unreadCount } = useUnreadCount()
   const { mutate: markAsRead } = useMarkAsRead()
   const { mutate: markAllAsRead } = useMarkAllAsRead()
@@ -105,7 +106,9 @@ export default function NotificationListPage() {
       )}
 
       {/* 로딩 스켈레톤 */}
-      {isLoading ? (
+      {isError ? (
+        <ErrorState onRetry={refetch} />
+      ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="shimmer" style={{ height: 72, borderRadius: 10 }} />

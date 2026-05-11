@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -19,11 +20,16 @@ import java.nio.charset.StandardCharsets;
 @Component
 public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<AuthorizationHeaderFilter.Config> {
 
+    private static final String BLACKLIST_PREFIX = "auth:blacklist:";
+
+    private final ReactiveStringRedisTemplate redisTemplate;
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
-    public AuthorizationHeaderFilter() {
+    public AuthorizationHeaderFilter(ReactiveStringRedisTemplate redisTemplate) {
         super(Config.class);
+        this.redisTemplate = redisTemplate;
     }
 
     @Override
@@ -40,13 +46,21 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                 return onError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
-            Claims claims = getClaims(token);
-            exchange = exchange.mutate()
-                    .request(r -> r.header("X-User-Id", claims.getSubject())
-                            .header("X-User-Role", claims.get("role", String.class)))
-                    .build();
+            return redisTemplate.hasKey(BLACKLIST_PREFIX + token)
+                    .flatMap(isBlacklisted -> {
+                        if (Boolean.TRUE.equals(isBlacklisted)) {
+                            log.debug("Blacklisted token rejected");
+                            return onError(exchange, HttpStatus.UNAUTHORIZED);
+                        }
 
-            return chain.filter(exchange);
+                        Claims claims = getClaims(token);
+                        ServerWebExchange modifiedExchange = exchange.mutate()
+                                .request(r -> r.header("X-User-Id", claims.getSubject())
+                                        .header("X-User-Role", claims.get("role", String.class)))
+                                .build();
+
+                        return chain.filter(modifiedExchange);
+                    });
         };
     }
 
@@ -55,7 +69,7 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             getClaims(token);
             return true;
         } catch (Exception e) {
-            log.warn("Invalid JWT token: {}", e.getMessage());
+            log.warn("JWT token validation failed");
             return false;
         }
     }

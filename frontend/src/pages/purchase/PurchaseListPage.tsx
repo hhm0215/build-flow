@@ -4,11 +4,12 @@ import { ShoppingBag, Plus } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
+import ErrorState from '../../components/ErrorState'
 import { usePurchases, useCreatePurchase } from '../../api/purchases.api'
 import type { PurchaseCreateRequest } from '../../types'
 
 export default function PurchaseListPage() {
-  const { data, isLoading } = usePurchases()
+  const { data, isLoading, isError, refetch } = usePurchases()
   const purchases = data ?? []
   const totalAmount = purchases.reduce((sum, p) => sum + p.totalAmount, 0)
 
@@ -138,7 +139,9 @@ export default function PurchaseListPage() {
         </motion.div>
       )}
 
-      {isLoading ? (
+      {isError ? (
+        <ErrorState onRetry={refetch} />
+      ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />
