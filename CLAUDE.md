@@ -168,7 +168,8 @@ bun run preview         # 빌드 결과 미리보기
   - `git push --force` 금지
   - `--no-verify` 금지
   - **git이 거부/경고하면 멈추고 사용자에게 보고. force로 우회하지 않는다**
-- PR 생성/머지는 사용자가 GitHub 웹에서 직접 수행. gh CLI 사용 금지. PR 본문 텍스트만 제공
+- PR 생성/머지는 사용자가 GitHub 웹에서 직접 수행. gh CLI 사용 금지
+- PR 본문은 텍스트로만 제공. 형식 고정: `## 변경 사항` / `## 상세` 두 섹션만 사용. 개요·테스트·참고 같은 추가 섹션 즉흥 도입 금지
 - main 직접 push 금지. PR merge(Create a merge commit)로만 진행. Rebase and Merge 금지
 
 ## 주의사항
