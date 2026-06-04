@@ -3,6 +3,7 @@ import MainLayout from './layouts/MainLayout'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import SiteListPage from './pages/site/SiteListPage'
+import SiteDetailPage from './pages/site/SiteDetailPage'
 import EstimateListPage from './pages/estimate/EstimateListPage'
 import PurchaseListPage from './pages/purchase/PurchaseListPage'
 import TaxListPage from './pages/tax/TaxListPage'
@@ -30,6 +31,7 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="sites" element={<SiteListPage />} />
+        <Route path="sites/:id" element={<SiteDetailPage />} />
         <Route path="estimates" element={<EstimateListPage />} />
         <Route path="purchases" element={<PurchaseListPage />} />
         <Route path="taxes" element={<TaxListPage />} />
