@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Input } from 'antd'
 import { motion } from 'motion/react'
 import {
+  ArrowUpRight,
   Building2,
   CalendarDays,
   FileText,
@@ -215,6 +217,7 @@ function EmptyRelation({ message }: { message: string }) {
 }
 
 export default function SiteListPage() {
+  const navigate = useNavigate()
   const { data: sitesData, isLoading: sitesLoading, isError: sitesError, refetch: sitesRefetch } = useSites()
   const { data: estimatesData, isLoading: estimatesLoading } = useEstimates()
   const { data: purchasesData, isLoading: purchasesLoading } = usePurchases()
@@ -497,13 +500,32 @@ export default function SiteListPage() {
                       }}
                     >
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>진행 기간</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 10 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 12 }}>
                         {selectedSite.startDate} ~ {selectedSite.endDate}
                       </div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>현장 요약</div>
-                      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
-                        선택한 현장의 견적, 세금계산서, 매입 내역을 현장 기준으로 묶어서 보고 있습니다.
-                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => navigate(`/sites/${selectedSite.id}`)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          padding: '9px 12px',
+                          background: 'rgba(255,255,255,0.92)',
+                          border: 'none',
+                          borderRadius: 8,
+                          color: '#0b1220',
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        상세 페이지로 이동
+                        <ArrowUpRight size={14} strokeWidth={2.5} />
+                      </motion.button>
                     </div>
                   </div>
                 </motion.section>
