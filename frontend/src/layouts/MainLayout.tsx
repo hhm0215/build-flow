@@ -1,4 +1,4 @@
-import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, useNavigate, useLocation, matchPath } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   LayoutDashboard,
@@ -13,6 +13,8 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { useSite } from '../api/sites.api'
+import NotificationBell from '../components/NotificationBell'
 
 const menuItems = [
   { key: '/dashboard', icon: LayoutDashboard, label: '대시보드' },
@@ -30,6 +32,17 @@ export default function MainLayout() {
   const logout = useAuthStore((s) => s.logout)
 
   const currentPage = menuItems.find((m) => m.key === location.pathname)
+
+  const siteDetailMatch = matchPath('/sites/:id', location.pathname)
+  const parsedSiteId = siteDetailMatch?.params?.id ? Number(siteDetailMatch.params.id) : NaN
+  const siteDetailId = Number.isFinite(parsedSiteId) && parsedSiteId > 0 ? parsedSiteId : 0
+  const { data: siteForBreadcrumb } = useSite(siteDetailId)
+
+  const breadcrumbItems: string[] = currentPage
+    ? [currentPage.label]
+    : siteDetailId > 0
+      ? ['현장 관리', siteForBreadcrumb?.siteName ?? `#${siteDetailId}`]
+      : []
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
@@ -195,10 +208,26 @@ export default function MainLayout() {
           }}
         >
           <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>BuildFlow</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>/</span>
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500 }}>
-            {currentPage?.label ?? ''}
-          </span>
+          {breadcrumbItems.map((label, idx) => (
+            <span key={`${label}-${idx}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>/</span>
+              <span
+                style={{
+                  color: idx === breadcrumbItems.length - 1 ? 'var(--text-secondary)' : 'var(--text-muted)',
+                  fontSize: 13,
+                  fontWeight: idx === breadcrumbItems.length - 1 ? 500 : 400,
+                  maxWidth: 240,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </span>
+            </span>
+          ))}
+          <div style={{ flex: 1 }} />
+          <NotificationBell />
         </motion.header>
 
         {/* Content */}
