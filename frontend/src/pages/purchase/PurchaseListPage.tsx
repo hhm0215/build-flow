@@ -1,17 +1,64 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShoppingBag, Plus } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
+import FilterBar from '../../components/filters/FilterBar'
+import FilterSearch from '../../components/filters/FilterSearch'
+import FilterDateRange from '../../components/filters/FilterDateRange'
+import FilterAmountRange from '../../components/filters/FilterAmountRange'
+import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { usePurchases, useCreatePurchase } from '../../api/purchases.api'
 import type { PurchaseCreateRequest } from '../../types'
+
+interface PurchaseFilters {
+  q: string
+  startDate: string
+  endDate: string
+  minAmount: number
+  maxAmount: number
+}
+
+const FILTER_SCHEMA: FilterSchema = {
+  q: { type: 'string' },
+  startDate: { type: 'date' },
+  endDate: { type: 'date' },
+  minAmount: { type: 'number' },
+  maxAmount: { type: 'number' },
+}
 
 export default function PurchaseListPage() {
   const { data, isLoading, isError, refetch } = usePurchases()
   const purchases = data ?? []
-  const totalAmount = purchases.reduce((sum, p) => sum + p.totalAmount, 0)
+
+  const [filters, setFilters] = useFilterParams<PurchaseFilters>(FILTER_SCHEMA)
+  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
+
+  const filtered = useMemo(() => {
+    const q = debouncedQ.trim().toLowerCase()
+    return purchases.filter((p) => {
+      if (q && !(`${p.itemName} ${p.supplier ?? ''}`.toLowerCase().includes(q))) return false
+      const dateKey = p.purchaseDate?.slice(0, 10) ?? ''
+      if (filters.startDate && dateKey < filters.startDate) return false
+      if (filters.endDate && dateKey > filters.endDate) return false
+      if (filters.minAmount != null && p.totalAmount < filters.minAmount) return false
+      if (filters.maxAmount != null && p.totalAmount > filters.maxAmount) return false
+      return true
+    })
+  }, [purchases, debouncedQ, filters.startDate, filters.endDate, filters.minAmount, filters.maxAmount])
+
+  const totalAmount = filtered.reduce((sum, p) => sum + p.totalAmount, 0)
+
+  const activeCount =
+    (filters.q ? 1 : 0) +
+    (filters.startDate || filters.endDate ? 1 : 0) +
+    (filters.minAmount != null || filters.maxAmount != null ? 1 : 0)
+
+  const resetFilters = () =>
+    setFilters({ q: '', startDate: '', endDate: '', minAmount: undefined, maxAmount: undefined })
 
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm()
@@ -117,6 +164,28 @@ export default function PurchaseListPage() {
         </Form>
       </Modal>
 
+      <FilterBar activeCount={activeCount} onReset={resetFilters}>
+        <FilterSearch
+          value={filters.q ?? ''}
+          onChange={(v) => setFilters({ q: v })}
+          placeholder="품목명, 공급업체 검색"
+        />
+        <FilterDateRange
+          startDate={filters.startDate}
+          endDate={filters.endDate}
+          onChange={(range) =>
+            setFilters({ startDate: range.startDate ?? '', endDate: range.endDate ?? '' })
+          }
+        />
+        <FilterAmountRange
+          minAmount={filters.minAmount}
+          maxAmount={filters.maxAmount}
+          onChange={(range) =>
+            setFilters({ minAmount: range.minAmount, maxAmount: range.maxAmount })
+          }
+        />
+      </FilterBar>
+
       {!isLoading && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
@@ -132,7 +201,9 @@ export default function PurchaseListPage() {
             marginBottom: 12,
           }}
         >
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>전체 매입 합계</span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            {activeCount > 0 ? `필터 결과 매입 합계 (${filtered.length}건)` : '전체 매입 합계'}
+          </span>
           <span style={{ fontSize: 18, fontWeight: 700, color: '#ef4444', letterSpacing: '-0.03em' }}>
             ₩{totalAmount.toLocaleString('ko-KR')}
           </span>
@@ -147,6 +218,19 @@ export default function PurchaseListPage() {
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />
           ))}
         </div>
+      ) : filtered.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            textAlign: 'center',
+            padding: '48px 0',
+            color: 'var(--text-muted)',
+            fontSize: 14,
+          }}
+        >
+          {activeCount > 0 ? '필터 조건에 맞는 매입이 없습니다.' : '등록된 매입이 없습니다.'}
+        </motion.div>
       ) : (
         <motion.div
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}
@@ -164,13 +248,13 @@ export default function PurchaseListPage() {
               </tr>
             </thead>
             <tbody>
-              {purchases.map((p, i) => (
+              {filtered.map((p, i) => (
                 <motion.tr
                   key={p.id}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  style={{ borderBottom: i < purchases.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
+                  transition={{ delay: Math.min(i, 9) * 0.03 }}
+                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
