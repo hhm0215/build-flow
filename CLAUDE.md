@@ -96,8 +96,11 @@ bun run preview         # 빌드 결과 미리보기
 
 ### Kafka 이벤트 흐름
 
-- `estimate.parsed`: estimate-service → site-service (손익 재계산)
-- `purchase.registered`: purchase-service → site-service (손익 재계산)
+핵심 흐름만 요약 — 전체 토픽 목록은 `docs/ARCHITECTURE.md` "2.2 비동기 통신" 참조.
+
+- `estimate.parsed` / `estimate.deleted`: estimate-service → site-service (손익 재계산)
+- `purchase.registered` / `purchase.updated` / `purchase.deleted`: purchase-service → site-service
+- `tax.registered` / `tax.payment.confirmed`: tax-service → site-service (미수금 갱신)
 - notification-service: 모든 토픽 구독 → 인앱 알림
 
 ### 현장 문서 라이프사이클

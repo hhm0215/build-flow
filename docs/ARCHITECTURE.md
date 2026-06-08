@@ -62,13 +62,23 @@
 즉시 응답이 필요 없고, 이벤트 발생을 알리는 경우.
 발행자는 이벤트를 던지고 끝. 소비자가 각자 처리.
 
+#### 구현된 토픽 (2026-06-09 기준)
+
 | 토픽 | 발행자 | 소비자 | 설명 |
 |------|--------|--------|------|
-| estimate.uploaded | estimate-service | site-service | 견적서 업로드 완료 → 손익 재계산 |
-| purchase.registered | purchase-service | site-service | 매입 등록 → 손익 재계산 |
-| tax.invoice.created | tax-service | site-service | 세금계산서 등록 → 미수금 갱신 |
+| estimate.parsed | estimate-service | site-service · notification-service | 공내역 AI 파싱 완료 → 손익 재계산 + 알림 |
+| estimate.deleted | estimate-service | site-service · notification-service | 견적서 삭제 → 손익 재계산 |
+| purchase.registered | purchase-service | site-service · notification-service | 매입 등록 → 손익 재계산 + 알림 |
+| purchase.updated | purchase-service | site-service | 매입 수정 → 손익 재계산 |
+| purchase.deleted | purchase-service | site-service | 매입 삭제 → 손익 재계산 |
+| tax.registered | tax-service | site-service · notification-service | 세금계산서 등록 → 미수금 갱신 + 알림 |
 | tax.payment.confirmed | tax-service | site-service | 입금 확인 → 미수금 차감 |
-| warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 알림 생성 |
+
+#### 계획 토픽 (미구현)
+
+| 토픽 | 발행자 | 소비자 | 설명 |
+|------|--------|--------|------|
+| warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 알림 (스케줄러 미구현) |
 | site.status.changed | site-service | notification-service | 현장 상태 변경 → 알림 |
 
 ### 2.3 Kafka 메시지 포맷
