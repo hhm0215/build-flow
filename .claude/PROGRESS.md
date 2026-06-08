@@ -132,25 +132,53 @@
 
 ---
 
+### ✅ frontend — 헤더 알림 벨 + 브레드크럼 보정 (2026-06-07)
+- NotificationBell: 헤더 우측 미읽음 뱃지(99+ 캡) + 최근 5건 드롭다운 + ESC/외부 클릭 닫기
+- 알림 클릭 시 markAsRead + siteId 있으면 현장 상세로 이동
+- `/sites/:id` 브레드크럼: matchPath + useSite로 siteName 동적 표시
+- 비숫자 siteId NaN 가드
+- `ddfddf1` feat(frontend): 헤더 알림 벨 + /sites/:id 브레드크럼 보정
+
+---
+
+### ✅ frontend — 검색/필터링 5페이지 일괄 패턴화 (2026-06-08)
+- 공통 부품: FilterBar(children 패턴) + FilterSearch / FilterSelect / FilterDateRange / FilterAmountRange
+- 공통 훅: useFilterParams(URL 동기화 + 스키마 검증 + 무효값 자동 정리) + useDebouncedValue(250ms)
+- 5페이지 적용:
+  - PurchaseListPage: 검색(품목/공급업체) · 매입일 · 금액 범위
+  - EstimateListPage: 검색(제목) · 상태 · 견적일 · 총액 범위
+  - WarrantyListPage: 검색(보험사/증권번호) · 유효/만료 · 만료일 범위
+  - TaxListPage: 검색(거래처) · 구분 · 입금상태 · 발행일 · 총액 범위
+  - SiteListPage: 사이드바 인라인 검색 + 상태
+- /review 적용 fix (P1/P2): cleanupOnceRef 제거 + setFilters functional updater + AmountRange 0 잔류 방지 + Select/DateRange 메모이제이션 + motion 스태거 캡 + 날짜 ISO 정규화 + SiteListPage 4-dataset 메모이제이션
+- 별도 PR 예정: useListFilters 추상화, useFilterParams 타입 추론, Warranty 필드 명명 일관성
+
+---
+
 ## 다음 작업 (우선순위 순)
 
-### 🔜 1. 헤더 알림 벨 + 미읽음 뱃지
-- notification API 이미 연동되어 있으므로 헤더 드롭다운만 추가
-- MainLayout 헤더에 Bell 아이콘 + 미읽음 카운트 뱃지
+### 🔜 1. 필터 리팩터 (별도 PR)
+- useListFilters 추상화: 5페이지 공통 boilerplate 통합
+- useFilterParams: schema에서 T 타입 추론 (interface 중복 제거)
+- Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
 
 ### 🔜 2. 공내역서 업로드 UI
 - 백엔드 Ollama 파싱 완료 상태. 프론트에 엑셀 업로드 화면이 없음
 - 업로드 → 파싱 결과 표시 → 견적서 초안 자동 채우기
 
-### 🔜 3. 검색/필터링 기능
-- 현장 상태별 필터, 거래처별 필터
-- 견적/매입/세금계산서 날짜·금액 범위 필터
+### 🔜 3. notification-service OCR + 만료 스케줄러
+- 보증보험 PDF 업로드 + Tesseract OCR
+- `@Scheduled`로 만료 임박 자동 알림 발송
 
-### 🔜 4. MainLayout 브레드크럼 보정
-- `/sites/:id` 진입 시 헤더 라벨이 빈칸 — 동적 경로 매칭 추가
-
-### 🔜 5. ESLint v9 config 마이그레이션 (기존 이슈)
+### 🔜 4. ESLint v9 config 마이그레이션 (기존 이슈)
 - `eslint.config.js` 미설정 상태. lint 실행 불가
+
+### 🔜 5. Gradle wrapper 설치
+- `gradlew` 없음 — 백엔드 자동 컴파일 검증 불가
+
+### 🔜 6. 기존 InputNumber parser 타입 캐스트 정리
+- estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
+- 본 PR 스코프 외 — 별도 정리
 
 ---
 

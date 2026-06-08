@@ -1,10 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { FileText, Plus, Trash2 } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
+import FilterBar from '../../components/filters/FilterBar'
+import FilterSearch from '../../components/filters/FilterSearch'
+import FilterSelect from '../../components/filters/FilterSelect'
+import FilterDateRange from '../../components/filters/FilterDateRange'
+import FilterAmountRange from '../../components/filters/FilterAmountRange'
+import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useEstimates, useCreateEstimate } from '../../api/estimates.api'
 import type { EstimateStatus, EstimateCreateRequest } from '../../types'
 
@@ -17,6 +24,29 @@ const STATUS_COLOR: Record<EstimateStatus, string> = {
   CONFIRMED: '#22c55e',
 }
 
+const STATUS_OPTIONS = [
+  { value: 'DRAFT' as const, label: STATUS_LABEL.DRAFT, color: STATUS_COLOR.DRAFT },
+  { value: 'CONFIRMED' as const, label: STATUS_LABEL.CONFIRMED, color: STATUS_COLOR.CONFIRMED },
+] as const
+
+interface EstimateFilters {
+  q: string
+  status: EstimateStatus
+  startDate: string
+  endDate: string
+  minAmount: number
+  maxAmount: number
+}
+
+const FILTER_SCHEMA: FilterSchema = {
+  q: { type: 'string' },
+  status: { type: 'enum', values: ['DRAFT', 'CONFIRMED'] },
+  startDate: { type: 'date' },
+  endDate: { type: 'date' },
+  minAmount: { type: 'number' },
+  maxAmount: { type: 'number' },
+}
+
 function formatKRW(n: number) {
   return `₩${n.toLocaleString('ko-KR')}`
 }
@@ -24,6 +54,39 @@ function formatKRW(n: number) {
 export default function EstimateListPage() {
   const { data, isLoading, isError, refetch } = useEstimates()
   const estimates = data ?? []
+
+  const [filters, setFilters] = useFilterParams<EstimateFilters>(FILTER_SCHEMA)
+  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
+
+  const filtered = useMemo(() => {
+    const q = debouncedQ.trim().toLowerCase()
+    return estimates.filter((est) => {
+      if (q && !est.title.toLowerCase().includes(q)) return false
+      if (filters.status && est.status !== filters.status) return false
+      const dateKey = est.estimateDate?.slice(0, 10) ?? ''
+      if (filters.startDate && dateKey < filters.startDate) return false
+      if (filters.endDate && dateKey > filters.endDate) return false
+      if (filters.minAmount != null && est.totalAmount < filters.minAmount) return false
+      if (filters.maxAmount != null && est.totalAmount > filters.maxAmount) return false
+      return true
+    })
+  }, [estimates, debouncedQ, filters.status, filters.startDate, filters.endDate, filters.minAmount, filters.maxAmount])
+
+  const activeCount =
+    (filters.q ? 1 : 0) +
+    (filters.status ? 1 : 0) +
+    (filters.startDate || filters.endDate ? 1 : 0) +
+    (filters.minAmount != null || filters.maxAmount != null ? 1 : 0)
+
+  const resetFilters = () =>
+    setFilters({
+      q: '',
+      status: undefined,
+      startDate: '',
+      endDate: '',
+      minAmount: undefined,
+      maxAmount: undefined,
+    })
 
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm()
@@ -233,6 +296,34 @@ export default function EstimateListPage() {
         </Form>
       </Modal>
 
+      <FilterBar activeCount={activeCount} onReset={resetFilters}>
+        <FilterSearch
+          value={filters.q ?? ''}
+          onChange={(v) => setFilters({ q: v })}
+          placeholder="견적 제목 검색"
+        />
+        <FilterSelect<EstimateStatus>
+          placeholder="상태"
+          value={filters.status}
+          options={STATUS_OPTIONS}
+          onChange={(v) => setFilters({ status: v })}
+        />
+        <FilterDateRange
+          startDate={filters.startDate}
+          endDate={filters.endDate}
+          onChange={(range) =>
+            setFilters({ startDate: range.startDate ?? '', endDate: range.endDate ?? '' })
+          }
+        />
+        <FilterAmountRange
+          minAmount={filters.minAmount}
+          maxAmount={filters.maxAmount}
+          onChange={(range) =>
+            setFilters({ minAmount: range.minAmount, maxAmount: range.maxAmount })
+          }
+        />
+      </FilterBar>
+
       {isError ? (
         <ErrorState onRetry={refetch} />
       ) : isLoading ? (
@@ -241,6 +332,19 @@ export default function EstimateListPage() {
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />
           ))}
         </div>
+      ) : filtered.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            textAlign: 'center',
+            padding: '48px 0',
+            color: 'var(--text-muted)',
+            fontSize: 14,
+          }}
+        >
+          {activeCount > 0 ? '필터 조건에 맞는 견적서가 없습니다.' : '등록된 견적서가 없습니다.'}
+        </motion.div>
       ) : (
         <motion.div
           style={{
@@ -263,13 +367,13 @@ export default function EstimateListPage() {
               </tr>
             </thead>
             <tbody>
-              {estimates.map((est, i) => (
+              {filtered.map((est, i) => (
                 <motion.tr
                   key={est.id}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  style={{ borderBottom: i < estimates.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
+                  transition={{ delay: Math.min(i, 9) * 0.03 }}
+                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >

@@ -1,12 +1,39 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShieldCheck, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
+import FilterBar from '../../components/filters/FilterBar'
+import FilterSearch from '../../components/filters/FilterSearch'
+import FilterSelect from '../../components/filters/FilterSelect'
+import FilterDateRange from '../../components/filters/FilterDateRange'
+import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useWarranties, useExpiringWarranties, useDeleteWarranty, useCreateWarranty } from '../../api/warranties.api'
 import type { WarrantyCreateRequest } from '../../types/domain.types'
+
+type WarrantyStatus = 'VALID' | 'EXPIRED'
+
+const STATUS_OPTIONS = [
+  { value: 'VALID' as const, label: '유효', color: '#22c55e' },
+  { value: 'EXPIRED' as const, label: '만료', color: '#ef4444' },
+] as const
+
+interface WarrantyFilters {
+  q: string
+  status: WarrantyStatus
+  endStart: string
+  endEnd: string
+}
+
+const FILTER_SCHEMA: FilterSchema = {
+  q: { type: 'string' },
+  status: { type: 'enum', values: ['VALID', 'EXPIRED'] },
+  endStart: { type: 'date' },
+  endEnd: { type: 'date' },
+}
 
 export default function WarrantyListPage() {
   const { data, isLoading, isError, refetch } = useWarranties()
@@ -15,6 +42,30 @@ export default function WarrantyListPage() {
   const { mutate: createWarranty, isPending: isCreating } = useCreateWarranty()
   const warranties = data ?? []
   const expiringCount = expiringData?.length ?? 0
+
+  const [filters, setFilters] = useFilterParams<WarrantyFilters>(FILTER_SCHEMA)
+  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
+
+  const filtered = useMemo(() => {
+    const q = debouncedQ.trim().toLowerCase()
+    return warranties.filter((w) => {
+      if (q && !(`${w.insuranceCompany} ${w.policyNumber}`.toLowerCase().includes(q))) return false
+      if (filters.status === 'VALID' && w.expired) return false
+      if (filters.status === 'EXPIRED' && !w.expired) return false
+      const dateKey = w.endDate?.slice(0, 10) ?? ''
+      if (filters.endStart && dateKey < filters.endStart) return false
+      if (filters.endEnd && dateKey > filters.endEnd) return false
+      return true
+    })
+  }, [warranties, debouncedQ, filters.status, filters.endStart, filters.endEnd])
+
+  const activeCount =
+    (filters.q ? 1 : 0) +
+    (filters.status ? 1 : 0) +
+    (filters.endStart || filters.endEnd ? 1 : 0)
+
+  const resetFilters = () =>
+    setFilters({ q: '', status: undefined, endStart: '', endEnd: '' })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [form] = Form.useForm()
@@ -104,6 +155,27 @@ export default function WarrantyListPage() {
         </motion.div>
       )}
 
+      <FilterBar activeCount={activeCount} onReset={resetFilters}>
+        <FilterSearch
+          value={filters.q ?? ''}
+          onChange={(v) => setFilters({ q: v })}
+          placeholder="보험사, 증권번호 검색"
+        />
+        <FilterSelect<WarrantyStatus>
+          placeholder="상태"
+          value={filters.status}
+          options={STATUS_OPTIONS}
+          onChange={(v) => setFilters({ status: v })}
+        />
+        <FilterDateRange
+          startDate={filters.endStart}
+          endDate={filters.endEnd}
+          onChange={(range) =>
+            setFilters({ endStart: range.startDate ?? '', endEnd: range.endDate ?? '' })
+          }
+        />
+      </FilterBar>
+
       {isError ? (
         <ErrorState onRetry={refetch} />
       ) : isLoading ? (
@@ -112,7 +184,7 @@ export default function WarrantyListPage() {
             <div key={i} className="shimmer" style={{ height: 64, borderRadius: 10 }} />
           ))}
         </div>
-      ) : warranties.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -123,7 +195,7 @@ export default function WarrantyListPage() {
             fontSize: 14,
           }}
         >
-          등록된 보증보험이 없습니다.
+          {activeCount > 0 ? '필터 조건에 맞는 보증보험이 없습니다.' : '등록된 보증보험이 없습니다.'}
         </motion.div>
       ) : (
         <motion.div
@@ -142,13 +214,13 @@ export default function WarrantyListPage() {
               </tr>
             </thead>
             <tbody>
-              {warranties.map((w, i) => (
+              {filtered.map((w, i) => (
                 <motion.tr
                   key={w.id}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  style={{ borderBottom: i < warranties.length - 1 ? '1px solid var(--border)' : 'none' }}
+                  transition={{ delay: Math.min(i, 9) * 0.03 }}
+                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border)' : 'none' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >

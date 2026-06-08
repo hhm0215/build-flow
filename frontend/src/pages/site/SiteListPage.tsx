@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Input } from 'antd'
 import { motion } from 'motion/react'
 import {
   ArrowUpRight,
@@ -10,30 +9,49 @@ import {
   HardHat,
   Plus,
   Receipt,
-  Search,
   ShoppingBag,
   TrendingUp,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
+import FilterSearch from '../../components/filters/FilterSearch'
+import FilterSelect from '../../components/filters/FilterSelect'
+import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
+import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useSites } from '../../api/sites.api'
 import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
-import { Site } from '../../types'
+import { Site, SiteStatus } from '../../types'
 
-const STATUS_LABEL: Record<Site['status'], string> = {
+const STATUS_LABEL: Record<SiteStatus, string> = {
   IN_PROGRESS: '시공 중',
   SETTLING: '정산 중',
   WARRANTY: '하자보증',
   COMPLETED: '완료',
 }
-const STATUS_COLOR: Record<Site['status'], string> = {
+const STATUS_COLOR: Record<SiteStatus, string> = {
   IN_PROGRESS: '#3b82f6',
   SETTLING: '#f59e0b',
   WARRANTY: '#8b5cf6',
   COMPLETED: '#52525b',
+}
+
+const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SiteStatus[]).map((s) => ({
+  value: s,
+  label: STATUS_LABEL[s],
+  color: STATUS_COLOR[s],
+}))
+
+interface SiteFilters {
+  q: string
+  status: SiteStatus
+}
+
+const FILTER_SCHEMA: FilterSchema = {
+  q: { type: 'string' },
+  status: { type: 'enum', values: ['IN_PROGRESS', 'SETTLING', 'WARRANTY', 'COMPLETED'] },
 }
 
 const ESTIMATE_STATUS_LABEL: Record<string, string> = {
@@ -228,14 +246,18 @@ export default function SiteListPage() {
   const purchases = purchasesData ?? []
   const taxes = taxesData ?? []
 
-  const [query, setQuery] = useState('')
+  const [filters, setFilters] = useFilterParams<SiteFilters>(FILTER_SCHEMA)
+  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
 
-  const normalizedQuery = query.trim().toLowerCase()
-  const filteredSites = sites.filter((site) => {
-    if (!normalizedQuery) return true
-    return `${site.siteName} ${site.client?.companyName ?? ''}`.toLowerCase().includes(normalizedQuery)
-  })
+  const filteredSites = useMemo(() => {
+    const q = debouncedQ.trim().toLowerCase()
+    return sites.filter((site) => {
+      if (q && !`${site.siteName} ${site.client?.companyName ?? ''}`.toLowerCase().includes(q)) return false
+      if (filters.status && site.status !== filters.status) return false
+      return true
+    })
+  }, [sites, debouncedQ, filters.status])
 
   useEffect(() => {
     if (!filteredSites.length) {
@@ -248,30 +270,48 @@ export default function SiteListPage() {
     }
   }, [filteredSites, selectedSiteId])
 
-  const selectedSite = filteredSites.find((site) => site.id === selectedSiteId) ?? null
+  const selectedSite: Site | null = filteredSites.find((site) => site.id === selectedSiteId) ?? null
+  const selectedSiteIdResolved = selectedSite?.id ?? null
 
-  const siteEstimates = selectedSite
-    ? estimates
-      .filter((estimate) => estimate.siteId === selectedSite.id)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    : []
+  const siteEstimates = useMemo(
+    () =>
+      selectedSiteIdResolved == null
+        ? []
+        : estimates
+            .filter((estimate) => estimate.siteId === selectedSiteIdResolved)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [estimates, selectedSiteIdResolved],
+  )
 
-  const sitePurchases = selectedSite
-    ? purchases
-      .filter((purchase) => purchase.siteId === selectedSite.id)
-      .sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate))
-    : []
+  const sitePurchases = useMemo(
+    () =>
+      selectedSiteIdResolved == null
+        ? []
+        : purchases
+            .filter((purchase) => purchase.siteId === selectedSiteIdResolved)
+            .sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate)),
+    [purchases, selectedSiteIdResolved],
+  )
 
-  const siteTaxes = selectedSite
-    ? taxes
-      .filter((tax) => tax.siteId === selectedSite.id)
-      .sort((a, b) => b.issueDate.localeCompare(a.issueDate))
-    : []
+  const siteTaxes = useMemo(
+    () =>
+      selectedSiteIdResolved == null
+        ? []
+        : taxes
+            .filter((tax) => tax.siteId === selectedSiteIdResolved)
+            .sort((a, b) => b.issueDate.localeCompare(a.issueDate)),
+    [taxes, selectedSiteIdResolved],
+  )
 
-  const estimateTotal = siteEstimates.reduce((sum, estimate) => sum + estimate.totalAmount, 0)
-  const purchaseTotal = sitePurchases.reduce((sum, purchase) => sum + purchase.totalAmount, 0)
-  const taxTotal = siteTaxes.reduce((sum, tax) => sum + tax.totalAmount, 0)
-  const unpaidTotal = siteTaxes.filter((t) => !t.paymentConfirmed && t.type === 'SALES').reduce((sum, t) => sum + t.totalAmount, 0)
+  const { estimateTotal, purchaseTotal, taxTotal, unpaidTotal } = useMemo(() => {
+    const e = siteEstimates.reduce((sum, est) => sum + est.totalAmount, 0)
+    const p = sitePurchases.reduce((sum, pp) => sum + pp.totalAmount, 0)
+    const t = siteTaxes.reduce((sum, tt) => sum + tt.totalAmount, 0)
+    const u = siteTaxes
+      .filter((tt) => !tt.paymentConfirmed && tt.type === 'SALES')
+      .reduce((sum, tt) => sum + tt.totalAmount, 0)
+    return { estimateTotal: e, purchaseTotal: p, taxTotal: t, unpaidTotal: u }
+  }, [siteEstimates, sitePurchases, siteTaxes])
 
   return (
     <div>
@@ -340,13 +380,21 @@ export default function SiteListPage() {
               </div>
             </div>
 
-            <Input
-              allowClear
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              prefix={<Search size={15} color="var(--text-muted)" strokeWidth={2} />}
-              placeholder="현장명, 발주처 검색"
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <FilterSearch
+                value={filters.q ?? ''}
+                onChange={(v) => setFilters({ q: v })}
+                placeholder="현장명, 발주처 검색"
+                width={288}
+              />
+              <FilterSelect<SiteStatus>
+                placeholder="상태"
+                value={filters.status}
+                options={STATUS_OPTIONS}
+                onChange={(v) => setFilters({ status: v })}
+                width={288}
+              />
+            </div>
 
             <div
               style={{
@@ -376,7 +424,7 @@ export default function SiteListPage() {
                   border: '1px solid rgba(34,197,94,0.16)',
                 }}
               >
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>검색 결과</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>필터 결과</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{filteredSites.length}</div>
               </div>
             </div>
@@ -441,7 +489,7 @@ export default function SiteListPage() {
                   )
                 })
               ) : (
-                <EmptyRelation message="검색 조건에 맞는 현장이 없습니다." />
+                <EmptyRelation message="필터 조건에 맞는 현장이 없습니다." />
               )}
             </div>
           </aside>
