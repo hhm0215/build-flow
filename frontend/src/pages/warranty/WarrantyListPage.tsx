@@ -40,7 +40,7 @@ export default function WarrantyListPage() {
   const { data: expiringData } = useExpiringWarranties(30)
   const { mutate: deleteWarranty } = useDeleteWarranty()
   const { mutate: createWarranty, isPending: isCreating } = useCreateWarranty()
-  const warranties = data ?? []
+  const warranties = useMemo(() => data ?? [], [data])
   const expiringCount = expiringData?.length ?? 0
 
   const [filters, setFilters] = useFilterParams<WarrantyFilters>(FILTER_SCHEMA)

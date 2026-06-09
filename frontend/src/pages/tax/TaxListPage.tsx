@@ -52,7 +52,7 @@ export default function TaxListPage() {
   const { mutate: createTax, isPending: isCreating } = useCreateTax()
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm()
-  const invoices = data ?? []
+  const invoices = useMemo(() => data ?? [], [data])
 
   const [filters, setFilters] = useFilterParams<TaxFilters>(FILTER_SCHEMA)
   const debouncedQ = useDebouncedValue(filters.q ?? '', 250)

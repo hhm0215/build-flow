@@ -32,7 +32,7 @@ const FILTER_SCHEMA: FilterSchema = {
 
 export default function PurchaseListPage() {
   const { data, isLoading, isError, refetch } = usePurchases()
-  const purchases = data ?? []
+  const purchases = useMemo(() => data ?? [], [data])
 
   const [filters, setFilters] = useFilterParams<PurchaseFilters>(FILTER_SCHEMA)
   const debouncedQ = useDebouncedValue(filters.q ?? '', 250)

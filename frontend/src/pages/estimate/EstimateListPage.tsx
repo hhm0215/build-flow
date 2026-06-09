@@ -53,7 +53,7 @@ function formatKRW(n: number) {
 
 export default function EstimateListPage() {
   const { data, isLoading, isError, refetch } = useEstimates()
-  const estimates = data ?? []
+  const estimates = useMemo(() => data ?? [], [data])
 
   const [filters, setFilters] = useFilterParams<EstimateFilters>(FILTER_SCHEMA)
   const debouncedQ = useDebouncedValue(filters.q ?? '', 250)

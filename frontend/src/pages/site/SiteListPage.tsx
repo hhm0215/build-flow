@@ -241,10 +241,10 @@ export default function SiteListPage() {
   const { data: purchasesData, isLoading: purchasesLoading } = usePurchases()
   const { data: taxesData, isLoading: taxesLoading } = useTaxes()
 
-  const sites = sitesData ?? []
-  const estimates = estimatesData ?? []
-  const purchases = purchasesData ?? []
-  const taxes = taxesData ?? []
+  const sites = useMemo(() => sitesData ?? [], [sitesData])
+  const estimates = useMemo(() => estimatesData ?? [], [estimatesData])
+  const purchases = useMemo(() => purchasesData ?? [], [purchasesData])
+  const taxes = useMemo(() => taxesData ?? [], [taxesData])
 
   const [filters, setFilters] = useFilterParams<SiteFilters>(FILTER_SCHEMA)
   const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
