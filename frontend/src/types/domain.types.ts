@@ -91,6 +91,21 @@ export interface EstimateCreateRequest {
   memo?: string
 }
 
+// ── 공내역서 파싱 (Ollama) ─────────────────
+export interface ParsedItemResult {
+  itemName: string
+  unit: string
+  quantity: number
+  unitPrice: number
+  amount: number
+}
+
+export interface ParseResult {
+  fileName: string
+  itemCount: number
+  items: ParsedItemResult[]
+}
+
 // ── Purchase (매입) ───────────────────────────
 export interface Purchase {
   id: number

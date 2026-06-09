@@ -141,6 +141,17 @@
 
 ---
 
+### ✅ frontend — 공내역서 업로드 UI (2026-06-09)
+- 엑셀 업로드 모달 신설: 드래그앤드롭 + .xlsx/.xls 검증 + 10MB 제한
+- `POST /api/v1/estimates/parse` 호출 (multipart/form-data, timeout 120s)
+- 파싱 결과 항목 테이블 미리보기 + 합계 표시
+- "견적서로 만들기" → 견적서 작성 모달 열기 + items/title 자동 채움 (afterOpenChange + form.setFieldsValue)
+- MSW 핸들러: 1.5초 지연 + 10개 더미 항목 (실서버 Ollama는 30초~1분 소요, 모달에 안내)
+- 신규 타입: `ParseResult`, `ParsedItemResult`
+- 신규 훅: `useParseEstimateFile`
+
+---
+
 ### ✅ frontend — 검색/필터링 5페이지 일괄 패턴화 (2026-06-08)
 - 공통 부품: FilterBar(children 패턴) + FilterSearch / FilterSelect / FilterDateRange / FilterAmountRange
 - 공통 훅: useFilterParams(URL 동기화 + 스키마 검증 + 무효값 자동 정리) + useDebouncedValue(250ms)
@@ -162,21 +173,18 @@
 - useFilterParams: schema에서 T 타입 추론 (interface 중복 제거)
 - Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
 
-### 🔜 2. 공내역서 업로드 UI
-- 백엔드 Ollama 파싱 완료 상태. 프론트에 엑셀 업로드 화면이 없음
-- 업로드 → 파싱 결과 표시 → 견적서 초안 자동 채우기
-
-### 🔜 3. notification-service OCR + 만료 스케줄러
+### 🔜 2. notification-service OCR + 만료 스케줄러
 - 보증보험 PDF 업로드 + Tesseract OCR
 - `@Scheduled`로 만료 임박 자동 알림 발송
 
-### 🔜 4. ESLint v9 config 마이그레이션 (기존 이슈)
-- `eslint.config.js` 미설정 상태. lint 실행 불가
+### 🔜 3. 견적서 작성 모달 — 현장 ID 입력 개선
+- 현재 siteId 수동 InputNumber. Select(현장 목록 검색)으로 교체
+- 공내역서 업로드 흐름에서도 함께 적용
 
-### 🔜 5. Gradle wrapper 설치
+### 🔜 4. Gradle wrapper 설치
 - `gradlew` 없음 — 백엔드 자동 컴파일 검증 불가
 
-### 🔜 6. 기존 InputNumber parser 타입 캐스트 정리
+### 🔜 5. 기존 InputNumber parser 타입 캐스트 정리
 - estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
 - 본 PR 스코프 외 — 별도 정리
 
@@ -207,4 +215,5 @@
 
 - `estimate-service/build.gradle` line 9 타이포 (`boo,t`) — ✅ 수정 완료 (2026-04-09)
 - tax-service `ddl-auto: update`로 변경 완료
+- ESLint v9 flat config 도입 완료 (`66af734`, 2026-06-08)
 - Gradle wrapper (gradlew) 미설치 — 빌드 시 설치 필요
