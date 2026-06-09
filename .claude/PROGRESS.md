@@ -188,6 +188,10 @@
 - estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
 - 본 PR 스코프 외 — 별도 정리
 
+### 🔜 6. /review 발견 정리 (2026-06-10, 공내역서 업로드 UI 후속)
+- `frontend/src/api/estimates.api.ts:43` — multipart 요청에서 `Content-Type: 'multipart/form-data'` 수동 설정 제거. axios가 FormData 입력 시 boundary 포함해 자동 설정하므로 수동 헤더는 boundary 누락 위험
+- `frontend/src/pages/estimate/UploadParseModal.tsx:55` — parse 실패 시 백엔드 `error.response?.data?.error`를 우선 노출하고 fallback으로 generic 메시지 사용 (디버깅·사용자 안내 향상)
+
 ---
 
 ## 서비스 포트 정리
