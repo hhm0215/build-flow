@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { FileText, Plus, Trash2 } from 'lucide-react'
+import { FileText, Plus, Trash2, Sparkles } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
@@ -13,7 +13,8 @@ import FilterAmountRange from '../../components/filters/FilterAmountRange'
 import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useEstimates, useCreateEstimate } from '../../api/estimates.api'
-import type { EstimateStatus, EstimateCreateRequest } from '../../types'
+import UploadParseModal from './UploadParseModal'
+import type { EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
 
 const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
@@ -89,8 +90,25 @@ export default function EstimateListPage() {
     })
 
   const [open, setOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [pendingItems, setPendingItems] = useState<ParsedItemResult[] | null>(null)
   const [form] = Form.useForm()
   const createMutation = useCreateEstimate()
+
+  const handleParsedConfirm = (items: ParsedItemResult[], fileName: string) => {
+    setPendingItems(items)
+    setUploadOpen(false)
+    setOpen(true)
+    const fallbackTitle = fileName.replace(/\.(xlsx|xls)$/i, '')
+    form.setFieldsValue({ title: fallbackTitle })
+  }
+
+  const handleCreateModalAfterOpen = (visible: boolean) => {
+    if (visible && pendingItems) {
+      form.setFieldsValue({ items: pendingItems })
+      setPendingItems(null)
+    }
+  }
 
   const handleOk = () => {
     form.validateFields().then((values) => {
@@ -128,34 +146,59 @@ export default function EstimateListPage() {
         title="견적서"
         description="공내역서 AI 파싱 및 견적서 관리"
         action={
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setOpen(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px',
-              background: 'var(--accent-gradient)',
-              border: 'none', borderRadius: 'var(--radius-sm)',
-              color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 0 16px rgba(59,130,246,0.2)',
-            }}
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            견적서 작성
-          </motion.button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setUploadOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 14px',
+                background: 'rgba(167,139,250,0.1)',
+                border: '1px solid rgba(167,139,250,0.35)',
+                borderRadius: 'var(--radius-sm)',
+                color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <Sparkles size={14} strokeWidth={2.5} />
+              엑셀로 작성
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px',
+                background: 'var(--accent-gradient)',
+                border: 'none', borderRadius: 'var(--radius-sm)',
+                color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 0 16px rgba(59,130,246,0.2)',
+              }}
+            >
+              <Plus size={14} strokeWidth={2.5} />
+              견적서 작성
+            </motion.button>
+          </div>
         }
+      />
+
+      <UploadParseModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onConfirm={handleParsedConfirm}
       />
 
       <Modal
         title="견적서 작성"
         open={open}
         onOk={handleOk}
-        onCancel={() => { setOpen(false); form.resetFields() }}
+        onCancel={() => { setOpen(false); form.resetFields(); setPendingItems(null) }}
         okText="작성"
         cancelText="취소"
         confirmLoading={createMutation.isPending}
         destroyOnClose
+        afterOpenChange={handleCreateModalAfterOpen}
         width={720}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>

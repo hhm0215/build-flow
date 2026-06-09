@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, Estimate, EstimateCreateRequest } from '../types'
+import { ApiResponse, Estimate, EstimateCreateRequest, ParseResult } from '../types'
 
 export const ESTIMATES_KEY = {
   all: ['estimates'] as const,
@@ -34,6 +34,16 @@ const deleteEstimate = async (id: number) => {
 
 const confirmEstimate = async (id: number) => {
   const res = await axiosInstance.patch<ApiResponse<Estimate>>(`/estimates/${id}/confirm`)
+  return res.data.data
+}
+
+const parseEstimateFile = async (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await axiosInstance.post<ApiResponse<ParseResult>>('/estimates/parse', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120_000,
+  })
   return res.data.data
 }
 
@@ -81,5 +91,11 @@ export function useConfirmEstimate() {
   return useMutation({
     mutationFn: confirmEstimate,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ESTIMATES_KEY.all }),
+  })
+}
+
+export function useParseEstimateFile() {
+  return useMutation({
+    mutationFn: parseEstimateFile,
   })
 }
