@@ -204,15 +204,16 @@
 ## 다음 세션 진입점 (2026-06-10 갱신)
 
 **현재 git 상태**:
-- 로컬 `develop` = `origin/develop` (워크플로우 시스템 + /review fix 2건 push 완료)
+- 로컬 `develop` = `origin/develop` (워크플로우 시스템 + /review fix 2건 + PR 자동화 + 일관성 정렬까지 push)
 - 최신 SHA·차이는 `git fetch && git log origin/main..origin/develop`로 **실측**할 것
-- `origin/main`은 PR #20(공내역서 업로드 UI) 머지 시점 이후 변동 없음 — 누적 커밋 있음
+- **PR #21 생성 완료**: https://github.com/hhm0215/build-flow/pull/21 — 머지 대기
 
 **다음 세션 첫 액션**:
-1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측
-2. 누적 커밋 있고 PR 미생성이면 사용자에게 PR URL 안내 (`https://github.com/hhm0215/build-flow/compare/main...develop`)
-3. PR 머지 후 → `.claude/BACKLOG.md` 최우선 항목(현 시점 P0 #1 = notification-service OCR + 만료 스케줄러) 진입
-4. 사이클 시작 시 `.claude/plans/YYYY-MM-DD-{slug}.md` 계획 문서 작성부터
+1. `git fetch` 후 origin/main 변동 확인 (PR #21 머지 여부)
+2. PR #21 머지 완료면 → `.claude/BACKLOG.md` P0 #1 (notification-service OCR + 만료 스케줄러) 진입
+3. 사이클 시작 시 `.claude/plans/2026-XX-XX-warranty-ocr-scheduler.md` 계획 문서 작성부터
+4. **새 워크플로우 6단계(PR 생성 자동화)** 가 도입됨 — OCR 작업 끝나면 워크플로우 6단계 따라 `gh pr create`로 PR 자동 생성
+5. main 브랜치 보호 룰 활성화됨 — `gh pr merge`는 deny, 사용자가 GitHub 웹에서 직접 머지
 
 ## 알려진 이슈
 
