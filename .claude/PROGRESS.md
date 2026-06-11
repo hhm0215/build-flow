@@ -152,6 +152,14 @@
 
 ---
 
+### ✅ frontend — /review 후속 fix 2건 (2026-06-10) — 워크플로우 시범 사이클
+- `estimates.api.ts`: 공내역서 parse 요청에서 `Content-Type: multipart/form-data` 수동 헤더 제거 (axios 자동 boundary에 위임)
+- `UploadParseModal.tsx`: parse 실패 시 `isAxiosError` narrow 후 백엔드 `error.response?.data?.error?.message` 우선 노출
+- 워크플로우 시스템(BACKLOG/RETROSPECTIVE/plans + CLAUDE.md 사이클) 도입 후 첫 시범 사이클로 완주
+- 계획 문서: `.claude/plans/2026-06-10-review-fix-2.md`
+
+---
+
 ### ✅ frontend — 검색/필터링 5페이지 일괄 패턴화 (2026-06-08)
 - 공통 부품: FilterBar(children 패턴) + FilterSearch / FilterSelect / FilterDateRange / FilterAmountRange
 - 공통 훅: useFilterParams(URL 동기화 + 스키마 검증 + 무효값 자동 정리) + useDebouncedValue(250ms)
@@ -196,15 +204,15 @@
 ## 다음 세션 진입점 (2026-06-10 갱신)
 
 **현재 git 상태**:
-- 로컬 `develop` = `origin/develop` = `fdff6fd`
-- `origin/main` = `188a8ce` — **PR #20 머지 완료** (공내역서 업로드 UI 3 커밋 반영)
-- `develop ↔ main` 차이 = `fdff6fd docs: /review 후속 정리 항목 기록` 1개 (docs-only)
-  - 단독 PR 가치 약함 — 다음 작업과 묶어서 진행 권장
+- 로컬 `develop` = `origin/develop` (워크플로우 시스템 + /review fix 2건 push 완료)
+- 최신 SHA·차이는 `git fetch && git log origin/main..origin/develop`로 **실측**할 것
+- `origin/main`은 PR #20(공내역서 업로드 UI) 머지 시점 이후 변동 없음 — 누적 커밋 있음
 
 **다음 세션 첫 액션**:
-1. `git fetch` 후 origin/main, origin/develop 실측으로 PR 상태 검증 (PROGRESS.md만 믿지 말 것)
-2. 작업 우선순위 #2(보증보험 OCR + 스케줄러) 또는 #6(/review 후속 fix 2건)부터 진입
-3. #6은 작은 변경 — 다음 작업의 첫 커밋으로 묶어도 좋음
+1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측
+2. 누적 커밋 있고 PR 미생성이면 사용자에게 PR URL 안내 (`https://github.com/hhm0215/build-flow/compare/main...develop`)
+3. PR 머지 후 → `.claude/BACKLOG.md` 최우선 항목(현 시점 P0 #1 = notification-service OCR + 만료 스케줄러) 진입
+4. 사이클 시작 시 `.claude/plans/YYYY-MM-DD-{slug}.md` 계획 문서 작성부터
 
 ## 알려진 이슈
 

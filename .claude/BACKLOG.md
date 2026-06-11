@@ -25,14 +25,6 @@
 - **상태**: TODO
 - **계획 문서**: 작업 시작 시 `.claude/plans/YYYY-MM-DD-warranty-ocr-scheduler.md`로 작성
 
-### 2. /review 후속 fix 2건 (작은 변경, 워밍업)
-- **배경**: 공내역서 업로드 UI PR(#20) 머지 후 `/review`에서 발견. 단독 PR 가치는 약해 다음 작업 첫 커밋으로 묶을 만함.
-- **산출물**:
-  - `frontend/src/api/estimates.api.ts:43` — multipart 요청에서 `Content-Type: 'multipart/form-data'` 수동 설정 제거 (axios가 FormData 입력 시 boundary 포함해 자동 설정. 수동 헤더는 boundary 누락 위험)
-  - `frontend/src/pages/estimate/UploadParseModal.tsx:55` — parse 실패 시 백엔드 `error.response?.data?.error`를 우선 노출, fallback으로 generic 메시지
-- **예상 규모**: S
-- **상태**: TODO
-
 ---
 
 ## P1 — 중기
@@ -78,3 +70,4 @@
 | 날짜 | 작업 |
 |------|------|
 | 2026-06-10 | 초기 작성 — PROGRESS.md "다음 작업" 섹션에서 이관 |
+| 2026-06-10 | P0 #2 (/review 후속 fix 2건) 완료 → 제거 |
