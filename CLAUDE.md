@@ -175,6 +175,34 @@ bun run preview         # 빌드 결과 미리보기
 - PR 본문은 텍스트로만 제공. 형식 고정: `## 변경 사항` / `## 상세` 두 섹션만 사용. 개요·테스트·참고 같은 추가 섹션 즉흥 도입 금지
 - main 직접 push 금지. PR merge(Create a merge commit)로만 진행. Rebase and Merge 금지
 
+## 개발 워크플로우
+
+모든 작업은 아래 사이클을 따른다. 각 단계는 산출물(문서)을 남긴다.
+
+1. **백로그 확인** — `.claude/BACKLOG.md`에서 다음 항목 선택
+2. **계획 작성** — `.claude/plans/YYYY-MM-DD-{slug}.md` 작성 (템플릿은 `.claude/plans/README.md`), 사용자 합의 후 구현 진입
+3. **구현 + 커밋** — 작업 단위로 커밋, 사용자 사전 승인 규칙 준수
+4. **결과 반영** (작업 종료 시 필수):
+   - 계획 문서 "결과" 섹션 채움
+   - BACKLOG.md에서 완료 항목 제거
+   - PROGRESS.md "완료된 작업"에 한 줄 추가 + "다음 세션 진입점" git 상태 갱신
+5. **회고** — 실패/허비/예상과 다름이 있었으면 `.claude/RETROSPECTIVE.md`에 1건 작성. **재발 방지 규칙을 CLAUDE.md / 메모리 / hooks 중 어디에 박았는지 반드시 명시**
+
+- **IMPORTANT**: BACKLOG.md에 없는 작업은 먼저 BACKLOG.md에 추가 후 진행
+- **IMPORTANT**: 4단계 "결과 반영"을 누락하면 다음 세션이 stale 상태로 시작
+- **IMPORTANT**: RETROSPECTIVE에 회고만 적고 재발 방지 규칙을 어디에도 박지 않으면 같은 실패가 반복됨
+
+## 진행 상황 관리 (.claude/PROGRESS.md)
+
+- **IMPORTANT**: 세션 시작 시 `.claude/PROGRESS.md`를 먼저 읽고 현재 상태 파악
+- **IMPORTANT**: 작업 단위가 끝나 커밋을 만들 때 PROGRESS.md를 같은 작업 흐름에서 갱신
+  - "완료된 작업" 섹션에 신규 항목 추가
+  - "다음 작업" 우선순위에서 완료된 항목 제거 또는 갱신
+  - "다음 세션 진입점" 섹션의 git 상태(브랜치 SHA, PR 상태)를 현재 시점으로 정정
+  - 갱신은 작업 커밋에 묶거나 직후 별도 `docs:` 커밋으로
+- **IMPORTANT**: PROGRESS.md는 작성 시점 스냅샷 — PR 머지 여부, `origin/main ↔ origin/develop` 차이 같은 외부 상태는 PROGRESS.md만 믿지 말고 `git fetch` 후 실측으로 검증한 뒤 보고
+- 세션 종료 직전에도 PROGRESS.md 최신화 — 다음 세션이 stale 정보로 시작하지 않도록
+
 ## 주의사항
 
 - **IMPORTANT**: 환경변수 하드코딩 절대 금지

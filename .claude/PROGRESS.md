@@ -166,31 +166,9 @@
 
 ---
 
-## 다음 작업 (우선순위 순)
+## 다음 작업
 
-### 🔜 1. 필터 리팩터 (별도 PR)
-- useListFilters 추상화: 5페이지 공통 boilerplate 통합
-- useFilterParams: schema에서 T 타입 추론 (interface 중복 제거)
-- Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
-
-### 🔜 2. notification-service OCR + 만료 스케줄러
-- 보증보험 PDF 업로드 + Tesseract OCR
-- `@Scheduled`로 만료 임박 자동 알림 발송
-
-### 🔜 3. 견적서 작성 모달 — 현장 ID 입력 개선
-- 현재 siteId 수동 InputNumber. Select(현장 목록 검색)으로 교체
-- 공내역서 업로드 흐름에서도 함께 적용
-
-### 🔜 4. Gradle wrapper 설치
-- `gradlew` 없음 — 백엔드 자동 컴파일 검증 불가
-
-### 🔜 5. 기존 InputNumber parser 타입 캐스트 정리
-- estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
-- 본 PR 스코프 외 — 별도 정리
-
-### 🔜 6. /review 발견 정리 (2026-06-10, 공내역서 업로드 UI 후속)
-- `frontend/src/api/estimates.api.ts:43` — multipart 요청에서 `Content-Type: 'multipart/form-data'` 수동 설정 제거. axios가 FormData 입력 시 boundary 포함해 자동 설정하므로 수동 헤더는 boundary 누락 위험
-- `frontend/src/pages/estimate/UploadParseModal.tsx:55` — parse 실패 시 백엔드 `error.response?.data?.error`를 우선 노출하고 fallback으로 generic 메시지 사용 (디버깅·사용자 안내 향상)
+→ **`.claude/BACKLOG.md`** 참조 (우선순위 단일 진실원).
 
 ---
 
@@ -215,9 +193,26 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
+## 다음 세션 진입점 (2026-06-10 갱신)
+
+**현재 git 상태**:
+- 로컬 `develop` = `origin/develop` = `fdff6fd`
+- `origin/main` = `188a8ce` — **PR #20 머지 완료** (공내역서 업로드 UI 3 커밋 반영)
+- `develop ↔ main` 차이 = `fdff6fd docs: /review 후속 정리 항목 기록` 1개 (docs-only)
+  - 단독 PR 가치 약함 — 다음 작업과 묶어서 진행 권장
+
+**다음 세션 첫 액션**:
+1. `git fetch` 후 origin/main, origin/develop 실측으로 PR 상태 검증 (PROGRESS.md만 믿지 말 것)
+2. 작업 우선순위 #2(보증보험 OCR + 스케줄러) 또는 #6(/review 후속 fix 2건)부터 진입
+3. #6은 작은 변경 — 다음 작업의 첫 커밋으로 묶어도 좋음
+
 ## 알려진 이슈
 
 - `estimate-service/build.gradle` line 9 타이포 (`boo,t`) — ✅ 수정 완료 (2026-04-09)
 - tax-service `ddl-auto: update`로 변경 완료
 - ESLint v9 flat config 도입 완료 (`66af734`, 2026-06-08)
 - Gradle wrapper (gradlew) 미설치 — 빌드 시 설치 필요
+
+## 회고
+
+→ **`.claude/RETROSPECTIVE.md`** 참조.
