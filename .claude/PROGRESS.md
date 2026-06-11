@@ -160,6 +160,15 @@
 
 ---
 
+### ✅ 잡다한 수정 누적 (~2026-06-08)
+- `estimate-service/build.gradle` line 9 타이포(`boo,t`) 수정 (2026-04-09)
+- tax-service `ddl-auto: update`로 변경
+- ESLint v9 flat config 도입 (`66af734`, 2026-06-08)
+
+> 미완 항목 "Gradle wrapper 설치"는 `BACKLOG.md` P2로 이관.
+
+---
+
 ### ✅ frontend — 검색/필터링 5페이지 일괄 패턴화 (2026-06-08)
 - 공통 부품: FilterBar(children 패턴) + FilterSearch / FilterSelect / FilterDateRange / FilterAmountRange
 - 공통 훅: useFilterParams(URL 동기화 + 스키마 검증 + 무효값 자동 정리) + useDebouncedValue(250ms)
@@ -214,13 +223,6 @@
 3. 사이클 시작 시 `.claude/plans/2026-XX-XX-warranty-ocr-scheduler.md` 계획 문서 작성부터
 4. **새 워크플로우 6단계(PR 생성 자동화)** 가 도입됨 — OCR 작업 끝나면 워크플로우 6단계 따라 `gh pr create`로 PR 자동 생성
 5. main 브랜치 보호 룰 활성화됨 — `gh pr merge`는 deny, 사용자가 GitHub 웹에서 직접 머지
-
-## 알려진 이슈
-
-- `estimate-service/build.gradle` line 9 타이포 (`boo,t`) — ✅ 수정 완료 (2026-04-09)
-- tax-service `ddl-auto: update`로 변경 완료
-- ESLint v9 flat config 도입 완료 (`66af734`, 2026-06-08)
-- Gradle wrapper (gradlew) 미설치 — 빌드 시 설치 필요
 
 ## 회고
 
