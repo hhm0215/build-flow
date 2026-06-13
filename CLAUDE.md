@@ -171,11 +171,12 @@ bun run preview         # 빌드 결과 미리보기
   - `git push --force` 금지
   - `--no-verify` 금지
   - **git이 거부/경고하면 멈추고 사용자에게 보고. force로 우회하지 않는다**
-- PR 생성: Claude가 `gh pr create`로 자동 생성 가능 (단, 사전 검증 체크리스트 통과 시 — "## 개발 워크플로우" 6단계 참조)
-- PR 머지: 사용자가 GitHub 웹에서 직접 수행. `gh pr merge` 명령은 settings.local.json에서 deny로 차단됨
+- PR 생성: Claude가 `gh pr create`로 자동 생성 (사전 검증 체크리스트 통과 시 — "## 개발 워크플로우" 6단계)
+- PR 머지: Claude가 `gh pr merge --merge`로 자동 (SHA 자동 검증 안전망 통과 시 — "## 개발 워크플로우" 7단계). 2026-06-13 ADR-011 v2로 결정 번복됨
 - PR 본문은 텍스트로만 제공. 형식 고정: `## 변경 사항` / `## 상세` 두 섹션만 사용. 개요·테스트·참고 같은 추가 섹션 즉흥 도입 금지
 - main 직접 push 금지. PR merge(Create a merge commit)로만 진행. Rebase and Merge 금지
 - main 브랜치는 GitHub 보호 룰로 force-push/delete 차단됨 + PR 경로 강제
+- `gh pr close`는 settings.local.json deny 유지 (실수로 PR 닫는 것 방지)
 
 ## 개발 워크플로우
 
@@ -195,12 +196,22 @@ bun run preview         # 빌드 결과 미리보기
    - 사용자에게 머지될 커밋 목록 요약 + "PR 생성 진행?" 텍스트 확인 1회
    - `gh pr create --base main --head develop --title "..." --body "..."` (본문은 ##변경 사항/##상세 두 섹션 고정)
    - 반환된 PR URL을 사용자에게 전달
-   - 머지는 사용자가 GitHub 웹에서 Commits 탭 재확인 후 직접 (`gh pr merge`는 deny됨)
+
+7. **PR 자동 머지** (Commits SHA 검증 통과 시):
+   - 머지 직전 `gh pr view <num> --json commits --jq '.commits[].oid' | sort` ↔ `git log --format='%H' origin/main..origin/develop | sort` 비교
+   - SHA 일치 시 `gh pr merge <num> --merge` (Create a merge commit 방식)
+   - **SHA 불일치 시 머지 중단** + 사용자에게 보고 (PR 생성 후 develop에 추가 push가 들어간 경우 — PR 본문 갱신 후 재검증 또는 PR 닫고 새로 생성)
+   - 머지 성공 후 `git fetch origin`으로 로컬 origin/main 최신화
+
+8. **결과 반영 (PR 머지 후)**:
+   - PROGRESS.md "다음 세션 진입점"의 git 상태 → main 새 SHA, develop ↔ main 동기화 반영
+   - 다음 BACKLOG 항목으로 진입 또는 세션 종료
 
 - **IMPORTANT**: BACKLOG.md에 없는 작업은 먼저 BACKLOG.md에 추가 후 진행
 - **IMPORTANT**: 4단계 "결과 반영"을 누락하면 다음 세션이 stale 상태로 시작
 - **IMPORTANT**: RETROSPECTIVE에 회고만 적고 재발 방지 규칙을 어디에도 박지 않으면 같은 실패가 반복됨
 - **IMPORTANT**: 6단계 PR 생성 시 `git fetch` 후 push 누락 검증을 건너뛰면 PR #19 사고 재발 위험
+- **IMPORTANT**: 7단계 SHA 검증 안전망을 건너뛰면 의도와 다른 변경이 main에 머지됨. 활성 PR 있는 동안 develop에 추가 push 시 항상 본문 갱신 + 재검증
 
 ## 진행 상황 관리 (BACKLOG / PROGRESS / RETROSPECTIVE)
 
