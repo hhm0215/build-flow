@@ -210,12 +210,13 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-13 갱신)
+## 다음 세션 진입점 (2026-06-13 갱신, PR #22 머지 후)
 
 **현재 git 상태**:
-- `origin/main` = `9b18e86` (PR #21 머지 시점, Merge pull request #21)
-- `origin/develop` = main과 동기화 (PR #21 머지 직후, 추가 커밋 없음)
+- `origin/main` = `2e08ef2` (PR #22 머지 시점, ADR-011 v2 풀 자동 머지 첫 사이클 입증)
+- `origin/develop` = `fe93b62` — develop ↔ main 동기화 + 본 PROGRESS 갱신만 추가 push
 - 다음 세션은 BACKLOG P0 항목 진행 후 새 PR 생성 사이클 시작 가능
+- 이전 직진 사이클: PR #20(공내역서 UI) → PR #21(워크플로우/PR 자동화 v1) → PR #22(머지 자동화 v2)
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
