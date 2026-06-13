@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Modal, Upload, message, Button } from 'antd'
 import type { RcFile } from 'antd/es/upload'
+import { isAxiosError } from 'axios'
 import { FileSpreadsheet, Sparkles, RotateCcw } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useParseEstimateFile } from '../../api/estimates.api'
@@ -39,8 +40,11 @@ export default function UploadParseModal({ open, onClose, onConfirm }: UploadPar
         setResult(data)
         message.success(`${data.itemCount}개 항목을 추출했습니다.`)
       },
-      onError: () => {
-        message.error('공내역서 파싱에 실패했습니다. 다시 시도해 주세요.')
+      onError: (error) => {
+        const backendMsg = isAxiosError(error)
+          ? error.response?.data?.error?.message
+          : undefined
+        message.error(backendMsg ?? '공내역서 파싱에 실패했습니다. 다시 시도해 주세요.')
       },
     })
     return false

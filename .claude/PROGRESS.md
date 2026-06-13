@@ -152,6 +152,23 @@
 
 ---
 
+### ✅ frontend — /review 후속 fix 2건 (2026-06-10) — 워크플로우 시범 사이클
+- `estimates.api.ts`: 공내역서 parse 요청에서 `Content-Type: multipart/form-data` 수동 헤더 제거 (axios 자동 boundary에 위임)
+- `UploadParseModal.tsx`: parse 실패 시 `isAxiosError` narrow 후 백엔드 `error.response?.data?.error?.message` 우선 노출
+- 워크플로우 시스템(BACKLOG/RETROSPECTIVE/plans + CLAUDE.md 사이클) 도입 후 첫 시범 사이클로 완주
+- 계획 문서: `.claude/plans/2026-06-10-review-fix-2.md`
+
+---
+
+### ✅ 잡다한 수정 누적 (~2026-06-08)
+- `estimate-service/build.gradle` line 9 타이포(`boo,t`) 수정 (2026-04-09)
+- tax-service `ddl-auto: update`로 변경
+- ESLint v9 flat config 도입 (`66af734`, 2026-06-08)
+
+> 미완 항목 "Gradle wrapper 설치"는 `BACKLOG.md` P2로 이관.
+
+---
+
 ### ✅ frontend — 검색/필터링 5페이지 일괄 패턴화 (2026-06-08)
 - 공통 부품: FilterBar(children 패턴) + FilterSearch / FilterSelect / FilterDateRange / FilterAmountRange
 - 공통 훅: useFilterParams(URL 동기화 + 스키마 검증 + 무효값 자동 정리) + useDebouncedValue(250ms)
@@ -166,27 +183,9 @@
 
 ---
 
-## 다음 작업 (우선순위 순)
+## 다음 작업
 
-### 🔜 1. 필터 리팩터 (별도 PR)
-- useListFilters 추상화: 5페이지 공통 boilerplate 통합
-- useFilterParams: schema에서 T 타입 추론 (interface 중복 제거)
-- Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
-
-### 🔜 2. notification-service OCR + 만료 스케줄러
-- 보증보험 PDF 업로드 + Tesseract OCR
-- `@Scheduled`로 만료 임박 자동 알림 발송
-
-### 🔜 3. 견적서 작성 모달 — 현장 ID 입력 개선
-- 현재 siteId 수동 InputNumber. Select(현장 목록 검색)으로 교체
-- 공내역서 업로드 흐름에서도 함께 적용
-
-### 🔜 4. Gradle wrapper 설치
-- `gradlew` 없음 — 백엔드 자동 컴파일 검증 불가
-
-### 🔜 5. 기존 InputNumber parser 타입 캐스트 정리
-- estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
-- 본 PR 스코프 외 — 별도 정리
+→ **`.claude/BACKLOG.md`** 참조 (우선순위 단일 진실원).
 
 ---
 
@@ -211,9 +210,20 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 알려진 이슈
+## 다음 세션 진입점 (2026-06-10 갱신)
 
-- `estimate-service/build.gradle` line 9 타이포 (`boo,t`) — ✅ 수정 완료 (2026-04-09)
-- tax-service `ddl-auto: update`로 변경 완료
-- ESLint v9 flat config 도입 완료 (`66af734`, 2026-06-08)
-- Gradle wrapper (gradlew) 미설치 — 빌드 시 설치 필요
+**현재 git 상태**:
+- 로컬 `develop` = `origin/develop` (워크플로우 시스템 + /review fix 2건 + PR 자동화 + 일관성 정렬까지 push)
+- 최신 SHA·차이는 `git fetch && git log origin/main..origin/develop`로 **실측**할 것
+- **PR #21 생성 완료**: https://github.com/hhm0215/build-flow/pull/21 — 머지 대기
+
+**다음 세션 첫 액션**:
+1. `git fetch` 후 origin/main 변동 확인 (PR #21 머지 여부)
+2. PR #21 머지 완료면 → `.claude/BACKLOG.md` P0 #1 (notification-service OCR + 만료 스케줄러) 진입
+3. 사이클 시작 시 `.claude/plans/2026-XX-XX-warranty-ocr-scheduler.md` 계획 문서 작성부터
+4. **새 워크플로우 6단계(PR 생성 자동화)** 가 도입됨 — OCR 작업 끝나면 워크플로우 6단계 따라 `gh pr create`로 PR 자동 생성
+5. main 브랜치 보호 룰 활성화됨 — `gh pr merge`는 deny, 사용자가 GitHub 웹에서 직접 머지
+
+## 회고
+
+→ **`.claude/RETROSPECTIVE.md`** 참조.

@@ -171,9 +171,56 @@ bun run preview         # 빌드 결과 미리보기
   - `git push --force` 금지
   - `--no-verify` 금지
   - **git이 거부/경고하면 멈추고 사용자에게 보고. force로 우회하지 않는다**
-- PR 생성/머지는 사용자가 GitHub 웹에서 직접 수행. gh CLI 사용 금지
+- PR 생성: Claude가 `gh pr create`로 자동 생성 가능 (단, 사전 검증 체크리스트 통과 시 — "## 개발 워크플로우" 6단계 참조)
+- PR 머지: 사용자가 GitHub 웹에서 직접 수행. `gh pr merge` 명령은 settings.local.json에서 deny로 차단됨
 - PR 본문은 텍스트로만 제공. 형식 고정: `## 변경 사항` / `## 상세` 두 섹션만 사용. 개요·테스트·참고 같은 추가 섹션 즉흥 도입 금지
 - main 직접 push 금지. PR merge(Create a merge commit)로만 진행. Rebase and Merge 금지
+- main 브랜치는 GitHub 보호 룰로 force-push/delete 차단됨 + PR 경로 강제
+
+## 개발 워크플로우
+
+모든 작업은 아래 사이클을 따른다. 각 단계는 산출물(문서)을 남긴다.
+
+1. **백로그 확인** — `.claude/BACKLOG.md`에서 다음 항목 선택
+2. **계획 작성** — `.claude/plans/YYYY-MM-DD-{slug}.md` 작성 (템플릿은 `.claude/plans/README.md`), 사용자 합의 후 구현 진입
+3. **구현 + 커밋** — 작업 단위로 커밋, 사용자 사전 승인 규칙 준수
+4. **결과 반영** (작업 종료 시 필수):
+   - 계획 문서 "결과" 섹션 채움
+   - BACKLOG.md에서 완료 항목 제거
+   - PROGRESS.md "완료된 작업"에 한 줄 추가 + "다음 세션 진입점" git 상태 갱신
+5. **회고** — 실패/허비/예상과 다름이 있었으면 `.claude/RETROSPECTIVE.md`에 1건 작성. **재발 방지 규칙을 CLAUDE.md / 메모리 / hooks 중 어디에 박았는지 반드시 명시**
+6. **PR 생성** (develop ↔ main 차이가 PR 가치 있을 때):
+   - `git fetch && git log origin/main..origin/develop`로 머지 대상 커밋 목록 확보
+   - 로컬 `develop` SHA = `origin/develop` SHA 확인 (push 누락 검증 — PR #19 사고 가드레일)
+   - 사용자에게 머지될 커밋 목록 요약 + "PR 생성 진행?" 텍스트 확인 1회
+   - `gh pr create --base main --head develop --title "..." --body "..."` (본문은 ##변경 사항/##상세 두 섹션 고정)
+   - 반환된 PR URL을 사용자에게 전달
+   - 머지는 사용자가 GitHub 웹에서 Commits 탭 재확인 후 직접 (`gh pr merge`는 deny됨)
+
+- **IMPORTANT**: BACKLOG.md에 없는 작업은 먼저 BACKLOG.md에 추가 후 진행
+- **IMPORTANT**: 4단계 "결과 반영"을 누락하면 다음 세션이 stale 상태로 시작
+- **IMPORTANT**: RETROSPECTIVE에 회고만 적고 재발 방지 규칙을 어디에도 박지 않으면 같은 실패가 반복됨
+- **IMPORTANT**: 6단계 PR 생성 시 `git fetch` 후 push 누락 검증을 건너뛰면 PR #19 사고 재발 위험
+
+## 진행 상황 관리 (BACKLOG / PROGRESS / RETROSPECTIVE)
+
+세 문서는 **역할이 분리**되어 있고 양방향 동기가 의무다. 한 곳에만 쓰면 drift.
+
+### 각 문서 단일 책임
+- `.claude/BACKLOG.md` — **다음 작업 우선순위 단일 진실원**. P0/P1/P2 그룹. 글로벌 번호 없음, 헤딩만
+- `.claude/PROGRESS.md` — **완료 이력 + 현재 git 상태 + 다음 세션 진입점**. "다음 작업" 목록은 BACKLOG 참조로만 유지, 직접 쓰지 않음
+- `.claude/RETROSPECTIVE.md` — **실패/사고 회고 + 재발 방지 규칙 + 반영 위치**
+
+### 갱신 의무
+- **IMPORTANT**: 세션 시작 시 `BACKLOG.md` + `PROGRESS.md`를 먼저 읽고 현재 상태 파악
+- **IMPORTANT**: 작업 단위가 끝나 커밋을 만들 때 다음을 같은 작업 흐름에서 갱신
+  - BACKLOG: 완료 항목 제거 (이동 아닌 제거)
+  - PROGRESS "완료된 작업": 신규 항목 한 줄 추가
+  - PROGRESS "다음 세션 진입점": git 상태 + PR 상태 현재 시점으로 정정
+  - 회고가 필요한 경우 RETROSPECTIVE에 1건 추가, 재발 방지 규칙을 박은 위치 명시
+- **IMPORTANT**: 외부 상태(PR 머지, `origin/main ↔ origin/develop`)는 PROGRESS만 믿지 말고 `git fetch` 후 실측으로 검증
+- **IMPORTANT**: "다음 작업"을 PROGRESS에 직접 적지 않는다. drift 원천. BACKLOG에만 적고 PROGRESS는 참조
+- 세션 종료 직전에도 위 갱신 한 번 더 — 다음 세션 stale 방지
 
 ## 주의사항
 

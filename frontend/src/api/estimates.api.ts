@@ -41,7 +41,6 @@ const parseEstimateFile = async (file: File) => {
   const formData = new FormData()
   formData.append('file', file)
   const res = await axiosInstance.post<ApiResponse<ParseResult>>('/estimates/parse', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120_000,
   })
   return res.data.data

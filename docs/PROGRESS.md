@@ -1,9 +1,13 @@
-# BuildFlow 진행 상황
+# BuildFlow 진행 상황 (초기 계획 — 2026-04-04 스냅샷)
 
-> **최신 진행상황은 `.claude/PROGRESS.md`를 참고하세요.** 이 파일은 초기 계획 기록용입니다.
-
-> 현재 개발 진행 상황 추적.
-> 새 Claude Code 세션을 열 때 이 문서를 참조하여 현재 상태를 파악한다.
+> **이 파일은 초기 Phase 계획 기록용입니다. 최신 상태는 아래 4개 문서 세트를 참고하세요.**
+>
+> - `.claude/BACKLOG.md` — 다음 작업 우선순위 (단일 진실원)
+> - `.claude/PROGRESS.md` — 완료 이력 + 현재 git 상태
+> - `.claude/RETROSPECTIVE.md` — 실패/사고 회고 + 재발 방지 규칙
+> - `.claude/plans/` — 작업별 계획 문서 (`YYYY-MM-DD-{slug}.md`)
+>
+> 워크플로우 사이클은 `CLAUDE.md` "## 개발 워크플로우" 참고.
 
 ---
 
