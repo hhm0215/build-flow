@@ -82,6 +82,18 @@ git checkout develop
       "Bash(git remote:*)",
       "Bash(git ls-files:*)",
 
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh api repos/*/pulls*)",
+      "Bash(gh api repos/*/branches/*/protection*)",
+      "Bash(gh auth status:*)",
+
       "Bash(curl localhost:*)",
       "Bash(curl http://localhost:*)",
       "Bash(curl -s localhost:*)",
@@ -94,6 +106,16 @@ git checkout develop
       "Bash(java --version)",
 
       "Skill(design-review)"
+    ],
+    "deny": [
+      "Bash(gh pr close:*)",
+      "Bash(gh pr edit * --state*)",
+      "Bash(gh repo delete:*)",
+      "Bash(gh api -X DELETE*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push * --no-verify*)",
+      "Bash(git commit * --no-verify*)"
     ]
   },
   "hooks": {
@@ -149,7 +171,7 @@ Claude Code를 BuildFlow 디렉토리에서 시작하면 SessionStart hook이 �
 
 ### 5-1. `gradlew` 미설치
 - **증상**: `.claude/hooks/post-edit-compile.sh`가 Java 편집 후 graceful skip(컴파일 검증 비활성)
-- **원인**: 프로젝트에 Gradle Wrapper 가 없음 (PROGRESS.md "알려진 이슈"에도 기록됨)
+- **원인**: 프로젝트에 Gradle Wrapper 가 없음 (BACKLOG.md P2에 등록됨)
 - **대응**: 다음 중 택1
   ```bash
   # A. 시스템 gradle 설치 후 wrapper 생성
@@ -176,7 +198,13 @@ Claude Code를 BuildFlow 디렉토리에서 시작하면 SessionStart hook이 �
 
 ### 5-4. Claude Code 메모리(`~/.claude/projects/...`)
 - 이 영역은 git이 아닌 **글로벌 사용자 영역**이라 Windows에 자동으로 따라오지 않음
-- 새 머신에선 자동 학습이 다시 시작됨 (PROGRESS.md + CLAUDE.md만으로도 충분)
+- **그러나 핵심 규칙은 모두 git 추적 파일에 박혀 있어 메모리 없이도 동일 워크플로우 작동**:
+  - `CLAUDE.md` — 코드/git/워크플로우 규칙 (5+1+1+1 = 8단계 사이클)
+  - `.claude/BACKLOG.md` — 다음 작업 우선순위 단일 진실원
+  - `.claude/PROGRESS.md` — 완료 이력 + git 상태 + 다음 세션 진입점
+  - `.claude/RETROSPECTIVE.md` — 실패/사고 회고 + 재발 방지 규칙
+  - `docs/DECISIONS.md` — ADR (워크플로우 시스템, PR 자동화 등)
+- 메모리는 보조 노트 — 머신 간 동기화 안 해도 됨
 - 굳이 옮기려면 macOS의 `~/.claude/projects/-Users-...-BuildFlow/memory/` 폴더를 Windows의 `%USERPROFILE%\.claude\projects\` 아래 적절한 프로젝트 디렉토리로 수동 복사 (디렉토리명은 프로젝트 절대경로의 슬래시를 하이픈으로 치환한 형태)
 
 ### 5-5. Docker Desktop + Ollama
@@ -201,8 +229,11 @@ git commit -m "feat(service): ..."
 # 4) push 시점에 묶어서
 git push origin develop
 
-# 5) develop → main PR은 GitHub 웹에서 직접 (gh CLI 금지)
-#    PR 본문 형식: 변경 사항 / 상세 두 섹션만 사용
+# 5) 워크플로우 6~8단계는 Claude가 자동 수행
+#    6단계: gh pr create — PR 자동 생성 (push 누락 검증 후)
+#    7단계: gh pr merge --merge — Commits SHA 자동 검증 후 자동 머지
+#    8단계: PROGRESS "다음 세션 진입점" main 동기화 반영
+#    PR 본문 형식: ##변경 사항 / ##상세 두 섹션 고정
 ```
 
 ---

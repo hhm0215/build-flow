@@ -210,19 +210,23 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-10 갱신)
+## 다음 세션 진입점 (2026-06-13 갱신)
 
 **현재 git 상태**:
-- 로컬 `develop` = `origin/develop` (워크플로우 시스템 + /review fix 2건 + PR 자동화 + 일관성 정렬까지 push)
-- 최신 SHA·차이는 `git fetch && git log origin/main..origin/develop`로 **실측**할 것
-- **PR #21 생성 완료**: https://github.com/hhm0215/build-flow/pull/21 — 머지 대기
+- `origin/main` = `9b18e86` (PR #21 머지 시점, Merge pull request #21)
+- `origin/develop` = main과 동기화 (PR #21 머지 직후, 추가 커밋 없음)
+- 다음 세션은 BACKLOG P0 항목 진행 후 새 PR 생성 사이클 시작 가능
 
 **다음 세션 첫 액션**:
-1. `git fetch` 후 origin/main 변동 확인 (PR #21 머지 여부)
-2. PR #21 머지 완료면 → `.claude/BACKLOG.md` P0 #1 (notification-service OCR + 만료 스케줄러) 진입
-3. 사이클 시작 시 `.claude/plans/2026-XX-XX-warranty-ocr-scheduler.md` 계획 문서 작성부터
-4. **새 워크플로우 6단계(PR 생성 자동화)** 가 도입됨 — OCR 작업 끝나면 워크플로우 6단계 따라 `gh pr create`로 PR 자동 생성
-5. main 브랜치 보호 룰 활성화됨 — `gh pr merge`는 deny, 사용자가 GitHub 웹에서 직접 머지
+1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
+2. `.claude/BACKLOG.md` P0 항목(현재: notification-service OCR + 만료 스케줄러) 계획 문서 작성부터 시작
+3. 워크플로우 5+1+1+1 단계(이제 8단계 — 백로그→계획→구현→결과→회고→PR 생성→PR 자동 머지→main 동기화) 그대로 적용
+
+**활성화된 워크플로우 자동화** (2026-06-13 갱신):
+- ✅ PR 생성 자동 (`gh pr create`)
+- ✅ PR 자동 머지 (`gh pr merge --merge`) — SHA 검증 안전망 통과 시
+- ✅ main 브랜치 보호 룰: force-push/delete 차단, PR 경로 강제
+- ⚠️ 활성 PR 동안 develop 추가 push 시 PR 본문 즉시 갱신 의무 (RETROSPECTIVE 회고)
 
 ## 회고
 

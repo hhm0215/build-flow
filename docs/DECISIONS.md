@@ -210,13 +210,53 @@ Zustand (클라이언트 상태) + TanStack Query (서버 상태)
 
 ---
 
-## ADR-011: PR 생성 자동화 + main 브랜치 보호 (머지는 사용자 직접)
+## ADR-011: PR 생성 + 머지 풀 자동화 (SHA 검증 안전망) — v2 2026-06-13 갱신
 
-### 결정
+### 결정 (v2 — 2026-06-13)
 
 - PR 생성: Claude가 `gh pr create`로 자동 (사전 검증 6단계 체크리스트 통과 시)
-- PR 머지: **사용자가 GitHub 웹에서 직접**. `gh pr merge` 명령은 settings.local.json `deny`로 차단
-- main 브랜치 보호 룰: PR 경로 강제, force-push/delete 금지 (approval 0, 1인 환경 현실 고려)
+- **PR 머지: Claude가 `gh pr merge --merge`로 자동 (SHA 검증 안전망 7단계 통과 시)**
+- main 브랜치 보호 룰: PR 경로 강제, force-push/delete 금지 (approval 0)
+
+### 결정 v1 (2026-06-10) — 번복됨
+
+v1은 "PR 머지: 사용자가 GitHub 웹에서 직접"이었음. 시범 진행 직후 결정 번복.
+
+### 번복 이유
+
+v1 머지 자동화 선행 3조건(CI / 머신 리더블 메타 / 풀 사이클 멱등)이 안 갖춰졌으나, **시범에서 SHA 검증 안전망이 PR #19 패턴(PR 생성 후 추가 push 누적)을 실제로 잡음** → 사용자 최종 의도 재확인을 대체할 수 있음을 검증. 1인 환경에서 매번 GitHub 웹 클릭하는 비용 > 자동화 위험.
+
+### 새 안전망: Commits SHA 자동 검증 (7단계)
+
+```
+gh pr view <num> --json commits --jq '.commits[].oid' | sort
+↕ 비교
+git log --format="%H" origin/main..origin/develop | sort
+→ 일치: gh pr merge --merge
+→ 불일치: 머지 중단 + 사용자 보고
+```
+
+이는 사용자가 GitHub 웹에서 매번 Commits 탭을 보던 절차를 코드로 강제. PR 생성 후 추가 push가 들어와 의도가 어긋난 경우 머지 직전에 잡힘. (실제로 PR #21 시범 중에 ADR/drift 정렬 커밋 2개가 의도 외로 누적된 것을 잡음 — `.claude/RETROSPECTIVE.md` 참조)
+
+### 가드레일 4중 차단 (v2 갱신)
+
+| 차단 위치 | 대상 |
+|-----------|------|
+| settings.local.json `deny` | `gh pr close`, force-push, `--no-verify` (단, `gh pr merge`는 v2부터 허용) |
+| main 브랜치 보호 룰 | force-push, delete, 직접 push |
+| 7단계 SHA 자동 검증 | 의도와 다른 변경 머지 차단 |
+| RETROSPECTIVE.md | 자동 머지 확장 시 재검토 강제 |
+
+### 머지 자동화 v3 확장 조건 (미래)
+
+v2가 1인 환경에 충분하지만, 다음이 갖춰지면 더 안전한 v3로:
+- CI 통과 필수 (현재 없음)
+- PR description 머신 리더블 메타 강제
+- 자동 머지 후 develop fast-forward 후처리
+
+### 면접 답변
+
+"PR 생성·머지를 둘 다 자동화했지만, 머지 직전에 Commits SHA 자동 검증을 박았습니다. PR 생성 시점의 의도 SHA와 머지 시점의 PR 실제 SHA를 비교해서 일치할 때만 머지. 실제로 시범 운영 중에 PR 생성 후 develop에 추가 push가 들어가 의도가 어긋난 케이스를 이 검증이 잡았습니다. 사용자가 매번 GitHub 웹에서 Commits 탭을 보던 절차를 코드로 옮긴 것입니다."
 
 ### 배경
 
@@ -263,6 +303,7 @@ PR #19 사고의 본질은 "사용자 매번 검증 → 한 번 실수". 사용�
 |------|------|------|
 | v1.0 | 2026-04-04 | 초안 (ADR-001 ~ ADR-009) |
 | v1.1 | 2026-06-10 | ADR-010 (워크플로우 시스템) + ADR-011 (PR 자동화) 추가 |
+| v1.2 | 2026-06-13 | ADR-011 v2 — PR 머지 자동화로 확장 (SHA 검증 안전망 도입) |
 
 ---
 
