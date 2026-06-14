@@ -27,6 +27,11 @@
 git clone https://github.com/hhm0215/build-flow.git
 cd build-flow
 git checkout develop
+
+# 환경변수 파일 생성 (.env는 git 추적 외)
+copy .env.example .env       # Windows cmd / PowerShell
+# 또는 Git Bash: cp .env.example .env
+# .env 열어서 DB_PASSWORD / JWT_SECRET 값 채우기
 ```
 
 > 하네스와 문서는 `develop` 브랜치에 있다. `main`은 다음 번 PR 머지 시점에 따라잡힘.
