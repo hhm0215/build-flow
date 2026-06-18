@@ -240,17 +240,17 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-18 갱신, PR #24 머지 후)
+## 다음 세션 진입점 (2026-06-18 갱신, PR #25 머지 후)
 
 **현재 git 상태**:
-- `origin/main` = `fbb6d25` (PR #24 머지 시점, warranty 만료 스케줄러 Phase 1)
-- `origin/develop` = `639167e` — main과 완전 동기화 (차이 0)
-- 다음 세션은 BACKLOG P0 항목 진행 후 새 PR 생성 사이클 시작 가능
-- 직진 사이클: PR #20 → #21 → #22 → #23 → #24 (warranty 스케줄러 Phase 1)
+- `origin/main` = `a6ce501` (PR #25 머지 시점, warranty PDF OCR Phase 2)
+- `origin/develop` = `71cec1b` — main과 완전 동기화 (차이 0)
+- 직진 사이클: PR #20 → #21 → #22 → #23 → #24(스케줄러 Phase 1) → #25(OCR Phase 2)
 
 **다음 작업**:
-- BACKLOG P0 **notification-service Phase 2 — PDF OCR 자동 채움** (Tess4J + PDFBox + Docker 한글 traineddata)
-- 또는 머지된 Phase 1을 `docker compose up`으로 통합 검증 후 진입
+- BACKLOG P0 **프론트엔드 — 보증보험 PDF 업로드 + OCR 상태 표시** (M 규모)
+- 또는 백엔드 Phase 1·2 통합 검증 우선 (`docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d`)
+- 실제 PDF 샘플 확보되면 Phase 3 정규식 튜닝 검토
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
