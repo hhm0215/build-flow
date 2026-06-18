@@ -152,6 +152,14 @@
 
 ---
 
+### ✅ frontend — 보증보험 PDF 업로드 모달 + OCR 상태 뱃지 + 폴링 (2026-06-18)
+- 신규: `components/OcrStatusBadge.tsx`, `pages/warranty/WarrantyUploadModal.tsx`
+- 갱신: `types/domain.types.ts`(OcrStatus + ocrStatus/filePath 추가), `api/warranties.api.ts`(uploadWarranty + useUploadWarranty + refetchInterval), `WarrantyListPage`(UploadCloud 버튼 + 보험사 셀 뱃지 + PENDING 5초 폴링), MSW 핸들러(/upload 202 + 10초 자동 SUCCESS 시뮬)
+- `bun run lint` 0 errors / `bun run build` 통과
+- 계획 문서: `.claude/plans/2026-06-18-warranty-upload-ui.md`
+
+---
+
 ### ✅ notification-service — PDF OCR Phase 2 (2026-06-18)
 - `notification-service/Dockerfile` 전용 신설 — debian jammy + Tesseract 4 + kor·eng traineddata (다른 8 서비스는 alpine 그대로)
 - `docker-compose.app.yml` notification-service build.dockerfile 경로 변경

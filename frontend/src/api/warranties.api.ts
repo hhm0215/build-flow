@@ -13,6 +13,16 @@ const fetchWarranties = async (params?: Record<string, string>) => {
   return res.data.data
 }
 
+const uploadWarranty = async ({ file, siteId }: { file: File; siteId: number }) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('siteId', String(siteId))
+  const res = await axiosInstance.post<ApiResponse<Warranty>>('/warranties/upload', formData, {
+    timeout: 30_000,
+  })
+  return res.data.data
+}
+
 const createWarranty = async (body: Omit<Warranty, 'id' | 'daysUntilExpiry' | 'expired' | 'createdAt' | 'updatedAt'>) => {
   const res = await axiosInstance.post<ApiResponse<Warranty>>('/warranties', body)
   return res.data.data
@@ -32,10 +42,19 @@ const fetchExpiring = async (days: number) => {
   return res.data.data
 }
 
-export function useWarranties(params?: Record<string, string>) {
+export function useWarranties(params?: Record<string, string>, refetchInterval?: number) {
   return useQuery({
     queryKey: WARRANTIES_KEY.list(params),
     queryFn: () => fetchWarranties(params),
+    refetchInterval,
+  })
+}
+
+export function useUploadWarranty() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: uploadWarranty,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: WARRANTIES_KEY.all }),
   })
 }
 

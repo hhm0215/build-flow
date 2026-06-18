@@ -16,21 +16,16 @@
 
 ## P0 — 다음 1~2 작업
 
-### 프론트엔드 — 보증보험 PDF 업로드 + OCR 상태 표시
-- **배경**: 백엔드 Phase 2 완료(2026-06-18). 프론트엔드는 아직 JSON 수동 입력만 — 업로드 모달 + OCR 상태 표시 필요
-- **산출물**:
-  - `WarrantyListPage`에 PDF 업로드 모달 신설 (드래그앤드롭 + .pdf 검증 + 20MB 제한)
-  - `POST /api/v1/warranties/upload` 호출 (multipart) — `useUploadWarranty` 훅
-  - 행마다 OCR 상태 뱃지 (PENDING 회색 / SUCCESS 초록 / FAILED 빨강 / MANUAL 보라)
-  - PENDING 행은 polling (5~10초 간격, SUCCESS/FAILED 되면 중지)
-  - MSW 핸들러 업데이트 — multipart 업로드 + 2회 폴링 후 SUCCESS 시뮬
-- **관련 파일**: `frontend/src/pages/warranty/**`, `frontend/src/api/warranties.api.ts`
-- **예상 규모**: M
-- **상태**: TODO
+(현재 비어 있음 — 위임 모드 멈춤 조건)
 
 ---
 
 ## P1 — 중기
+
+### frontend Warranty 타입을 백엔드와 일치
+- **배경**: frontend mock에 `coverageAmount` 있으나 백엔드 엔티티에 해당 필드 없음. 실제 백엔드 통합 시 타입 불일치
+- **산출물**: `Warranty.coverageAmount` 제거 또는 백엔드에 추가 결정 → 양쪽 정렬
+- **예상 규모**: S
 
 ### 필터 리팩터 (별도 PR)
 - useListFilters 추상화: 5페이지 공통 boilerplate 통합
@@ -81,3 +76,4 @@
 | 2026-06-18 | warranty 만료 스케줄러 + Kafka 발행 Phase 1 완료 → P0 항목을 Phase 2(OCR)로 갱신 |
 | 2026-06-18 | warranty PDF OCR Phase 2 완료 → P0 항목을 프론트 업로드/상태 표시로 갱신 |
 | 2026-06-18 | ADR-012 위임 모드 정식 도입 (BACKLOG 항목 외 메타 작업) |
+| 2026-06-18 | 프론트 PDF 업로드 + OCR 상태 표시 완료 → P0 비움. P1에 Warranty 타입 일치 신규 등록 |

@@ -12,6 +12,7 @@ export const mockWarranties: Warranty[] = [
     memo: '강남 리모델링 하자보증',
     daysUntilExpiry: 402,
     expired: false,
+    ocrStatus: 'MANUAL',
     createdAt: '2025-06-01T09:00:00',
     updatedAt: '2025-06-01T09:00:00',
   },

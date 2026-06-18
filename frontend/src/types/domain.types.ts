@@ -197,6 +197,8 @@ export interface Notification {
 }
 
 // ── Warranty (하자보증보험) ───────────────────
+export type OcrStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'MANUAL'
+
 export interface Warranty {
   id: number
   siteId: number
@@ -208,6 +210,8 @@ export interface Warranty {
   memo: string
   daysUntilExpiry: number
   expired: boolean
+  filePath?: string
+  ocrStatus?: OcrStatus
   createdAt: string
   updatedAt: string
 }
