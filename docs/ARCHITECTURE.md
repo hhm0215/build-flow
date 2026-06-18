@@ -73,12 +73,12 @@
 | purchase.deleted | purchase-service | site-service | 매입 삭제 → 손익 재계산 |
 | tax.registered | tax-service | site-service · notification-service | 세금계산서 등록 → 미수금 갱신 + 알림 |
 | tax.payment.confirmed | tax-service | site-service | 입금 확인 → 미수금 차감 |
+| warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 인앱 알림 (스케줄러 매일 09:00, cooldown 7일) |
 
 #### 계획 토픽 (미구현)
 
 | 토픽 | 발행자 | 소비자 | 설명 |
 |------|--------|--------|------|
-| warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 알림 (스케줄러 미구현) |
 | site.status.changed | site-service | notification-service | 현장 상태 변경 → 알림 |
 
 ### 2.3 Kafka 메시지 포맷

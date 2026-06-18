@@ -152,6 +152,20 @@
 
 ---
 
+### ✅ notification-service — 만료 스케줄러 Phase 1 (2026-06-18)
+- `@EnableScheduling` 도입 + `WarrantyExpirationScheduler` (매일 09:00 cron)
+- `KafkaProducerService` 신설 — `warranty.expiring` 토픽 (notification-service 최초 발행자)
+- `WarrantyExpiringPayload`: warrantyId/siteId/insuranceCompany/endDate/daysUntilExpiry
+- `DefectWarranty.lastExpiringAlertSentAt` + `markExpiringAlertSent` 추가 — cooldown 7일 단일 컬럼 중복 방지
+- `findExpiringNotYetAlerted(today, threshold, cooldownThreshold)` 쿼리
+- `KafkaConsumerService`에 `warranty.expiring` 핸들러 → 인앱 알림 `WARRANTY_EXPIRING` 자동 생성
+- application.yml: kafka producer 설정 + `app.warranty.{alert-threshold-days=30, alert-cooldown-days=7, scheduler-cron="0 0 9 * * *"}` 외부화
+- 계획 문서: `.claude/plans/2026-06-18-warranty-ocr-scheduler.md`
+- Phase 2 (OCR): BACKLOG P0 재등록
+- ⚠️ 빌드 검증 못함 (gradlew 부재 BACKLOG P2) — 정적 정합성 점검만 수행, 머지 후 `docker compose up`으로 통합 검증 필요
+
+---
+
 ### ✅ frontend — /review 후속 fix 2건 (2026-06-10) — 워크플로우 시범 사이클
 - `estimates.api.ts`: 공내역서 parse 요청에서 `Content-Type: multipart/form-data` 수동 헤더 제거 (axios 자동 boundary에 위임)
 - `UploadParseModal.tsx`: parse 실패 시 `isAxiosError` narrow 후 백엔드 `error.response?.data?.error?.message` 우선 노출

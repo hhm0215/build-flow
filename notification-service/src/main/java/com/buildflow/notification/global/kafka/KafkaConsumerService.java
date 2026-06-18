@@ -153,6 +153,29 @@ public class KafkaConsumerService {
         }
     }
 
+    @KafkaListener(topics = "warranty.expiring", groupId = "notification-service-group")
+    public void consumeWarrantyExpiring(String message) {
+        try {
+            Map<String, Object> event = objectMapper.readValue(message, new TypeReference<>() {});
+            Map<String, Object> payload = getPayload(event);
+
+            Long siteId = toLong(payload.get("siteId"));
+            Long warrantyId = toLong(payload.get("warrantyId"));
+            Long daysUntilExpiry = toLong(payload.get("daysUntilExpiry"));
+            String insurer = payload.get("insuranceCompany") != null
+                    ? payload.get("insuranceCompany").toString() : "";
+
+            notificationService.createNotification(
+                    "WARRANTY_EXPIRING",
+                    String.format("하자보증보험(ID: %d, %s) 만료까지 %d일 남았습니다.",
+                            warrantyId, insurer, daysUntilExpiry),
+                    siteId
+            );
+        } catch (Exception e) {
+            log.error("warranty.expiring 알림 처리 실패: {}", e.getMessage(), e);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> getPayload(Map<String, Object> event) {
         return (Map<String, Object>) event.get("payload");
