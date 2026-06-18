@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { ShieldCheck, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { ShieldCheck, Plus, Trash2, AlertTriangle, UploadCloud } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
+import OcrStatusBadge from '../../components/OcrStatusBadge'
 import FilterBar from '../../components/filters/FilterBar'
 import FilterSearch from '../../components/filters/FilterSearch'
 import FilterSelect from '../../components/filters/FilterSelect'
@@ -13,6 +14,7 @@ import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useWarranties, useExpiringWarranties, useDeleteWarranty, useCreateWarranty } from '../../api/warranties.api'
 import type { WarrantyCreateRequest } from '../../types/domain.types'
+import WarrantyUploadModal from './WarrantyUploadModal'
 
 type WarrantyStatus = 'VALID' | 'EXPIRED'
 
@@ -36,11 +38,20 @@ const FILTER_SCHEMA: FilterSchema = {
 }
 
 export default function WarrantyListPage() {
-  const { data, isLoading, isError, refetch } = useWarranties()
+  // PENDING 상태가 하나라도 있으면 5초 폴링 — OCR 비동기 처리 완료 자동 반영
+  const [hasPendingHint, setHasPendingHint] = useState(false)
+  const refetchInterval = hasPendingHint ? 5000 : undefined
+  const { data, isLoading, isError, refetch } = useWarranties(undefined, refetchInterval)
   const { data: expiringData } = useExpiringWarranties(30)
   const { mutate: deleteWarranty } = useDeleteWarranty()
   const { mutate: createWarranty, isPending: isCreating } = useCreateWarranty()
   const warranties = useMemo(() => data ?? [], [data])
+
+  // 데이터 갱신 시점에 PENDING 존재 여부 재계산
+  useMemo(() => {
+    const hasPending = warranties.some((w) => w.ocrStatus === 'PENDING')
+    setHasPendingHint(hasPending)
+  }, [warranties])
   const expiringCount = expiringData?.length ?? 0
 
   const [filters, setFilters] = useFilterParams<WarrantyFilters>(FILTER_SCHEMA)
@@ -68,6 +79,7 @@ export default function WarrantyListPage() {
     setFilters({ q: '', status: undefined, endStart: '', endEnd: '' })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [form] = Form.useForm()
 
   const handleCreateSubmit = () => {
@@ -109,22 +121,40 @@ export default function WarrantyListPage() {
         title="하자보증보험"
         description="보증보험 관리 및 만료 추적"
         action={
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsModalOpen(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px',
-              background: 'var(--accent-gradient)',
-              border: 'none', borderRadius: 'var(--radius-sm)',
-              color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 0 16px rgba(59,130,246,0.2)',
-            }}
-          >
-            <Plus size={14} strokeWidth={2.5} />
-            보험 등록
-          </motion.button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsUploadModalOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px',
+                background: 'rgba(167,139,250,0.12)',
+                border: '1px solid rgba(167,139,250,0.3)',
+                borderRadius: 'var(--radius-sm)',
+                color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <UploadCloud size={14} strokeWidth={2.5} />
+              PDF 업로드
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsModalOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px',
+                background: 'var(--accent-gradient)',
+                border: 'none', borderRadius: 'var(--radius-sm)',
+                color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                boxShadow: '0 0 16px rgba(59,130,246,0.2)',
+              }}
+            >
+              <Plus size={14} strokeWidth={2.5} />
+              보험 등록
+            </motion.button>
+          </div>
         }
       />
 
@@ -225,7 +255,10 @@ export default function WarrantyListPage() {
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {w.insuranceCompany}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{w.insuranceCompany || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>분석 대기</span>}</span>
+                      <OcrStatusBadge status={w.ocrStatus} />
+                    </div>
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
                     {w.policyNumber}
@@ -320,6 +353,12 @@ export default function WarrantyListPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <WarrantyUploadModal
+        open={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploaded={() => refetch()}
+      />
     </div>
   )
 }

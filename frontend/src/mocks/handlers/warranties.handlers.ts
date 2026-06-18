@@ -2,7 +2,13 @@ import { http, HttpResponse } from 'msw'
 import { mockWarranties } from '../data/warranties.data'
 import { ApiResponse, Warranty } from '../../types'
 
-let warranties = [...mockWarranties]
+let warranties: Warranty[] = [...mockWarranties]
+
+// OCR 시뮬용 가짜 보험사·증권번호 풀
+const FAKE_INSURERS = ['서울보증보험', '한화손해보험', '삼성화재', 'DB손해보험', 'KB손해보험']
+function randomPolicyNumber() {
+  return 'AUTO-' + Math.random().toString(36).slice(2, 10).toUpperCase()
+}
 
 export const warrantiesHandlers = [
   // 전체 목록 — GET /api/v1/warranties?siteId=
@@ -96,5 +102,62 @@ export const warrantiesHandlers = [
   http.delete<{ id: string }>('/api/v1/warranties/:id', ({ params }) => {
     warranties = warranties.filter((w) => w.id !== Number(params.id))
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
+  }),
+
+  // PDF 업로드 + OCR 비동기 시뮬 — POST /api/v1/warranties/upload (multipart)
+  http.post<never, never, ApiResponse<Warranty | null>>('/api/v1/warranties/upload', async ({ request }) => {
+    const formData = await request.formData()
+    const siteId = Number(formData.get('siteId') ?? 0)
+    const file = formData.get('file') as File | null
+    if (!file) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '파일이 없습니다.' },
+        { status: 400 },
+      )
+    }
+
+    const newId = warranties.length > 0 ? Math.max(...warranties.map((w) => w.id)) + 1 : 1
+    const pending: Warranty = {
+      id: newId,
+      siteId,
+      insuranceCompany: '',
+      policyNumber: '',
+      coverageAmount: 0,
+      startDate: '',
+      endDate: '',
+      memo: `업로드 파일: ${file.name}`,
+      daysUntilExpiry: 0,
+      expired: false,
+      filePath: `/uploads/warranties/${newId}-${file.name}`,
+      ocrStatus: 'PENDING',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    warranties = [pending, ...warranties]
+
+    // 10초 후 자동 SUCCESS — 폴링이 잡아냄
+    setTimeout(() => {
+      const idx = warranties.findIndex((w) => w.id === newId)
+      if (idx === -1) return
+      const today = new Date()
+      const end = new Date(today)
+      end.setFullYear(end.getFullYear() + 2)
+      const days = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      warranties[idx] = {
+        ...warranties[idx],
+        insuranceCompany: FAKE_INSURERS[Math.floor(Math.random() * FAKE_INSURERS.length)],
+        policyNumber: randomPolicyNumber(),
+        startDate: today.toISOString().slice(0, 10),
+        endDate: end.toISOString().slice(0, 10),
+        daysUntilExpiry: days,
+        ocrStatus: 'SUCCESS',
+        updatedAt: new Date().toISOString(),
+      }
+    }, 10_000)
+
+    return HttpResponse.json<ApiResponse<Warranty>>(
+      { success: true, data: pending, error: null },
+      { status: 202 },
+    )
   }),
 ]
