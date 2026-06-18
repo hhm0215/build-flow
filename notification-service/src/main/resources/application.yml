@@ -45,6 +45,22 @@ app:
     alert-cooldown-days: 7
     # 스케줄 cron — 매일 09:00
     scheduler-cron: "0 0 9 * * *"
+  upload-dir: ${UPLOAD_DIR:./uploads/warranties}
+  # multipart 업로드 제한 (Spring 기본 1MB / 10MB로 줄여진 것을 PDF 사이즈에 맞춰 확장)
+  ocr:
+    # PDFBox 텍스트 추출 결과가 이 길이 미만이면 Tess4J OCR fallback
+    min-text-length: 50
+    # 스캔 PDF 렌더링 DPI (높을수록 정확도↑, 처리 시간↑)
+    scan-dpi: 300
+    # Tesseract traineddata 경로 (Docker: debian jammy 기본 경로)
+    tessdata-path: /usr/share/tesseract-ocr/4.00/tessdata
+    # Tesseract 인식 언어 (+ 구분)
+    languages: kor+eng
+
+servlet:
+  multipart:
+    max-file-size: 20MB
+    max-request-size: 20MB
 
 eureka:
   client:

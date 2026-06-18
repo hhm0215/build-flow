@@ -16,20 +16,17 @@
 
 ## P0 — 다음 1~2 작업
 
-### notification-service Phase 2 — PDF OCR 자동 채움
-- **배경**: Phase 1(만료 스케줄러 + Kafka 발행)은 2026-06-18 완료. Phase 2는 PDF 업로드 + 텍스트 자동 추출
+### 프론트엔드 — 보증보험 PDF 업로드 + OCR 상태 표시
+- **배경**: 백엔드 Phase 2 완료(2026-06-18). 프론트엔드는 아직 JSON 수동 입력만 — 업로드 모달 + OCR 상태 표시 필요
 - **산출물**:
-  - `build.gradle`에 Tess4J + PDFBox 의존성
-  - `DefectWarranty`에 `ocrStatus` ENUM 필드 (PENDING/SUCCESS/FAILED)
-  - `WarrantyOcrService`: PDFBox 텍스트 1차 추출 → 부족 시 Tess4J 2차 → 정규식 파싱 (보험사/증권번호/시작·만료일)
-  - `POST /api/v1/warranties/upload` 멀티파트 엔드포인트 + `@Async` 비동기 처리
-  - `Dockerfile`에 Tesseract 바이너리 + 한글 traineddata(`kor.traineddata`) 설치
-  - `app.upload-dir` 설정 (로컬 파일시스템, S3 전환 가능 구조)
-- **관련 파일**: `notification-service/.../domain/warranty/**`, `Dockerfile`
-- **예상 규모**: M~L
+  - `WarrantyListPage`에 PDF 업로드 모달 신설 (드래그앤드롭 + .pdf 검증 + 20MB 제한)
+  - `POST /api/v1/warranties/upload` 호출 (multipart) — `useUploadWarranty` 훅
+  - 행마다 OCR 상태 뱃지 (PENDING 회색 / SUCCESS 초록 / FAILED 빨강 / MANUAL 보라)
+  - PENDING 행은 polling (5~10초 간격, SUCCESS/FAILED 되면 중지)
+  - MSW 핸들러 업데이트 — multipart 업로드 + 2회 폴링 후 SUCCESS 시뮬
+- **관련 파일**: `frontend/src/pages/warranty/**`, `frontend/src/api/warranties.api.ts`
+- **예상 규모**: M
 - **상태**: TODO
-- **선행**: Phase 1 PR 머지 후 진입
-- **계획 문서**: 작업 시작 시 `.claude/plans/YYYY-MM-DD-warranty-ocr-phase2.md`로 작성
 
 ---
 
@@ -82,3 +79,4 @@
 | 2026-06-13 | PR 머지 자동화 도입 (BACKLOG 항목 외 메타 작업) — ADR-011 v2 |
 | 2026-06-14 | docker-compose obsolete `version:` 제거 + `.env.example` 신설 (윈도우 이동 전 정리) |
 | 2026-06-18 | warranty 만료 스케줄러 + Kafka 발행 Phase 1 완료 → P0 항목을 Phase 2(OCR)로 갱신 |
+| 2026-06-18 | warranty PDF OCR Phase 2 완료 → P0 항목을 프론트 업로드/상태 표시로 갱신 |

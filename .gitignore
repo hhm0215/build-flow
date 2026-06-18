@@ -30,6 +30,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env.local
 
+# Uploads (warranty PDF 등 — 로컬 파일시스템 저장)
+uploads/
+**/uploads/
+
 # Docker volumes
 docker/volumes/
 

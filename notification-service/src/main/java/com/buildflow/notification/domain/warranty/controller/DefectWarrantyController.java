@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -56,5 +57,19 @@ public class DefectWarrantyController {
     public ResponseEntity<ApiResponse<List<WarrantyResponse>>> findExpiringSoon(
             @RequestParam(defaultValue = "30") int days) {
         return ResponseEntity.ok(ApiResponse.success(warrantyService.findExpiringSoon(days)));
+    }
+
+    /**
+     * PDF 업로드 + OCR 비동기 처리.
+     * 즉시 PENDING 상태 WarrantyResponse + HTTP 202 Accepted 반환.
+     * 클라이언트는 GET /api/v1/warranties/{id}로 처리 결과 폴링.
+     */
+    @PostMapping(value = "/upload", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<WarrantyResponse>> upload(
+            @RequestParam(value = "siteId") Long siteId,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity
+                .status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.success(warrantyService.createFromOcr(siteId, file)));
     }
 }

@@ -26,16 +26,16 @@ public class DefectWarranty {
     @Column(nullable = false)
     private Long siteId;
 
-    @Column(nullable = false, length = 200)
+    @Column(length = 200)
     private String insuranceCompany;
 
     @Column(length = 100)
     private String policyNumber;
 
-    @Column(nullable = false)
+    @Column
     private LocalDate startDate;
 
-    @Column(nullable = false)
+    @Column
     private LocalDate endDate;
 
     @Column(length = 500)
@@ -46,6 +46,10 @@ public class DefectWarranty {
 
     @Column
     private LocalDate lastExpiringAlertSentAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    private OcrStatus ocrStatus;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -65,6 +69,16 @@ public class DefectWarranty {
         this.endDate = endDate;
         this.filePath = filePath;
         this.memo = memo;
+        this.ocrStatus = OcrStatus.MANUAL;
+    }
+
+    /** OCR 흐름 진입점 — 최소 정보(siteId + filePath)만으로 PENDING 레코드 생성 */
+    public static DefectWarranty createPending(Long siteId, String filePath) {
+        DefectWarranty w = new DefectWarranty();
+        w.siteId = siteId;
+        w.filePath = filePath;
+        w.ocrStatus = OcrStatus.PENDING;
+        return w;
     }
 
     public void update(String insuranceCompany, String policyNumber,
@@ -76,16 +90,31 @@ public class DefectWarranty {
         this.memo = memo;
     }
 
+    /** OCR 성공 시 추출 결과 반영 — null 필드는 사용자가 수동 보완 */
+    public void applyOcrResult(String insuranceCompany, String policyNumber,
+                               LocalDate startDate, LocalDate endDate) {
+        if (insuranceCompany != null) this.insuranceCompany = insuranceCompany;
+        if (policyNumber != null) this.policyNumber = policyNumber;
+        if (startDate != null) this.startDate = startDate;
+        if (endDate != null) this.endDate = endDate;
+        this.ocrStatus = OcrStatus.SUCCESS;
+    }
+
+    public void markOcrFailed() {
+        this.ocrStatus = OcrStatus.FAILED;
+    }
+
     public void markExpiringAlertSent(LocalDate sentAt) {
         this.lastExpiringAlertSentAt = sentAt;
     }
 
     public boolean isExpiringSoon(int daysBeforeExpiry) {
-        return LocalDate.now().plusDays(daysBeforeExpiry).isAfter(endDate)
+        return endDate != null
+                && LocalDate.now().plusDays(daysBeforeExpiry).isAfter(endDate)
                 && LocalDate.now().isBefore(endDate);
     }
 
     public boolean isExpired() {
-        return LocalDate.now().isAfter(endDate);
+        return endDate != null && LocalDate.now().isAfter(endDate);
     }
 }

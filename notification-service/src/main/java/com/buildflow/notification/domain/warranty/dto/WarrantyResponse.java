@@ -1,6 +1,7 @@
 package com.buildflow.notification.domain.warranty.dto;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -22,11 +23,14 @@ public class WarrantyResponse {
     private boolean expired;
     private String filePath;
     private String memo;
+    private OcrStatus ocrStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static WarrantyResponse from(DefectWarranty warranty) {
-        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), warranty.getEndDate());
+        long daysUntil = warranty.getEndDate() != null
+                ? ChronoUnit.DAYS.between(LocalDate.now(), warranty.getEndDate())
+                : 0L;
         return WarrantyResponse.builder()
                 .id(warranty.getId())
                 .siteId(warranty.getSiteId())
@@ -38,6 +42,7 @@ public class WarrantyResponse {
                 .expired(warranty.isExpired())
                 .filePath(warranty.getFilePath())
                 .memo(warranty.getMemo())
+                .ocrStatus(warranty.getOcrStatus())
                 .createdAt(warranty.getCreatedAt())
                 .updatedAt(warranty.getUpdatedAt())
                 .build();
