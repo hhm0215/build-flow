@@ -152,6 +152,22 @@
 
 ---
 
+### ✅ notification-service — PDF OCR Phase 2 (2026-06-18)
+- `notification-service/Dockerfile` 전용 신설 — debian jammy + Tesseract 4 + kor·eng traineddata (다른 8 서비스는 alpine 그대로)
+- `docker-compose.app.yml` notification-service build.dockerfile 경로 변경
+- `build.gradle`: `pdfbox:3.0.3` + `tess4j:5.13.0` 의존성
+- `OcrStatus` enum (PENDING/SUCCESS/FAILED/MANUAL) + `DefectWarranty` 필드 추가, 기존 빌더는 default MANUAL
+- `WarrantyOcrParser` 정규식 — 보험사 화이트리스트 12종 + 증권번호/날짜 추출, 6 단위 테스트
+- `WarrantyOcrService.@Async` 하이브리드 파이프라인: PDFBox 텍스트 1차 → 50자 미만이면 Tess4J 2차 (300 DPI)
+- `WarrantyOcrConfig.@EnableAsync` + Tesseract 빈 (`kor+eng`, datapath 외부화)
+- `POST /api/v1/warranties/upload` (multipart, 202 Accepted) — 즉시 PENDING + 비동기 OCR
+- `application.yml`: `app.upload-dir`, `app.ocr.{min-text-length,scan-dpi,tessdata-path,languages}`, multipart 20MB 한도
+- `.gitignore`: `uploads/` 추가
+- ⚠️ 빌드 검증 못함 (gradlew 부재, BACKLOG P2). 실제 PDF 샘플 정규식 튜닝은 첫 사용 후 보강
+- 계획 문서: `.claude/plans/2026-06-18-warranty-ocr-phase2.md`
+
+---
+
 ### ✅ notification-service — 만료 스케줄러 Phase 1 (2026-06-18)
 - `@EnableScheduling` 도입 + `WarrantyExpirationScheduler` (매일 09:00 cron)
 - `KafkaProducerService` 신설 — `warranty.expiring` 토픽 (notification-service 최초 발행자)

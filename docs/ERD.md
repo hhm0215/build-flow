@@ -182,7 +182,8 @@
 | guarantee_amount | BIGINT | 보증금액 (OCR 추출) |
 | start_date | DATE | 보증 시작일 (OCR 추출) |
 | end_date | DATE | 보증 만료일 (OCR 추출) |
-| ocr_status | ENUM('PENDING','SUCCESS','FAILED') | OCR 처리 상태 |
+| ocr_status | ENUM('PENDING','SUCCESS','FAILED','MANUAL') | OCR 처리 상태 (MANUAL=사용자 직접 입력) |
+| last_expiring_alert_sent_at | DATE | 만료 임박 알림 마지막 발송일 (스케줄러 cooldown 7일) |
 | created_at | DATETIME | |
 | updated_at | DATETIME | |
 

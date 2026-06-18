@@ -253,12 +253,12 @@ services:
       - buildflow-net
 
   # ─────────────────────────────────────────
-  # 9. Notification Service
+  # 9. Notification Service (전용 Dockerfile — Tesseract + 한글 모델 포함)
   # ─────────────────────────────────────────
   notification-service:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: notification-service/Dockerfile
       args:
         SERVICE_NAME: notification-service
     container_name: buildflow-notification

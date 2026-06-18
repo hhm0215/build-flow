@@ -147,11 +147,13 @@
 
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
-| POST | /api/v1/warranties | PDF 업로드 + OCR 요청 | O (ADMIN) |
+| POST | /api/v1/warranties | JSON으로 직접 등록 (ocrStatus=MANUAL) | O (ADMIN) |
+| POST | /api/v1/warranties/upload | PDF 멀티파트 업로드 + OCR 비동기 처리 (202 Accepted) | O (ADMIN) |
 | GET | /api/v1/warranties?siteId={id} | 현장별 보증보험 목록 | O |
-| GET | /api/v1/warranties/{id} | 상세 (OCR 결과 포함) | O |
-| GET | /api/v1/warranties/{id}/download | PDF 다운로드 | O |
-| GET | /api/v1/warranties/expiring | 만료 임박 목록 | O |
+| GET | /api/v1/warranties/{id} | 상세 (OCR 결과 + ocrStatus 포함) | O |
+| PUT | /api/v1/warranties/{id} | 수정 (OCR 실패 시 사용자 보완) | O (ADMIN) |
+| DELETE | /api/v1/warranties/{id} | 삭제 | O (ADMIN) |
+| GET | /api/v1/warranties/expiring?days=30 | 만료 임박 목록 | O |
 
 ### 알림
 
