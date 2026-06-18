@@ -283,12 +283,12 @@ export default function EstimateListPage() {
                       rules={[{ required: true, message: '단가' }]}
                       style={{ marginBottom: 8 }}
                     >
-                      <InputNumber
+                      <InputNumber<number>
                         style={{ width: '100%' }}
                         min={0}
                         placeholder="단가"
                         formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={(v) => Number(v?.replace(/,/g, '') ?? 0) as 0}
+                        parser={(v) => Number(v?.replace(/,/g, '') ?? 0)}
                       />
                     </Form.Item>
                     <Button

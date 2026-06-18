@@ -93,7 +93,7 @@ export default function WarrantyListPage() {
         endDate: dayjs(values.endDate).format('YYYY-MM-DD'),
         memo: values.memo || '',
       }
-      createWarranty(request as any, {
+      createWarranty(request, {
         onSuccess: () => {
           setIsModalOpen(false)
           form.resetFields()
@@ -334,12 +334,12 @@ export default function WarrantyListPage() {
             <Input placeholder="증권번호" />
           </Form.Item>
           <Form.Item name="coverageAmount" label="보증금액" rules={[{ required: true, message: '보증금액을 입력하세요' }]}>
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               placeholder="보증금액"
               min={0}
               formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '')) as any}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, ''))}
             />
           </Form.Item>
           <Form.Item name="startDate" label="보증 시작일" rules={[{ required: true, message: '시작일을 선택하세요' }]}>

@@ -330,20 +330,20 @@ export default function TaxListPage() {
             <Input placeholder="거래처명" />
           </Form.Item>
           <Form.Item name="supplyAmount" label="공급가액" rules={[{ required: true, message: '공급가액을 입력해주세요' }]}>
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               min={0}
               formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0) as any}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0)}
               placeholder="공급가액"
             />
           </Form.Item>
           <Form.Item name="taxAmount" label="세액" rules={[{ required: true, message: '세액을 입력해주세요' }]}>
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               min={0}
               formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0) as any}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0)}
               placeholder="세액"
             />
           </Form.Item>

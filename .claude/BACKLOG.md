@@ -38,10 +38,6 @@
 - 공내역서 업로드 흐름에서도 함께 적용
 - **예상 규모**: S
 
-### InputNumber parser 타입 캐스트 정리
-- estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
-- **예상 규모**: S
-
 ---
 
 ## P2 — 인프라/툴링
