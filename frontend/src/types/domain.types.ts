@@ -204,7 +204,8 @@ export interface Warranty {
   siteId: number
   insuranceCompany: string
   policyNumber: string
-  coverageAmount: number
+  /** 백엔드 응답에 없을 수 있음 — frontend mock에만 존재 (백엔드 추가는 BACKLOG P2) */
+  coverageAmount?: number
   startDate: string
   endDate: string
   memo: string
@@ -220,7 +221,7 @@ export interface WarrantyCreateRequest {
   siteId: number
   insuranceCompany: string
   policyNumber: string
-  coverageAmount: number
+  coverageAmount?: number
   startDate: string
   endDate: string
   memo?: string

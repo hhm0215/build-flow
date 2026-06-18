@@ -264,7 +264,7 @@ export default function WarrantyListPage() {
                     {w.policyNumber}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
-                    ₩{w.coverageAmount.toLocaleString('ko-KR')}
+                    {w.coverageAmount != null ? `₩${w.coverageAmount.toLocaleString('ko-KR')}` : '—'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {w.startDate} ~ {w.endDate}

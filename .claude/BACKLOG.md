@@ -22,10 +22,10 @@
 
 ## P1 — 중기
 
-### frontend Warranty 타입을 백엔드와 일치
-- **배경**: frontend mock에 `coverageAmount` 있으나 백엔드 엔티티에 해당 필드 없음. 실제 백엔드 통합 시 타입 불일치
-- **산출물**: `Warranty.coverageAmount` 제거 또는 백엔드에 추가 결정 → 양쪽 정렬
-- **예상 규모**: S
+### 백엔드 DefectWarranty에 coverageAmount 필드 추가
+- **배경**: frontend는 `coverageAmount` 표시·입력 (UX 가치 있음). 백엔드 엔티티에 없어 등록 시 무시됨
+- **산출물**: `DefectWarranty.coverageAmount BIGINT` 추가 + DTO/Response 갱신 + ERD 갱신. ddl-auto: update로 자동 마이그레이션
+- **예상 규모**: S (백엔드만)
 
 ### 필터 리팩터 (별도 PR)
 - useListFilters 추상화: 5페이지 공통 boilerplate 통합
