@@ -248,17 +248,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-18 갱신, PR #25 머지 후)
+## 다음 세션 진입점 (2026-06-18 갱신, PR #27 머지 후 — 위임 모드 첫 시범 종료)
 
 **현재 git 상태**:
-- `origin/main` = `a6ce501` (PR #25 머지 시점, warranty PDF OCR Phase 2)
-- `origin/develop` = `71cec1b` — main과 완전 동기화 (차이 0)
-- 직진 사이클: PR #20 → #21 → #22 → #23 → #24(스케줄러 Phase 1) → #25(OCR Phase 2)
+- `origin/main` = `13cc6b2` (PR #27 머지, frontend warranty 업로드 UI)
+- `origin/develop` = `68d282a` — main과 완전 동기화 (차이 0)
+- 위임 모드 사이클 — PR #26(ADR-012 위임 모드) → PR #27(frontend) 자동 연속 처리
+- 직진 사이클: PR #20 → ... → #24(스케줄러) → #25(OCR) → #26(위임 모드) → #27(frontend)
 
 **다음 작업**:
-- BACKLOG P0 **프론트엔드 — 보증보험 PDF 업로드 + OCR 상태 표시** (M 규모)
-- 또는 백엔드 Phase 1·2 통합 검증 우선 (`docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d`)
-- 실제 PDF 샘플 확보되면 Phase 3 정규식 튜닝 검토
+- BACKLOG P0 **비어 있음** — 위임 모드 멈춤 조건 도달
+- P1 후보: frontend Warranty 타입 백엔드 일치 / 필터 리팩터 / 견적서 모달 siteId Select / InputNumber 캐스트 정리
+- 또는 통합 검증 / 실제 PDF 샘플로 정규식 튜닝
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
