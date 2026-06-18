@@ -20,6 +20,14 @@ spring:
     show-sql: false
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        retries: 3
     consumer:
       group-id: notification-service-group
       auto-offset-reset: earliest
@@ -28,6 +36,15 @@ spring:
       enable-auto-commit: false
     listener:
       ack-mode: record
+
+app:
+  warranty:
+    # 만료 임박 알림 임계치 (일 단위) — 종료일이 오늘 ~ today+threshold 범위면 알림 발송
+    alert-threshold-days: 30
+    # 동일 보증서 알림 쿨다운 (일 단위) — 마지막 발송 후 N일 지나야 재발송
+    alert-cooldown-days: 7
+    # 스케줄 cron — 매일 09:00
+    scheduler-cron: "0 0 9 * * *"
 
 eureka:
   client:

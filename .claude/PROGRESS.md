@@ -152,6 +152,20 @@
 
 ---
 
+### ✅ notification-service — 만료 스케줄러 Phase 1 (2026-06-18)
+- `@EnableScheduling` 도입 + `WarrantyExpirationScheduler` (매일 09:00 cron)
+- `KafkaProducerService` 신설 — `warranty.expiring` 토픽 (notification-service 최초 발행자)
+- `WarrantyExpiringPayload`: warrantyId/siteId/insuranceCompany/endDate/daysUntilExpiry
+- `DefectWarranty.lastExpiringAlertSentAt` + `markExpiringAlertSent` 추가 — cooldown 7일 단일 컬럼 중복 방지
+- `findExpiringNotYetAlerted(today, threshold, cooldownThreshold)` 쿼리
+- `KafkaConsumerService`에 `warranty.expiring` 핸들러 → 인앱 알림 `WARRANTY_EXPIRING` 자동 생성
+- application.yml: kafka producer 설정 + `app.warranty.{alert-threshold-days=30, alert-cooldown-days=7, scheduler-cron="0 0 9 * * *"}` 외부화
+- 계획 문서: `.claude/plans/2026-06-18-warranty-ocr-scheduler.md`
+- Phase 2 (OCR): BACKLOG P0 재등록
+- ⚠️ 빌드 검증 못함 (gradlew 부재 BACKLOG P2) — 정적 정합성 점검만 수행, 머지 후 `docker compose up`으로 통합 검증 필요
+
+---
+
 ### ✅ frontend — /review 후속 fix 2건 (2026-06-10) — 워크플로우 시범 사이클
 - `estimates.api.ts`: 공내역서 parse 요청에서 `Content-Type: multipart/form-data` 수동 헤더 제거 (axios 자동 boundary에 위임)
 - `UploadParseModal.tsx`: parse 실패 시 `isAxiosError` narrow 후 백엔드 `error.response?.data?.error?.message` 우선 노출
@@ -210,13 +224,13 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-13 갱신, PR #22 머지 후)
+## 다음 세션 진입점 (2026-06-14 갱신, PR #23 머지 후)
 
 **현재 git 상태**:
-- `origin/main` = `2e08ef2` (PR #22 머지 시점, ADR-011 v2 풀 자동 머지 첫 사이클 입증)
-- `origin/develop` = `fe93b62` — develop ↔ main 동기화 + 본 PROGRESS 갱신만 추가 push
+- `origin/main` = `c0f49f9` (PR #23 머지 시점, 윈도우 이동 전 정리 + PROGRESS 후처리)
+- `origin/develop` = `44f6cde` — main과 완전 동기화 (차이 0)
 - 다음 세션은 BACKLOG P0 항목 진행 후 새 PR 생성 사이클 시작 가능
-- 이전 직진 사이클: PR #20(공내역서 UI) → PR #21(워크플로우/PR 자동화 v1) → PR #22(머지 자동화 v2)
+- 직진 사이클: PR #20(공내역서 UI) → PR #21(워크플로우/PR 자동화 v1) → PR #22(머지 자동화 v2) → PR #23(윈도우 이동 전 정리)
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)

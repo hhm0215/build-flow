@@ -44,6 +44,9 @@ public class DefectWarranty {
     @Column(columnDefinition = "TEXT")
     private String memo;
 
+    @Column
+    private LocalDate lastExpiringAlertSentAt;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -71,6 +74,10 @@ public class DefectWarranty {
         this.startDate = startDate;
         this.endDate = endDate;
         this.memo = memo;
+    }
+
+    public void markExpiringAlertSent(LocalDate sentAt) {
+        this.lastExpiringAlertSentAt = sentAt;
     }
 
     public boolean isExpiringSoon(int daysBeforeExpiry) {
