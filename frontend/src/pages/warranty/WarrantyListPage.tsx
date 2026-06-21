@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShieldCheck, Plus, Trash2, AlertTriangle, UploadCloud } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
+import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
@@ -26,15 +27,15 @@ const STATUS_OPTIONS = [
 interface WarrantyFilters {
   q: string
   status: WarrantyStatus
-  endStart: string
-  endEnd: string
+  expiryFrom: string
+  expiryTo: string
 }
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
   status: { type: 'enum', values: ['VALID', 'EXPIRED'] },
-  endStart: { type: 'date' },
-  endEnd: { type: 'date' },
+  expiryFrom: { type: 'date' },
+  expiryTo: { type: 'date' },
 }
 
 export default function WarrantyListPage() {
@@ -64,19 +65,19 @@ export default function WarrantyListPage() {
       if (filters.status === 'VALID' && w.expired) return false
       if (filters.status === 'EXPIRED' && !w.expired) return false
       const dateKey = w.endDate?.slice(0, 10) ?? ''
-      if (filters.endStart && dateKey < filters.endStart) return false
-      if (filters.endEnd && dateKey > filters.endEnd) return false
+      if (filters.expiryFrom && dateKey < filters.expiryFrom) return false
+      if (filters.expiryTo && dateKey > filters.expiryTo) return false
       return true
     })
-  }, [warranties, debouncedQ, filters.status, filters.endStart, filters.endEnd])
+  }, [warranties, debouncedQ, filters.status, filters.expiryFrom, filters.expiryTo])
 
   const activeCount =
     (filters.q ? 1 : 0) +
     (filters.status ? 1 : 0) +
-    (filters.endStart || filters.endEnd ? 1 : 0)
+    (filters.expiryFrom || filters.expiryTo ? 1 : 0)
 
   const resetFilters = () =>
-    setFilters({ q: '', status: undefined, endStart: '', endEnd: '' })
+    setFilters({ q: '', status: undefined, expiryFrom: '', expiryTo: '' })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
@@ -93,7 +94,7 @@ export default function WarrantyListPage() {
         endDate: dayjs(values.endDate).format('YYYY-MM-DD'),
         memo: values.memo || '',
       }
-      createWarranty(request as any, {
+      createWarranty(request, {
         onSuccess: () => {
           setIsModalOpen(false)
           form.resetFields()
@@ -198,10 +199,10 @@ export default function WarrantyListPage() {
           onChange={(v) => setFilters({ status: v })}
         />
         <FilterDateRange
-          startDate={filters.endStart}
-          endDate={filters.endEnd}
+          startDate={filters.expiryFrom}
+          endDate={filters.expiryTo}
           onChange={(range) =>
-            setFilters({ endStart: range.startDate ?? '', endEnd: range.endDate ?? '' })
+            setFilters({ expiryFrom: range.startDate ?? '', expiryTo: range.endDate ?? '' })
           }
         />
       </FilterBar>
@@ -264,7 +265,7 @@ export default function WarrantyListPage() {
                     {w.policyNumber}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
-                    ₩{w.coverageAmount.toLocaleString('ko-KR')}
+                    {w.coverageAmount != null ? `₩${w.coverageAmount.toLocaleString('ko-KR')}` : '—'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {w.startDate} ~ {w.endDate}
@@ -324,8 +325,8 @@ export default function WarrantyListPage() {
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="siteId" label="현장 ID" rules={[{ required: true, message: '현장 ID를 입력하세요' }]}>
-            <InputNumber style={{ width: '100%' }} placeholder="현장 ID" min={1} />
+          <Form.Item name="siteId" label="현장" rules={[{ required: true, message: '현장을 선택하세요' }]}>
+            <SiteSelect placeholder="현장 검색 / 선택" />
           </Form.Item>
           <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, message: '보험사를 입력하세요' }]}>
             <Input placeholder="보험사명" />
@@ -334,12 +335,12 @@ export default function WarrantyListPage() {
             <Input placeholder="증권번호" />
           </Form.Item>
           <Form.Item name="coverageAmount" label="보증금액" rules={[{ required: true, message: '보증금액을 입력하세요' }]}>
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               placeholder="보증금액"
               min={0}
               formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '')) as any}
+              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, ''))}
             />
           </Form.Item>
           <Form.Item name="startDate" label="보증 시작일" rules={[{ required: true, message: '시작일을 선택하세요' }]}>

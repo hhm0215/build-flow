@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShoppingBag, Plus } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
+import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
@@ -120,10 +121,10 @@ export default function PurchaseListPage() {
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="siteId"
-            label="현장 ID"
-            rules={[{ required: true, message: '현장 ID를 입력하세요' }]}
+            label="현장"
+            rules={[{ required: true, message: '현장을 선택하세요' }]}
           >
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="현장 ID" />
+            <SiteSelect placeholder="현장 검색 / 선택" />
           </Form.Item>
           <Form.Item
             name="itemName"
@@ -144,12 +145,12 @@ export default function PurchaseListPage() {
             label="단가"
             rules={[{ required: true, message: '단가를 입력하세요' }]}
           >
-            <InputNumber
+            <InputNumber<number>
               style={{ width: '100%' }}
               min={0}
               placeholder="단가"
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(v) => Number(v?.replace(/,/g, '') ?? 0) as 0}
+              parser={(v) => Number(v?.replace(/,/g, '') ?? 0)}
             />
           </Form.Item>
           <Form.Item name="supplier" label="공급업체">

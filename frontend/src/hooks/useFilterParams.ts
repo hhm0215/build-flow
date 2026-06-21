@@ -9,6 +9,23 @@ export type FilterFieldSchema =
 
 export type FilterSchema = Record<string, FilterFieldSchema>
 
+/**
+ * 스키마 필드에서 값 타입을 추론.
+ * - string / date → string
+ * - number → number
+ * - enum → values 배열의 union
+ */
+export type InferFilterField<F extends FilterFieldSchema> =
+  F extends { type: 'string' } ? string
+  : F extends { type: 'date' } ? string
+  : F extends { type: 'number' } ? number
+  : F extends { type: 'enum'; values: readonly (infer V)[] } ? V
+  : never
+
+export type InferFilters<S extends FilterSchema> = {
+  [K in keyof S]?: InferFilterField<S[K]>
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 function parseField(raw: string, schema: FilterFieldSchema): unknown | undefined {
@@ -32,9 +49,24 @@ function serializeField(value: unknown): string | undefined {
   return String(value)
 }
 
+/**
+ * 스키마 기반 URL 쿼리 ↔ 필터 상태 동기화.
+ *
+ * 타입 추론: 명시적 제네릭을 주지 않으면 스키마 객체에서 자동 추론됨.
+ * - `useFilterParams(SCHEMA)` — 타입 자동 추론 (스키마를 `as const`로 선언 권장)
+ * - `useFilterParams<MyFilters>(SCHEMA)` — 명시적 인터페이스 (하위 호환)
+ */
+/* eslint-disable no-redeclare */
+export function useFilterParams<const S extends FilterSchema>(
+  schema: S,
+): [InferFilters<S>, (next: Partial<InferFilters<S>>) => void]
+export function useFilterParams<T extends object>(
+  schema: FilterSchema,
+): [Partial<T>, (next: Partial<T>) => void]
 export function useFilterParams<T extends object>(
   schema: FilterSchema,
 ): [Partial<T>, (next: Partial<T>) => void] {
+  /* eslint-enable no-redeclare */
   const [searchParams, setSearchParams] = useSearchParams()
 
   const { parsed, hasInvalid } = useMemo(() => {

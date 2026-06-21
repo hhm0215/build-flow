@@ -607,7 +607,7 @@ export default function SiteDetailPage() {
                           <div>
                             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>보증금액</div>
                             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {formatKRW(w.coverageAmount)}
+                              {w.coverageAmount != null ? formatKRW(w.coverageAmount) : '—'}
                             </div>
                           </div>
                           <div>

@@ -22,25 +22,16 @@
 
 ## P1 — 중기
 
-### frontend Warranty 타입을 백엔드와 일치
-- **배경**: frontend mock에 `coverageAmount` 있으나 백엔드 엔티티에 해당 필드 없음. 실제 백엔드 통합 시 타입 불일치
-- **산출물**: `Warranty.coverageAmount` 제거 또는 백엔드에 추가 결정 → 양쪽 정렬
-- **예상 규모**: S
+### 백엔드 DefectWarranty에 coverageAmount 필드 추가
+- **배경**: frontend는 `coverageAmount` 표시·입력 (UX 가치 있음). 백엔드 엔티티에 없어 등록 시 무시됨
+- **산출물**: `DefectWarranty.coverageAmount BIGINT` 추가 + DTO/Response 갱신 + ERD 갱신. ddl-auto: update로 자동 마이그레이션
+- **예상 규모**: S (백엔드만)
 
-### 필터 리팩터 (별도 PR)
-- useListFilters 추상화: 5페이지 공통 boilerplate 통합
-- useFilterParams: schema에서 T 타입 추론 (interface 중복 제거)
-- Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
-- **예상 규모**: M
-
-### 견적서 작성 모달 — 현장 ID 입력 개선
-- 현재 siteId 수동 InputNumber → Select(현장 목록 검색)으로 교체
-- 공내역서 업로드 흐름에서도 함께 적용
-- **예상 규모**: S
-
-### InputNumber parser 타입 캐스트 정리
-- estimate/purchase/tax/warranty 모달 폼의 `as 0` / `as any` 캐스트 제거
-- **예상 규모**: S
+### useListFilters 추상화 (별도 PR — 큰 결정)
+- **배경**: 5페이지(estimate/purchase/tax/warranty/site) ListPage가 `useFilterParams + useDebouncedValue + filtered useMemo + resetFilters + activeCount` 패턴 반복
+- **산출물**: `useListFilters(schema, items, filterFn)` 훅으로 boilerplate 통합. 각 페이지 차이(검색 필드 다름, 필터 로직 다름)를 어떻게 추상화할지 설계 필요
+- **예상 규모**: M (5페이지 다 손대야 함, 추상화 잘못 가면 가독성 ↓)
+- **상태**: TODO — 설계부터 합의 필요 (자동 진행 위험)
 
 ---
 
@@ -77,3 +68,4 @@
 | 2026-06-18 | warranty PDF OCR Phase 2 완료 → P0 항목을 프론트 업로드/상태 표시로 갱신 |
 | 2026-06-18 | ADR-012 위임 모드 정식 도입 (BACKLOG 항목 외 메타 작업) |
 | 2026-06-18 | 프론트 PDF 업로드 + OCR 상태 표시 완료 → P0 비움. P1에 Warranty 타입 일치 신규 등록 |
+| 2026-06-21 | 위임 모드 5 사이클 일괄 처리 — P1 4건 완료(InputNumber/Warranty optional/SiteSelect/필터 명명+추론), useListFilters는 별도 분리 |

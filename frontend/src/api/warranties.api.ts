@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, Warranty } from '../types'
+import { ApiResponse, Warranty, WarrantyCreateRequest } from '../types'
 
 export const WARRANTIES_KEY = {
   all: ['warranties'] as const,
@@ -23,12 +23,12 @@ const uploadWarranty = async ({ file, siteId }: { file: File; siteId: number }) 
   return res.data.data
 }
 
-const createWarranty = async (body: Omit<Warranty, 'id' | 'daysUntilExpiry' | 'expired' | 'createdAt' | 'updatedAt'>) => {
+const createWarranty = async (body: WarrantyCreateRequest) => {
   const res = await axiosInstance.post<ApiResponse<Warranty>>('/warranties', body)
   return res.data.data
 }
 
-const updateWarranty = async ({ id, ...body }: Omit<Warranty, 'daysUntilExpiry' | 'expired' | 'createdAt' | 'updatedAt'>) => {
+const updateWarranty = async ({ id, ...body }: WarrantyCreateRequest & { id: number }) => {
   const res = await axiosInstance.put<ApiResponse<Warranty>>(`/warranties/${id}`, body)
   return res.data.data
 }
