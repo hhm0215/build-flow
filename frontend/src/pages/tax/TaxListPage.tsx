@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { Receipt, Plus, CheckCircle } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd'
+import SiteSelect from '../../components/SiteSelect'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
 import FilterBar from '../../components/filters/FilterBar'
@@ -323,8 +324,8 @@ export default function TaxListPage() {
               ]}
             />
           </Form.Item>
-          <Form.Item name="siteId" label="현장 ID" rules={[{ required: true, message: '현장 ID를 입력해주세요' }]}>
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="현장 ID" />
+          <Form.Item name="siteId" label="현장" rules={[{ required: true, message: '현장을 선택해주세요' }]}>
+            <SiteSelect placeholder="현장 검색 / 선택" />
           </Form.Item>
           <Form.Item name="counterparty" label="거래처" rules={[{ required: true, message: '거래처를 입력해주세요' }]}>
             <Input placeholder="거래처명" />

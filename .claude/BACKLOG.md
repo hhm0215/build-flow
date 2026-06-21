@@ -33,11 +33,6 @@
 - Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
 - **예상 규모**: M
 
-### 견적서 작성 모달 — 현장 ID 입력 개선
-- 현재 siteId 수동 InputNumber → Select(현장 목록 검색)으로 교체
-- 공내역서 업로드 흐름에서도 함께 적용
-- **예상 규모**: S
-
 ---
 
 ## P2 — 인프라/툴링

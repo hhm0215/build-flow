@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShieldCheck, Plus, Trash2, AlertTriangle, UploadCloud } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
+import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
@@ -324,8 +325,8 @@ export default function WarrantyListPage() {
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="siteId" label="현장 ID" rules={[{ required: true, message: '현장 ID를 입력하세요' }]}>
-            <InputNumber style={{ width: '100%' }} placeholder="현장 ID" min={1} />
+          <Form.Item name="siteId" label="현장" rules={[{ required: true, message: '현장을 선택하세요' }]}>
+            <SiteSelect placeholder="현장 검색 / 선택" />
           </Form.Item>
           <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, message: '보험사를 입력하세요' }]}>
             <Input placeholder="보험사명" />

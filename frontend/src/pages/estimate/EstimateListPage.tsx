@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { FileText, Plus, Trash2, Sparkles } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
+import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
@@ -204,10 +205,10 @@ export default function EstimateListPage() {
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="siteId"
-            label="현장 ID"
-            rules={[{ required: true, message: '현장 ID를 입력하세요' }]}
+            label="현장"
+            rules={[{ required: true, message: '현장을 선택하세요' }]}
           >
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="현장 ID" />
+            <SiteSelect placeholder="현장 검색 / 선택" />
           </Form.Item>
           <Form.Item
             name="title"
