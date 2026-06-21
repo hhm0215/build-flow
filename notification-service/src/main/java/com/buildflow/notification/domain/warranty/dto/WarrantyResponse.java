@@ -19,6 +19,7 @@ public class WarrantyResponse {
     private String policyNumber;
     private LocalDate startDate;
     private LocalDate endDate;
+    private Long coverageAmount;
     private long daysUntilExpiry;
     private boolean expired;
     private String filePath;
@@ -38,6 +39,7 @@ public class WarrantyResponse {
                 .policyNumber(warranty.getPolicyNumber())
                 .startDate(warranty.getStartDate())
                 .endDate(warranty.getEndDate())
+                .coverageAmount(warranty.getCoverageAmount())
                 .daysUntilExpiry(Math.max(daysUntil, 0))
                 .expired(warranty.isExpired())
                 .filePath(warranty.getFilePath())

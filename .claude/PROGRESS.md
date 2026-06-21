@@ -152,6 +152,17 @@
 
 ---
 
+### ✅ 백엔드 DefectWarranty.coverageAmount 필드 추가 (2026-06-21)
+- `DefectWarranty.coverageAmount BIGINT` 필드 + 빌더/update 메서드 인자 추가
+- `WarrantyCreateRequest` / `WarrantyUpdateRequest`에 `Long coverageAmount` 옵션 필드
+- `WarrantyResponse`에 `coverageAmount` 포함
+- `DefectWarrantyService.create/update` 호출부 갱신
+- `docs/ERD.md`: warranties → defect_warranties (실제 테이블명) + insurance_company/policy_number/coverage_amount 컬럼 반영, NOT NULL 표시
+- `ddl-auto: update`로 컬럼 자동 마이그레이션 (NULL 허용)
+- frontend는 이미 옵셔널 처리 완료 (사이클 2 짝 완성)
+
+---
+
 ### ✅ 위임 모드 P1 일괄 처리 + 자동화 가이드 (2026-06-21)
 - **사이클 1**: InputNumber `as 0`/`as any` 캐스트 정리 — 5개 InputNumber `<number>` 제네릭 명시 + createWarranty/updateWarranty 시그니처 좁힘. lint warning 4 → 0
 - **사이클 2**: `Warranty.coverageAmount` optional 처리 + WarrantyListPage/SiteDetailPage null 가드. 백엔드 추가는 BACKLOG P2로 분리
