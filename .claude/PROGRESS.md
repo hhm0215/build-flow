@@ -152,6 +152,16 @@
 
 ---
 
+### ✅ 위임 모드 P1 일괄 처리 + 자동화 가이드 (2026-06-21)
+- **사이클 1**: InputNumber `as 0`/`as any` 캐스트 정리 — 5개 InputNumber `<number>` 제네릭 명시 + createWarranty/updateWarranty 시그니처 좁힘. lint warning 4 → 0
+- **사이클 2**: `Warranty.coverageAmount` optional 처리 + WarrantyListPage/SiteDetailPage null 가드. 백엔드 추가는 BACKLOG P2로 분리
+- **사이클 3**: `SiteSelect` 컴포넌트 신설 + 4개 모달(estimate/purchase/tax/warranty) siteId 입력을 useSites 기반 검색 드롭다운으로 교체
+- **사이클 4**: `useFilterParams` 함수 오버로드 + `InferFilters<S>` 타입 추론. Warranty 필터 `endStart/endEnd` → `expiryFrom/expiryTo` 명명. useListFilters 추상화는 위험 분리로 별도 P1 등록
+- **사이클 5**: `docs/AUTOMATION_GUIDE.md` 신설 — 자동화 3모드 / 8단계 사이클 / 진입 키워드 / 멈춤 조건 / FAQ / 트러블슈팅 / 치트시트
+- 위임 모드 진입 키워드 1회로 5 사이클 자동 처리 (ADR-012 본격 활용)
+
+---
+
 ### ✅ frontend — 보증보험 PDF 업로드 모달 + OCR 상태 뱃지 + 폴링 (2026-06-18)
 - 신규: `components/OcrStatusBadge.tsx`, `pages/warranty/WarrantyUploadModal.tsx`
 - 갱신: `types/domain.types.ts`(OcrStatus + ocrStatus/filePath 추가), `api/warranties.api.ts`(uploadWarranty + useUploadWarranty + refetchInterval), `WarrantyListPage`(UploadCloud 버튼 + 보험사 셀 뱃지 + PENDING 5초 폴링), MSW 핸들러(/upload 202 + 10초 자동 SUCCESS 시뮬)
