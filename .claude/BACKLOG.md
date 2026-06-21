@@ -27,11 +27,11 @@
 - **산출물**: `DefectWarranty.coverageAmount BIGINT` 추가 + DTO/Response 갱신 + ERD 갱신. ddl-auto: update로 자동 마이그레이션
 - **예상 규모**: S (백엔드만)
 
-### 필터 리팩터 (별도 PR)
-- useListFilters 추상화: 5페이지 공통 boilerplate 통합
-- useFilterParams: schema에서 T 타입 추론 (interface 중복 제거)
-- Warranty endStart/endEnd → expiryFrom/expiryTo 명명 일관성
-- **예상 규모**: M
+### useListFilters 추상화 (별도 PR — 큰 결정)
+- **배경**: 5페이지(estimate/purchase/tax/warranty/site) ListPage가 `useFilterParams + useDebouncedValue + filtered useMemo + resetFilters + activeCount` 패턴 반복
+- **산출물**: `useListFilters(schema, items, filterFn)` 훅으로 boilerplate 통합. 각 페이지 차이(검색 필드 다름, 필터 로직 다름)를 어떻게 추상화할지 설계 필요
+- **예상 규모**: M (5페이지 다 손대야 함, 추상화 잘못 가면 가독성 ↓)
+- **상태**: TODO — 설계부터 합의 필요 (자동 진행 위험)
 
 ---
 

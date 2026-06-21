@@ -27,15 +27,15 @@ const STATUS_OPTIONS = [
 interface WarrantyFilters {
   q: string
   status: WarrantyStatus
-  endStart: string
-  endEnd: string
+  expiryFrom: string
+  expiryTo: string
 }
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
   status: { type: 'enum', values: ['VALID', 'EXPIRED'] },
-  endStart: { type: 'date' },
-  endEnd: { type: 'date' },
+  expiryFrom: { type: 'date' },
+  expiryTo: { type: 'date' },
 }
 
 export default function WarrantyListPage() {
@@ -65,19 +65,19 @@ export default function WarrantyListPage() {
       if (filters.status === 'VALID' && w.expired) return false
       if (filters.status === 'EXPIRED' && !w.expired) return false
       const dateKey = w.endDate?.slice(0, 10) ?? ''
-      if (filters.endStart && dateKey < filters.endStart) return false
-      if (filters.endEnd && dateKey > filters.endEnd) return false
+      if (filters.expiryFrom && dateKey < filters.expiryFrom) return false
+      if (filters.expiryTo && dateKey > filters.expiryTo) return false
       return true
     })
-  }, [warranties, debouncedQ, filters.status, filters.endStart, filters.endEnd])
+  }, [warranties, debouncedQ, filters.status, filters.expiryFrom, filters.expiryTo])
 
   const activeCount =
     (filters.q ? 1 : 0) +
     (filters.status ? 1 : 0) +
-    (filters.endStart || filters.endEnd ? 1 : 0)
+    (filters.expiryFrom || filters.expiryTo ? 1 : 0)
 
   const resetFilters = () =>
-    setFilters({ q: '', status: undefined, endStart: '', endEnd: '' })
+    setFilters({ q: '', status: undefined, expiryFrom: '', expiryTo: '' })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
@@ -199,10 +199,10 @@ export default function WarrantyListPage() {
           onChange={(v) => setFilters({ status: v })}
         />
         <FilterDateRange
-          startDate={filters.endStart}
-          endDate={filters.endEnd}
+          startDate={filters.expiryFrom}
+          endDate={filters.expiryTo}
           onChange={(range) =>
-            setFilters({ endStart: range.startDate ?? '', endEnd: range.endDate ?? '' })
+            setFilters({ expiryFrom: range.startDate ?? '', expiryTo: range.endDate ?? '' })
           }
         />
       </FilterBar>
