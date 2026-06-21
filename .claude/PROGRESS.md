@@ -258,18 +258,24 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-18 갱신, PR #27 머지 후 — 위임 모드 첫 시범 종료)
+## 다음 세션 진입점 (2026-06-21 갱신, PR #28 머지 후)
 
 **현재 git 상태**:
-- `origin/main` = `13cc6b2` (PR #27 머지, frontend warranty 업로드 UI)
-- `origin/develop` = `68d282a` — main과 완전 동기화 (차이 0)
-- 위임 모드 사이클 — PR #26(ADR-012 위임 모드) → PR #27(frontend) 자동 연속 처리
-- 직진 사이클: PR #20 → ... → #24(스케줄러) → #25(OCR) → #26(위임 모드) → #27(frontend)
+- `origin/main` = `c01355a` (PR #28 머지, 위임 모드 P1 5 사이클 일괄)
+- `origin/develop` = `552e7af` — main과 완전 동기화 (차이 0)
+- 위임 모드 두 번째 본격 활용 — 5 사이클 자동 처리 (P1 4건 + 자동화 가이드)
+- 직진 사이클: PR #20 → ... → #27 → #28(P1 5 사이클)
 
 **다음 작업**:
-- BACKLOG P0 **비어 있음** — 위임 모드 멈춤 조건 도달
-- P1 후보: frontend Warranty 타입 백엔드 일치 / 필터 리팩터 / 견적서 모달 siteId Select / InputNumber 캐스트 정리
-- 또는 통합 검증 / 실제 PDF 샘플로 정규식 튜닝
+- BACKLOG P0: **비어 있음**
+- P1 후보:
+  - 백엔드 DefectWarranty.coverageAmount 필드 추가 (사이클 2 백엔드 짝)
+  - useListFilters 추상화 (큰 결정 — 설계 합의 필요)
+- P2: Gradle wrapper 설치 / chat-service RAG 챗봇 미구현
+- 통합 검증: warranty Phase 1·2 docker compose up 테스트
+- 실제 보증보험 PDF 샘플로 정규식 튜닝 (Phase 3 후속)
+
+**자동화 가이드**: `docs/AUTOMATION_GUIDE.md` 참조
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
