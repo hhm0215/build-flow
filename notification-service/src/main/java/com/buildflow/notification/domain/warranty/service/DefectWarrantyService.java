@@ -42,6 +42,7 @@ public class DefectWarrantyService {
                 .policyNumber(request.getPolicyNumber())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
+                .coverageAmount(request.getCoverageAmount())
                 .memo(request.getMemo())
                 .build();
 
@@ -70,6 +71,7 @@ public class DefectWarrantyService {
                 request.getPolicyNumber(),
                 request.getStartDate(),
                 request.getEndDate(),
+                request.getCoverageAmount(),
                 request.getMemo()
         );
         return WarrantyResponse.from(warranty);

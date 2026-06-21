@@ -171,20 +171,21 @@
 
 ## 6. buildflow_notification (notification-service)
 
-### warranties (하자보증보험)
+### defect_warranties (하자보증보험)
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | id | BIGINT PK | |
-| site_id | BIGINT | 현장 ID |
-| file_name | VARCHAR(255) | PDF 파일명 |
-| file_path | VARCHAR(500) | 저장 경로 |
-| insurer | VARCHAR(200) | 보험사명 (OCR 추출) |
-| guarantee_amount | BIGINT | 보증금액 (OCR 추출) |
+| site_id | BIGINT NOT NULL | 현장 ID |
+| insurance_company | VARCHAR(200) | 보험사명 (OCR 추출 또는 사용자 입력, MANUAL 외 nullable) |
+| policy_number | VARCHAR(100) | 증권번호 (OCR 추출) |
 | start_date | DATE | 보증 시작일 (OCR 추출) |
 | end_date | DATE | 보증 만료일 (OCR 추출) |
-| ocr_status | ENUM('PENDING','SUCCESS','FAILED','MANUAL') | OCR 처리 상태 (MANUAL=사용자 직접 입력) |
+| coverage_amount | BIGINT | 보증금액 (사용자 입력, OCR 미추출) |
+| file_path | VARCHAR(500) | PDF 저장 경로 |
+| memo | TEXT | 메모 |
+| ocr_status | ENUM('PENDING','SUCCESS','FAILED','MANUAL') NOT NULL | OCR 처리 상태 (MANUAL=사용자 직접 입력) |
 | last_expiring_alert_sent_at | DATE | 만료 임박 알림 마지막 발송일 (스케줄러 cooldown 7일) |
-| created_at | DATETIME | |
+| created_at | DATETIME NOT NULL | |
 | updated_at | DATETIME | |
 
 ### notifications (알림)

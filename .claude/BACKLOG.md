@@ -22,10 +22,6 @@
 
 ## P1 — 중기
 
-### 백엔드 DefectWarranty에 coverageAmount 필드 추가
-- **배경**: frontend는 `coverageAmount` 표시·입력 (UX 가치 있음). 백엔드 엔티티에 없어 등록 시 무시됨
-- **산출물**: `DefectWarranty.coverageAmount BIGINT` 추가 + DTO/Response 갱신 + ERD 갱신. ddl-auto: update로 자동 마이그레이션
-- **예상 규모**: S (백엔드만)
 
 ### useListFilters 추상화 (별도 PR — 큰 결정)
 - **배경**: 5페이지(estimate/purchase/tax/warranty/site) ListPage가 `useFilterParams + useDebouncedValue + filtered useMemo + resetFilters + activeCount` 패턴 반복
@@ -69,3 +65,4 @@
 | 2026-06-18 | ADR-012 위임 모드 정식 도입 (BACKLOG 항목 외 메타 작업) |
 | 2026-06-18 | 프론트 PDF 업로드 + OCR 상태 표시 완료 → P0 비움. P1에 Warranty 타입 일치 신규 등록 |
 | 2026-06-21 | 위임 모드 5 사이클 일괄 처리 — P1 4건 완료(InputNumber/Warranty optional/SiteSelect/필터 명명+추론), useListFilters는 별도 분리 |
+| 2026-06-21 | 백엔드 DefectWarranty.coverageAmount 필드 추가 완료 — 사이클 2 짝 완성 (frontend↔backend 일치) |

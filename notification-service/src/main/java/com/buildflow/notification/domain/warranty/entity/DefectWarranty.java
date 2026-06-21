@@ -38,6 +38,9 @@ public class DefectWarranty {
     @Column
     private LocalDate endDate;
 
+    @Column
+    private Long coverageAmount;
+
     @Column(length = 500)
     private String filePath;
 
@@ -61,12 +64,13 @@ public class DefectWarranty {
     @Builder
     private DefectWarranty(Long siteId, String insuranceCompany, String policyNumber,
                            LocalDate startDate, LocalDate endDate,
-                           String filePath, String memo) {
+                           Long coverageAmount, String filePath, String memo) {
         this.siteId = siteId;
         this.insuranceCompany = insuranceCompany;
         this.policyNumber = policyNumber;
         this.startDate = startDate;
         this.endDate = endDate;
+        this.coverageAmount = coverageAmount;
         this.filePath = filePath;
         this.memo = memo;
         this.ocrStatus = OcrStatus.MANUAL;
@@ -82,11 +86,13 @@ public class DefectWarranty {
     }
 
     public void update(String insuranceCompany, String policyNumber,
-                       LocalDate startDate, LocalDate endDate, String memo) {
+                       LocalDate startDate, LocalDate endDate,
+                       Long coverageAmount, String memo) {
         this.insuranceCompany = insuranceCompany;
         this.policyNumber = policyNumber;
         this.startDate = startDate;
         this.endDate = endDate;
+        this.coverageAmount = coverageAmount;
         this.memo = memo;
     }
 

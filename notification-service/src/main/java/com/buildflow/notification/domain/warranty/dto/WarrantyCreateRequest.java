@@ -25,5 +25,8 @@ public class WarrantyCreateRequest {
     @NotNull(message = "보험 만료일은 필수입니다.")
     private LocalDate endDate;
 
+    /** 보증금액 (원). 선택 — 추후 추가 가능 */
+    private Long coverageAmount;
+
     private String memo;
 }
