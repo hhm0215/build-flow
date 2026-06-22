@@ -94,8 +94,11 @@ public class DefectWarrantyService {
     /**
      * PDF 업로드 → 파일 저장 → PENDING 레코드 즉시 생성 → 비동기 OCR 트리거.
      * 컨트롤러는 즉시 PENDING WarrantyResponse를 반환 (HTTP 202).
+     *
+     * <p>NOTE(@Transactional 의도적 미부착): processAsync가 outer tx 커밋 전에 실행되면
+     * 비동기 스레드의 findById가 PENDING row를 못 봐 영구 PENDING 사고가 발생함.
+     * `savePending`만 Spring Data JPA가 자체 짧은 tx로 commit한 후 `processAsync` 호출.
      */
-    @Transactional
     public WarrantyResponse createFromOcr(Long siteId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.WARRANTY_FILE_EMPTY);
