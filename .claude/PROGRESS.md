@@ -282,18 +282,12 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-21 갱신, PR #29 머지 후)
+## 다음 세션 진입점 (2026-06-22 갱신, PR #30 머지 후)
 
 **현재 git 상태**:
-- `origin/main` = `cbdef45` (PR #29 머지, 백엔드 coverageAmount)
-- `origin/develop` = `7d991ac` — main과 완전 동기화 (차이 0)
-- 위임 모드 "P2까지 자동 진행" 명령에서 1 사이클 처리 + 3건 멈춤 조건 도달
-- 직진 사이클: PR #20 → ... → #28(P1 5건) → #29(coverageAmount)
-
-**대기 중인 큰 결정 (사용자 합의 필요)**:
-1. **P1 useListFilters 추상화** (M) — 5페이지 일괄 손대야 함, 추상화 방향 결정 필요
-2. **P2 Gradle wrapper 설치** (S) — `brew install gradle` 선행 필요 (시스템 gradle 미설치)
-3. **P2 chat-service RAG 챗봇** (L) — 새 서비스 신설, 외부 LLM 의존성, function calling 설계
+- `origin/main` = `2135fdb` (PR #30 머지, warranty 핫픽스 7건)
+- `origin/develop` = `7efdffa` — main과 동기화 (차이 0, 후처리 1 커밋 누적 예정)
+- 직진 사이클: PR #20 → ... → #29 → #30(핫픽스)
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` 참조
 
