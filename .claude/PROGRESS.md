@@ -294,18 +294,22 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-22 갱신, PR #30·#31 머지 후 — 위임 D 종료)
+## 다음 세션 진입점 (2026-06-22 갱신, PR #32 머지 후)
 
 **현재 git 상태**:
-- `origin/main` = `c548221` (PR #31, ADR-013 자동 코드 리뷰 5.5단계 통합)
-- `origin/develop` = `9697c16` — main과 동기화 (차이 0)
-- 직진 사이클: ... → #30(warranty 핫픽스) → #31(ADR-013)
+- `origin/main` = `aee06d7` (PR #32, P1 MEDIUM 6건 + 5.5 HIGH 1 즉시 fix)
+- `origin/develop` = `3e9fbb4` — main과 동기화 (차이 0)
+- 직진 사이클: ... → #30(핫픽스) → #31(ADR-013) → #32(P1 MEDIUM + 5.5 첫 적용)
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
 **대기 작업 (사용자 액션 필요)**:
-- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d` 권장
-- Docker Daemon 미실행 — 검증 시 Docker Desktop 기동 필요
+- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d`
+- Docker Daemon 미실행 — Docker Desktop 기동 필요
+
+**남은 BACKLOG**:
+- P1: 5.5단계 후속 MEDIUM 2건 (parser 200자 / update null 비우기), useListFilters 추상화
+- P2: 5.5단계 후속 LOW 2건 (parser 첫 라벨 / isExpiringSoon dead), Gradle wrapper, chat-service RAG
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
