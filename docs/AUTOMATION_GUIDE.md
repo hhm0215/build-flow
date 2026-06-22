@@ -30,6 +30,12 @@
    ↓
 5. 회고 (실패 있으면 RETROSPECTIVE + 재발 방지 규칙 박기)
    ↓
+5.5. 자동 코드 리뷰 (코드 변경 있을 때만 — ADR-013)
+     · CRITICAL → 같은 사이클에서 fix 후 재실행
+     · HIGH → 같은 PR에 포함, 안 되면 별도 핫픽스 PR
+     · MEDIUM → BACKLOG P1 등록
+     · LOW → BACKLOG P2 또는 무시
+   ↓
 6. PR 생성 (gh pr create + push 누락 검증)
    ↓
 7. PR 자동 머지 (SHA 검증 안전망 통과 시)

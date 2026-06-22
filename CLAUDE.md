@@ -190,6 +190,7 @@ bun run preview         # 빌드 결과 미리보기
    - BACKLOG.md에서 완료 항목 제거
    - PROGRESS.md "완료된 작업"에 한 줄 추가 + "다음 세션 진입점" git 상태 갱신
 5. **회고** — 실패/허비/예상과 다름이 있었으면 `.claude/RETROSPECTIVE.md`에 1건 작성. **재발 방지 규칙을 CLAUDE.md / 메모리 / hooks 중 어디에 박았는지 반드시 명시**
+5.5. **자동 코드 리뷰** (구현 사이클에 한해 필수) — 백엔드/프론트 코드 변경이 포함된 사이클은 PR 생성 전 `/code-review` 또는 그에 준하는 정적 점검 실행. CRITICAL 발견 시 동일 사이클 안에서 fix 후 재실행, HIGH 발견 시 같은 PR에 포함하거나 별도 핫픽스 PR. lint/build만 통과하면 통과로 간주하던 관행은 종료 (ADR-013 참조)
 6. **PR 생성** (develop ↔ main 차이가 PR 가치 있을 때):
    - `git fetch && git log origin/main..origin/develop`로 머지 대상 커밋 목록 확보
    - 로컬 `develop` SHA = `origin/develop` SHA 확인 (push 누락 검증 — PR #19 사고 가드레일)
@@ -212,6 +213,7 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: RETROSPECTIVE에 회고만 적고 재발 방지 규칙을 어디에도 박지 않으면 같은 실패가 반복됨
 - **IMPORTANT**: 6단계 PR 생성 시 `git fetch` 후 push 누락 검증을 건너뛰면 PR #19 사고 재발 위험
 - **IMPORTANT**: 7단계 SHA 검증 안전망을 건너뛰면 의도와 다른 변경이 main에 머지됨. 활성 PR 있는 동안 develop에 추가 push 시 항상 본문 갱신 + 재검증
+- **IMPORTANT**: 5.5단계 코드 리뷰를 건너뛰면 lint/build는 통과하지만 race/스레드 안전성/마이그레이션/timezone 같은 동작 버그가 머지됨 (2026-06-22 warranty 핫픽스 사례 참조)
 
 ## 위임 모드 (옵션) — 사이클 간 자동 트리거
 
