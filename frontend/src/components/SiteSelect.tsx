@@ -1,48 +1,43 @@
-import { Select } from 'antd'
+import { Select, type SelectProps } from 'antd'
 import { useSites } from '../api/sites.api'
 
-interface Props {
-  value?: number
-  onChange?: (value: number | undefined) => void
-  placeholder?: string
-  disabled?: boolean
-  allowClear?: boolean
-}
-
 /**
- * 현장 선택 드롭다운 — 이름 검색 + ID 표시.
- * useSites로 전체 현장 목록을 받아 Select option으로 렌더.
- * Ant Design Form.Item이 value/onChange를 자동 주입하므로 별도 옵션 불필요.
+ * AntD Select<number>의 props를 그대로 받고 (Form.Item 주입 id/onBlur/aria-* 포함),
+ * options/showSearch/optionFilterProp/filterOption은 본 컴포넌트가 관리.
+ *
+ * Form.Item과 함께 쓸 때 라벨 클릭 포커스/검증 status/접근성 props가 전부 forward됨.
  */
+type SiteSelectProps = Omit<
+  SelectProps<number>,
+  'options' | 'showSearch' | 'optionFilterProp' | 'filterOption' | 'loading' | 'mode'
+>
+
 export default function SiteSelect({
-  value,
-  onChange,
   placeholder = '현장 선택',
-  disabled,
   allowClear = true,
-}: Props) {
+  style,
+  ...rest
+}: SiteSelectProps) {
   const { data, isLoading } = useSites()
   const options = (data ?? []).map((s) => ({
     value: s.id,
     label: `${s.siteName} (#${s.id})`,
-    searchText: `${s.siteName} ${s.id} ${s.client?.companyName ?? ''}`.toLowerCase(),
+    searchKey: `${s.siteName} ${s.id} ${s.client?.companyName ?? ''}`.toLowerCase(),
   }))
 
   return (
     <Select<number>
-      value={value}
-      onChange={onChange}
+      {...rest}
       placeholder={placeholder}
-      disabled={disabled}
       allowClear={allowClear}
       showSearch
       loading={isLoading}
-      optionFilterProp="searchText"
+      optionFilterProp="label"
       filterOption={(input, option) =>
-        (option?.searchText ?? '').includes(input.toLowerCase())
+        (option?.searchKey ?? '').includes(input.toLowerCase())
       }
       options={options}
-      style={{ width: '100%' }}
+      style={{ width: '100%', ...style }}
     />
   )
 }

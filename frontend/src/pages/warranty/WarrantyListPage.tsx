@@ -39,20 +39,15 @@ const FILTER_SCHEMA: FilterSchema = {
 }
 
 export default function WarrantyListPage() {
-  // PENDING 상태가 하나라도 있으면 5초 폴링 — OCR 비동기 처리 완료 자동 반영
-  const [hasPendingHint, setHasPendingHint] = useState(false)
-  const refetchInterval = hasPendingHint ? 5000 : undefined
-  const { data, isLoading, isError, refetch } = useWarranties(undefined, refetchInterval)
+  // PENDING 상태가 있으면 5초 폴링 (React Query refetchInterval 함수 전달 — 매 페치마다 query.state.data로 자동 평가)
+  const { data, isLoading, isError, refetch } = useWarranties(undefined, (query) => {
+    const items = (query.state.data ?? []) as { ocrStatus?: string }[]
+    return items.some((w) => w.ocrStatus === 'PENDING') ? 5000 : false
+  })
   const { data: expiringData } = useExpiringWarranties(30)
   const { mutate: deleteWarranty } = useDeleteWarranty()
   const { mutate: createWarranty, isPending: isCreating } = useCreateWarranty()
   const warranties = useMemo(() => data ?? [], [data])
-
-  // 데이터 갱신 시점에 PENDING 존재 여부 재계산
-  useMemo(() => {
-    const hasPending = warranties.some((w) => w.ocrStatus === 'PENDING')
-    setHasPendingHint(hasPending)
-  }, [warranties])
   const expiringCount = expiringData?.length ?? 0
 
   const [filters, setFilters] = useFilterParams<WarrantyFilters>(FILTER_SCHEMA)

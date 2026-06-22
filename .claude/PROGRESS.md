@@ -152,6 +152,18 @@
 
 ---
 
+### ✅ P1 MEDIUM 6건 + 5.5단계 첫 적용 (2026-06-22)
+- useMemo+setState 안티패턴 → React Query refetchInterval 함수 전달 (setState 제거)
+- `useWarranties` refetchInterval 옵션 타입 확장 (`number | false | function`)
+- `DefectWarranty.isExpiringSoon/isExpired` — boundary today 포함 (당일 임박, 다음날 만료)
+- `SiteSelect` — AntD `SelectProps<number>` spread, Form.Item 주입 props forward
+- `WarrantyOcrParser` — PERIOD_LABEL + DATE 분리 패턴 (단방 날짜 추출 가능, 테스트 2건 추가)
+- `DefectWarranty.update` — null 인자 skip (partial update 시맨틱)
+- `DefectWarrantyService.delete` — TransactionSynchronization.afterCommit으로 파일 cleanup 이동 (commit 전 inverse-orphan 방지)
+- **5.5단계 자동 코드 리뷰** (ADR-013 첫 적용) — finder 2개 병렬, HIGH 1건 발견 즉시 같은 PR fix, MEDIUM 2건 + LOW 2건은 BACKLOG 분리 등록
+
+---
+
 ### ✅ warranty 핫픽스 Phase 1.5 — /code-review CRITICAL+HIGH 7건 (2026-06-22)
 - **@Async tx race 해소**: `createFromOcr`에서 `@Transactional` 제거 → save 자체 tx commit 후 processAsync 호출 (PENDING 영구 고착 사고 방지)
 - **servlet.multipart YAML 위치 수정**: `spring.servlet.multipart.*`로 이동 → 20MB 한도 정상 적용
@@ -282,14 +294,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-22 갱신, PR #30 머지 후)
+## 다음 세션 진입점 (2026-06-22 갱신, PR #30·#31 머지 후 — 위임 D 종료)
 
 **현재 git 상태**:
-- `origin/main` = `2135fdb` (PR #30 머지, warranty 핫픽스 7건)
-- `origin/develop` = `7efdffa` — main과 동기화 (차이 0, 후처리 1 커밋 누적 예정)
-- 직진 사이클: PR #20 → ... → #29 → #30(핫픽스)
+- `origin/main` = `c548221` (PR #31, ADR-013 자동 코드 리뷰 5.5단계 통합)
+- `origin/develop` = `9697c16` — main과 동기화 (차이 0)
+- 직진 사이클: ... → #30(warranty 핫픽스) → #31(ADR-013)
 
-**자동화 가이드**: `docs/AUTOMATION_GUIDE.md` 참조
+**자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
+
+**대기 작업 (사용자 액션 필요)**:
+- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d` 권장
+- Docker Daemon 미실행 — 검증 시 Docker Desktop 기동 필요
 
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)

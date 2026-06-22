@@ -42,11 +42,16 @@ const fetchExpiring = async (days: number) => {
   return res.data.data
 }
 
-export function useWarranties(params?: Record<string, string>, refetchInterval?: number) {
+type RefetchIntervalOption =
+  | number
+  | false
+  | ((query: { state: { data?: Warranty[] } }) => number | false)
+
+export function useWarranties(params?: Record<string, string>, refetchInterval?: RefetchIntervalOption) {
   return useQuery({
     queryKey: WARRANTIES_KEY.list(params),
     queryFn: () => fetchWarranties(params),
-    refetchInterval,
+    refetchInterval: refetchInterval as never,
   })
 }
 

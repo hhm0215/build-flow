@@ -92,15 +92,20 @@ public class DefectWarranty {
         return w;
     }
 
+    /**
+     * 부분 갱신 (PATCH 시맨틱):
+     * null 인자는 기존 값 유지. 명시적으로 빈 값으로 만들려면 별도 API 필요.
+     * 호출자가 폼에서 일부 필드를 누락해도 기존 데이터가 의도치 않게 null로 덮어쓰이지 않음.
+     */
     public void update(String insuranceCompany, String policyNumber,
                        LocalDate startDate, LocalDate endDate,
                        Long coverageAmount, String memo) {
-        this.insuranceCompany = insuranceCompany;
-        this.policyNumber = policyNumber;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.coverageAmount = coverageAmount;
-        this.memo = memo;
+        if (insuranceCompany != null) this.insuranceCompany = insuranceCompany;
+        if (policyNumber != null) this.policyNumber = policyNumber;
+        if (startDate != null) this.startDate = startDate;
+        if (endDate != null) this.endDate = endDate;
+        if (coverageAmount != null) this.coverageAmount = coverageAmount;
+        if (memo != null) this.memo = memo;
     }
 
     /**
@@ -126,13 +131,18 @@ public class DefectWarranty {
         this.lastExpiringAlertSentAt = sentAt;
     }
 
+    /**
+     * 만료 임박: today ≤ endDate ≤ today+daysBeforeExpiry (양 경계 포함).
+     * 만료 당일(today == endDate)은 "임박"이자 아직 "만료"는 아님.
+     */
     public boolean isExpiringSoon(int daysBeforeExpiry) {
-        return endDate != null
-                && LocalDate.now().plusDays(daysBeforeExpiry).isAfter(endDate)
-                && LocalDate.now().isBefore(endDate);
+        if (endDate == null) return false;
+        LocalDate today = LocalDate.now();
+        return !endDate.isBefore(today) && !endDate.isAfter(today.plusDays(daysBeforeExpiry));
     }
 
+    /** 만료: endDate < today (만료 당일은 아직 expired=false, 다음 날부터 true). */
     public boolean isExpired() {
-        return endDate != null && LocalDate.now().isAfter(endDate);
+        return endDate != null && endDate.isBefore(LocalDate.now());
     }
 }
