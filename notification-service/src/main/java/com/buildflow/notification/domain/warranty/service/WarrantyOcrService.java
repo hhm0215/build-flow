@@ -9,6 +9,7 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,11 @@ import java.nio.file.Path;
 public class WarrantyOcrService {
 
     private final DefectWarrantyRepository warrantyRepository;
-    private final Tesseract tesseract;
+    /**
+     * Tesseract는 thread-safe하지 않아 prototype scope로 등록됨 (WarrantyOcrConfig).
+     * @Async 동시 호출 시 ObjectProvider로 호출마다 새 인스턴스를 가져옴.
+     */
+    private final ObjectProvider<Tesseract> tesseractProvider;
 
     @Value("${app.ocr.min-text-length:50}")
     private int minTextLength;
@@ -70,6 +75,8 @@ public class WarrantyOcrService {
             log.debug("PDFBox 텍스트 부족 — Tess4J OCR fallback");
             PDFRenderer renderer = new PDFRenderer(doc);
             StringBuilder sb = new StringBuilder();
+            // prototype scope — 이 호출 단위로 전용 인스턴스 (thread-safe 회피)
+            Tesseract tesseract = tesseractProvider.getObject();
             for (int i = 0; i < doc.getNumberOfPages(); i++) {
                 BufferedImage img = renderer.renderImageWithDPI(i, scanDpi);
                 sb.append(tesseract.doOCR(img)).append('\n');

@@ -36,6 +36,11 @@ spring:
       enable-auto-commit: false
     listener:
       ack-mode: record
+  servlet:
+    multipart:
+      # PDF 업로드 한도 — 백엔드 한도 = frontend 한도(20MB)와 일치
+      max-file-size: 20MB
+      max-request-size: 20MB
 
 app:
   warranty:
@@ -56,11 +61,6 @@ app:
     tessdata-path: /usr/share/tesseract-ocr/4.00/tessdata
     # Tesseract 인식 언어 (+ 구분)
     languages: kor+eng
-
-servlet:
-  multipart:
-    max-file-size: 20MB
-    max-request-size: 20MB
 
 eureka:
   client:

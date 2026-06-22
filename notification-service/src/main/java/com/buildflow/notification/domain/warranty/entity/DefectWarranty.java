@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -50,8 +51,14 @@ public class DefectWarranty {
     @Column
     private LocalDate lastExpiringAlertSentAt;
 
+    /**
+     * OCR 처리 상태.
+     * ColumnDefault: ddl-auto=update로 기존 운영 데이터에 컬럼 추가 시
+     * DEFAULT 'MANUAL'로 backfill되어 NOT NULL ALTER 실패 방지.
+     */
     @Enumerated(EnumType.STRING)
     @Column(length = 20, nullable = false)
+    @ColumnDefault("'MANUAL'")
     private OcrStatus ocrStatus;
 
     @CreatedDate
@@ -96,14 +103,19 @@ public class DefectWarranty {
         this.memo = memo;
     }
 
-    /** OCR 성공 시 추출 결과 반영 — null 필드는 사용자가 수동 보완 */
+    /**
+     * OCR 추출 결과 반영. 4 필드 중 1개 이상 추출됐을 때만 SUCCESS.
+     * 모두 null이면 FAILED로 마킹 — 사용자가 수동 입력으로 보완해야 함.
+     */
     public void applyOcrResult(String insuranceCompany, String policyNumber,
                                LocalDate startDate, LocalDate endDate) {
         if (insuranceCompany != null) this.insuranceCompany = insuranceCompany;
         if (policyNumber != null) this.policyNumber = policyNumber;
         if (startDate != null) this.startDate = startDate;
         if (endDate != null) this.endDate = endDate;
-        this.ocrStatus = OcrStatus.SUCCESS;
+        boolean anyExtracted = insuranceCompany != null || policyNumber != null
+                || startDate != null || endDate != null;
+        this.ocrStatus = anyExtracted ? OcrStatus.SUCCESS : OcrStatus.FAILED;
     }
 
     public void markOcrFailed() {

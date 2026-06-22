@@ -152,6 +152,19 @@
 
 ---
 
+### ✅ warranty 핫픽스 Phase 1.5 — /code-review CRITICAL+HIGH 7건 (2026-06-22)
+- **@Async tx race 해소**: `createFromOcr`에서 `@Transactional` 제거 → save 자체 tx commit 후 processAsync 호출 (PENDING 영구 고착 사고 방지)
+- **servlet.multipart YAML 위치 수정**: `spring.servlet.multipart.*`로 이동 → 20MB 한도 정상 적용
+- **applyOcrResult 가드**: 1개 이상 추출 시 SUCCESS, 모두 null이면 FAILED (거짓 SUCCESS 뱃지 방지)
+- **Tesseract bean prototype scope + ObjectProvider**: 동시 호출 시 native lib race 회피
+- **Kafka send 동기 await**: `CompletableFuture.get(5s)` + 실패 시 markExpiringAlertSent skip → 다음 cron 재시도
+- **timezone 명시**: `@Scheduled(zone="Asia/Seoul")` + `LocalDate.now(KST)` → UTC 컨테이너에서도 09:00 KST 정확 발사
+- **ocrStatus 마이그레이션 안전**: `@ColumnDefault("'MANUAL'")` → 기존 운영 데이터 backfill
+- 계획 문서: `.claude/plans/2026-06-22-warranty-hotfix.md`
+- /code-review MEDIUM 7건은 P1 신규 등록
+
+---
+
 ### ✅ 백엔드 DefectWarranty.coverageAmount 필드 추가 (2026-06-21)
 - `DefectWarranty.coverageAmount BIGINT` 필드 + 빌더/update 메서드 인자 추가
 - `WarrantyCreateRequest` / `WarrantyUpdateRequest`에 `Long coverageAmount` 옵션 필드

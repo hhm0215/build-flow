@@ -22,6 +22,17 @@
 
 ## P1 — 중기
 
+### /code-review MEDIUM 7건 — warranty 후속 정리 (2026-06-22 등록)
+- `WarrantyListPage.tsx:51` — `useMemo` 안 `setHasPendingHint` 호출 → `useEffect`로 이전
+- `DefectWarrantyService.createFromOcr:113` — multipart 파일 저장을 컨트롤러 또는 별도 helper로 분리 (DB conn pool 보호)
+- `DefectWarranty.isExpiringSoon:120` — `isBefore` → `!isAfter` 또는 `<=`로 boundary today 포함
+- `SiteSelect.tsx:32` — Form.Item 주입 props 모두 forward (`{...rest}` spread)
+- `WarrantyOcrParser:25` — PERIOD_PATTERN을 시작/만료 분리 매칭으로 변경 (단방 날짜 추출 가능)
+- `DefectWarranty.update:88` — partial-update 패턴 (null 인자는 기존 값 유지) — `pickNonNull` 헬퍼
+- `DefectWarrantyService.delete + WarrantyOcrService FAILED` — filePath의 파일 시스템 cleanup
+- **예상 규모**: M (묶음 1 PR)
+- **선행**: 사이클 A 머지 후
+
 
 ### useListFilters 추상화 (별도 PR — 큰 결정)
 - **배경**: 5페이지(estimate/purchase/tax/warranty/site) ListPage가 `useFilterParams + useDebouncedValue + filtered useMemo + resetFilters + activeCount` 패턴 반복
@@ -66,3 +77,4 @@
 | 2026-06-18 | 프론트 PDF 업로드 + OCR 상태 표시 완료 → P0 비움. P1에 Warranty 타입 일치 신규 등록 |
 | 2026-06-21 | 위임 모드 5 사이클 일괄 처리 — P1 4건 완료(InputNumber/Warranty optional/SiteSelect/필터 명명+추론), useListFilters는 별도 분리 |
 | 2026-06-21 | 백엔드 DefectWarranty.coverageAmount 필드 추가 완료 — 사이클 2 짝 완성 (frontend↔backend 일치) |
+| 2026-06-22 | /code-review로 critical+high 7건 발견 → 사이클 A 핫픽스 완료. MEDIUM 7건은 P1 신규 등록 |
