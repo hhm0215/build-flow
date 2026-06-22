@@ -64,4 +64,21 @@ class WarrantyOcrParserTest {
         assertThat(r.getEndDate()).isEqualTo(LocalDate.of(2027, 4, 30));
         assertThat(r.extractedFieldCount()).isEqualTo(4);
     }
+
+    @Test
+    void 단방향_기간만_있을_때_start만_추출_end는_null() {
+        // 만료일이 누락된 PDF — 종전 PERIOD_PATTERN은 둘 다 null이었으나, 분리 패턴으로 start만 살림
+        String text = "보증기간 2026.05.01 부터 효력 발생";
+        WarrantyOcrParser.Result r = WarrantyOcrParser.parse(text);
+        assertThat(r.getStartDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+        assertThat(r.getEndDate()).isNull();
+    }
+
+    @Test
+    void 기간_라벨_없으면_둘다_null() {
+        String text = "2026-01-01 어쩌고 저쩌고 2027-01-01";
+        WarrantyOcrParser.Result r = WarrantyOcrParser.parse(text);
+        assertThat(r.getStartDate()).isNull();
+        assertThat(r.getEndDate()).isNull();
+    }
 }

@@ -152,6 +152,18 @@
 
 ---
 
+### ✅ P1 MEDIUM 6건 + 5.5단계 첫 적용 (2026-06-22)
+- useMemo+setState 안티패턴 → React Query refetchInterval 함수 전달 (setState 제거)
+- `useWarranties` refetchInterval 옵션 타입 확장 (`number | false | function`)
+- `DefectWarranty.isExpiringSoon/isExpired` — boundary today 포함 (당일 임박, 다음날 만료)
+- `SiteSelect` — AntD `SelectProps<number>` spread, Form.Item 주입 props forward
+- `WarrantyOcrParser` — PERIOD_LABEL + DATE 분리 패턴 (단방 날짜 추출 가능, 테스트 2건 추가)
+- `DefectWarranty.update` — null 인자 skip (partial update 시맨틱)
+- `DefectWarrantyService.delete` — TransactionSynchronization.afterCommit으로 파일 cleanup 이동 (commit 전 inverse-orphan 방지)
+- **5.5단계 자동 코드 리뷰** (ADR-013 첫 적용) — finder 2개 병렬, HIGH 1건 발견 즉시 같은 PR fix, MEDIUM 2건 + LOW 2건은 BACKLOG 분리 등록
+
+---
+
 ### ✅ warranty 핫픽스 Phase 1.5 — /code-review CRITICAL+HIGH 7건 (2026-06-22)
 - **@Async tx race 해소**: `createFromOcr`에서 `@Transactional` 제거 → save 자체 tx commit 후 processAsync 호출 (PENDING 영구 고착 사고 방지)
 - **servlet.multipart YAML 위치 수정**: `spring.servlet.multipart.*`로 이동 → 20MB 한도 정상 적용

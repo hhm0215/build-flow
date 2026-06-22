@@ -26,23 +26,25 @@ public final class WarrantyOcrParser {
     private static final Pattern POLICY_PATTERN = Pattern.compile(
             "(?:보험번호|증권번호|보증번호|증서번호)\\s*[:：]?\\s*([A-Z0-9\\-]{6,30})");
 
-    /** 보증기간/유효기간 라벨 후 두 날짜 — YYYY-MM-DD / YYYY.MM.DD / YYYY년 MM월 DD일 */
-    private static final Pattern PERIOD_PATTERN = Pattern.compile(
-            "(?:보증기간|유효기간|보험기간|보장기간)[\\s\\S]{0,80}?" +
-                    "(\\d{4})\\s*[.\\-년]\\s*(\\d{1,2})\\s*[.\\-월]\\s*(\\d{1,2})\\s*일?" +
-                    "[\\s~∼\\-까지부터]{1,10}?" +
-                    "(\\d{4})\\s*[.\\-년]\\s*(\\d{1,2})\\s*[.\\-월]\\s*(\\d{1,2})\\s*일?");
+    /** 보증/유효/보험/보장 기간 라벨 — 라벨 뒤 텍스트를 캡처 */
+    private static final Pattern PERIOD_LABEL = Pattern.compile(
+            "(?:보증기간|유효기간|보험기간|보장기간)([\\s\\S]{0,200})");
+
+    /** 단일 날짜 — YYYY-MM-DD / YYYY.MM.DD / YYYY년 MM월 DD일 */
+    private static final Pattern DATE = Pattern.compile(
+            "(\\d{4})\\s*[.\\-년]\\s*(\\d{1,2})\\s*[.\\-월]\\s*(\\d{1,2})\\s*일?");
 
     public static Result parse(String text) {
         if (text == null || text.isBlank()) {
             return Result.empty();
         }
         String normalized = text.replaceAll("\\s+", " ");
+        LocalDate[] period = findPeriod(normalized);
         return Result.builder()
                 .insuranceCompany(findInsurer(normalized))
                 .policyNumber(findPolicyNumber(normalized))
-                .startDate(findStart(normalized))
-                .endDate(findEnd(normalized))
+                .startDate(period[0])
+                .endDate(period[1])
                 .build();
     }
 
@@ -58,16 +60,18 @@ public final class WarrantyOcrParser {
         return m.find() ? m.group(1).trim() : null;
     }
 
-    private static LocalDate findStart(String text) {
-        Matcher m = PERIOD_PATTERN.matcher(text);
-        if (!m.find()) return null;
-        return safeDate(m.group(1), m.group(2), m.group(3));
-    }
+    /**
+     * 보증기간 라벨 뒤에서 등장하는 날짜를 순서대로 추출.
+     * 1개만 있으면 start만 채워지고 end는 null — 한쪽만이라도 살림 (라벨이 없으면 둘 다 null).
+     */
+    private static LocalDate[] findPeriod(String text) {
+        Matcher label = PERIOD_LABEL.matcher(text);
+        if (!label.find()) return new LocalDate[] { null, null };
 
-    private static LocalDate findEnd(String text) {
-        Matcher m = PERIOD_PATTERN.matcher(text);
-        if (!m.find()) return null;
-        return safeDate(m.group(4), m.group(5), m.group(6));
+        Matcher date = DATE.matcher(label.group(1));
+        LocalDate start = date.find() ? safeDate(date.group(1), date.group(2), date.group(3)) : null;
+        LocalDate end = date.find() ? safeDate(date.group(1), date.group(2), date.group(3)) : null;
+        return new LocalDate[] { start, end };
     }
 
     private static LocalDate safeDate(String y, String mo, String d) {

@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -80,7 +82,30 @@ public class DefectWarrantyService {
     @Transactional
     public void delete(Long id) {
         DefectWarranty warranty = getWarranty(id);
+        String filePath = warranty.getFilePath();
         warrantyRepository.delete(warranty);
+        // 트랜잭션 커밋 후에만 파일 삭제 — rollback 시 파일은 남고 다음 cleanup job 대상이 됨.
+        // (커밋 전 삭제 시 rollback이 일어나면 DB row는 남고 파일은 사라진 dangling 상태가 됨)
+        if (filePath != null && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deleteFileQuietly(filePath);
+                }
+            });
+        }
+    }
+
+    private void deleteFileQuietly(String filePath) {
+        try {
+            Path p = Paths.get(filePath);
+            if (Files.deleteIfExists(p)) {
+                log.info("업로드 파일 삭제: {}", p);
+            }
+        } catch (IOException e) {
+            // 파일이 이미 사라졌거나 권한 문제 — DB는 이미 정리됐으므로 로그만 남김 (orphan 파일은 별도 cleanup job 검토)
+            log.warn("업로드 파일 삭제 실패 (orphan 가능): path={} cause={}", filePath, e.getMessage());
+        }
     }
 
     public List<WarrantyResponse> findExpiringSoon(int days) {
