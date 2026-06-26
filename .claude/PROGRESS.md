@@ -152,6 +152,13 @@
 
 ---
 
+### ✅ P2 LOW 2건 정리 (2026-06-26)
+- `WarrantyOcrParser.findPeriod` — `if (!label.find())` 단발 → `while (label.find())` 다중 라벨 순회. 두 날짜 모두 추출되는 첫 라벨 채택, 못 찾으면 첫 라벨의 start만 fallback으로 반환 (테스트 1건 추가)
+- `DefectWarranty.isExpiringSoon` — 호출자 0건 dead 메서드 제거. 만료 판정은 Repository의 BETWEEN 쿼리(`findExpiringSoon`/`findExpiringNotYetAlerted`)와 `isExpired()` 메서드가 담당
+- 5.5단계 인라인 검토 (변경 양 작아 finder agent 생략) — HIGH/CRITICAL 없음
+
+---
+
 ### ✅ P1 MEDIUM 6건 + 5.5단계 첫 적용 (2026-06-22)
 - useMemo+setState 안티패턴 → React Query refetchInterval 함수 전달 (setState 제거)
 - `useWarranties` refetchInterval 옵션 타입 확장 (`number | false | function`)

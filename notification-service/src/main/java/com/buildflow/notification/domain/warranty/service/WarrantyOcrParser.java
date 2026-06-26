@@ -62,16 +62,26 @@ public final class WarrantyOcrParser {
 
     /**
      * 보증기간 라벨 뒤에서 등장하는 날짜를 순서대로 추출.
-     * 1개만 있으면 start만 채워지고 end는 null — 한쪽만이라도 살림 (라벨이 없으면 둘 다 null).
+     *
+     * <p>모든 라벨 매치를 순회 — 첫 라벨 200자 윈도우에 날짜가 없거나 부족해도
+     * 다음 라벨에서 두 날짜를 모두 찾으면 그걸 채택. 부분 결과(start만)만 발견된 경우는
+     * 가장 먼저 발견된 start를 fallback으로 반환.
      */
     private static LocalDate[] findPeriod(String text) {
         Matcher label = PERIOD_LABEL.matcher(text);
-        if (!label.find()) return new LocalDate[] { null, null };
-
-        Matcher date = DATE.matcher(label.group(1));
-        LocalDate start = date.find() ? safeDate(date.group(1), date.group(2), date.group(3)) : null;
-        LocalDate end = date.find() ? safeDate(date.group(1), date.group(2), date.group(3)) : null;
-        return new LocalDate[] { start, end };
+        LocalDate firstStartFallback = null;
+        while (label.find()) {
+            Matcher date = DATE.matcher(label.group(1));
+            LocalDate start = date.find() ? safeDate(date.group(1), date.group(2), date.group(3)) : null;
+            LocalDate end = date.find() ? safeDate(date.group(1), date.group(2), date.group(3)) : null;
+            if (start != null && end != null) {
+                return new LocalDate[] { start, end };
+            }
+            if (start != null && firstStartFallback == null) {
+                firstStartFallback = start;
+            }
+        }
+        return new LocalDate[] { firstStartFallback, null };
     }
 
     private static LocalDate safeDate(String y, String mo, String d) {

@@ -81,4 +81,15 @@ class WarrantyOcrParserTest {
         assertThat(r.getStartDate()).isNull();
         assertThat(r.getEndDate()).isNull();
     }
+
+    @Test
+    void 라벨_두_번_등장_첫_라벨엔_날짜_없고_두번째에_둘_다() {
+        // 첫 라벨 윈도우(200자) 안에 날짜가 없거나 부족할 때, 두 번째 라벨에서 두 날짜 모두 추출
+        String text = "보증기간 안내사항: 약관에 따라 정해진 기간 동안 보증하며 자세한 내용은 첨부 약관 참고. " +
+                "위 사항은 일반적인 안내로 실제 적용은 개별 증서에 따릅니다. " +
+                "본 보증서의 보증기간 2026.05.01 ~ 2027.04.30 입니다.";
+        WarrantyOcrParser.Result r = WarrantyOcrParser.parse(text);
+        assertThat(r.getStartDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+        assertThat(r.getEndDate()).isEqualTo(LocalDate.of(2027, 4, 30));
+    }
 }

@@ -131,16 +131,6 @@ public class DefectWarranty {
         this.lastExpiringAlertSentAt = sentAt;
     }
 
-    /**
-     * 만료 임박: today ≤ endDate ≤ today+daysBeforeExpiry (양 경계 포함).
-     * 만료 당일(today == endDate)은 "임박"이자 아직 "만료"는 아님.
-     */
-    public boolean isExpiringSoon(int daysBeforeExpiry) {
-        if (endDate == null) return false;
-        LocalDate today = LocalDate.now();
-        return !endDate.isBefore(today) && !endDate.isAfter(today.plusDays(daysBeforeExpiry));
-    }
-
     /** 만료: endDate < today (만료 당일은 아직 expired=false, 다음 날부터 true). */
     public boolean isExpired() {
         return endDate != null && endDate.isBefore(LocalDate.now());
