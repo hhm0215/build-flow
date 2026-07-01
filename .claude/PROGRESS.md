@@ -309,12 +309,17 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-01 갱신, PR #33 머지 반영)
+## 다음 세션 진입점 (2026-07-01 갱신, PR #34 머지 반영 — ADR-014 [TRIAL] 실험 시작)
 
 **현재 git 상태**:
-- `origin/main` = `7ba9e00` (PR #33 머지 — P1 MEDIUM 2건 + P2 LOW 잔여 2건 + 5.5 HIGH 2건 fix)
-- `origin/develop` = `c385c05` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #32(P1 MEDIUM + 5.5 첫 적용) → #33(P1 MEDIUM 2건 + 5.5 HIGH 2건 + P2 LOW 백로그)
+- `origin/main` = `2100076` (PR #34 머지 — ADR-014 [TRIAL] 능동 발의 실험 규칙 도입)
+- `origin/develop` = `80b60c2` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #33(P1 MEDIUM + 5.5 HIGH) → #34(ADR-014 [TRIAL] 실험 도입)
+
+**⚠️ ADR-014 [TRIAL] 실험 중** — 다음 세션 첫 액션은 BACKLOG P0 "능동 발의 실험 피드백 회고":
+1. `.claude/PROGRESS.md` "능동 발의 로그" 섹션 통독
+2. 발의 N건 승인률·거부 사유 요약 → 사용자에게 확정/폐기/수정 3택 제시
+3. 결정 반영 (ADR-014 상태 갱신 + 필요 시 CLAUDE.md 수정)
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
