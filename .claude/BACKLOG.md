@@ -22,13 +22,6 @@
 
 ## P1 — 중기
 
-### /code-review 5.5단계 후속 MEDIUM 2건 (2026-06-22 P1 MEDIUM fix 후 잔여)
-- `WarrantyOcrParser.findPeriod` 200자 윈도우 — 라벨과 실제 기간 사이의 부가 날짜(예: 발급일자) 잘못 매칭 위험. 종전 PERIOD_PATTERN의 10자 separator 제약을 부분 복원하거나, 라벨 직후 N자 내 + 두 날짜 사이 거리 제약 추가
-- `DefectWarranty.update` partial-skip이 의도적 비우기 차단 — `memo`/`policyNumber`/`coverageAmount` 필드는 사용자가 null로 비우려는 의도가 있을 수 있음. PATCH/PUT 시맨틱 분리 또는 null vs absent를 구분하는 DTO (Optional 래퍼 또는 Map 기반)
-- **예상 규모**: S
-
-
-
 ### useListFilters 추상화 (별도 PR — 큰 결정)
 - **배경**: 5페이지(estimate/purchase/tax/warranty/site) ListPage가 `useFilterParams + useDebouncedValue + filtered useMemo + resetFilters + activeCount` 패턴 반복
 - **산출물**: `useListFilters(schema, items, filterFn)` 훅으로 boilerplate 통합. 각 페이지 차이(검색 필드 다름, 필터 로직 다름)를 어떻게 추상화할지 설계 필요
@@ -76,3 +69,4 @@
 | 2026-06-22 | ADR-013 자동 코드 리뷰 5.5단계 정식 도입 (BACKLOG 항목 외 메타 작업) |
 | 2026-06-22 | P1 MEDIUM 6건 fix 완료 + 5.5단계 자동 리뷰 HIGH 1건 즉시 fix. MEDIUM 2건/LOW 2건 분리 등록 |
 | 2026-06-26 | P2 LOW 2건 정리 — parser 다중 라벨 순회 + isExpiringSoon dead 메서드 제거 |
+| 2026-07-01 | P1 MEDIUM 2건(parser 거리 제약 + update Optional 3-state) 완료 + 5.5 리뷰 HIGH 2건(greedy group 캡처 + gap 임계값) 즉시 fix |

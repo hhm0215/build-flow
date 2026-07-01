@@ -12,6 +12,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Entity
 @Table(name = "defect_warranties")
@@ -93,19 +94,30 @@ public class DefectWarranty {
     }
 
     /**
-     * 부분 갱신 (PATCH 시맨틱):
-     * null 인자는 기존 값 유지. 명시적으로 빈 값으로 만들려면 별도 API 필요.
-     * 호출자가 폼에서 일부 필드를 누락해도 기존 데이터가 의도치 않게 null로 덮어쓰이지 않음.
+     * PATCH 시맨틱 갱신.
+     *
+     * <p>필수 필드({@code insuranceCompany}, {@code startDate}, {@code endDate})는 DTO 검증
+     * 단계에서 non-null이 보장되므로 항상 새 값으로 대입.
+     *
+     * <p>선택 필드({@code policyNumber}, {@code coverageAmount}, {@code memo})는 3-state
+     * {@link Optional}로 받아 clear/skip/update를 구분한다:
+     * <ul>
+     *   <li>{@code null} 인자 → 기존 값 유지 (JSON에 필드 없음)</li>
+     *   <li>{@code Optional.empty()} → {@code null}로 clear (JSON에 명시적 null)</li>
+     *   <li>{@code Optional.of(value)} → 새 값으로 갱신</li>
+     * </ul>
      */
-    public void update(String insuranceCompany, String policyNumber,
+    public void update(String insuranceCompany,
                        LocalDate startDate, LocalDate endDate,
-                       Long coverageAmount, String memo) {
-        if (insuranceCompany != null) this.insuranceCompany = insuranceCompany;
-        if (policyNumber != null) this.policyNumber = policyNumber;
-        if (startDate != null) this.startDate = startDate;
-        if (endDate != null) this.endDate = endDate;
-        if (coverageAmount != null) this.coverageAmount = coverageAmount;
-        if (memo != null) this.memo = memo;
+                       Optional<String> policyNumber,
+                       Optional<Long> coverageAmount,
+                       Optional<String> memo) {
+        this.insuranceCompany = insuranceCompany;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        if (policyNumber != null) this.policyNumber = policyNumber.orElse(null);
+        if (coverageAmount != null) this.coverageAmount = coverageAmount.orElse(null);
+        if (memo != null) this.memo = memo.orElse(null);
     }
 
     /**
