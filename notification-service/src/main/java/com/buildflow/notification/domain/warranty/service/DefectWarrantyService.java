@@ -70,9 +70,9 @@ public class DefectWarrantyService {
         DefectWarranty warranty = getWarranty(id);
         warranty.update(
                 request.getInsuranceCompany(),
-                request.getPolicyNumber(),
                 request.getStartDate(),
                 request.getEndDate(),
+                request.getPolicyNumber(),
                 request.getCoverageAmount(),
                 request.getMemo()
         );

@@ -81,4 +81,35 @@ class WarrantyOcrParserTest {
         assertThat(r.getStartDate()).isNull();
         assertThat(r.getEndDate()).isNull();
     }
+
+    @Test
+    void 라벨_두_번_등장_첫_라벨엔_날짜_없고_두번째에_둘_다() {
+        // 첫 라벨 윈도우(200자) 안에 날짜가 없거나 부족할 때, 두 번째 라벨에서 두 날짜 모두 추출
+        String text = "보증기간 안내사항: 약관에 따라 정해진 기간 동안 보증하며 자세한 내용은 첨부 약관 참고. " +
+                "위 사항은 일반적인 안내로 실제 적용은 개별 증서에 따릅니다. " +
+                "본 보증서의 보증기간 2026.05.01 ~ 2027.04.30 입니다.";
+        WarrantyOcrParser.Result r = WarrantyOcrParser.parse(text);
+        assertThat(r.getStartDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+        assertThat(r.getEndDate()).isEqualTo(LocalDate.of(2027, 4, 30));
+    }
+
+    @Test
+    void 라벨과_실제기간_사이_부가_날짜_오매칭_방지() {
+        // 라벨 뒤에 "발급일자" 같은 다른 날짜가 끼어들어도, 두 날짜 사이 gap이 크면 채택하지 않음.
+        // 라벨 하나뿐이라 다음 라벨로 넘어갈 수 없고, 시작일만 잡힌 상태로 gap이 초과되면 fallback도 skip.
+        String text = "보증기간 안내 발급일자 2025-01-01 담당자 홍길동 실제 적용 기간 2026.05.01 ~ 2027.04.30 입니다";
+        WarrantyOcrParser.Result r = WarrantyOcrParser.parse(text);
+        assertThat(r.getStartDate()).isNull();
+        assertThat(r.getEndDate()).isNull();
+    }
+
+    @Test
+    void 두_라벨_중_첫번째는_오매칭_두번째는_정상_추출() {
+        // 첫 라벨 뒤에는 발급일자만 있어 gap 초과로 skip, 두 번째 라벨에서 두 날짜 정상 추출.
+        String text = "보증기간 안내 발급일자 2025-01-01 담당자 안내 종료. " +
+                "본 증서의 보증기간 2026.05.01 ~ 2027.04.30 입니다.";
+        WarrantyOcrParser.Result r = WarrantyOcrParser.parse(text);
+        assertThat(r.getStartDate()).isEqualTo(LocalDate.of(2026, 5, 1));
+        assertThat(r.getEndDate()).isEqualTo(LocalDate.of(2027, 4, 30));
+    }
 }

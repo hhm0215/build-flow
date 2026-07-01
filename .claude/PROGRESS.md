@@ -152,6 +152,13 @@
 
 ---
 
+### ✅ P2 LOW 2건 정리 (2026-06-26)
+- `WarrantyOcrParser.findPeriod` — `if (!label.find())` 단발 → `while (label.find())` 다중 라벨 순회. 두 날짜 모두 추출되는 첫 라벨 채택, 못 찾으면 첫 라벨의 start만 fallback으로 반환 (테스트 1건 추가)
+- `DefectWarranty.isExpiringSoon` — 호출자 0건 dead 메서드 제거. 만료 판정은 Repository의 BETWEEN 쿼리(`findExpiringSoon`/`findExpiringNotYetAlerted`)와 `isExpired()` 메서드가 담당
+- 5.5단계 인라인 검토 (변경 양 작아 finder agent 생략) — HIGH/CRITICAL 없음
+
+---
+
 ### ✅ P1 MEDIUM 6건 + 5.5단계 첫 적용 (2026-06-22)
 - useMemo+setState 안티패턴 → React Query refetchInterval 함수 전달 (setState 제거)
 - `useWarranties` refetchInterval 옵션 타입 확장 (`number | false | function`)
@@ -253,6 +260,14 @@
 
 ---
 
+### ✅ warranty P1 MEDIUM 2건 정리 + 5.5 HIGH 2건 즉시 fix (2026-07-01)
+- `WarrantyOcrParser.findPeriod` 거리 제약 강화: 라벨↔시작일 60자, 시작일↔종료일 15자. 발급일자 등 부가 날짜 오매칭 방지
+- `DefectWarranty.update` 3-state 시맨틱: `Optional<T>` DTO로 skip/clear/update 구분 (memo/policyNumber/coverageAmount)
+- 5.5단계 자동 리뷰 HIGH 2건 즉시 fix — PERIOD_LABEL greedy `[\s\S]{0,200}` 캡처가 다음 라벨을 삼키는 문제(라벨만 매칭+substring 방식으로 재작성) / START_TO_END_GAP=30이 오매칭 케이스 통과시켜 15로 조임
+- 신규 테스트 3건 (parser 2건 + WarrantyUpdateRequest 3-state + DefectWarranty entity update)
+
+---
+
 ### ✅ frontend — 검색/필터링 5페이지 일괄 패턴화 (2026-06-08)
 - 공통 부품: FilterBar(children 패턴) + FilterSearch / FilterSelect / FilterDateRange / FilterAmountRange
 - 공통 훅: useFilterParams(URL 동기화 + 스키마 검증 + 무효값 자동 정리) + useDebouncedValue(250ms)
@@ -294,23 +309,27 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-06-22 갱신, PR #30·#31 머지 후 — 위임 D 종료)
+## 다음 세션 진입점 (2026-07-01 갱신, P1 MEDIUM 2건 + 5.5 HIGH 2건 fix 커밋 완료 · PR 생성 예정)
 
 **현재 git 상태**:
-- `origin/main` = `c548221` (PR #31, ADR-013 자동 코드 리뷰 5.5단계 통합)
-- `origin/develop` = `9697c16` — main과 동기화 (차이 0)
-- 직진 사이클: ... → #30(warranty 핫픽스) → #31(ADR-013)
+- `origin/main` = `aee06d7` (PR #32 이후 변동 없음)
+- `origin/develop`: PR 생성 직전 (커밋 SHA는 push 후 확정)
+- 직진 사이클: ... → #32(P1 MEDIUM + 5.5 첫 적용) → PR #33 예정(P1 MEDIUM 2건 + 5.5 HIGH 2건)
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
 **대기 작업 (사용자 액션 필요)**:
-- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d` 권장
-- Docker Daemon 미실행 — 검증 시 Docker Desktop 기동 필요
+- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d`
+- Docker Daemon 미실행 — Docker Desktop 기동 필요
+
+**남은 BACKLOG**:
+- P1: useListFilters 추상화 (설계 합의 필요)
+- P2: Gradle wrapper, chat-service RAG
 
 **다음 세션 첫 액션**:
-1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측 (혹시 다른 머신·시점에서 추가 push 있는지)
-2. `.claude/BACKLOG.md` P0 항목(현재: notification-service OCR + 만료 스케줄러) 계획 문서 작성부터 시작
-3. 워크플로우 5+1+1+1 단계(이제 8단계 — 백로그→계획→구현→결과→회고→PR 생성→PR 자동 머지→main 동기화) 그대로 적용
+1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측
+2. `.claude/BACKLOG.md`에서 다음 항목 선택 (useListFilters는 설계 문서부터, Gradle wrapper는 사용자 로컬 액션 필요)
+3. 워크플로우 8단계 그대로 적용
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):
 - ✅ PR 생성 자동 (`gh pr create`)
