@@ -16,7 +16,11 @@
 
 ## P0 — 다음 1~2 작업
 
-(현재 비어 있음 — 위임 모드 멈춤 조건)
+### 능동 발의 실험 피드백 회고 (2026-07-01 시작, 다음 세션 첫 액션)
+- **트리거**: ADR-014 [TRIAL] 종료 시점 = 다음 세션 시작
+- **첫 액션**: `.claude/PROGRESS.md` "능동 발의 로그" 섹션 통독 → 발의 N건 승인률·거부 사유 요약 → 사용자에게 확정/폐기/수정 3택 제시
+- **결과 반영**: `docs/DECISIONS.md` ADR-014 상태 갱신 (TRIAL → CONFIRMED/DEPRECATED/REVISED) + 규칙 조정 시 CLAUDE.md "능동 발의" 섹션 편집
+- **예상 규모**: S
 
 ---
 
@@ -70,3 +74,4 @@
 | 2026-06-22 | P1 MEDIUM 6건 fix 완료 + 5.5단계 자동 리뷰 HIGH 1건 즉시 fix. MEDIUM 2건/LOW 2건 분리 등록 |
 | 2026-06-26 | P2 LOW 2건 정리 — parser 다중 라벨 순회 + isExpiringSoon dead 메서드 제거 |
 | 2026-07-01 | P1 MEDIUM 2건(parser 거리 제약 + update Optional 3-state) 완료 + 5.5 리뷰 HIGH 2건(greedy group 캡처 + gap 임계값) 즉시 fix |
+| 2026-07-01 | ADR-014 [TRIAL] 능동 발의 실험 도입 — 다음 세션 회고 대상, P0에 피드백 항목 등록 |

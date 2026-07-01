@@ -309,12 +309,12 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-01 갱신, P1 MEDIUM 2건 + 5.5 HIGH 2건 fix 커밋 완료 · PR 생성 예정)
+## 다음 세션 진입점 (2026-07-01 갱신, PR #33 머지 반영)
 
 **현재 git 상태**:
-- `origin/main` = `aee06d7` (PR #32 이후 변동 없음)
-- `origin/develop`: PR 생성 직전 (커밋 SHA는 push 후 확정)
-- 직진 사이클: ... → #32(P1 MEDIUM + 5.5 첫 적용) → PR #33 예정(P1 MEDIUM 2건 + 5.5 HIGH 2건)
+- `origin/main` = `7ba9e00` (PR #33 머지 — P1 MEDIUM 2건 + P2 LOW 잔여 2건 + 5.5 HIGH 2건 fix)
+- `origin/develop` = `c385c05` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #32(P1 MEDIUM + 5.5 첫 적용) → #33(P1 MEDIUM 2건 + 5.5 HIGH 2건 + P2 LOW 백로그)
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
@@ -336,6 +336,13 @@
 - ✅ PR 자동 머지 (`gh pr merge --merge`) — SHA 검증 안전망 통과 시
 - ✅ main 브랜치 보호 룰: force-push/delete 차단, PR 경로 강제
 - ⚠️ 활성 PR 동안 develop 추가 push 시 PR 본문 즉시 갱신 의무 (RETROSPECTIVE 회고)
+
+## 능동 발의 로그 (실험 기간 2026-07-01 ~ 다음 세션)
+
+> ADR-014 [TRIAL] 실험 운영. 발의할 때마다 한 줄 축적. 다음 세션 첫 액션으로 이 로그 통독 후 확정/폐기/수정 결정.
+> 형식: `- [YYYY-MM-DD HH:MM] {발의 종류} — 판단: … / 근거: … / 대안: … / 응답: 승인|거부|수정`
+
+- (아직 발의 없음 — 실험 시작 시점)
 
 ## 회고
 
