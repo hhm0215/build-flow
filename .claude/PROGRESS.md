@@ -309,17 +309,16 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-01 갱신, PR #34 머지 반영 — ADR-014 [TRIAL] 실험 시작)
+## 다음 세션 진입점 (2026-07-03 갱신, PR #35 머지 반영 — ADR-014 [TRIAL] 실험 연장)
 
 **현재 git 상태**:
-- `origin/main` = `2100076` (PR #34 머지 — ADR-014 [TRIAL] 능동 발의 실험 규칙 도입)
-- `origin/develop` = `80b60c2` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #33(P1 MEDIUM + 5.5 HIGH) → #34(ADR-014 [TRIAL] 실험 도입)
+- `origin/main` = `1b7b06b` (PR #35 머지 — ADR-014 [TRIAL] 실험 연장, 회고 트리거 조정)
+- `origin/develop` = `06d53e2` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #34(ADR-014 [TRIAL] 실험 도입) → #35(실험 연장, 회고 트리거 조정)
 
-**⚠️ ADR-014 [TRIAL] 실험 중** — 다음 세션 첫 액션은 BACKLOG P0 "능동 발의 실험 피드백 회고":
-1. `.claude/PROGRESS.md` "능동 발의 로그" 섹션 통독
-2. 발의 N건 승인률·거부 사유 요약 → 사용자에게 확정/폐기/수정 3택 제시
-3. 결정 반영 (ADR-014 상태 갱신 + 필요 시 CLAUDE.md 수정)
+**⚠️ ADR-014 [TRIAL] 실험 연장 중** — 1회차 회고 완료(발의 0건 → 실험 연장 결정).
+- 회고 트리거 갱신: **발의 5건 축적 또는 실사이클 3회 경과** 중 먼저 도달 시 2회차 회고
+- 현재 발의 로그: 1건 (실험 연장 발의, 승인)
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
