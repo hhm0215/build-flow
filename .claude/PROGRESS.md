@@ -325,23 +325,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #38 머지 반영 — Gradle wrapper)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #39 머지 반영 — 백엔드 컴파일 검증)
 
 **현재 git 상태**:
-- `origin/main` = `3f466c8` (PR #38 머지 — Gradle wrapper 8.10 생성)
-- `origin/develop` = `bc80221` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #37(useListFilters) → #38(Gradle wrapper)
+- `origin/main` = `ce7e427` (PR #39 머지 — 컴파일 검증 + JDK 17 문서화)
+- `origin/develop` = `1c36572` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #37(useListFilters) → #38(Gradle wrapper) → #39(컴파일 검증)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
-**BACKLOG 현황**: P0·P1 없음. P2 2건 모두 사용자 로컬 액션/큰 결정:
-- 백엔드 컴파일 검증: `brew install openjdk@17` 필요 (wrapper는 완료, JDK 17만 있으면 `./gradlew build` 가능)
-- chat-service RAG: L 규모 새 서비스 — 설계 자문부터
+**BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
 
-**능동 발의 실험**: 로그 3건 축적(전부 승인). 실사이클 3회 경과(실험연장/AGENTS/useListFilters+wrapper) → **2회차 회고 트리거 도달 근접**.
-
-**⚠️ ADR-014 [TRIAL] 실험 연장 중** — 1회차 회고 완료(발의 0건 → 실험 연장 결정).
-- 회고 트리거 갱신: **발의 5건 축적 또는 실사이클 3회 경과** 중 먼저 도달 시 2회차 회고
-- 현재 발의 로그: 1건 (실험 연장 발의, 승인)
+**✅ 능동 발의 실험 종료**: 2회차 회고 완료 → **확정(CONFIRMED, ADR-014 v1.0)**. 승인률 100%(3/3)·정합성 이탈 0. [TRIAL] 딱지 제거, 규칙 상시 적용. 발의 로그 상시 축적 중단.
+- 로컬 환경: gradle 9.6.1 + openjdk@17 설치됨, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`로 `./gradlew` 실행 가능
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
@@ -364,10 +359,9 @@
 - ✅ main 브랜치 보호 룰: force-push/delete 차단, PR 경로 강제
 - ⚠️ 활성 PR 동안 develop 추가 push 시 PR 본문 즉시 갱신 의무 (RETROSPECTIVE 회고)
 
-## 능동 발의 로그 (실험 기간 2026-07-01 ~ 발의 5건/실사이클 3회 도달 시)
+## 능동 발의 로그 (실험 종료 — 2026-07-04 확정, 아카이브)
 
-> ADR-014 [TRIAL] 실험 운영. 발의할 때마다 한 줄 축적. **회고 트리거**(2026-07-03 조정): 발의 5건 축적 또는 실사이클 3회 경과 중 먼저 도달 시 이 로그 통독 후 확정/폐기/수정 결정.
-> 형식: `- [YYYY-MM-DD HH:MM] {발의 종류} — 판단: … / 근거: … / 대안: … / 응답: 승인|거부|수정`
+> **[TRIAL] 종료**: 2회차 회고(2026-07-04) 승인률 100%(3/3)·정합성 이탈 0으로 **확정(CONFIRMED)**. ADR-014 v1.0 정식화, 규칙 상시 적용. 아래는 실험 기간 계측 기록 (상시 축적은 중단).
 
 - [2026-07-03] 회고/규칙 진화 발의 — 판단: 회고 트리거를 "다음 세션 시작"→"발의 5건/실사이클 3회"로 조정 / 근거: 도입 세션(PR #34) 직후 종료로 회고 시점 발의 0건 공회전 / 대안: 트리거 유지 시 매 세션 빈 회고 반복 / 응답: 승인(실험 연장)
 - [2026-07-03] BACKLOG 발의 — 판단: 미추적 AGENTS.md를 버전 관리에 편입 / 근거: 세션 시작부터 `?? AGENTS.md` 방치, .gitignore에도 없어 매 세션 노이즈 + 크로스툴 지침 drift 위험 / 대안: gitignore 로컬전용(공유 포기) 또는 방치(노이즈 지속) / 응답: 승인(커밋)
