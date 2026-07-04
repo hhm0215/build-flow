@@ -11,8 +11,8 @@ import FilterBar from '../../components/filters/FilterBar'
 import FilterSearch from '../../components/filters/FilterSearch'
 import FilterSelect from '../../components/filters/FilterSelect'
 import FilterDateRange from '../../components/filters/FilterDateRange'
-import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
-import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { FilterSchema } from '../../hooks/useFilterParams'
+import { useListFilters } from '../../hooks/useListFilters'
 import { useWarranties, useExpiringWarranties, useDeleteWarranty, useCreateWarranty } from '../../api/warranties.api'
 import type { WarrantyCreateRequest } from '../../types/domain.types'
 import WarrantyUploadModal from './WarrantyUploadModal'
@@ -50,29 +50,22 @@ export default function WarrantyListPage() {
   const warranties = useMemo(() => data ?? [], [data])
   const expiringCount = expiringData?.length ?? 0
 
-  const [filters, setFilters] = useFilterParams<WarrantyFilters>(FILTER_SCHEMA)
-  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
-
-  const filtered = useMemo(() => {
-    const q = debouncedQ.trim().toLowerCase()
-    return warranties.filter((w) => {
-      if (q && !(`${w.insuranceCompany} ${w.policyNumber}`.toLowerCase().includes(q))) return false
-      if (filters.status === 'VALID' && w.expired) return false
-      if (filters.status === 'EXPIRED' && !w.expired) return false
-      const dateKey = w.endDate?.slice(0, 10) ?? ''
-      if (filters.expiryFrom && dateKey < filters.expiryFrom) return false
-      if (filters.expiryTo && dateKey > filters.expiryTo) return false
-      return true
+  const { filters, setFilters, filtered, activeCount, resetFilters } =
+    useListFilters({
+      schema: FILTER_SCHEMA,
+      items: warranties,
+      groups: [['expiryFrom', 'expiryTo']],
+      filterFn: (w, f: Partial<WarrantyFilters>, rawQ) => {
+        const q = rawQ.trim().toLowerCase()
+        if (q && !`${w.insuranceCompany} ${w.policyNumber}`.toLowerCase().includes(q)) return false
+        if (f.status === 'VALID' && w.expired) return false
+        if (f.status === 'EXPIRED' && !w.expired) return false
+        const dateKey = w.endDate?.slice(0, 10) ?? ''
+        if (f.expiryFrom && dateKey < f.expiryFrom) return false
+        if (f.expiryTo && dateKey > f.expiryTo) return false
+        return true
+      },
     })
-  }, [warranties, debouncedQ, filters.status, filters.expiryFrom, filters.expiryTo])
-
-  const activeCount =
-    (filters.q ? 1 : 0) +
-    (filters.status ? 1 : 0) +
-    (filters.expiryFrom || filters.expiryTo ? 1 : 0)
-
-  const resetFilters = () =>
-    setFilters({ q: '', status: undefined, expiryFrom: '', expiryTo: '' })
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)

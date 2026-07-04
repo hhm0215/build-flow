@@ -27,11 +27,7 @@
 
 ## P1 — 중기
 
-### useListFilters 추상화 (별도 PR — 큰 결정)
-- **배경**: 5페이지(estimate/purchase/tax/warranty/site) ListPage가 `useFilterParams + useDebouncedValue + filtered useMemo + resetFilters + activeCount` 패턴 반복
-- **산출물**: `useListFilters(schema, items, filterFn)` 훅으로 boilerplate 통합. 각 페이지 차이(검색 필드 다름, 필터 로직 다름)를 어떻게 추상화할지 설계 필요
-- **예상 규모**: M (5페이지 다 손대야 함, 추상화 잘못 가면 가독성 ↓)
-- **상태**: TODO — 설계부터 합의 필요 (자동 진행 위험)
+(현재 없음 — useListFilters 추상화 2026-07-04 완료)
 
 ---
 
@@ -78,3 +74,4 @@
 | 2026-07-01 | ADR-014 [TRIAL] 능동 발의 실험 도입 — 다음 세션 회고 대상, P0에 피드백 항목 등록 |
 | 2026-07-03 | ADR-014 [TRIAL] 1회차 회고(발의 0건) → 실험 연장, 회고 트리거 조정 (PR #35) |
 | 2026-07-03 | BACKLOG 발의(실험 데이터 #2) → 미추적 AGENTS.md 버전 관리 편입 완료 |
+| 2026-07-04 | P1 useListFilters 추상화 완료 — 5페이지 필터 훅 통합, 5.5 리뷰 회귀 1건 자가 fix (설계 자문 발의 #3) |

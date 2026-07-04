@@ -10,8 +10,8 @@ import FilterBar from '../../components/filters/FilterBar'
 import FilterSearch from '../../components/filters/FilterSearch'
 import FilterDateRange from '../../components/filters/FilterDateRange'
 import FilterAmountRange from '../../components/filters/FilterAmountRange'
-import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
-import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { FilterSchema } from '../../hooks/useFilterParams'
+import { useListFilters } from '../../hooks/useListFilters'
 import { usePurchases, useCreatePurchase } from '../../api/purchases.api'
 import type { PurchaseCreateRequest } from '../../types'
 
@@ -35,31 +35,27 @@ export default function PurchaseListPage() {
   const { data, isLoading, isError, refetch } = usePurchases()
   const purchases = useMemo(() => data ?? [], [data])
 
-  const [filters, setFilters] = useFilterParams<PurchaseFilters>(FILTER_SCHEMA)
-  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
-
-  const filtered = useMemo(() => {
-    const q = debouncedQ.trim().toLowerCase()
-    return purchases.filter((p) => {
-      if (q && !(`${p.itemName} ${p.supplier ?? ''}`.toLowerCase().includes(q))) return false
-      const dateKey = p.purchaseDate?.slice(0, 10) ?? ''
-      if (filters.startDate && dateKey < filters.startDate) return false
-      if (filters.endDate && dateKey > filters.endDate) return false
-      if (filters.minAmount != null && p.totalAmount < filters.minAmount) return false
-      if (filters.maxAmount != null && p.totalAmount > filters.maxAmount) return false
-      return true
+  const { filters, setFilters, filtered, activeCount, resetFilters } =
+    useListFilters({
+      schema: FILTER_SCHEMA,
+      items: purchases,
+      groups: [
+        ['startDate', 'endDate'],
+        ['minAmount', 'maxAmount'],
+      ],
+      filterFn: (p, f: Partial<PurchaseFilters>, rawQ) => {
+        const q = rawQ.trim().toLowerCase()
+        if (q && !`${p.itemName} ${p.supplier ?? ''}`.toLowerCase().includes(q)) return false
+        const dateKey = p.purchaseDate?.slice(0, 10) ?? ''
+        if (f.startDate && dateKey < f.startDate) return false
+        if (f.endDate && dateKey > f.endDate) return false
+        if (f.minAmount != null && p.totalAmount < f.minAmount) return false
+        if (f.maxAmount != null && p.totalAmount > f.maxAmount) return false
+        return true
+      },
     })
-  }, [purchases, debouncedQ, filters.startDate, filters.endDate, filters.minAmount, filters.maxAmount])
 
   const totalAmount = filtered.reduce((sum, p) => sum + p.totalAmount, 0)
-
-  const activeCount =
-    (filters.q ? 1 : 0) +
-    (filters.startDate || filters.endDate ? 1 : 0) +
-    (filters.minAmount != null || filters.maxAmount != null ? 1 : 0)
-
-  const resetFilters = () =>
-    setFilters({ q: '', startDate: '', endDate: '', minAmount: undefined, maxAmount: undefined })
 
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm()
