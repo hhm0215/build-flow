@@ -10,8 +10,8 @@ import FilterSearch from '../../components/filters/FilterSearch'
 import FilterSelect from '../../components/filters/FilterSelect'
 import FilterDateRange from '../../components/filters/FilterDateRange'
 import FilterAmountRange from '../../components/filters/FilterAmountRange'
-import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
-import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { FilterSchema } from '../../hooks/useFilterParams'
+import { useListFilters } from '../../hooks/useListFilters'
 import { useTaxes, useConfirmPayment, useCreateTax } from '../../api/taxes.api'
 import type { TaxInvoiceCreateRequest, TaxInvoiceType } from '../../types'
 
@@ -55,41 +55,27 @@ export default function TaxListPage() {
   const [form] = Form.useForm()
   const invoices = useMemo(() => data ?? [], [data])
 
-  const [filters, setFilters] = useFilterParams<TaxFilters>(FILTER_SCHEMA)
-  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
-
-  const filtered = useMemo(() => {
-    const q = debouncedQ.trim().toLowerCase()
-    return invoices.filter((inv) => {
-      if (q && !inv.counterparty.toLowerCase().includes(q)) return false
-      if (filters.type && inv.type !== filters.type) return false
-      if (filters.payment === 'PAID' && !inv.paymentConfirmed) return false
-      if (filters.payment === 'UNPAID' && inv.paymentConfirmed) return false
-      const dateKey = inv.issueDate?.slice(0, 10) ?? ''
-      if (filters.startDate && dateKey < filters.startDate) return false
-      if (filters.endDate && dateKey > filters.endDate) return false
-      if (filters.minAmount != null && inv.totalAmount < filters.minAmount) return false
-      if (filters.maxAmount != null && inv.totalAmount > filters.maxAmount) return false
-      return true
-    })
-  }, [invoices, debouncedQ, filters.type, filters.payment, filters.startDate, filters.endDate, filters.minAmount, filters.maxAmount])
-
-  const activeCount =
-    (filters.q ? 1 : 0) +
-    (filters.type ? 1 : 0) +
-    (filters.payment ? 1 : 0) +
-    (filters.startDate || filters.endDate ? 1 : 0) +
-    (filters.minAmount != null || filters.maxAmount != null ? 1 : 0)
-
-  const resetFilters = () =>
-    setFilters({
-      q: '',
-      type: undefined,
-      payment: undefined,
-      startDate: '',
-      endDate: '',
-      minAmount: undefined,
-      maxAmount: undefined,
+  const { filters, setFilters, filtered, activeCount, resetFilters } =
+    useListFilters({
+      schema: FILTER_SCHEMA,
+      items: invoices,
+      groups: [
+        ['startDate', 'endDate'],
+        ['minAmount', 'maxAmount'],
+      ],
+      filterFn: (inv, f: Partial<TaxFilters>, rawQ) => {
+        const q = rawQ.trim().toLowerCase()
+        if (q && !inv.counterparty.toLowerCase().includes(q)) return false
+        if (f.type && inv.type !== f.type) return false
+        if (f.payment === 'PAID' && !inv.paymentConfirmed) return false
+        if (f.payment === 'UNPAID' && inv.paymentConfirmed) return false
+        const dateKey = inv.issueDate?.slice(0, 10) ?? ''
+        if (f.startDate && dateKey < f.startDate) return false
+        if (f.endDate && dateKey > f.endDate) return false
+        if (f.minAmount != null && inv.totalAmount < f.minAmount) return false
+        if (f.maxAmount != null && inv.totalAmount > f.maxAmount) return false
+        return true
+      },
     })
 
   const unpaidTotal = filtered

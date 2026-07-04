@@ -122,6 +122,14 @@
 
 ---
 
+### ✅ frontend — useListFilters 훅 추상화 (2026-07-04, P1 완료)
+- 5페이지(estimate/purchase/tax/warranty/site) 필터 scaffolding을 `useListFilters` 훅으로 통합
+- filterFn(검색+술어)만 페이지에 남기고 resetFilters·activeCount는 schema/groups에서 자동 도출
+- 5.5 리뷰 자가 발견: `filtered` memo가 검색어 타이핑마다 재계산되던 디바운스 회귀 → `filterSig`+ref로 in-cycle fix
+- 계획: `.claude/plans/2026-07-04-use-list-filters.md`
+
+---
+
 ### ✅ frontend — 현장 상세 페이지 (SiteDetailPage)
 - `/sites/:id` 라우트 신설, SiteListPage에서 진입 버튼 추가
 - 헤더: 현장명/상태/거래처/공사기간/주소/메모 + 상태 변경 Select (Antd message 토스트)
@@ -349,6 +357,7 @@
 
 - [2026-07-03] 회고/규칙 진화 발의 — 판단: 회고 트리거를 "다음 세션 시작"→"발의 5건/실사이클 3회"로 조정 / 근거: 도입 세션(PR #34) 직후 종료로 회고 시점 발의 0건 공회전 / 대안: 트리거 유지 시 매 세션 빈 회고 반복 / 응답: 승인(실험 연장)
 - [2026-07-03] BACKLOG 발의 — 판단: 미추적 AGENTS.md를 버전 관리에 편입 / 근거: 세션 시작부터 `?? AGENTS.md` 방치, .gitignore에도 없어 매 세션 노이즈 + 크로스툴 지침 drift 위험 / 대안: gitignore 로컬전용(공유 포기) 또는 방치(노이즈 지속) / 응답: 승인(커밋)
+- [2026-07-04] 설계 자문 발의 — 판단: useListFilters를 Approach A(콜백 기반, scaffolding만 흡수)로 구현 / 근거: 5페이지 차이는 검색필드+술어뿐, reset·activeCount는 schema 도출 가능, tax/warranty 특수 술어는 선언형에 안 접힘 / 대안: Approach B 완전 선언형(가독성 ↓ 반려), 1페이지 PoC 우선 / 응답: 승인(A 전면 구현)
 
 ## 회고
 

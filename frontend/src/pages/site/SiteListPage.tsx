@@ -17,8 +17,8 @@ import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
 import FilterSearch from '../../components/filters/FilterSearch'
 import FilterSelect from '../../components/filters/FilterSelect'
-import { useFilterParams, FilterSchema } from '../../hooks/useFilterParams'
-import { useDebouncedValue } from '../../hooks/useDebouncedValue'
+import { FilterSchema } from '../../hooks/useFilterParams'
+import { useListFilters } from '../../hooks/useListFilters'
 import { useSites } from '../../api/sites.api'
 import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
@@ -246,18 +246,17 @@ export default function SiteListPage() {
   const purchases = useMemo(() => purchasesData ?? [], [purchasesData])
   const taxes = useMemo(() => taxesData ?? [], [taxesData])
 
-  const [filters, setFilters] = useFilterParams<SiteFilters>(FILTER_SCHEMA)
-  const debouncedQ = useDebouncedValue(filters.q ?? '', 250)
-  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
-
-  const filteredSites = useMemo(() => {
-    const q = debouncedQ.trim().toLowerCase()
-    return sites.filter((site) => {
+  const { filters, setFilters, filtered: filteredSites } = useListFilters({
+    schema: FILTER_SCHEMA,
+    items: sites,
+    filterFn: (site, f: Partial<SiteFilters>, rawQ) => {
+      const q = rawQ.trim().toLowerCase()
       if (q && !`${site.siteName} ${site.client?.companyName ?? ''}`.toLowerCase().includes(q)) return false
-      if (filters.status && site.status !== filters.status) return false
+      if (f.status && site.status !== f.status) return false
       return true
-    })
-  }, [sites, debouncedQ, filters.status])
+    },
+  })
+  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!filteredSites.length) {
