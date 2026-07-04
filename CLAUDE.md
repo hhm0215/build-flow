@@ -37,6 +37,12 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml up -d
 cd estimate-service && ./gradlew bootRun
 ```
 
+**JDK 17 필수**: `./gradlew`는 Gradle 8.10 기반이라 JDK 17로 실행해야 함(JDK 26 등 상위 버전은 미지원). 시스템 기본 JDK가 없거나 상위 버전이면 JAVA_HOME 지정:
+```bash
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"   # brew install openjdk@17
+./gradlew compileJava   # 9개 서비스 컴파일 검증 (2026-07-04 통과 확인)
+```
+
 **기동 순서 필수**: Eureka(8761) → Config(8888) → Gateway(8080) → 나머지 서비스
 
 ### 프론트엔드

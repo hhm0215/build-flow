@@ -130,10 +130,11 @@
 
 ---
 
-### ✅ 인프라 — Gradle wrapper 생성 (2026-07-04)
+### ✅ 인프라 — Gradle wrapper 생성 + 백엔드 컴파일 검증 (2026-07-04)
 - 루트에 `gradlew` + gradle 8.10 wrapper 생성·커밋 (멀티프로젝트 9개 서비스 공통)
 - `brew install gradle`(9.6.1)로 호스트 gradle 확보 → `gradle wrapper --gradle-version 8.10`
-- ⚠️ 실제 `./gradlew build` 컴파일 검증은 JDK 17 필요(시스템 JDK 없음, brew openjdk 26은 Gradle 8.10 미지원) → BACKLOG P2 후속
+- `brew install openjdk@17` + `JAVA_HOME` 지정 → `./gradlew compileJava` **9개 서비스 전부 BUILD SUCCESSFUL** (프로젝트 최초 백엔드 컴파일 검증)
+- 실행법 CLAUDE.md "빌드 & 실행 > Gradle"에 JDK 17/JAVA_HOME 문서화
 
 ---
 
