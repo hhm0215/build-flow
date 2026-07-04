@@ -33,13 +33,6 @@
 
 ## P2 — 인프라/툴링
 
-### 백엔드 컴파일 검증용 JDK 17 (Gradle wrapper는 2026-07-04 완료)
-- wrapper(`gradlew` + gradle 8.10) 생성·커밋 완료. 그러나 실제 `./gradlew build`는 아직 불가:
-  시스템에 JDK 없음(brew openjdk 26은 미링크 + Gradle 8.10이 JDK 26 미지원, 상한 ~22)
-- **필요 액션**: `brew install openjdk@17` 후 `JAVA_HOME` 설정(또는 build.gradle에 toolchain 17 명시)
-- **산출물**: `./gradlew :auth-service:compileJava` 등으로 9개 서비스 컴파일 통과 확인
-- **예상 규모**: S — 사용자 로컬 `brew install openjdk@17` 필요
-
 ### chat-service (RAG 챗봇) 미구현
 - LLM function calling + OpenFeign + SSE 스트리밍
 - 본 시스템의 핵심 차별화 기능이지만 미착수
@@ -79,3 +72,4 @@
 | 2026-07-03 | BACKLOG 발의(실험 데이터 #2) → 미추적 AGENTS.md 버전 관리 편입 완료 |
 | 2026-07-04 | P1 useListFilters 추상화 완료 — 5페이지 필터 훅 통합, 5.5 리뷰 회귀 1건 자가 fix (설계 자문 발의 #3) |
 | 2026-07-04 | Gradle wrapper(8.10) 생성·커밋 완료 — 컴파일 검증은 JDK 17 필요로 후속 분리 |
+| 2026-07-04 | openjdk@17 설치 + `./gradlew compileJava` 9개 서비스 컴파일 통과 — 백엔드 컴파일 검증 최초 성공, P2 닫음 |
