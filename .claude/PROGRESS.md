@@ -130,6 +130,13 @@
 
 ---
 
+### ✅ 인프라 — Gradle wrapper 생성 (2026-07-04)
+- 루트에 `gradlew` + gradle 8.10 wrapper 생성·커밋 (멀티프로젝트 9개 서비스 공통)
+- `brew install gradle`(9.6.1)로 호스트 gradle 확보 → `gradle wrapper --gradle-version 8.10`
+- ⚠️ 실제 `./gradlew build` 컴파일 검증은 JDK 17 필요(시스템 JDK 없음, brew openjdk 26은 Gradle 8.10 미지원) → BACKLOG P2 후속
+
+---
+
 ### ✅ frontend — 현장 상세 페이지 (SiteDetailPage)
 - `/sites/:id` 라우트 신설, SiteListPage에서 진입 버튼 추가
 - 헤더: 현장명/상태/거래처/공사기간/주소/메모 + 상태 변경 Select (Antd message 토스트)
