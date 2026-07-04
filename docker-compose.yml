@@ -47,7 +47,8 @@ services:
   # EXTERNAL:  호스트에서 직접 접근 (localhost:9094)
   # ─────────────────────────────────────────
   kafka:
-    image: bitnami/kafka:3.7
+    # bitnami/kafka는 2025년 Docker Hub 무료 배포 중단 → bitnamilegacy로 드롭인 교체 (KAFKA_CFG_* 동일)
+    image: bitnamilegacy/kafka:3.7
     container_name: buildflow-kafka
     ports:
       - "9094:9094"

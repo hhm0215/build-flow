@@ -130,6 +130,12 @@
 
 ---
 
+### ✅ chat-service Phase 1 런타임 검증 + 잠복 버그 3건 fix (2026-07-04)
+- Claude가 직접 실행: docker(mysql/redis/ollama+qwen2.5:7b) + bootRun(eureka→site→chat) → 툴콜 E2E 검증
+- "등록된 현장 목록" → listSites 툴콜 → Feign 실데이터 답변 ✅ / 같은 세션 "마진 얼마?" → getSiteProfit 체인 ✅ / chat_messages 영속화 ✅
+- 잠복 버그 fix: ① bitnami/kafka Docker Hub 소멸 → bitnamilegacy 교체 ② 전 서비스 JDBC `allowPublicKeyRetrieval=true` 추가(새 볼륨에서 기동 불가 버그) ③ init SQL에 buildflow_chat 추가
+- 7b 토큰 잡음("마argin율") 실측 → Phase 3 견고화 근거. 검증 후 mariadb 복구·컨테이너 정리 완료
+
 ### ✅ 테스트 파운데이션 + CI (2026-07-04, ADR-015)
 - **CI**: GitHub Actions `.github/workflows/ci.yml` — PR(→main)/push(develop)마다 백엔드 `./gradlew test`(JDK 17) + 프론트 `bun lint/test/build`
 - **프론트**: Vitest + Testing Library + jsdom 셋업 + 파일럿 `useListFilters.test.tsx`(4개 통과)
@@ -339,13 +345,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #41 머지 반영 — chat-service Phase 1)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #42 머지 반영 — 테스트 파운데이션 + CI)
 
 **현재 git 상태**:
-- `origin/main` = `cd7e090` (PR #41 머지 — chat-service Phase 1 툴콜 에이전트)
-- `origin/develop` = `e672329` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #39(컴파일 검증) → #40(ADR-014 확정) → #41(chat-service Phase 1)
+- `origin/main` = `e26fdfd` (PR #42 머지 — 테스트 파운데이션 + CI, ADR-015)
+- `origin/develop` = `1b58e05` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #40(ADR-014 확정) → #41(chat Phase 1) → #42(테스트 파운데이션+CI)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
+
+**✅ CI 가동**: PR마다 GitHub Actions 자동 실행(백엔드 `./gradlew test` + 프론트 lint/test/build). PR #42가 첫 실행 green.
+**로컬 테스트**: 백엔드 `JAVA_HOME=... ./gradlew test`, 프론트 `cd frontend && bun run test`.
+
+**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI). 런타임 검증(Ollama)은 사용자 환경 필요.
 
 **BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
 

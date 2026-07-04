@@ -32,9 +32,9 @@
 
 ## P2 — 인프라/툴링
 
-### chat-service Phase 3 (Phase 1 완료, Phase 2는 P0)
+### chat-service Phase 3 (Phase 1 완료+런타임 검증 통과, Phase 2는 P0)
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
-- **런타임 검증 대기**: Ollama 기동 상태에서 실제 툴콜 왕복 수기 확인 (사용자 환경)
+- 런타임 검증(2026-07-04) 통과: 툴콜 발화·Feign 체인·세션 이력 모두 실동작. 7b 토큰 잡음("마argin율") 실측 → 견고화 근거
 
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
@@ -79,3 +79,4 @@
 | 2026-07-04 | 능동 발의 실험 2회차 회고 → **확정(CONFIRMED)** — ADR-014 v1.0 정식화, [TRIAL] 종료, P0 회고 항목 제거 |
 | 2026-07-04 | chat-service Phase 1 완료 — 툴콜 에이전트(아키텍처 A), 도구 4종, 이력 저장. P2를 Phase 2~3로 갱신 |
 | 2026-07-04 | 테스트 파운데이션 완료 — CI(GitHub Actions) + Vitest(프론트) + 백엔드 파일럿 단위 테스트, ADR-015. chat Phase 2를 P0로 |
+| 2026-07-04 | chat Phase 1 런타임 검증 통과(툴콜+Feign+세션 실동작) + 잠복 버그 3건 fix(kafka 이미지 소멸/JDBC PublicKeyRetrieval/init chat 스키마) |

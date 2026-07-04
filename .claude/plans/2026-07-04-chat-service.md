@@ -85,7 +85,16 @@ POST /api/v1/chat  { sessionId, message }
 - **API**: `POST /api/v1/chat` → `ApiResponse<ChatResponse{sessionId, answer}>`.
 - **검증**: `./gradlew compileJava` 10개 모듈 전부 통과(JDK 17). 5.5 정적 리뷰 CRITICAL/HIGH 0.
 
+### Phase 1 런타임 검증 통과 (2026-07-04, Claude가 직접 실행)
+- 환경: docker(mysql/redis/ollama + qwen2.5:7b pull) + 호스트 bootRun(eureka→site→chat)
+- **(a) 툴콜 스모크**: "등록된 현장 목록 알려줘" → listSites 발화 → Feign 실데이터 → "1. 강남 리모델링 (진행 중, 서울 강남구)" ✅ (54s, 모델 로드 포함)
+- **(b) 체인+세션**: 같은 세션 "강남 리모델링 현장 마진 얼마야?" → getSiteProfit(siteId=1) → "마진 0원, 마진율 0%"(신규 DB라 정확) ✅ (10s)
+- DB 영속화: chat_messages 4행(USER/ASSISTANT 왕복) 확인. 로컬 7b 토큰 잡음("마argin율") 관찰 — Phase 3 견고화 근거
+- **검증 중 발견·수정한 잠복 버그 3건**:
+  1. `bitnami/kafka:3.7` Docker Hub 소멸(2025 무료 배포 중단) → `bitnamilegacy/kafka:3.7` 드롭인 교체
+  2. 전 서비스 JDBC URL에 `allowPublicKeyRetrieval=true` 부재 → 새 MySQL 볼륨에서 전 서비스 기동 불가(잠복 버그) → 7개 yml 일괄 수정
+  3. `docker/mysql/init`에 buildflow_chat 스키마 누락 → 추가
+
 ### 남은 것
 - **Phase 2**: SSE(`SseEmitter`) 스트리밍 + 프론트 채팅 UI.
-- **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + 툴콜 견고화(tool_call_id 상관).
-- **런타임 미검증**: Ollama 기동 상태에서 실제 툴콜 왕복 수기 확인은 Docker/Ollama 필요 → 사용자 환경에서 확인 권장.
+- **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + 툴콜 견고화(tool_call_id 상관, 7b 토큰 잡음 실측됨).
