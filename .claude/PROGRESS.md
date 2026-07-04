@@ -130,6 +130,12 @@
 
 ---
 
+### ✅ chat-service Phase 1 런타임 검증 + 잠복 버그 3건 fix (2026-07-04)
+- Claude가 직접 실행: docker(mysql/redis/ollama+qwen2.5:7b) + bootRun(eureka→site→chat) → 툴콜 E2E 검증
+- "등록된 현장 목록" → listSites 툴콜 → Feign 실데이터 답변 ✅ / 같은 세션 "마진 얼마?" → getSiteProfit 체인 ✅ / chat_messages 영속화 ✅
+- 잠복 버그 fix: ① bitnami/kafka Docker Hub 소멸 → bitnamilegacy 교체 ② 전 서비스 JDBC `allowPublicKeyRetrieval=true` 추가(새 볼륨에서 기동 불가 버그) ③ init SQL에 buildflow_chat 추가
+- 7b 토큰 잡음("마argin율") 실측 → Phase 3 견고화 근거. 검증 후 mariadb 복구·컨테이너 정리 완료
+
 ### ✅ 테스트 파운데이션 + CI (2026-07-04, ADR-015)
 - **CI**: GitHub Actions `.github/workflows/ci.yml` — PR(→main)/push(develop)마다 백엔드 `./gradlew test`(JDK 17) + 프론트 `bun lint/test/build`
 - **프론트**: Vitest + Testing Library + jsdom 셋업 + 파일럿 `useListFilters.test.tsx`(4개 통과)
