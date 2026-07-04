@@ -130,6 +130,13 @@
 
 ---
 
+### ✅ 테스트 파운데이션 + CI (2026-07-04, ADR-015)
+- **CI**: GitHub Actions `.github/workflows/ci.yml` — PR(→main)/push(develop)마다 백엔드 `./gradlew test`(JDK 17) + 프론트 `bun lint/test/build`
+- **프론트**: Vitest + Testing Library + jsdom 셋업 + 파일럿 `useListFilters.test.tsx`(4개 통과)
+- **백엔드**: 파일럿 `ToolExecutorTest`/`ToolCatalogTest`(chat-service, Mockito) + 기존 notification 3종 = `./gradlew test` green
+- **워크플로우**: 5.6단계(순수 로직 변경 시 단위 테스트 동반) 신설, ADR-015. 수동 회귀 검증 토일 → CI 자동화
+- 로컬 검증: `bun run test`(4 pass) + `./gradlew :chat-service:test :notification-service:test`(green)
+
 ### ✅ chat-service Phase 1 — 툴콜 에이전트 챗봇 (2026-07-04)
 - 신규 마이크로서비스(포트 8087, buildflow_chat). 아키텍처 A(툴콜 에이전트) — 벡터스토어 없이 OpenFeign 실데이터 기반
 - `OllamaToolService` 에이전트 루프(Ollama `/api/chat` 툴콜 왕복) + 도구 4종(listSites/getSiteProfit/getOutstandingTax/getDashboardSummary)
