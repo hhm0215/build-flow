@@ -332,12 +332,12 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #40 머지 반영 — ADR-014 확정)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #41 머지 반영 — chat-service Phase 1)
 
 **현재 git 상태**:
-- `origin/main` = `d16567d` (PR #40 머지 — ADR-014 능동 발의 확정 v1.0)
-- `origin/develop` = `1943cf5` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #38(Gradle wrapper) → #39(컴파일 검증) → #40(ADR-014 확정)
+- `origin/main` = `cd7e090` (PR #41 머지 — chat-service Phase 1 툴콜 에이전트)
+- `origin/develop` = `e672329` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #39(컴파일 검증) → #40(ADR-014 확정) → #41(chat-service Phase 1)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
 **BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
