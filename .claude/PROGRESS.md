@@ -130,6 +130,13 @@
 
 ---
 
+### ✅ chat-service Phase 1 — 툴콜 에이전트 챗봇 (2026-07-04)
+- 신규 마이크로서비스(포트 8087, buildflow_chat). 아키텍처 A(툴콜 에이전트) — 벡터스토어 없이 OpenFeign 실데이터 기반
+- `OllamaToolService` 에이전트 루프(Ollama `/api/chat` 툴콜 왕복) + 도구 4종(listSites/getSiteProfit/getOutstandingTax/getDashboardSummary)
+- Feign: SiteClient/TaxClient, 이력: MySQL(ChatSession/ChatMessage) + Redis 세션 TTL, API: `POST /api/v1/chat`
+- Gateway `/api/v1/chat/**` 라우트 추가, settings.gradle 등록. compileJava 10모듈 통과(JDK 17), 5.5 리뷰 CRITICAL/HIGH 0
+- 계획: `.claude/plans/2026-07-04-chat-service.md` (Phase 2 SSE+UI, Phase 3 확장 남음)
+
 ### ✅ 인프라 — Gradle wrapper 생성 + 백엔드 컴파일 검증 (2026-07-04)
 - 루트에 `gradlew` + gradle 8.10 wrapper 생성·커밋 (멀티프로젝트 9개 서비스 공통)
 - `brew install gradle`(9.6.1)로 호스트 gradle 확보 → `gradle wrapper --gradle-version 8.10`
@@ -325,12 +332,12 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #39 머지 반영 — 백엔드 컴파일 검증)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #40 머지 반영 — ADR-014 확정)
 
 **현재 git 상태**:
-- `origin/main` = `ce7e427` (PR #39 머지 — 컴파일 검증 + JDK 17 문서화)
-- `origin/develop` = `1c36572` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #37(useListFilters) → #38(Gradle wrapper) → #39(컴파일 검증)
+- `origin/main` = `d16567d` (PR #40 머지 — ADR-014 능동 발의 확정 v1.0)
+- `origin/develop` = `1943cf5` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #38(Gradle wrapper) → #39(컴파일 검증) → #40(ADR-014 확정)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
 **BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
