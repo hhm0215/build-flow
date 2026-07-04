@@ -339,13 +339,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #41 머지 반영 — chat-service Phase 1)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #42 머지 반영 — 테스트 파운데이션 + CI)
 
 **현재 git 상태**:
-- `origin/main` = `cd7e090` (PR #41 머지 — chat-service Phase 1 툴콜 에이전트)
-- `origin/develop` = `e672329` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #39(컴파일 검증) → #40(ADR-014 확정) → #41(chat-service Phase 1)
+- `origin/main` = `e26fdfd` (PR #42 머지 — 테스트 파운데이션 + CI, ADR-015)
+- `origin/develop` = `1b58e05` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #40(ADR-014 확정) → #41(chat Phase 1) → #42(테스트 파운데이션+CI)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
+
+**✅ CI 가동**: PR마다 GitHub Actions 자동 실행(백엔드 `./gradlew test` + 프론트 lint/test/build). PR #42가 첫 실행 green.
+**로컬 테스트**: 백엔드 `JAVA_HOME=... ./gradlew test`, 프론트 `cd frontend && bun run test`.
+
+**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI). 런타임 검증(Ollama)은 사용자 환경 필요.
 
 **BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
 
