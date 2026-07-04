@@ -74,6 +74,13 @@ spring:
           filters:
             - AuthorizationHeaderFilter
 
+        - id: chat-service
+          uri: lb://chat-service
+          predicates:
+            - Path=/api/v1/chat/**
+          filters:
+            - AuthorizationHeaderFilter
+
     config:
       uri: http://localhost:8888
 

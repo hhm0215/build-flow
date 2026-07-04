@@ -28,10 +28,11 @@
 
 ## P2 — 인프라/툴링
 
-### chat-service (RAG 챗봇) 미구현
-- LLM function calling + OpenFeign + SSE 스트리밍
-- 본 시스템의 핵심 차별화 기능이지만 미착수
-- **예상 규모**: L
+### chat-service Phase 2~3 (Phase 1은 2026-07-04 완료)
+- **Phase 1 완료**: 툴콜 에이전트 코어 + 도구 4종 + 이력 저장 + `POST /api/v1/chat` (아키텍처 A, 계획 `.claude/plans/2026-07-04-chat-service.md`)
+- **Phase 2**: SSE(`SseEmitter`) 스트리밍 + 프론트 채팅 UI — 예상 M
+- **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
+- **런타임 검증 대기**: Ollama 기동 상태에서 실제 툴콜 왕복 수기 확인 (사용자 환경)
 
 ---
 
@@ -69,3 +70,4 @@
 | 2026-07-04 | Gradle wrapper(8.10) 생성·커밋 완료 — 컴파일 검증은 JDK 17 필요로 후속 분리 |
 | 2026-07-04 | openjdk@17 설치 + `./gradlew compileJava` 9개 서비스 컴파일 통과 — 백엔드 컴파일 검증 최초 성공, P2 닫음 |
 | 2026-07-04 | 능동 발의 실험 2회차 회고 → **확정(CONFIRMED)** — ADR-014 v1.0 정식화, [TRIAL] 종료, P0 회고 항목 제거 |
+| 2026-07-04 | chat-service Phase 1 완료 — 툴콜 에이전트(아키텍처 A), 도구 4종, 이력 저장. P2를 Phase 2~3로 갱신 |
