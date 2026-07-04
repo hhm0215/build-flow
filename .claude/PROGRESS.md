@@ -345,18 +345,19 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #42 머지 반영 — 테스트 파운데이션 + CI)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #43 머지 반영 — 런타임 검증 + 잠복 버그 fix)
 
 **현재 git 상태**:
-- `origin/main` = `e26fdfd` (PR #42 머지 — 테스트 파운데이션 + CI, ADR-015)
-- `origin/develop` = `1b58e05` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #40(ADR-014 확정) → #41(chat Phase 1) → #42(테스트 파운데이션+CI)
+- `origin/main` = `26c43c2` (PR #43 머지 — 런타임 검증 통과 + 잠복 버그 3건 fix)
+- `origin/develop` = `37cb554` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #41(chat Phase 1) → #42(테스트 파운데이션+CI) → #43(런타임 검증+fix)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
-**✅ CI 가동**: PR마다 GitHub Actions 자동 실행(백엔드 `./gradlew test` + 프론트 lint/test/build). PR #42가 첫 실행 green.
-**로컬 테스트**: 백엔드 `JAVA_HOME=... ./gradlew test`, 프론트 `cd frontend && bun run test`.
+**✅ CI 가동**: PR마다 GitHub Actions 자동(백엔드 test + 프론트 lint/test/build). #42·#43 연속 green.
+**✅ chat Phase 1 런타임 검증 통과**: 툴콜 발화·Feign 체인·세션 이력·DB 영속화 실동작 확인 (Claude 직접 실행).
+**로컬 실행 노하우**: mariadb(brew)가 3306 점유 시 `brew services stop mariadb` 필요. docker 볼륨에 qwen2.5:7b 모델 유지됨. 검증 절차는 plan 문서 참조.
 
-**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI). 런타임 검증(Ollama)은 사용자 환경 필요.
+**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI, ADR-015 테스트 동반).
 
 **BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
 
