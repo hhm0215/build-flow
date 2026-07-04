@@ -130,6 +130,13 @@
 
 ---
 
+### ✅ 인프라 — Gradle wrapper 생성 (2026-07-04)
+- 루트에 `gradlew` + gradle 8.10 wrapper 생성·커밋 (멀티프로젝트 9개 서비스 공통)
+- `brew install gradle`(9.6.1)로 호스트 gradle 확보 → `gradle wrapper --gradle-version 8.10`
+- ⚠️ 실제 `./gradlew build` 컴파일 검증은 JDK 17 필요(시스템 JDK 없음, brew openjdk 26은 Gradle 8.10 미지원) → BACKLOG P2 후속
+
+---
+
 ### ✅ frontend — 현장 상세 페이지 (SiteDetailPage)
 - `/sites/:id` 라우트 신설, SiteListPage에서 진입 버튼 추가
 - 헤더: 현장명/상태/거래처/공사기간/주소/메모 + 상태 변경 Select (Antd message 토스트)
@@ -317,13 +324,15 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-03 갱신, PR #36 머지 반영 — AGENTS.md 편입)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #37 머지 반영 — useListFilters 추상화)
 
 **현재 git 상태**:
-- `origin/main` = `db388d1` (PR #36 머지 — AGENTS.md 편입 + 진입점 갱신)
-- `origin/develop` = `39a1cff` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #35(실험 연장, 회고 트리거 조정) → #36(AGENTS.md 편입)
+- `origin/main` = `37088e0` (PR #37 머지 — useListFilters 5페이지 필터 통합)
+- `origin/develop` = `df332cb` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #36(AGENTS.md 편입) → #37(useListFilters 추상화)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
+
+**BACKLOG 현황**: P0 없음, P1 없음(useListFilters 완료). 남은 건 P2뿐 — 전부 사용자 액션/큰 결정.
 
 **⚠️ ADR-014 [TRIAL] 실험 연장 중** — 1회차 회고 완료(발의 0건 → 실험 연장 결정).
 - 회고 트리거 갱신: **발의 5건 축적 또는 실사이클 3회 경과** 중 먼저 도달 시 2회차 회고
