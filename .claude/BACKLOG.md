@@ -16,7 +16,11 @@
 
 ## P0 — 다음 1~2 작업
 
-(현재 없음 — 능동 발의 실험 2026-07-04 확정 완료)
+### chat-service Phase 2 (SSE 스트리밍 + 프론트 채팅 UI)
+- **배경**: Phase 1(툴콜 에이전트 코어) 완료. 테스트 파운데이션도 완료 → 이제 테스트 동반해서 Phase 2
+- **산출물**: `SseEmitter`로 답변 토큰 스트리밍 + 프론트 채팅 UI. 순수 로직은 단위 테스트 동반(ADR-015)
+- **예상 규모**: M
+- **상태**: TODO
 
 ---
 
@@ -28,11 +32,14 @@
 
 ## P2 — 인프라/툴링
 
-### chat-service Phase 2~3 (Phase 1은 2026-07-04 완료)
-- **Phase 1 완료**: 툴콜 에이전트 코어 + 도구 4종 + 이력 저장 + `POST /api/v1/chat` (아키텍처 A, 계획 `.claude/plans/2026-07-04-chat-service.md`)
-- **Phase 2**: SSE(`SseEmitter`) 스트리밍 + 프론트 채팅 UI — 예상 M
+### chat-service Phase 3 (Phase 1 완료, Phase 2는 P0)
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
 - **런타임 검증 대기**: Ollama 기동 상태에서 실제 툴콜 왕복 수기 확인 (사용자 환경)
+
+### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
+- 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
+- 후보: ProfitService 마진계산, estimate OllamaService JSON추출, tax 미수금 계산, 프론트 다른 훅
+- **예상 규모**: S~M (점진적)
 
 ---
 
@@ -71,3 +78,4 @@
 | 2026-07-04 | openjdk@17 설치 + `./gradlew compileJava` 9개 서비스 컴파일 통과 — 백엔드 컴파일 검증 최초 성공, P2 닫음 |
 | 2026-07-04 | 능동 발의 실험 2회차 회고 → **확정(CONFIRMED)** — ADR-014 v1.0 정식화, [TRIAL] 종료, P0 회고 항목 제거 |
 | 2026-07-04 | chat-service Phase 1 완료 — 툴콜 에이전트(아키텍처 A), 도구 4종, 이력 저장. P2를 Phase 2~3로 갱신 |
+| 2026-07-04 | 테스트 파운데이션 완료 — CI(GitHub Actions) + Vitest(프론트) + 백엔드 파일럿 단위 테스트, ADR-015. chat Phase 2를 P0로 |

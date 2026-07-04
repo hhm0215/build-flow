@@ -41,6 +41,7 @@ cd estimate-service && ./gradlew bootRun
 ```bash
 export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"   # brew install openjdk@17
 ./gradlew compileJava   # 9개 서비스 컴파일 검증 (2026-07-04 통과 확인)
+./gradlew test          # 단위 테스트 (순수 로직, 인프라 불필요)
 ```
 
 **기동 순서 필수**: Eureka(8761) → Config(8888) → Gateway(8080) → 나머지 서비스
@@ -53,6 +54,7 @@ bun install             # 패키지 설치 (bun 사용)
 bun run dev             # Vite dev server
 bun run build           # TypeScript + Vite 프로덕션 빌드
 bun run lint            # ESLint (max-warnings: 0)
+bun run test            # Vitest 단위 테스트 (test:watch = watch 모드)
 bun run preview         # 빌드 결과 미리보기
 ```
 
@@ -197,6 +199,7 @@ bun run preview         # 빌드 결과 미리보기
    - PROGRESS.md "완료된 작업"에 한 줄 추가 + "다음 세션 진입점" git 상태 갱신
 5. **회고** — 실패/허비/예상과 다름이 있었으면 `.claude/RETROSPECTIVE.md`에 1건 작성. **재발 방지 규칙을 CLAUDE.md / 메모리 / hooks 중 어디에 박았는지 반드시 명시**
 5.5. **자동 코드 리뷰** (구현 사이클에 한해 필수) — 백엔드/프론트 코드 변경이 포함된 사이클은 PR 생성 전 `/code-review` 또는 그에 준하는 정적 점검 실행. CRITICAL 발견 시 동일 사이클 안에서 fix 후 재실행, HIGH 발견 시 같은 PR에 포함하거나 별도 핫픽스 PR. lint/build만 통과하면 통과로 간주하던 관행은 종료 (ADR-013 참조)
+5.6. **단위 테스트** (순수 로직 변경 시 기본값) — 계산·파싱·라우팅·훅 등 순수 로직을 추가/변경하면 단위 테스트 동반. 백엔드 `./gradlew test`(Mockito, 인프라 불필요), 프론트 `bun run test`(Vitest). 무거운 통합(Testcontainers)은 강제 아님. PR은 GitHub Actions CI(`./gradlew test` + 프론트 lint/test/build)가 돌아 회귀를 자동 검증 (ADR-015 참조). 5.5(정적 점검)와 상보 — 테스트는 동작 회귀를 잡는다
 6. **PR 생성** (develop ↔ main 차이가 PR 가치 있을 때):
    - `git fetch && git log origin/main..origin/develop`로 머지 대상 커밋 목록 확보
    - 로컬 `develop` SHA = `origin/develop` SHA 확인 (push 누락 검증 — PR #19 사고 가드레일)
