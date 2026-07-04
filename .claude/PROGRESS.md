@@ -325,19 +325,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #38 머지 반영 — Gradle wrapper)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #39 머지 반영 — 백엔드 컴파일 검증)
 
 **현재 git 상태**:
-- `origin/main` = `3f466c8` (PR #38 머지 — Gradle wrapper 8.10 생성)
-- `origin/develop` = `bc80221` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #37(useListFilters) → #38(Gradle wrapper)
+- `origin/main` = `ce7e427` (PR #39 머지 — 컴파일 검증 + JDK 17 문서화)
+- `origin/develop` = `1c36572` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #37(useListFilters) → #38(Gradle wrapper) → #39(컴파일 검증)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
-**BACKLOG 현황**: P0·P1 없음. P2 2건 모두 사용자 로컬 액션/큰 결정:
-- 백엔드 컴파일 검증: `brew install openjdk@17` 필요 (wrapper는 완료, JDK 17만 있으면 `./gradlew build` 가능)
-- chat-service RAG: L 규모 새 서비스 — 설계 자문부터
+**BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
 
-**능동 발의 실험**: 로그 3건 축적(전부 승인). 실사이클 3회 경과(실험연장/AGENTS/useListFilters+wrapper) → **2회차 회고 트리거 도달 근접**.
+**⚠️ 능동 발의 2회차 회고 트리거 도달**: 실사이클 3회 경과(useListFilters/wrapper/컴파일검증) + 발의 3건(전부 승인). 다음 세션 첫 액션으로 실험 2회차 회고(확정/폐기/수정) 권장.
+- 로컬 환경: gradle 9.6.1 + openjdk@17 설치됨, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`로 `./gradlew` 실행 가능
 
 **⚠️ ADR-014 [TRIAL] 실험 연장 중** — 1회차 회고 완료(발의 0건 → 실험 연장 결정).
 - 회고 트리거 갱신: **발의 5건 축적 또는 실사이클 3회 경과** 중 먼저 도달 시 2회차 회고
