@@ -354,38 +354,33 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #43 머지 반영 — 런타임 검증 + 잠복 버그 fix)
+## 다음 세션 진입점 (2026-07-15 갱신, PR #44 머지 반영 — chat Phase 2 완료)
 
 **현재 git 상태**:
-- `origin/main` = `26c43c2` (PR #43 머지 — 런타임 검증 통과 + 잠복 버그 3건 fix)
-- `origin/develop` = `37cb554` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #41(chat Phase 1) → #42(테스트 파운데이션+CI) → #43(런타임 검증+fix)
+- `origin/main` = `5626b9f` (PR #44 머지 — chat Phase 2: SSE 스트리밍 + 채팅 패널)
+- `origin/develop` = `b7eadbd` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #42(테스트 파운데이션+CI) → #43(런타임 검증+fix) → #44(chat Phase 2)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
-**✅ CI 가동**: PR마다 GitHub Actions 자동(백엔드 test + 프론트 lint/test/build). #42·#43 연속 green.
-**✅ chat Phase 1 런타임 검증 통과**: 툴콜 발화·Feign 체인·세션 이력·DB 영속화 실동작 확인 (Claude 직접 실행).
-**로컬 실행 노하우**: mariadb(brew)가 3306 점유 시 `brew services stop mariadb` 필요. docker 볼륨에 qwen2.5:7b 모델 유지됨. 검증 절차는 plan 문서 참조.
+**✅ chat Phase 2 완료**: SSE 스트리밍 + 플로팅 채팅 패널, 5.5 리뷰 10건 in-cycle fix, Gateway 경유 런타임 검증 통과(툴콜/세션 연속성/중단/영속화).
 
-**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI, ADR-015 테스트 동반).
+**로컬 실행 노하우** (2026-07-15 확장 — 상세는 plan 문서 "환경 함정"):
+- mariadb(brew)가 3306 점유 시 `brew services stop mariadb`
+- **호스트 네이티브 Ollama가 11434 이중 점유**(IPv4=네이티브 qwen3:8b, IPv6=도커 qwen2.5:7b) → chat 기동 시 `OLLAMA_URL=http://[::1]:11434`
+- 로컬 nginx(brew)가 8080/8081 점유 → gateway/auth는 `SERVER_PORT=18080/18081` 오버라이드 (⚠️ vite dev proxy는 8080 고정이라 로컬 프론트 연동 시 nginx 중지 또는 proxy 조정 필요)
+- bootRun 시 `DB_PASSWORD=buildflow123` 필수(yml 기본값 없음), gateway는 `SPRING_CLOUD_CONFIG_ENABLED=false`(config repo 이 머신에 없음)
 
-**BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
+**다음 작업**: P1 실데이터 파일럿 온보딩 (사용자 USB 자료 준비 필요 — 현장 1개 끝까지 입력, 갭 목록 도출). 배포/운영 트랙은 사용자 결정으로 보류(2026-07-15).
 
-**✅ 능동 발의 실험 종료**: 2회차 회고 완료 → **확정(CONFIRMED, ADR-014 v1.0)**. 승인률 100%(3/3)·정합성 이탈 0. [TRIAL] 딱지 제거, 규칙 상시 적용. 발의 로그 상시 축적 중단.
-- 로컬 환경: gradle 9.6.1 + openjdk@17 설치됨, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`로 `./gradlew` 실행 가능
+**BACKLOG 현황**: P0 없음. P1 실데이터 파일럿 온보딩. P2 chat Phase 3(견고화+실시간 스트리밍 이관분), 테스트 커버리지 확장.
+
+**✅ 능동 발의 규칙 상시 적용** (ADR-014 v1.0). 로컬 환경: gradle 9.6.1 + openjdk@17, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
-**대기 작업 (사용자 액션 필요)**:
-- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d`
-- Docker Daemon 미실행 — Docker Desktop 기동 필요
-
-**남은 BACKLOG**:
-- P1: useListFilters 추상화 (설계 합의 필요)
-- P2: Gradle wrapper, chat-service RAG
-
 **다음 세션 첫 액션**:
 1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측
-2. `.claude/BACKLOG.md`에서 다음 항목 선택 (useListFilters는 설계 문서부터, Gradle wrapper는 사용자 로컬 액션 필요)
+2. P1 파일럿 온보딩은 사용자 자료 준비가 선행 — 없으면 P2(chat Phase 3 또는 테스트 확장) 선택
 3. 워크플로우 8단계 그대로 적용
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):
