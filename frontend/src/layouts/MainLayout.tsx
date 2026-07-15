@@ -15,6 +15,7 @@ import {
 import { useAuthStore } from '../stores/authStore'
 import { useSite } from '../api/sites.api'
 import NotificationBell from '../components/NotificationBell'
+import ChatPanel from '../components/chat/ChatPanel'
 
 const menuItems = [
   { key: '/dashboard', icon: LayoutDashboard, label: '대시보드' },
@@ -246,6 +247,7 @@ export default function MainLayout() {
           </AnimatePresence>
         </main>
       </div>
+      <ChatPanel />
     </div>
   )
 }

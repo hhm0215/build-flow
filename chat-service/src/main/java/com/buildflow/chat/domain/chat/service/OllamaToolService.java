@@ -13,9 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Ollama 툴-콜링 에이전트 루프.
@@ -26,6 +30,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class OllamaToolService {
+
+    private static final int CHUNK_MIN_LENGTH = 16;
 
     private final WebClient ollamaWebClient;
     private final ObjectMapper objectMapper;
@@ -42,12 +48,23 @@ public class OllamaToolService {
 
     /** messages: system/history/user가 채워진 가변 리스트. 루프 중 도구 왕복이 추가된다. */
     public String run(List<Object> messages) {
+        return runStreaming(messages, status -> { }, token -> { });
+    }
+
+    /**
+     * run()과 동일한 에이전트 루프에 진행 상태·답변 조각 콜백을 얹은 버전.
+     * 최종 답변은 툴 선택 라운드가 이미 생성한 내용을 그대로 조각내 전달한다 —
+     * 별도 재생성 없음(동기 경로와 항상 같은 답변, LLM 호출 1회 절약).
+     */
+    public String runStreaming(List<Object> messages, Consumer<String> statusConsumer,
+                               Consumer<String> tokenConsumer) {
         for (int round = 0; round < maxToolRounds; round++) {
+            statusConsumer.accept("thinking");
             JsonNode message = callOllama(messages, ToolCatalog.tools());
             JsonNode toolCalls = message.get("tool_calls");
 
             if (toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) {
-                return textOrFallback(message);
+                return emitAnswer(textOrFallback(message), statusConsumer, tokenConsumer);
             }
 
             // 어시스턴트의 도구 호출 메시지를 컨텍스트에 그대로 되돌려 넣는다.
@@ -58,16 +75,40 @@ public class OllamaToolService {
                 if (fn == null || fn.get("name") == null) {
                     continue;
                 }
-                String name = fn.get("name").asText();
-                JsonNode args = normalizeArgs(fn.get("arguments"));
-                String result = toolExecutor.execute(name, args);
+                statusConsumer.accept("tool");
+                String result = toolExecutor.execute(fn.get("name").asText(), normalizeArgs(fn.get("arguments")));
                 messages.add(Map.of("role", "tool", "content", result));
             }
         }
 
         // 도구 라운드 상한 초과 → 도구 없이 최종 답변을 강제한다.
-        JsonNode finalMsg = callOllama(messages, null);
-        return textOrFallback(finalMsg);
+        return emitAnswer(textOrFallback(callOllama(messages, null)), statusConsumer, tokenConsumer);
+    }
+
+    private String emitAnswer(String answer, Consumer<String> statusConsumer, Consumer<String> tokenConsumer) {
+        statusConsumer.accept("answering");
+        for (String chunk : chunkAnswer(answer)) {
+            tokenConsumer.accept(chunk);
+        }
+        return answer;
+    }
+
+    /** 답변을 공백 경계 기준 조각으로 나눈다 — SSE token 이벤트 단위. 조각 연결 = 원문. */
+    static List<String> chunkAnswer(String answer) {
+        List<String> chunks = new ArrayList<>();
+        Matcher matcher = Pattern.compile("\\s*\\S+").matcher(answer);
+        StringBuilder buffer = new StringBuilder();
+        while (matcher.find()) {
+            buffer.append(matcher.group());
+            if (buffer.length() >= CHUNK_MIN_LENGTH) {
+                chunks.add(buffer.toString());
+                buffer.setLength(0);
+            }
+        }
+        if (buffer.length() > 0) {
+            chunks.add(buffer.toString());
+        }
+        return chunks;
     }
 
     private JsonNode normalizeArgs(JsonNode arguments) {
@@ -122,4 +163,5 @@ public class OllamaToolService {
             throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
         }
     }
+
 }

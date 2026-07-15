@@ -98,3 +98,60 @@ POST /api/v1/chat  { sessionId, message }
 ### 남은 것
 - **Phase 2**: SSE(`SseEmitter`) 스트리밍 + 프론트 채팅 UI.
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + 툴콜 견고화(tool_call_id 상관, 7b 토큰 잡음 실측됨).
+
+## Phase 2 실행 계획 (2026-07-10)
+
+### 범위
+
+- 기존 동기 `POST /api/v1/chat`은 호환성과 진단 용도로 유지한다.
+- `POST /api/v1/chat/stream`을 추가하고 Spring MVC `SseEmitter`로 응답한다.
+- 툴 선택 라운드는 기존 `stream:false`를 유지하고, 최종 답변 생성만 Ollama `stream:true`로 전달한다.
+- 인증된 모든 프론트 화면에서 접근 가능한 플로팅 채팅 패널을 추가한다.
+
+### 스트리밍 계약
+
+- `session`: 서버가 결정한 `sessionId`. 스트림의 첫 이벤트.
+- `status`: `thinking`, `tool`, `answering` 진행 상태. 내부 도구 결과나 인자는 노출하지 않는다.
+- `token`: 최종 답변의 텍스트 조각.
+- `done`: 답변 저장까지 정상 완료됨.
+- `error`: 사용자에게 공개 가능한 오류 코드와 메시지.
+- 이벤트 데이터는 모두 JSON이며 SSE 내부에는 `ApiResponse` 래퍼를 사용하지 않는다.
+
+### 백엔드 구현 순서
+
+1. 동기/스트리밍 경로가 세션 생성, 이력 구성, 사용자 메시지 저장, 툴 라운드를 공유하도록 오케스트레이션을 분리한다.
+2. `OllamaToolService`에 최종 답변 NDJSON 스트림을 순서대로 해석하는 경로를 추가한다.
+3. 정상 완료 시에만 누적 답변을 ASSISTANT 메시지로 한 번 저장하고 Redis TTL을 갱신한다.
+4. 연결 중단·타임아웃·Ollama 오류 시 부분 답변은 저장하지 않고 정리한다.
+5. `/stream` 컨트롤러와 설정 가능한 emitter timeout(초기값 180초)을 추가한다.
+
+### 프론트 구현 순서
+
+1. JWT 헤더와 POST JSON이 필요하므로 네이티브 `EventSource` 대신 `fetch` + `ReadableStream` 기반 SSE 클라이언트를 만든다.
+2. UTF-8/청크 경계를 보존하는 독립 SSE 파서를 구현하고 단위 테스트를 추가한다.
+3. `ChatLauncher`, `ChatPanel`, 메시지 목록, 입력기를 만들고 `MainLayout`에 장착한다.
+4. 대화 상태는 기능 내부에서 관리하고 `sessionId`만 `sessionStorage`에 보존한다.
+5. 데스크톱은 우측 패널, 모바일은 전체 화면으로 표시하며 전송·중단·재시도·새 대화 상태를 제공한다.
+
+### 테스트 / 완료 조건
+
+- 백엔드: 이벤트 순서, 토큰 누적/단일 저장, 오류·중단 시 부분 저장 방지, 기존 동기 API 회귀 테스트.
+- 프론트: SSE 분할 청크, 다중 이벤트, 401 로그아웃, abort, 한 메시지에 토큰 누적, 패널 상호작용 테스트.
+- `./gradlew :chat-service:test`, `bun run lint`, `bun run test`, `bun run build` 통과.
+- Gateway(8080) 경유 실데이터 툴콜 스트리밍, 중단, 세션 연속성 수동 검증.
+- 구현 종료 후 이 문서 결과, BACKLOG 제거, PROGRESS 완료 이력을 함께 갱신한다.
+
+### Phase 2 결과 (2026-07-15)
+
+- **백엔드**: `POST /api/v1/chat/stream`(SseEmitter, timeout 180s 설정화) + 전용 `chatStreamExecutor`(core2/max4/queue20). 이벤트 계약 session/status/token/done/error 구현. 동기 `POST /chat` 유지.
+- **프론트**: `fetch`+`ReadableStream` SSE 클라이언트(`chat.api.ts`, UTF-8 청크 경계 보존 파서) + `ChatPanel` 플로팅 패널(전송/중단/새 대화, sessionStorage sessionId) + MSW 핸들러. MainLayout(인증 화면 전체)에 장착.
+- **계획 대비 변경 — 최종 답변 스트리밍 방식**: 5.5 리뷰에서 "툴 선택 라운드가 이미 생성한 답변을 버리고 stream:true로 재생성 → 모든 답변이 LLM 2회 생성"(HIGH) 발견. Ollama `stream:true` relay 대신 **선택 라운드의 답변을 공백 경계 조각(chunkAnswer)으로 relay**하도록 변경 — 생성 1회로 절감, 동기 경로와 답변 항상 일치. 모델 실시간 토큰 스트리밍(stream:true+tools 단일 콜)은 Phase 3로 이관.
+- **5.5 리뷰(high)**: findings 10건(HIGH 1) 전부 같은 사이클에서 fix — 이중 생성 제거, emitter 생명주기(onTimeout/onError+disconnected 플래그), 클라이언트 중단을 INFO로 분류(SseDisconnectedException), executor 포화 시 error 이벤트(CHAT_BUSY), BusinessException ErrorCode 보존, lombok.config(@Qualifier 복사), 프론트 reader.cancel/uuid 폴백/reset 동기화/scroll 최적화, run↔runStreaming 루프 통합, 401 처리 공유(handleSessionExpired).
+- **테스트**: 백엔드 ChatServiceTest(2)+OllamaToolServiceTest(chunkAnswer 3) / 프론트 chat.api.test 3(분할 청크·trailing·reader 취소). lint·build·전체 테스트 green.
+- **런타임 검증 (Claude 직접 실행, Gateway 경유)**: (a) 툴콜 스트리밍 "현장 목록" → listSites → token 조각 → done ✅ (b) 세션 연속성 "그 현장 마진?" → listSites→getSiteProfit 2라운드 체인 ✅ (c) 중단 → INFO 분류·부분 답변 미저장·ERROR 0 ✅ (d) chat_messages 영속화 ✅. 7b 토큰 잡음("마argin율") 재실측.
+- **검증 중 발견한 환경 함정 (런북 갱신)**:
+  1. **호스트 네이티브 Ollama와 docker Ollama가 11434 이중 리스너**(IPv4 네이티브/IPv6 docker) — Java는 IPv4로 붙어 모델 없는 네이티브가 404. 해결: `OLLAMA_URL=http://[::1]:11434` 또는 네이티브 중지.
+  2. 로컬 nginx(brew)가 8080/8081 점유 → gateway/auth는 `SERVER_PORT` 오버라이드(18080/18081)로 기동.
+  3. gateway는 config-server 필수(`spring.config.import`) — 없으면 `SPRING_CLOUD_CONFIG_ENABLED=false`. config-server는 `~/buildflow-config-repo` git 저장소 부재로 이 머신에선 반쪽.
+  4. 서비스 yml `password: ${DB_PASSWORD}` 기본값 없음 → bootRun 시 `DB_PASSWORD=buildflow123` 필수.
+- **잔여(Phase 3로)**: 모델 실시간 토큰 스트리밍(stream:true+tools), tool_call_id 상관, 프론트 per-token 전체 리스트 리렌더 최적화, buildMessages 이력 tail 쿼리(LIMIT).

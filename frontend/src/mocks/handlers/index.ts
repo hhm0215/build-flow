@@ -7,6 +7,7 @@ import { taxesHandlers } from './taxes.handlers'
 import { dashboardHandlers } from './dashboard.handlers'
 import { notificationsHandlers } from './notifications.handlers'
 import { warrantiesHandlers } from './warranties.handlers'
+import { chatHandlers } from './chat.handlers'
 
 export const handlers = [
   ...authHandlers,
@@ -17,4 +18,5 @@ export const handlers = [
   ...dashboardHandlers,
   ...notificationsHandlers,
   ...warrantiesHandlers,
+  ...chatHandlers,
 ]

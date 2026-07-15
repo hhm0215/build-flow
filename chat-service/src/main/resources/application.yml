@@ -38,6 +38,7 @@ chat:
   history-limit: 20
   session-ttl-minutes: 30
   max-tool-rounds: 4
+  stream-timeout-seconds: 180
 
 management:
   endpoints:

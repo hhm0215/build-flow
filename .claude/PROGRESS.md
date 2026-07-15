@@ -130,6 +130,15 @@
 
 ---
 
+### ✅ chat-service Phase 2 — SSE 스트리밍 + 채팅 패널 UI (2026-07-15)
+- 백엔드: `POST /api/v1/chat/stream`(SseEmitter 180s, 전용 executor) — 이벤트 session/status/token/done/error. 동기 API 유지
+- 프론트: fetch+ReadableStream SSE 클라이언트(UTF-8 청크 경계 파서, 단위 테스트) + ChatPanel 플로팅 패널(전송/중단/새 대화) MainLayout 장착
+- 설계 변경: 툴 선택 라운드 답변을 조각 relay(chunkAnswer) — 5.5 리뷰 HIGH(이중 LLM 생성) fix. 실시간 stream:true+tools는 Phase 3
+- 5.5 리뷰(high) findings 10건 전부 in-cycle fix: emitter 생명주기/중단 INFO 분류/CHAT_BUSY 거부 처리/ErrorCode 보존/lombok.config/reader.cancel/uuid 폴백 등
+- 런타임 검증(Gateway 경유): 툴콜 스트리밍·2라운드 체인·세션 연속성·중단(부분 미저장, ERROR 0)·DB 영속화 전부 ✅
+- 환경 함정 4건 런북화(plan 문서): 11434 이중 리스너(네이티브/도커 Ollama), nginx 8080/8081 점유, DB_PASSWORD 필수, config-server 우회
+- 계획: `.claude/plans/2026-07-04-chat-service.md` "Phase 2 결과"
+
 ### ✅ chat-service Phase 1 런타임 검증 + 잠복 버그 3건 fix (2026-07-04)
 - Claude가 직접 실행: docker(mysql/redis/ollama+qwen2.5:7b) + bootRun(eureka→site→chat) → 툴콜 E2E 검증
 - "등록된 현장 목록" → listSites 툴콜 → Feign 실데이터 답변 ✅ / 같은 세션 "마진 얼마?" → getSiteProfit 체인 ✅ / chat_messages 영속화 ✅
@@ -345,18 +354,19 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #42 머지 반영 — 테스트 파운데이션 + CI)
+## 다음 세션 진입점 (2026-07-04 갱신, PR #43 머지 반영 — 런타임 검증 + 잠복 버그 fix)
 
 **현재 git 상태**:
-- `origin/main` = `e26fdfd` (PR #42 머지 — 테스트 파운데이션 + CI, ADR-015)
-- `origin/develop` = `1b58e05` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #40(ADR-014 확정) → #41(chat Phase 1) → #42(테스트 파운데이션+CI)
+- `origin/main` = `26c43c2` (PR #43 머지 — 런타임 검증 통과 + 잠복 버그 3건 fix)
+- `origin/develop` = `37cb554` — main과 PR 머지 커밋 하나 차이(정상)
+- 직진 사이클: ... → #41(chat Phase 1) → #42(테스트 파운데이션+CI) → #43(런타임 검증+fix)
 - ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
-**✅ CI 가동**: PR마다 GitHub Actions 자동 실행(백엔드 `./gradlew test` + 프론트 lint/test/build). PR #42가 첫 실행 green.
-**로컬 테스트**: 백엔드 `JAVA_HOME=... ./gradlew test`, 프론트 `cd frontend && bun run test`.
+**✅ CI 가동**: PR마다 GitHub Actions 자동(백엔드 test + 프론트 lint/test/build). #42·#43 연속 green.
+**✅ chat Phase 1 런타임 검증 통과**: 툴콜 발화·Feign 체인·세션 이력·DB 영속화 실동작 확인 (Claude 직접 실행).
+**로컬 실행 노하우**: mariadb(brew)가 3306 점유 시 `brew services stop mariadb` 필요. docker 볼륨에 qwen2.5:7b 모델 유지됨. 검증 절차는 plan 문서 참조.
 
-**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI). 런타임 검증(Ollama)은 사용자 환경 필요.
+**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI, ADR-015 테스트 동반).
 
 **BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
 
