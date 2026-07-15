@@ -130,6 +130,15 @@
 
 ---
 
+### ✅ chat-service Phase 2 — SSE 스트리밍 + 채팅 패널 UI (2026-07-15)
+- 백엔드: `POST /api/v1/chat/stream`(SseEmitter 180s, 전용 executor) — 이벤트 session/status/token/done/error. 동기 API 유지
+- 프론트: fetch+ReadableStream SSE 클라이언트(UTF-8 청크 경계 파서, 단위 테스트) + ChatPanel 플로팅 패널(전송/중단/새 대화) MainLayout 장착
+- 설계 변경: 툴 선택 라운드 답변을 조각 relay(chunkAnswer) — 5.5 리뷰 HIGH(이중 LLM 생성) fix. 실시간 stream:true+tools는 Phase 3
+- 5.5 리뷰(high) findings 10건 전부 in-cycle fix: emitter 생명주기/중단 INFO 분류/CHAT_BUSY 거부 처리/ErrorCode 보존/lombok.config/reader.cancel/uuid 폴백 등
+- 런타임 검증(Gateway 경유): 툴콜 스트리밍·2라운드 체인·세션 연속성·중단(부분 미저장, ERROR 0)·DB 영속화 전부 ✅
+- 환경 함정 4건 런북화(plan 문서): 11434 이중 리스너(네이티브/도커 Ollama), nginx 8080/8081 점유, DB_PASSWORD 필수, config-server 우회
+- 계획: `.claude/plans/2026-07-04-chat-service.md` "Phase 2 결과"
+
 ### ✅ chat-service Phase 1 런타임 검증 + 잠복 버그 3건 fix (2026-07-04)
 - Claude가 직접 실행: docker(mysql/redis/ollama+qwen2.5:7b) + bootRun(eureka→site→chat) → 툴콜 E2E 검증
 - "등록된 현장 목록" → listSites 툴콜 → Feign 실데이터 답변 ✅ / 같은 세션 "마진 얼마?" → getSiteProfit 체인 ✅ / chat_messages 영속화 ✅

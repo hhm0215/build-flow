@@ -16,25 +16,26 @@
 
 ## P0 — 다음 1~2 작업
 
-### chat-service Phase 2 (SSE 스트리밍 + 프론트 채팅 UI)
-- **배경**: Phase 1(툴콜 에이전트 코어) 완료. 테스트 파운데이션도 완료 → 이제 테스트 동반해서 Phase 2
-- **산출물**: `SseEmitter`로 답변 토큰 스트리밍 + 프론트 채팅 UI. 순수 로직은 단위 테스트 동반(ADR-015)
-- **예상 규모**: M
-- **상태**: TODO
+(현재 없음 — chat Phase 2 2026-07-15 완료)
 
 ---
 
 ## P1 — 중기
 
-(현재 없음 — useListFilters 추상화 2026-07-04 완료)
+### 실데이터 파일럿 온보딩 (현장 1개 끝까지 입력)
+- **배경**: 기능 라이프사이클 전 구간 완성. 다음 완성도 요구사항은 추측이 아니라 실데이터에서 도출 — USB의 실제 현장 자료 1개를 거래처→현장→견적(공내역서 파싱)→매입→세금계산서→보증보험까지 실제로 입력
+- **산출물**: 온보딩 중 드러난 갭 목록(입력 필드 부족, 현장별 문서함(원본 파일 보관 — 현재 warranty PDF만 저장됨) 필요성, 과거 현장 일괄 입력 UX 등)을 BACKLOG 신규 항목으로 전환
+- **예상 규모**: S~M (사용자 참여 필요 — USB 자료 준비)
+- **상태**: TODO
 
 ---
 
 ## P2 — 인프라/툴링
 
-### chat-service Phase 3 (Phase 1 완료+런타임 검증 통과, Phase 2는 P0)
+### chat-service Phase 3 (Phase 1·2 완료, 견고화/확장)
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
-- 런타임 검증(2026-07-04) 통과: 툴콜 발화·Feign 체인·세션 이력 모두 실동작. 7b 토큰 잡음("마argin율") 실측 → 견고화 근거
+- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화, buildMessages 이력 tail 쿼리(LIMIT)
+- 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
 
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
@@ -80,3 +81,4 @@
 | 2026-07-04 | chat-service Phase 1 완료 — 툴콜 에이전트(아키텍처 A), 도구 4종, 이력 저장. P2를 Phase 2~3로 갱신 |
 | 2026-07-04 | 테스트 파운데이션 완료 — CI(GitHub Actions) + Vitest(프론트) + 백엔드 파일럿 단위 테스트, ADR-015. chat Phase 2를 P0로 |
 | 2026-07-04 | chat Phase 1 런타임 검증 통과(툴콜+Feign+세션 실동작) + 잠복 버그 3건 fix(kafka 이미지 소멸/JDBC PublicKeyRetrieval/init chat 스키마) |
+| 2026-07-15 | chat Phase 2 완료(SSE 스트리밍+채팅 패널) — 5.5 리뷰 10건 전부 fix, Gateway 경유 런타임 검증 통과. P0 비움, P1에 실데이터 파일럿 온보딩 등록, Phase 3에 실시간 스트리밍 이관 |
