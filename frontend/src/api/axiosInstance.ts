@@ -14,12 +14,17 @@ axiosInstance.interceptors.request.use((config) => {
   return config
 })
 
+/** 인증 만료 공통 처리 — axios 인터셉터와 스트리밍 fetch(chat.api)가 공유한다. */
+export function handleSessionExpired() {
+  useAuthStore.getState().logout()
+  window.location.href = '/login'
+}
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+      handleSessionExpired()
     }
     return Promise.reject(error)
   },
