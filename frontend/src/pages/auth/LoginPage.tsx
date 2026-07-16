@@ -7,7 +7,7 @@ import { useAuthStore } from '../../stores/authStore'
 import axiosInstance from '../../api/axiosInstance'
 
 interface LoginForm {
-  loginId: string
+  email: string
   password: string
 }
 
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setErrorMsg(null)
     try {
       const response = await axiosInstance.post('/auth/login', {
-        loginId: values.loginId,
+        email: values.email,
         password: values.password,
       })
       setTokens(response.data.data.accessToken)
@@ -161,16 +161,17 @@ export default function LoginPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <Form layout="vertical" onFinish={onFinish} size="large">
             <Form.Item
-              name="loginId"
-              label="관리자 아이디"
+              name="email"
+              label="관리자 이메일"
               rules={[
-                { required: true, message: '관리자 아이디를 입력하세요' },
+                { required: true, message: '관리자 이메일을 입력하세요' },
+                { type: 'email', message: '이메일 형식이 올바르지 않습니다' },
               ]}
               style={{ marginBottom: 16 }}
             >
               <Input
                 prefix={<UserCog size={15} color="var(--text-muted)" strokeWidth={1.8} style={{ marginRight: 4 }} />}
-                placeholder="admin01"
+                placeholder="admin@buildflow.dev"
               />
             </Form.Item>
 
