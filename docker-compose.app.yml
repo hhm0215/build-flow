@@ -40,7 +40,8 @@ services:
     ports:
       - "8888:8888"
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      # native: git 설정 저장소 없이 기동 (서비스들은 optional:configserver라 중앙 설정 없어도 동작)
+      SPRING_PROFILES_ACTIVE: docker,native
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
       eureka-server:
@@ -140,6 +141,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # 호스트 네이티브 Ollama(Apple Silicon GPU) 사용 — 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 모델 로드 시 OOM
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
     depends_on:
       eureka-server:
@@ -280,7 +283,41 @@ services:
       - buildflow-net
 
   # ─────────────────────────────────────────
-  # 10. Frontend (React + Nginx)
+  # 10. Chat Service (AI 채팅 — SSE 스트리밍)
+  # ─────────────────────────────────────────
+  chat-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: chat-service
+    container_name: buildflow-chat
+    ports:
+      - "8087:8087"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      DB_HOST: mysql
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      # 호스트 네이티브 Ollama(Apple Silicon GPU) 사용 — 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 모델 로드 시 OOM
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - buildflow-net
+
+  # ─────────────────────────────────────────
+  # 11. Frontend (React + Nginx)
   # ─────────────────────────────────────────
   frontend:
     build:

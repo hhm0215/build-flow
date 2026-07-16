@@ -1,7 +1,8 @@
 # notification-service 전용 Dockerfile — Tess4J(JNA) 안정성을 위해 debian-slim 베이스 + Tesseract 4 + kor·eng traineddata
 # 다른 8개 서비스는 루트 Dockerfile(alpine) 그대로 사용
 
-FROM gradle:8.8-jdk17-alpine AS builder
+# alpine 태그는 arm64(Apple Silicon) 매니페스트가 없어 non-alpine 사용
+FROM gradle:8.10-jdk17 AS builder
 WORKDIR /workspace
 
 ARG SERVICE_NAME=notification-service
