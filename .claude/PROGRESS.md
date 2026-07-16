@@ -327,6 +327,14 @@
 
 ---
 
+### ✅ 풀 도커 실서비스 모드 전환 (2026-07-16, 커밋 4abbc7f + 23f35b8)
+- 파일럿 온보딩 선행 작업: dev 서버는 MSW 전 도메인 목업이라 실사용 불가 → 프로덕션 빌드 풀 도커 스택으로 전환
+- 잠복 갭 8건 발견·수정: chat-service 도커 편입 누락 / arm64 베이스 3종 / 로그인 loginId↔email 계약 불일치(MSW가 가림) / config-server git repo 요구 / 컨테이너 내 OLLAMA_URL localhost / 도커 Ollama OOM(VM 7.8GB) / Ollama 11434 이중 점유 / nginx SSE 버퍼링
+- 스모크 전 구간 통과 (로그인→사이트/견적/매입/세금→chat SSE 툴콜 실DB 조회)
+- 5.5 리뷰: CRITICAL/HIGH 0건, LOW 1건(nginx location 중복 — nonblocking)
+
+---
+
 ## 다음 작업
 
 → **`.claude/BACKLOG.md`** 참조 (우선순위 단일 진실원).
@@ -354,23 +362,24 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-15 갱신, PR #44 머지 반영 — chat Phase 2 완료)
+## 다음 세션 진입점 (2026-07-16 갱신 — 풀 도커 실서비스 모드 가동)
 
 **현재 git 상태**:
 - `origin/main` = `5626b9f` (PR #44 머지 — chat Phase 2: SSE 스트리밍 + 채팅 패널)
-- `origin/develop` = `b7eadbd` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #42(테스트 파운데이션+CI) → #43(런타임 검증+fix) → #44(chat Phase 2)
-- ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
+- develop 로컬 = `23f35b8` (풀 도커 전환 fix 2건 + docs) — push 및 PR 여부는 세션 진행 참조
+- ⚠️ 진입점 갱신 커밋들은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
 
-**✅ chat Phase 2 완료**: SSE 스트리밍 + 플로팅 채팅 패널, 5.5 리뷰 10건 in-cycle fix, Gateway 경유 런타임 검증 통과(툴콜/세션 연속성/중단/영속화).
+**✅ 풀 도커 실서비스 모드 가동 (2026-07-16)**: MSW 목업 아닌 실백엔드로 전 구간 동작. `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d`로 16컨테이너. http://localhost:3000, ADMIN 계정 `hhan010215@gmail.com` (비밀번호는 사용자 보관). 스모크 통과: 로그인/사이트/견적/매입/세금 + chat SSE 툴콜 풀루프.
 
-**로컬 실행 노하우** (2026-07-15 확장 — 상세는 plan 문서 "환경 함정"):
-- mariadb(brew)가 3306 점유 시 `brew services stop mariadb`
-- **호스트 네이티브 Ollama가 11434 이중 점유**(IPv4=네이티브 qwen3:8b, IPv6=도커 qwen2.5:7b) → chat 기동 시 `OLLAMA_URL=http://[::1]:11434`
-- 로컬 nginx(brew)가 8080/8081 점유 → gateway/auth는 `SERVER_PORT=18080/18081` 오버라이드 (⚠️ vite dev proxy는 8080 고정이라 로컬 프론트 연동 시 nginx 중지 또는 proxy 조정 필요)
-- bootRun 시 `DB_PASSWORD=buildflow123` 필수(yml 기본값 없음), gateway는 `SPRING_CLOUD_CONFIG_ENABLED=false`(config repo 이 머신에 없음)
+**로컬 실행 노하우** (2026-07-16 풀 도커 전환으로 갱신):
+- **brew 서비스 mariadb·redis·nginx는 중지 상태 유지** — 도커가 3306/6379/8080 사용. ollama만 네이티브 실행(brew services start ollama)
+- **Ollama는 호스트 네이티브**(Apple Silicon GPU, qwen2.5:7b + qwen3:8b 보유) — 컨테이너는 `host.docker.internal:11434`로 접근. 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 로드 시 OOM → 사용 안 함, 호스트 포트도 11435로 분리해 이중 점유 함정 제거
+- config-server는 native 프로파일(도커) — git 설정 저장소 불필요
+- 루트 `.env`(gitignore) 필수: `DB_PASSWORD`, `JWT_SECRET`. 없으면 auth/gateway 기동 실패
+- 이미지 베이스: gradle/temurin/bun 모두 arm64 호환 태그로 고정됨 (alpine 계열 금지 — 매니페스트 없음)
+- (구) bootRun 개별 기동 노하우는 plan 문서 "환경 함정" 참조 — 풀 도커 모드에서는 불필요
 
-**다음 작업**: P1 실데이터 파일럿 온보딩 (사용자 USB 자료 준비 필요 — 현장 1개 끝까지 입력, 갭 목록 도출). 배포/운영 트랙은 사용자 결정으로 보류(2026-07-15).
+**다음 작업**: P1 실데이터 파일럿 온보딩 — **환경 준비 완료, USB 자료도 준비됨. 바로 진입 가능** (현장 1개 끝까지 입력, 갭 목록 도출). 배포/운영 트랙은 사용자 결정으로 보류(2026-07-15).
 
 **BACKLOG 현황**: P0 없음. P1 실데이터 파일럿 온보딩. P2 chat Phase 3(견고화+실시간 스트리밍 이관분), 테스트 커버리지 확장.
 
