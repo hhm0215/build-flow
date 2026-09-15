@@ -73,6 +73,7 @@ services:
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       SPRING_DATA_REDIS_HOST: redis
       JWT_SECRET: ${JWT_SECRET}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -108,6 +109,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       JWT_SECRET: ${JWT_SECRET}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -144,6 +146,7 @@ services:
       # 호스트 네이티브 Ollama(Apple Silicon GPU) 사용 — 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 모델 로드 시 OOM
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -177,6 +180,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # 호스트 네이티브 Ollama(Apple Silicon GPU) 사용 — 컨테이너 localhost는 호스트 Ollama에 도달하지 못함
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -210,6 +216,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -243,6 +250,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -271,14 +279,23 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      DB_HOST: mysql
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      UPLOAD_DIR: /app/uploads/warranties
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
       config-server:
         condition: service_healthy
+      mysql:
+        condition: service_healthy
       kafka:
         condition: service_healthy
+    volumes:
+      - warranty_uploads:/app/uploads/warranties
     networks:
       - buildflow-net
 
@@ -304,6 +321,7 @@ services:
       REDIS_HOST: redis
       # 호스트 네이티브 Ollama(Apple Silicon GPU) 사용 — 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 모델 로드 시 OOM
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -334,5 +352,7 @@ services:
 
 networks:
   buildflow-net:
-    external: true
     name: buildflow-net
+
+volumes:
+  warranty_uploads:
