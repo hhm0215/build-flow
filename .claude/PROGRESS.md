@@ -14,7 +14,7 @@
 - site-service Docker Ollama 주소를 호스트 네이티브 인스턴스로 정렬, AI summary 실제 호출 HTTP 200
 - 트레이싱 앱 8개의 Zipkin endpoint를 서비스 DNS로 정렬 — Zipkin에서 8개 서비스 span 수집 확인
 - 결합 Compose가 `buildflow-net`을 직접 생성·관리하도록 수정, clean host 단일 기동 경로 정렬
-- Bun packageManager/Docker/CI를 1.3.11로 고정, `.dockerignore`로 frontend build context 약 266.69MB → 5.63kB 축소
+- Bun packageManager/Docker/CI를 1.3.11로 고정, GitHub Actions를 `checkout@v7`·`setup-java@v6`으로 갱신, `.dockerignore`로 frontend build context 약 266.69MB → 5.63kB 축소
 - 서비스별 IDE `bin/` 산출물 ignore, 풀 Docker/계약 동기화/신규 서비스 편입 규칙을 CLAUDE.md에 고정
 - 검증: Gradle 전체 테스트 29개, frontend lint·Vitest 7개·build, Compose config, 16개 컨테이너 기동, 핵심 health/API HTTP 200 모두 통과
 - 계획: `.claude/plans/2026-09-15-pilot-runtime-stabilization.md`

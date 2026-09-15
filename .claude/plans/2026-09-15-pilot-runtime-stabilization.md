@@ -77,7 +77,7 @@
 - site-service Ollama 주소를 `host.docker.internal:11434`로 정렬했고 AI summary 실제 호출이 HTTP 200(19.08초)으로 완료됐다.
 - `buildflow-net`의 `external` override를 제거해 결합 Compose가 네트워크를 직접 관리하게 했다.
 - 런타임 로그에서 트레이싱 앱 8개가 `localhost:9411`로 span을 보내는 누락을 추가 발견해 Docker 서비스 DNS endpoint로 정렬했다. 이후 Zipkin `/api/v2/services`에서 8개 앱 모두 수집됨을 확인했다.
-- Bun을 packageManager·Docker·CI 모두 1.3.11로 고정했다. 프론트 `.dockerignore` 추가로 build context가 약 266.69MB에서 5.63kB로 감소했다.
+- Bun을 packageManager·Docker·CI 모두 1.3.11로 고정했다. 프론트 `.dockerignore` 추가로 build context가 약 266.69MB에서 5.63kB로 감소했다. 첫 push CI의 Node 20/deprecation annotation을 따라 공식 최신 major인 `checkout@v7`, `setup-java@v6`으로 갱신했다.
 - 서비스별 IDE `bin/` 산출물을 삭제하지 않고 ignore 처리했으며, 2026-07-16 회고의 재발 방지 규칙 3개를 CLAUDE.md에 반영했다.
 - 정적 검증: 결합 Compose config 정상, 앱 16개 구성, notification volume/DB, site Ollama, Zipkin endpoint 8개, managed network를 확인했다.
 - 테스트: 백엔드 전체 Gradle 테스트 29개, 프론트 lint·Vitest 7개·프로덕션 build 모두 통과했다.
