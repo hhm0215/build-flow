@@ -9,6 +9,16 @@
 
 ## 완료된 작업
 
+### ✅ 실데이터 파일럿 선행 런타임 안정화 (2026-09-15)
+- notification-service Docker DB 환경/MySQL health 의존성 추가, 보증보험 업로드를 `buildflow_warranty_uploads` named volume으로 영속화
+- site-service Docker Ollama 주소를 호스트 네이티브 인스턴스로 정렬, AI summary 실제 호출 HTTP 200
+- 트레이싱 앱 8개의 Zipkin endpoint를 서비스 DNS로 정렬 — Zipkin에서 8개 서비스 span 수집 확인
+- 결합 Compose가 `buildflow-net`을 직접 생성·관리하도록 수정, clean host 단일 기동 경로 정렬
+- Bun packageManager/Docker/CI를 1.3.11로 고정, `.dockerignore`로 frontend build context 약 266.69MB → 5.63kB 축소
+- 서비스별 IDE `bin/` 산출물 ignore, 풀 Docker/계약 동기화/신규 서비스 편입 규칙을 CLAUDE.md에 고정
+- 검증: Gradle 전체 테스트 29개, frontend lint·Vitest 7개·build, Compose config, 16개 컨테이너 기동, 핵심 health/API HTTP 200 모두 통과
+- 계획: `.claude/plans/2026-09-15-pilot-runtime-stabilization.md`
+
 ### ✅ 인프라 서비스
 - **eureka-server** — 서비스 디스커버리 완료
 - **config-server** — 중앙 설정 서버 완료
@@ -354,6 +364,7 @@
 | purchase-service | 8084 |
 | tax-service | 8085 |
 | notification-service | 8086 |
+| chat-service | 8087 |
 
 ## Kafka 토픽 현황
 
@@ -362,12 +373,12 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-16 갱신 — 풀 도커 실서비스 모드 가동)
+## 다음 세션 진입점 (2026-09-15 갱신 — 파일럿 런타임 안정화 완료)
 
-**현재 git 상태**:
-- `origin/main` = `5626b9f` (PR #44 머지 — chat Phase 2: SSE 스트리밍 + 채팅 패널)
-- develop 로컬 = `23f35b8` (풀 도커 전환 fix 2건 + docs) — push 및 PR 여부는 세션 진행 참조
-- ⚠️ 진입점 갱신 커밋들은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
+**현재 git 기준점**:
+- 점검 시작 시 `HEAD = origin/develop = 3a0eeb7`, `origin/main = 5626b9f`
+- `origin/main..origin/develop`에 풀 도커 전환 및 문서화 4개 커밋이 존재하며, 이번 안정화 커밋과 함께 다음 develop→main PR 대상
+- 기존 사용자 변경 `docs/DECISIONS.md` 포매팅은 이번 작업 커밋에서 제외해 작업 트리에 보존
 
 **✅ 풀 도커 실서비스 모드 가동 (2026-07-16)**: MSW 목업 아닌 실백엔드로 전 구간 동작. `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d`로 16컨테이너. http://localhost:3000, ADMIN 계정 `hhan010215@gmail.com` (비밀번호는 사용자 보관). 스모크 통과: 로그인/사이트/견적/매입/세금 + chat SSE 툴콜 풀루프.
 
@@ -379,17 +390,17 @@
 - 이미지 베이스: gradle/temurin/bun 모두 arm64 호환 태그로 고정됨 (alpine 계열 금지 — 매니페스트 없음)
 - (구) bootRun 개별 기동 노하우는 plan 문서 "환경 함정" 참조 — 풀 도커 모드에서는 불필요
 
-**다음 작업**: P1 실데이터 파일럿 온보딩 — **환경 준비 완료, USB 자료도 준비됨. 바로 진입 가능** (현장 1개 끝까지 입력, 갭 목록 도출). 배포/운영 트랙은 사용자 결정으로 보류(2026-07-15).
+**다음 작업**: P1 실데이터 파일럿 온보딩 — 환경 준비 완료. 사용자 USB 자료로 현장 1개를 거래처→현장→견적/파싱→매입→세금계산서→보증보험까지 입력하고 갭을 BACKLOG로 전환. 실제 자료와 로그인 비밀번호가 필요한 시점에만 사용자 확인.
 
-**BACKLOG 현황**: P0 없음. P1 실데이터 파일럿 온보딩. P2 chat Phase 3(견고화+실시간 스트리밍 이관분), 테스트 커버리지 확장.
+**BACKLOG 현황**: P0 없음. P1 실데이터 파일럿 온보딩. P2 chat Phase 3, ADR-003 drift 정정, Config Client 중복 import 경고, 프론트 번들 분할, 테스트 커버리지 확장.
 
 **✅ 능동 발의 규칙 상시 적용** (ADR-014 v1.0). 로컬 환경: gradle 9.6.1 + openjdk@17, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
 **다음 세션 첫 액션**:
-1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측
-2. P1 파일럿 온보딩은 사용자 자료 준비가 선행 — 없으면 P2(chat Phase 3 또는 테스트 확장) 선택
+1. PR 생성 전 `git fetch` 후 local develop↔origin/develop SHA 및 `origin/main..origin/develop` 커밋 목록 재검증
+2. PR/머지 사이클 완료 후 P1 파일럿 온보딩 진입 — 실제 USB 자료 위치와 로그인 정보가 필요한 시점에만 질문
 3. 워크플로우 8단계 그대로 적용
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):
