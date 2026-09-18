@@ -16,13 +16,6 @@
 
 ## P0 — 다음 1~2 작업
 
-### Windows fresh clone 개발 준비
-- **배경**: Windows에서 저장소를 새로 clone한 직후 이어서 개발하려면 현재 README의 npm/포트/Gradle 안내와 Windows 가이드의 오래된 내용부터 실제 구성에 맞춰야 함
-- **산출물**: PowerShell 준비·기동 스크립트, Windows 셋업/README 정비, 줄바꿈·CI 재현성 정렬, 새 clone 기준 정적·빌드 검증
-- **관련 파일**: `README.md`, `docs/WINDOWS_SETUP.md`, `scripts/buildflow.ps1`, `.env.example`, `.gitattributes`, `.github/workflows/ci.yml`
-- **예상 규모**: M
-- **상태**: IN_PROGRESS
-
 ### 단일 관리자 loginId 인증 전환
 - **배경**: 로컬 서버 실사용자는 시스템 관리자 1명이며 현재 공개 signup·이메일 형식 로그인·ADMIN/VIEWER 다중 역할은 요구사항과 불일치
 - **산출물**: 기존 사용자 정리/마이그레이션, 공개 signup 제거, 최초 관리자 안전한 bootstrap, `loginId/password` 계약으로 백엔드·Gateway JWT·프론트·MSW·문서 동기화
@@ -125,3 +118,4 @@
 | 2026-07-15 | chat Phase 2 완료(SSE 스트리밍+채팅 패널) — 5.5 리뷰 10건 전부 fix, Gateway 경유 런타임 검증 통과. P0 비움, P1에 실데이터 파일럿 온보딩 등록, Phase 3에 실시간 스트리밍 이관 |
 | 2026-07-22 | 외부 서류 작업 중 근거 실측에서 문서↔실구현 drift 발견 → P2에 "ADR-003 / 아키텍처 문서 drift 정정" 등록 |
 | 2026-09-15 | 실데이터 파일럿 선행 런타임 안정화 완료 → notification DB/volume, site Ollama, Zipkin, managed network, Bun/context, ignore/검증 규칙 정렬 |
+| 2026-09-18 | Windows fresh clone 개발 준비 완료 → PowerShell helper, 비밀값 로컬 생성, README/셋업, loopback Compose, Windows CI 정렬 |

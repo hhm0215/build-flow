@@ -54,7 +54,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
       - name: Validate Windows PowerShell 5.1 syntax
         shell: powershell
         run: |

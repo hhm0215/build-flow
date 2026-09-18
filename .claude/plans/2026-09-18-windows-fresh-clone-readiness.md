@@ -3,7 +3,7 @@
 - **시작일**: 2026-09-18
 - **BACKLOG 항목**: P0 — Windows fresh clone 개발 준비
 - **예상 규모**: M
-- **상태**: IN_PROGRESS
+- **상태**: DONE
 
 ## 목표
 
@@ -40,7 +40,7 @@ Windows에서 저장소를 새로 clone한 뒤 PowerShell 중심의 짧고 재�
 - [x] Compose/Gradle/frontend 검증
 - [x] 새 clone 시뮬레이션 또는 동등한 tracked-file 검증
 - [x] 정적 리뷰 CRITICAL/HIGH 0
-- [ ] GitHub Windows runner에서 PowerShell 5.1·`gradlew.bat` 검증
+- [x] GitHub Windows runner에서 PowerShell 5.1·`gradlew.bat` 검증
 
 ## 리스크 / 모르는 것
 
@@ -65,4 +65,5 @@ Windows에서 저장소를 새로 clone한 뒤 PowerShell 중심의 짧고 재�
 - 기본 Compose는 native Ollama를 사용하고 선택 profile에서만 컨테이너 Ollama를 띄우며, 모든 host publish를 `127.0.0.1`로 제한했다.
 - 루트 Docker context에서 VCS·비밀값·프론트 의존성을 제외해 백엔드 context를 서비스별 약 12~89kB로 줄였다.
 - 로컬 검증은 Gradle 전체 테스트, frontend lint·7 tests·build, 결합 Compose, 15개 기본 컨테이너 기동과 HTTP 200, fresh checkout-index Compose 검증이 통과했다.
-- Windows native 검증은 새 CI job의 PowerShell 5.1 parser와 `gradlew.bat --version` 결과를 확인한 뒤 완료 처리한다.
+- GitHub Actions run `35340302553`에서 backend, frontend, Windows 3개 job이 모두 통과했다. Windows job은 실제 PowerShell 5.1 parser와 `gradlew.bat --version`을 검증했다.
+- 첫 Windows job에서 wrapper 버전 확인만으로는 저장할 Gradle cache가 없어 annotation이 발생해, 불필요한 cache 옵션은 완료 문서 커밋에서 제거했다.
