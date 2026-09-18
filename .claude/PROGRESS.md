@@ -384,10 +384,11 @@
 
 ## 다음 세션 진입점 (2026-09-18 갱신 — Windows fresh clone 준비 완료)
 
-**현재 git 기준점**:
-- PR #46 merge 완료: `06b1349` (`origin/develop = origin/main` 동기화)
-- 포함 커밋: `1e5f405` 구현, `96c4785` 검증 결과·CI 경고 정리
-- 기존 사용자 변경 `docs/DECISIONS.md` 포매팅은 이번 작업 커밋에서 제외해 작업 트리에 보존
+**현재 git 기준점** (2026-09-18 갱신 — Windows 인계 정리 완료):
+- PR #48 merge 완료: `origin/main = 658f677`, `origin/develop = 34e8c2a` (트리 완전 동기)
+- Windows 준비 본체는 PR #46(`06b1349`, 구현 `1e5f405` + 검증 `96c4785`)·PR #47로 반영됨
+- 미커밋이던 `docs/DECISIONS.md` 마크다운 포매팅을 `34e8c2a`로 커밋·push → PR #48로 main 병합. 로컬 워킹트리 클린
+- 다음 개발은 `develop`에서 진행 (윈도우: `git switch develop` 후 `.\scripts\buildflow.ps1 check`→`up`)
 
 **Windows 준비 변경**:
 - `scripts/buildflow.ps1`: `.env` 무작위 생성 + check/up/down/status/logs
