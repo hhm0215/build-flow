@@ -15,7 +15,7 @@
 - 모든 개발 host publish를 `127.0.0.1`로 제한하고 컨테이너 Ollama를 선택 profile로 분리
 - 루트 `.dockerignore`로 백엔드 context 약 366MB → 서비스별 약 12~89kB, `.env`·VCS·로컬 산출물 전송 차단
 - Gradle wrapper 공식 SHA-256 고정, CI runner Ubuntu 24.04 고정, Windows PowerShell 5.1·`gradlew.bat` job 추가
-- 검증: Gradle 전체 테스트, frontend lint·Vitest 7개·build, Compose/15개 컨테이너/HTTP 200, CI run `35340302553` 3개 job 통과
+- 검증: Gradle 전체 테스트, frontend lint·Vitest 7개·build, Compose/15개 컨테이너/HTTP 200, PR CI run `35340803038` 3개 job 통과
 - 자동 리뷰 2회 CRITICAL/HIGH 0, 계획: `.claude/plans/2026-09-18-windows-fresh-clone-readiness.md`
 
 ### ✅ 실데이터 파일럿 선행 런타임 안정화 (2026-09-15)
@@ -385,9 +385,8 @@
 ## 다음 세션 진입점 (2026-09-18 갱신 — Windows fresh clone 준비 완료)
 
 **현재 git 기준점**:
-- 작업 시작 기준 `origin/develop = origin/main = 4d5e8b6` (PR #45 merge 완료)
-- 구현 커밋 `1e5f405`는 `origin/develop` push 완료, CI run `35340302553` 성공
-- Windows CI cache annotation 제거와 완료 문서가 후속 커밋 대상
+- PR #46 merge 완료: `06b1349` (`origin/develop = origin/main` 동기화)
+- 포함 커밋: `1e5f405` 구현, `96c4785` 검증 결과·CI 경고 정리
 - 기존 사용자 변경 `docs/DECISIONS.md` 포매팅은 이번 작업 커밋에서 제외해 작업 트리에 보존
 
 **Windows 준비 변경**:
@@ -405,7 +404,7 @@
 - 백엔드 Docker context: 기존 약 366MB → 서비스별 약 12~89kB
 - 자동 리뷰 CRITICAL/HIGH 0
 
-**다음 작업**: 완료 문서 커밋·CI·PR merge 후 P0 단일 관리자 `loginId/password` 인증 전환.
+**다음 작업**: P0 단일 관리자 `loginId/password` 인증 전환.
 
 **BACKLOG 현황**: P0 단일 관리자 loginId 인증 전환. P1 로컬 서버 배포 보안 하드닝, 실데이터 파일럿 온보딩.
 
@@ -414,9 +413,9 @@
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
 **다음 세션 첫 액션**:
-1. 완료 문서 커밋 push 후 GitHub Actions의 3개 job 확인
-2. SHA 검증 후 develop→main PR 생성·merge
-3. P0 단일 관리자 `loginId/password` 인증 전환 계획 수립
+1. P0 단일 관리자 `loginId/password` 인증 전환 계획 수립
+2. 기존 사용자/DB 백업과 마이그레이션 경로 실측
+3. 공개 signup 제거 + backend/frontend/MSW 계약 동기화
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):
 - ✅ PR 생성 자동 (`gh pr create`)
