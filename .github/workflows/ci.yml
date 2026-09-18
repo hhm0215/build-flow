@@ -9,7 +9,7 @@ on:
 jobs:
   backend:
     name: 백엔드 (Gradle test, JDK 17)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - name: Set up JDK 17
@@ -25,7 +25,7 @@ jobs:
 
   frontend:
     name: 프론트 (lint · test · build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -43,3 +43,32 @@ jobs:
         run: bun run test
       - name: Build
         run: bun run build
+
+  windows-readiness:
+    name: Windows (PowerShell · Gradle Wrapper)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Validate Windows PowerShell 5.1 syntax
+        shell: powershell
+        run: |
+          $failed = $false
+          Get-ChildItem scripts/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber) $($_.Message)" }
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+      - name: Validate Gradle Wrapper
+        shell: powershell
+        run: .\gradlew.bat --version

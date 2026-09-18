@@ -1,11 +1,14 @@
-# Shell 스크립트는 Windows에서도 LF 유지 (Git Bash/WSL bash가 CRLF 읽으면 실패)
-*.sh text eol=lf
+# 기본 텍스트 자동 감지
+* text=auto
 
-# Gradle wrapper 스크립트도 LF
+# Unix 스크립트는 Windows checkout에서도 LF 유지
+*.sh text eol=lf
 gradlew text eol=lf
 
-# 일반 텍스트 파일은 OS 자동 변환
-* text=auto
+# Windows 실행 스크립트는 CRLF 유지
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
 
 # 바이너리 파일은 변환 금지
 *.jar binary

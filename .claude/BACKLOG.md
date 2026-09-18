@@ -16,11 +16,30 @@
 
 ## P0 — 다음 1~2 작업
 
-(현재 없음 — 실데이터 파일럿 선행 런타임 안정화 2026-09-15 완료)
+### Windows fresh clone 개발 준비
+- **배경**: Windows에서 저장소를 새로 clone한 직후 이어서 개발하려면 현재 README의 npm/포트/Gradle 안내와 Windows 가이드의 오래된 내용부터 실제 구성에 맞춰야 함
+- **산출물**: PowerShell 준비·기동 스크립트, Windows 셋업/README 정비, 줄바꿈·CI 재현성 정렬, 새 clone 기준 정적·빌드 검증
+- **관련 파일**: `README.md`, `docs/WINDOWS_SETUP.md`, `scripts/buildflow.ps1`, `.env.example`, `.gitattributes`, `.github/workflows/ci.yml`
+- **예상 규모**: M
+- **상태**: IN_PROGRESS
+
+### 단일 관리자 loginId 인증 전환
+- **배경**: 로컬 서버 실사용자는 시스템 관리자 1명이며 현재 공개 signup·이메일 형식 로그인·ADMIN/VIEWER 다중 역할은 요구사항과 불일치
+- **산출물**: 기존 사용자 정리/마이그레이션, 공개 signup 제거, 최초 관리자 안전한 bootstrap, `loginId/password` 계약으로 백엔드·Gateway JWT·프론트·MSW·문서 동기화
+- **관련 파일**: `auth-service`, `gateway-server`, `frontend/src/pages/auth`, `frontend/src/mocks`, 인증 관련 문서/테스트
+- **예상 규모**: M
+- **상태**: TODO
 
 ---
 
 ## P1 — 중기
+
+### 로컬 서버 배포 보안 하드닝
+- **배경**: 개발 Compose는 loopback 전용으로 안전하게 제한했지만 향후 LAN 공개 시 Gateway만 노출하고 8081~8087·MySQL·Redis·Kafka 직접 접근을 차단해야 함
+- **산출물**: 로컬 서버용 Compose override, 외부 노출 포트 정책, Redis/DB 보안, 백업·복구 및 방화벽 런북
+- **관련 파일**: `docker-compose.yml`, `docker-compose.app.yml`, 신규 배포 override, `docs/`
+- **예상 규모**: M
+- **상태**: TODO
 
 ### 실데이터 파일럿 온보딩 (현장 1개 끝까지 입력)
 - **배경**: 기능 라이프사이클 전 구간 완성. 다음 완성도 요구사항은 추측이 아니라 실데이터에서 도출 — USB의 실제 현장 자료 1개를 거래처→현장→견적(공내역서 파싱)→매입→세금계산서→보증보험까지 실제로 입력

@@ -49,7 +49,7 @@ AI 대시보드로 마진·손익을 요약. 1인 개발 + 실사용(혜민 관�
 
 ```bash
 # 인프라 (Docker)
-docker compose up -d                                    # MySQL, Redis, Kafka, Ollama, Zipkin
+docker compose up -d                                    # MySQL, Redis, Kafka, Zipkin (Ollama는 native 기본)
 docker compose -f docker-compose.yml -f docker-compose.app.yml up -d  # 앱 포함 전체
 docker compose down                                     # 종료 (docker stop 금지)
 
@@ -176,7 +176,7 @@ eventId 기반 멱등성 필수.
 |------|------|
 | `CLAUDE.md` | 전체 개발 가이드 (사람 + AI용, 상세) |
 | `.claude/BACKLOG.md` | 다음 작업 우선순위 (P0/P1/P2) |
-| `docs/PROGRESS.md` | 완료 이력 + 현재 git 상태 |
+| `.claude/PROGRESS.md` | 완료 이력 + 현재 git 상태 |
 | `docs/ARCHITECTURE.md` | 시스템 전체 구조 상세 |
 | `docs/ERD.md` | 데이터 모델 |
 | `docs/API_SPEC.md` | API 명세 |
@@ -203,6 +203,5 @@ eventId 기반 멱등성 필수.
 - `DefectWarranty.update` PATCH/PUT 시맨틱 분리 (null vs absent 구분)
 - `useListFilters` 훅 추상화 (5개 ListPage 중복 제거)
 
-### 백로그 (P2)
-- Gradle wrapper 설치
-- chat-service (RAG 챗봇, LLM function calling + OpenFeign + SSE)
+### 백로그
+- `.claude/BACKLOG.md`를 단일 진실원으로 사용

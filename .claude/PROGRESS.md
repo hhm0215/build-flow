@@ -373,35 +373,40 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-15 갱신 — 파일럿 런타임 안정화 완료)
+## 다음 세션 진입점 (2026-09-18 갱신 — Windows fresh clone 준비 검증 중)
 
 **현재 git 기준점**:
-- 점검 시작 시 `HEAD = origin/develop = 3a0eeb7`, `origin/main = 5626b9f`
-- `origin/main..origin/develop`에 풀 도커 전환 및 문서화 4개 커밋이 존재하며, 이번 안정화 커밋과 함께 다음 develop→main PR 대상
+- 작업 시작 시 `HEAD = origin/develop = origin/main = 4d5e8b6` (PR #45 merge 완료)
+- Windows fresh clone 준비 변경은 구현·로컬 검증 완료, GitHub Windows runner 검증 전
 - 기존 사용자 변경 `docs/DECISIONS.md` 포매팅은 이번 작업 커밋에서 제외해 작업 트리에 보존
 
-**✅ 풀 도커 실서비스 모드 가동 (2026-07-16)**: MSW 목업 아닌 실백엔드로 전 구간 동작. `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d`로 16컨테이너. http://localhost:3000, ADMIN 계정 `hhan010215@gmail.com` (비밀번호는 사용자 보관). 스모크 통과: 로그인/사이트/견적/매입/세금 + chat SSE 툴콜 풀루프.
+**Windows 준비 변경**:
+- `scripts/buildflow.ps1`: `.env` 무작위 생성 + check/up/down/status/logs
+- `scripts/boot-service.ps1`: 각 PowerShell 창에서 `.env` 로드, Docker 인프라 host 주소 주입
+- `scripts/create-admin.ps1`: 비밀번호가 기록에 남지 않는 대화형 초기 관리자 생성
+- 기본 Compose 15개 서비스, native Ollama 사용. `container-ollama` profile 사용 시 16개
+- 모든 host publish는 개발 안전 기본값인 `127.0.0.1`로 제한
+- Windows PowerShell 5.1 구문과 `gradlew.bat`을 검증하는 CI job 추가
 
-**로컬 실행 노하우** (2026-07-16 풀 도커 전환으로 갱신):
-- **brew 서비스 mariadb·redis·nginx는 중지 상태 유지** — 도커가 3306/6379/8080 사용. ollama만 네이티브 실행(brew services start ollama)
-- **Ollama는 호스트 네이티브**(Apple Silicon GPU, qwen2.5:7b + qwen3:8b 보유) — 컨테이너는 `host.docker.internal:11434`로 접근. 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 로드 시 OOM → 사용 안 함, 호스트 포트도 11435로 분리해 이중 점유 함정 제거
-- config-server는 native 프로파일(도커) — git 설정 저장소 불필요
-- 루트 `.env`(gitignore) 필수: `DB_PASSWORD`, `JWT_SECRET`. 없으면 auth/gateway 기동 실패
-- 이미지 베이스: gradle/temurin/bun 모두 arm64 호환 태그로 고정됨 (alpine 계열 금지 — 매니페스트 없음)
-- (구) bootRun 개별 기동 노하우는 plan 문서 "환경 함정" 참조 — 풀 도커 모드에서는 불필요
+**검증 결과**:
+- Gradle 전체 테스트 성공
+- frontend lint, Vitest 7개, production build 성공 (기존 1.36MB chunk 경고는 P2 유지)
+- 결합 Compose config 성공, 전체 이미지 build 및 15개 기본 서비스 기동, frontend/Gateway HTTP 200
+- 백엔드 Docker context: 기존 약 366MB → 서비스별 약 12~89kB
+- 자동 리뷰 CRITICAL/HIGH 0
 
-**다음 작업**: P1 실데이터 파일럿 온보딩 — 환경 준비 완료. 사용자 USB 자료로 현장 1개를 거래처→현장→견적/파싱→매입→세금계산서→보증보험까지 입력하고 갭을 BACKLOG로 전환. 실제 자료와 로그인 비밀번호가 필요한 시점에만 사용자 확인.
+**다음 작업**: GitHub Windows CI 통과 확인 후 계획/BACKLOG를 완료 처리하고 PR 생성·merge. 그다음 P0 단일 관리자 `loginId/password` 인증 전환.
 
-**BACKLOG 현황**: P0 없음. P1 실데이터 파일럿 온보딩. P2 chat Phase 3, ADR-003 drift 정정, Config Client 중복 import 경고, 프론트 번들 분할, 테스트 커버리지 확장.
+**BACKLOG 현황**: P0 Windows fresh clone 준비(IN_PROGRESS), 단일 관리자 loginId 인증 전환. P1 로컬 서버 배포 보안 하드닝, 실데이터 파일럿 온보딩.
 
 **✅ 능동 발의 규칙 상시 적용** (ADR-014 v1.0). 로컬 환경: gradle 9.6.1 + openjdk@17, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
 **다음 세션 첫 액션**:
-1. PR 생성 전 `git fetch` 후 local develop↔origin/develop SHA 및 `origin/main..origin/develop` 커밋 목록 재검증
-2. PR/머지 사이클 완료 후 P1 파일럿 온보딩 진입 — 실제 USB 자료 위치와 로그인 정보가 필요한 시점에만 질문
-3. 워크플로우 8단계 그대로 적용
+1. Windows readiness 구현 커밋 push 후 GitHub Actions의 3개 job 확인
+2. 통과 시 계획/BACKLOG/PROGRESS 완료 반영 커밋
+3. SHA 검증 후 develop→main PR 생성·merge
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):
 - ✅ PR 생성 자동 (`gh pr create`)
