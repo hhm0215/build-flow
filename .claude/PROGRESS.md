@@ -9,6 +9,16 @@
 
 ## 완료된 작업
 
+### ✅ 실데이터 파일럿 선행 런타임 안정화 (2026-09-15)
+- notification-service Docker DB 환경/MySQL health 의존성 추가, 보증보험 업로드를 `buildflow_warranty_uploads` named volume으로 영속화
+- site-service Docker Ollama 주소를 호스트 네이티브 인스턴스로 정렬, AI summary 실제 호출 HTTP 200
+- 트레이싱 앱 8개의 Zipkin endpoint를 서비스 DNS로 정렬 — Zipkin에서 8개 서비스 span 수집 확인
+- 결합 Compose가 `buildflow-net`을 직접 생성·관리하도록 수정, clean host 단일 기동 경로 정렬
+- Bun packageManager/Docker/CI를 1.3.11로 고정, GitHub Actions를 `checkout@v7`·`setup-java@v6`으로 갱신, `.dockerignore`로 frontend build context 약 266.69MB → 5.63kB 축소
+- 서비스별 IDE `bin/` 산출물 ignore, 풀 Docker/계약 동기화/신규 서비스 편입 규칙을 CLAUDE.md에 고정
+- 검증: Gradle 전체 테스트 29개, frontend lint·Vitest 7개·build, Compose config, 16개 컨테이너 기동, 핵심 health/API HTTP 200 모두 통과
+- 계획: `.claude/plans/2026-09-15-pilot-runtime-stabilization.md`
+
 ### ✅ 인프라 서비스
 - **eureka-server** — 서비스 디스커버리 완료
 - **config-server** — 중앙 설정 서버 완료
@@ -327,6 +337,14 @@
 
 ---
 
+### ✅ 풀 도커 실서비스 모드 전환 (2026-07-16, 커밋 4abbc7f + 23f35b8)
+- 파일럿 온보딩 선행 작업: dev 서버는 MSW 전 도메인 목업이라 실사용 불가 → 프로덕션 빌드 풀 도커 스택으로 전환
+- 잠복 갭 8건 발견·수정: chat-service 도커 편입 누락 / arm64 베이스 3종 / 로그인 loginId↔email 계약 불일치(MSW가 가림) / config-server git repo 요구 / 컨테이너 내 OLLAMA_URL localhost / 도커 Ollama OOM(VM 7.8GB) / Ollama 11434 이중 점유 / nginx SSE 버퍼링
+- 스모크 전 구간 통과 (로그인→사이트/견적/매입/세금→chat SSE 툴콜 실DB 조회)
+- 5.5 리뷰: CRITICAL/HIGH 0건, LOW 1건(nginx location 중복 — nonblocking)
+
+---
+
 ## 다음 작업
 
 → **`.claude/BACKLOG.md`** 참조 (우선순위 단일 진실원).
@@ -346,6 +364,7 @@
 | purchase-service | 8084 |
 | tax-service | 8085 |
 | notification-service | 8086 |
+| chat-service | 8087 |
 
 ## Kafka 토픽 현황
 
@@ -354,38 +373,34 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-07-04 갱신, PR #43 머지 반영 — 런타임 검증 + 잠복 버그 fix)
+## 다음 세션 진입점 (2026-09-15 갱신 — 파일럿 런타임 안정화 완료)
 
-**현재 git 상태**:
-- `origin/main` = `26c43c2` (PR #43 머지 — 런타임 검증 통과 + 잠복 버그 3건 fix)
-- `origin/develop` = `37cb554` — main과 PR 머지 커밋 하나 차이(정상)
-- 직진 사이클: ... → #41(chat Phase 1) → #42(테스트 파운데이션+CI) → #43(런타임 검증+fix)
-- ⚠️ 이 진입점 갱신 커밋은 develop에만 존재 → 다음 PR에 번들됨(024a6b9 패턴)
+**현재 git 기준점**:
+- 점검 시작 시 `HEAD = origin/develop = 3a0eeb7`, `origin/main = 5626b9f`
+- `origin/main..origin/develop`에 풀 도커 전환 및 문서화 4개 커밋이 존재하며, 이번 안정화 커밋과 함께 다음 develop→main PR 대상
+- 기존 사용자 변경 `docs/DECISIONS.md` 포매팅은 이번 작업 커밋에서 제외해 작업 트리에 보존
 
-**✅ CI 가동**: PR마다 GitHub Actions 자동(백엔드 test + 프론트 lint/test/build). #42·#43 연속 green.
-**✅ chat Phase 1 런타임 검증 통과**: 툴콜 발화·Feign 체인·세션 이력·DB 영속화 실동작 확인 (Claude 직접 실행).
-**로컬 실행 노하우**: mariadb(brew)가 3306 점유 시 `brew services stop mariadb` 필요. docker 볼륨에 qwen2.5:7b 모델 유지됨. 검증 절차는 plan 문서 참조.
+**✅ 풀 도커 실서비스 모드 가동 (2026-07-16)**: MSW 목업 아닌 실백엔드로 전 구간 동작. `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d`로 16컨테이너. http://localhost:3000, ADMIN 계정 `hhan010215@gmail.com` (비밀번호는 사용자 보관). 스모크 통과: 로그인/사이트/견적/매입/세금 + chat SSE 툴콜 풀루프.
 
-**다음 작업**: P0 chat-service Phase 2 (SSE `SseEmitter` 스트리밍 + 프론트 채팅 UI, ADR-015 테스트 동반).
+**로컬 실행 노하우** (2026-07-16 풀 도커 전환으로 갱신):
+- **brew 서비스 mariadb·redis·nginx는 중지 상태 유지** — 도커가 3306/6379/8080 사용. ollama만 네이티브 실행(brew services start ollama)
+- **Ollama는 호스트 네이티브**(Apple Silicon GPU, qwen2.5:7b + qwen3:8b 보유) — 컨테이너는 `host.docker.internal:11434`로 접근. 도커 Ollama는 VM 메모리(7.8GB) 부족으로 7b 로드 시 OOM → 사용 안 함, 호스트 포트도 11435로 분리해 이중 점유 함정 제거
+- config-server는 native 프로파일(도커) — git 설정 저장소 불필요
+- 루트 `.env`(gitignore) 필수: `DB_PASSWORD`, `JWT_SECRET`. 없으면 auth/gateway 기동 실패
+- 이미지 베이스: gradle/temurin/bun 모두 arm64 호환 태그로 고정됨 (alpine 계열 금지 — 매니페스트 없음)
+- (구) bootRun 개별 기동 노하우는 plan 문서 "환경 함정" 참조 — 풀 도커 모드에서는 불필요
 
-**BACKLOG 현황**: P0·P1 없음. **P2는 chat-service RAG(L, 새 서비스) 하나만** — 설계 자문부터.
+**다음 작업**: P1 실데이터 파일럿 온보딩 — 환경 준비 완료. 사용자 USB 자료로 현장 1개를 거래처→현장→견적/파싱→매입→세금계산서→보증보험까지 입력하고 갭을 BACKLOG로 전환. 실제 자료와 로그인 비밀번호가 필요한 시점에만 사용자 확인.
 
-**✅ 능동 발의 실험 종료**: 2회차 회고 완료 → **확정(CONFIRMED, ADR-014 v1.0)**. 승인률 100%(3/3)·정합성 이탈 0. [TRIAL] 딱지 제거, 규칙 상시 적용. 발의 로그 상시 축적 중단.
-- 로컬 환경: gradle 9.6.1 + openjdk@17 설치됨, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`로 `./gradlew` 실행 가능
+**BACKLOG 현황**: P0 없음. P1 실데이터 파일럿 온보딩. P2 chat Phase 3, ADR-003 drift 정정, Config Client 중복 import 경고, 프론트 번들 분할, 테스트 커버리지 확장.
+
+**✅ 능동 발의 규칙 상시 적용** (ADR-014 v1.0). 로컬 환경: gradle 9.6.1 + openjdk@17, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
 
-**대기 작업 (사용자 액션 필요)**:
-- 통합 검증: `brew install gradle && cd notification-service && gradle wrapper --gradle-version 8.10` 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml build notification-service && up -d`
-- Docker Daemon 미실행 — Docker Desktop 기동 필요
-
-**남은 BACKLOG**:
-- P1: useListFilters 추상화 (설계 합의 필요)
-- P2: Gradle wrapper, chat-service RAG
-
 **다음 세션 첫 액션**:
-1. `git fetch` 후 `git log --oneline origin/main..origin/develop` 실측
-2. `.claude/BACKLOG.md`에서 다음 항목 선택 (useListFilters는 설계 문서부터, Gradle wrapper는 사용자 로컬 액션 필요)
+1. PR 생성 전 `git fetch` 후 local develop↔origin/develop SHA 및 `origin/main..origin/develop` 커밋 목록 재검증
+2. PR/머지 사이클 완료 후 P1 파일럿 온보딩 진입 — 실제 USB 자료 위치와 로그인 정보가 필요한 시점에만 질문
 3. 워크플로우 8단계 그대로 적용
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):

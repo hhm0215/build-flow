@@ -2,7 +2,7 @@
   "name": "buildflow-frontend",
   "version": "0.0.1",
   "private": true,
-  "packageManager": "bun@1.2.8",
+  "packageManager": "bun@1.3.11",
   "type": "module",
   "scripts": {
     "dev": "vite",

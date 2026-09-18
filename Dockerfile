@@ -1,4 +1,5 @@
-FROM gradle:8.8-jdk17-alpine AS builder
+# alpine 태그는 arm64(Apple Silicon) 매니페스트가 없어 non-alpine 사용
+FROM gradle:8.10-jdk17 AS builder
 WORKDIR /workspace
 
 ARG SERVICE_NAME
@@ -14,14 +15,16 @@ COPY site-service/build.gradle site-service/
 COPY purchase-service/build.gradle purchase-service/
 COPY tax-service/build.gradle tax-service/
 COPY notification-service/build.gradle notification-service/
+COPY chat-service/build.gradle chat-service/
 RUN gradle :${SERVICE_NAME}:dependencies --no-daemon 2>/dev/null || true
 
 COPY ${SERVICE_NAME}/src ${SERVICE_NAME}/src
 RUN gradle :${SERVICE_NAME}:bootJar --no-daemon -x test
 
-FROM eclipse-temurin:17-jre-alpine
+# 17-jre-alpine은 arm64(Apple Silicon) 매니페스트가 없어 jammy 사용
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN groupadd -r spring && useradd -r -g spring spring
 USER spring:spring
 
 ARG SERVICE_NAME

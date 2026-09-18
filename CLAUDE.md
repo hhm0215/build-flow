@@ -325,6 +325,9 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: 서비스 간 직접 DB 접근 금지 → OpenFeign 또는 Kafka
 - **IMPORTANT**: Entity에 @Data 금지
 - **IMPORTANT**: 기동 순서 Eureka → Config → Gateway → 나머지
+- **IMPORTANT**: 새 백엔드 서비스는 Docker 편입 3종(`docker-compose.app.yml` 서비스 블록, `application-docker.yml`, 루트 Dockerfile build.gradle COPY)을 함께 반영
+- **IMPORTANT**: 프론트↔백엔드 API 계약 변경 시 백엔드 DTO를 원본으로 프론트 타입·요청 코드·MSW 핸들러를 같은 작업에서 동기화
+- **IMPORTANT**: 파일럿/실사용 검증은 풀 Docker 실서비스 모드로 수행. `bootRun`과 MSW 검증은 각각 서비스 단위·목업 검증으로만 기록
 - docker compose down 사용 (docker stop 금지)
 
 ## compact 시 보존

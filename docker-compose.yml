@@ -85,7 +85,8 @@ services:
     image: ollama/ollama:latest
     container_name: buildflow-ollama
     ports:
-      - "11434:11434"
+      # 호스트 11434는 네이티브 Ollama가 사용 — 이중 점유(IPv4/IPv6) 함정 방지를 위해 11435로 분리
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
     networks:

@@ -1,5 +1,6 @@
 # ─── Build Stage ───
-FROM oven/bun:1.1-alpine AS builder
+# bun.lock(텍스트 lockfile)은 bun 1.2+ 형식 — packageManager/CI/로컬과 정렬
+FROM oven/bun:1.3.11-alpine AS builder
 WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
