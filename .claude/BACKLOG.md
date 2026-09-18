@@ -16,11 +16,23 @@
 
 ## P0 — 다음 1~2 작업
 
-(현재 없음 — 실데이터 파일럿 선행 런타임 안정화 2026-09-15 완료)
+### 단일 관리자 loginId 인증 전환
+- **배경**: 로컬 서버 실사용자는 시스템 관리자 1명이며 현재 공개 signup·이메일 형식 로그인·ADMIN/VIEWER 다중 역할은 요구사항과 불일치
+- **산출물**: 기존 사용자 정리/마이그레이션, 공개 signup 제거, 최초 관리자 안전한 bootstrap, `loginId/password` 계약으로 백엔드·Gateway JWT·프론트·MSW·문서 동기화
+- **관련 파일**: `auth-service`, `gateway-server`, `frontend/src/pages/auth`, `frontend/src/mocks`, 인증 관련 문서/테스트
+- **예상 규모**: M
+- **상태**: TODO
 
 ---
 
 ## P1 — 중기
+
+### 로컬 서버 배포 보안 하드닝
+- **배경**: 개발 Compose는 loopback 전용으로 안전하게 제한했지만 향후 LAN 공개 시 Gateway만 노출하고 8081~8087·MySQL·Redis·Kafka 직접 접근을 차단해야 함
+- **산출물**: 로컬 서버용 Compose override, 외부 노출 포트 정책, Redis/DB 보안, 백업·복구 및 방화벽 런북
+- **관련 파일**: `docker-compose.yml`, `docker-compose.app.yml`, 신규 배포 override, `docs/`
+- **예상 규모**: M
+- **상태**: TODO
 
 ### 실데이터 파일럿 온보딩 (현장 1개 끝까지 입력)
 - **배경**: 기능 라이프사이클 전 구간 완성. 다음 완성도 요구사항은 추측이 아니라 실데이터에서 도출 — USB의 실제 현장 자료 1개를 거래처→현장→견적(공내역서 파싱)→매입→세금계산서→보증보험까지 실제로 입력
@@ -106,3 +118,4 @@
 | 2026-07-15 | chat Phase 2 완료(SSE 스트리밍+채팅 패널) — 5.5 리뷰 10건 전부 fix, Gateway 경유 런타임 검증 통과. P0 비움, P1에 실데이터 파일럿 온보딩 등록, Phase 3에 실시간 스트리밍 이관 |
 | 2026-07-22 | 외부 서류 작업 중 근거 실측에서 문서↔실구현 drift 발견 → P2에 "ADR-003 / 아키텍처 문서 drift 정정" 등록 |
 | 2026-09-15 | 실데이터 파일럿 선행 런타임 안정화 완료 → notification DB/volume, site Ollama, Zipkin, managed network, Bun/context, ignore/검증 규칙 정렬 |
+| 2026-09-18 | Windows fresh clone 개발 준비 완료 → PowerShell helper, 비밀값 로컬 생성, README/셋업, loopback Compose, Windows CI 정렬 |

@@ -19,7 +19,7 @@ cd "$CLAUDE_PROJECT_DIR" 2>/dev/null || exit 0
 
 # === Java 검증 ===
 if [[ "$FILE_PATH" == *.java ]]; then
-  SERVICE=$(echo "$FILE_PATH" | grep -oE '(auth|estimate|site|purchase|tax|notification)-service|(eureka|config|gateway)-server')
+  SERVICE=$(echo "$FILE_PATH" | grep -oE '(auth|estimate|site|purchase|tax|notification|chat)-service|(eureka|config|gateway)-server')
   [[ -z "$SERVICE" ]] && exit 0
 
   # gradle 도구 선택: ./gradlew 우선, 없으면 gradle, 둘 다 없으면 skip

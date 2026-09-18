@@ -15,7 +15,7 @@ AI가 요약 대시보드를 생성하여 마진/손익을 한눈에 파악.
 ### 인프라 (Docker)
 
 ```bash
-docker compose up -d                    # MySQL, Redis, Kafka, Ollama, Zipkin
+docker compose up -d                    # MySQL, Redis, Kafka, Zipkin (Ollama는 native 기본)
 docker compose down                     # 종료 (docker stop 금지)
 
 # 전체 컨테이너 기동 (앱 포함)
