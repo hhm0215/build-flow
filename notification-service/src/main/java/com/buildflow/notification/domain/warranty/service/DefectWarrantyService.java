@@ -4,6 +4,7 @@ import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
 import com.buildflow.notification.domain.warranty.dto.WarrantyResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import com.buildflow.notification.global.exception.BusinessException;
 import com.buildflow.notification.global.exception.ErrorCode;
@@ -38,6 +39,8 @@ public class DefectWarrantyService {
 
     @Transactional
     public WarrantyResponse create(WarrantyCreateRequest request) {
+        validatePeriod(request.getStartDate(), request.getEndDate());
+        validateAmount(request.getCoverageAmount());
         DefectWarranty warranty = DefectWarranty.builder()
                 .siteId(request.getSiteId())
                 .insuranceCompany(request.getInsuranceCompany())
@@ -68,6 +71,13 @@ public class DefectWarrantyService {
     @Transactional
     public WarrantyResponse update(Long id, WarrantyUpdateRequest request) {
         DefectWarranty warranty = getWarranty(id);
+        if (warranty.getOcrStatus() == OcrStatus.PENDING) {
+            throw new BusinessException(ErrorCode.WARRANTY_OCR_PENDING);
+        }
+        validatePeriod(request.getStartDate(), request.getEndDate());
+        if (request.getCoverageAmount() != null) {
+            request.getCoverageAmount().ifPresent(this::validateAmount);
+        }
         warranty.update(
                 request.getInsuranceCompany(),
                 request.getStartDate(),
@@ -154,5 +164,17 @@ public class DefectWarrantyService {
     private DefectWarranty getWarranty(Long id) {
         return warrantyRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WARRANTY_NOT_FOUND));
+    }
+
+    private void validatePeriod(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new BusinessException(ErrorCode.WARRANTY_INVALID_PERIOD);
+        }
+    }
+
+    private void validateAmount(Long amount) {
+        if (amount != null && amount < 0) {
+            throw new BusinessException(ErrorCode.WARRANTY_INVALID_AMOUNT);
+        }
     }
 }

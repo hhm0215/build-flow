@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { ShieldCheck, Plus, Trash2, AlertTriangle, UploadCloud } from 'lucide-react'
+import { ShieldCheck, Plus, Trash2, AlertTriangle, UploadCloud, Pencil } from 'lucide-react'
 import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
@@ -14,8 +14,9 @@ import FilterDateRange from '../../components/filters/FilterDateRange'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
 import { useWarranties, useExpiringWarranties, useDeleteWarranty, useCreateWarranty } from '../../api/warranties.api'
-import type { WarrantyCreateRequest } from '../../types/domain.types'
+import type { Warranty, WarrantyCreateRequest } from '../../types/domain.types'
 import WarrantyUploadModal from './WarrantyUploadModal'
+import WarrantyEditModal from './WarrantyEditModal'
 
 type WarrantyStatus = 'VALID' | 'EXPIRED'
 
@@ -58,9 +59,10 @@ export default function WarrantyListPage() {
       filterFn: (w, f: Partial<WarrantyFilters>, rawQ) => {
         const q = rawQ.trim().toLowerCase()
         if (q && !`${w.insuranceCompany} ${w.policyNumber}`.toLowerCase().includes(q)) return false
-        if (f.status === 'VALID' && w.expired) return false
-        if (f.status === 'EXPIRED' && !w.expired) return false
+        if (f.status === 'VALID' && (!w.endDate || w.expired)) return false
+        if (f.status === 'EXPIRED' && (!w.endDate || !w.expired)) return false
         const dateKey = w.endDate?.slice(0, 10) ?? ''
+        if ((f.expiryFrom || f.expiryTo) && !dateKey) return false
         if (f.expiryFrom && dateKey < f.expiryFrom) return false
         if (f.expiryTo && dateKey > f.expiryTo) return false
         return true
@@ -69,6 +71,7 @@ export default function WarrantyListPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [editingWarranty, setEditingWarranty] = useState<Warranty | null>(null)
   const [form] = Form.useForm()
 
   const handleCreateSubmit = () => {
@@ -91,15 +94,17 @@ export default function WarrantyListPage() {
     })
   }
 
-  const getExpiryColor = (days: number, expired: boolean) => {
+  const getExpiryColor = (days: number, expired: boolean, hasEndDate: boolean) => {
+    if (!hasEndDate) return '#94a3b8'
     if (expired) return '#ef4444'
     if (days <= 7) return '#ef4444'
     if (days <= 30) return '#f59e0b'
     return '#22c55e'
   }
 
-  const getExpiryLabel = (days: number, expired: boolean) => {
-    if (expired) return `D+${Math.abs(days)}`
+  const getExpiryLabel = (days: number, expired: boolean, hasEndDate: boolean) => {
+    if (!hasEndDate) return '기간 미입력'
+    if (expired) return '만료'
     return `D-${days}`
   }
 
@@ -245,55 +250,68 @@ export default function WarrantyListPage() {
                 >
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>{w.insuranceCompany || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>분석 대기</span>}</span>
+                      <span>{w.insuranceCompany || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>{w.ocrStatus === 'PENDING' ? '분석 대기' : '보험사 미입력'}</span>}</span>
                       <OcrStatusBadge status={w.ocrStatus} />
                     </div>
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
-                    {w.policyNumber}
+                    {w.policyNumber || '—'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
                     {w.coverageAmount != null ? `₩${w.coverageAmount.toLocaleString('ko-KR')}` : '—'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
-                    {w.startDate} ~ {w.endDate}
+                    {w.startDate || '—'} ~ {w.endDate || '—'}
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 12, fontWeight: 700,
-                      color: getExpiryColor(w.daysUntilExpiry, w.expired),
+                      color: getExpiryColor(w.daysUntilExpiry, w.expired, !!w.endDate),
                     }}>
-                      {getExpiryLabel(w.daysUntilExpiry, w.expired)}
+                      {getExpiryLabel(w.daysUntilExpiry, w.expired, !!w.endDate)}
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '3px 8px',
                       borderRadius: 20,
-                      background: w.expired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                      color: w.expired ? '#ef4444' : '#22c55e',
-                      border: `1px solid ${w.expired ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
+                      background: !w.endDate ? 'rgba(148,163,184,0.1)' : w.expired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                      color: !w.endDate ? '#94a3b8' : w.expired ? '#ef4444' : '#22c55e',
+                      border: `1px solid ${!w.endDate ? 'rgba(148,163,184,0.2)' : w.expired ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
                     }}>
-                      {w.expired ? '만료' : '유효'}
+                      {!w.endDate ? '확인 필요' : w.expired ? '만료' : '유효'}
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px' }}>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => { if (window.confirm('정말 삭제하시겠습니까?')) deleteWarranty(w.id) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        fontSize: 11, fontWeight: 600,
-                        padding: '4px 10px', borderRadius: 6,
-                        background: 'rgba(239,68,68,0.1)',
-                        border: '1px solid rgba(239,68,68,0.2)',
-                        color: '#ef4444', cursor: 'pointer',
-                      }}
-                    >
-                      <Trash2 size={11} strokeWidth={2.5} />
-                      삭제
-                    </motion.button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {w.ocrStatus !== 'PENDING' && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setEditingWarranty(w)}
+                          aria-label={`${w.insuranceCompany || '보험사 미입력'} 수정`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', cursor: 'pointer' }}
+                        >
+                          <Pencil size={11} strokeWidth={2.5} /> 수정
+                        </motion.button>
+                      )}
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { if (window.confirm('정말 삭제하시겠습니까?')) deleteWarranty(w.id) }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          fontSize: 11, fontWeight: 600,
+                          padding: '4px 10px', borderRadius: 6,
+                          background: 'rgba(239,68,68,0.1)',
+                          border: '1px solid rgba(239,68,68,0.2)',
+                          color: '#ef4444', cursor: 'pointer',
+                        }}
+                      >
+                        <Trash2 size={11} strokeWidth={2.5} />
+                        삭제
+                      </motion.button>
+                    </div>
                   </td>
                 </motion.tr>
               ))}
@@ -310,7 +328,7 @@ export default function WarrantyListPage() {
         okText="등록"
         cancelText="취소"
         confirmLoading={isCreating}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="siteId" label="현장" rules={[{ required: true, message: '현장을 선택하세요' }]}>
@@ -348,6 +366,7 @@ export default function WarrantyListPage() {
         onClose={() => setIsUploadModalOpen(false)}
         onUploaded={() => refetch()}
       />
+      {editingWarranty && <WarrantyEditModal warranty={editingWarranty} onClose={() => setEditingWarranty(null)} />}
     </div>
   )
 }

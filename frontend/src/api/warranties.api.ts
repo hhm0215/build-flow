@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, Warranty, WarrantyCreateRequest } from '../types'
+import { ApiResponse, Warranty, WarrantyCreateRequest, WarrantyUpdateRequest } from '../types'
 
 export const WARRANTIES_KEY = {
   all: ['warranties'] as const,
@@ -28,7 +28,7 @@ const createWarranty = async (body: WarrantyCreateRequest) => {
   return res.data.data
 }
 
-const updateWarranty = async ({ id, ...body }: WarrantyCreateRequest & { id: number }) => {
+const updateWarranty = async ({ id, ...body }: WarrantyUpdateRequest & { id: number }) => {
   const res = await axiosInstance.put<ApiResponse<Warranty>>(`/warranties/${id}`, body)
   return res.data.data
 }
