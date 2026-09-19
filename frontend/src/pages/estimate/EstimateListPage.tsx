@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
-import { FileText, Plus, Trash2, Sparkles } from 'lucide-react'
-import { Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
+import { FileText, Pencil, Plus, Trash2, Sparkles } from 'lucide-react'
+import { Modal, Form, Input, InputNumber, DatePicker, Button, message } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
@@ -16,7 +16,10 @@ import { useListFilters } from '../../hooks/useListFilters'
 import { useEstimates, useCreateEstimate } from '../../api/estimates.api'
 import UploadParseModal from './UploadParseModal'
 import EstimateConfirmModal from './EstimateConfirmModal'
+import EstimateEditModal from './EstimateEditModal'
+import EstimateDeleteModal from './EstimateDeleteModal'
 import type { Estimate, EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
+import { validateEstimateAmounts } from '../../utils/estimate'
 
 const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
@@ -82,6 +85,8 @@ export default function EstimateListPage() {
   const [open, setOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<Estimate | null>(null)
+  const [editTarget, setEditTarget] = useState<Estimate | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Estimate | null>(null)
   const [pendingItems, setPendingItems] = useState<ParsedItemResult[] | null>(null)
   const [form] = Form.useForm()
   const createMutation = useCreateEstimate()
@@ -103,6 +108,11 @@ export default function EstimateListPage() {
 
   const handleOk = () => {
     form.validateFields().then((values) => {
+      const amountError = validateEstimateAmounts(values.items ?? [])
+      if (amountError) {
+        message.error(amountError)
+        return
+      }
       const items = (values.items ?? []).map(
         (item: { itemName: string; unit: string; quantity: number; unitPrice: number }) => ({
           itemName: item.itemName,
@@ -186,6 +196,8 @@ export default function EstimateListPage() {
           onClose={() => setConfirmTarget(null)}
         />
       )}
+      {editTarget && <EstimateEditModal estimate={editTarget} onClose={() => setEditTarget(null)} />}
+      {deleteTarget && <EstimateDeleteModal estimate={deleteTarget} onClose={() => setDeleteTarget(null)} />}
 
       <Modal
         title="견적서 작성"
@@ -259,6 +271,7 @@ export default function EstimateListPage() {
                     <Form.Item
                       {...restField}
                       name={[name, 'unit']}
+                      rules={[{ required: true, whitespace: true, message: '단위' }]}
                       style={{ marginBottom: 8 }}
                     >
                       <Input placeholder="EA" />
@@ -266,24 +279,26 @@ export default function EstimateListPage() {
                     <Form.Item
                       {...restField}
                       name={[name, 'quantity']}
-                      rules={[{ required: true, message: '수량' }]}
+                      rules={[{ required: true, message: '수량' }, { type: 'number', min: 0.01, message: '수량은 0보다 커야 합니다' }]}
                       style={{ marginBottom: 8 }}
                     >
                       <InputNumber
                         style={{ width: '100%' }}
-                        min={1}
+                        min={0.01}
+                        precision={2}
                         placeholder="수량"
                       />
                     </Form.Item>
                     <Form.Item
                       {...restField}
                       name={[name, 'unitPrice']}
-                      rules={[{ required: true, message: '단가' }]}
+                      rules={[{ required: true, message: '단가' }, { type: 'number', min: 0, message: '단가는 0 이상이어야 합니다' }]}
                       style={{ marginBottom: 8 }}
                     >
                       <InputNumber<number>
                         style={{ width: '100%' }}
                         min={0}
+                        precision={2}
                         placeholder="단가"
                         formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={(v) => Number(v?.replace(/,/g, '') ?? 0)}
@@ -443,9 +458,11 @@ export default function EstimateListPage() {
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     {est.status === 'DRAFT' ? (
-                      <Button size="small" onClick={() => setConfirmTarget(est)}>
-                        확정
-                      </Button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <Button size="small" onClick={() => setConfirmTarget(est)}>확정</Button>
+                        <Button size="small" icon={<Pencil size={12} />} onClick={() => setEditTarget(est)}>수정</Button>
+                        <Button size="small" danger icon={<Trash2 size={12} />} onClick={() => setDeleteTarget(est)}>삭제</Button>
+                      </div>
                     ) : '—'}
                   </td>
                 </motion.tr>

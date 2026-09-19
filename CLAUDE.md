@@ -328,6 +328,7 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: 기동 순서 Eureka → Config → Gateway → 나머지
 - **IMPORTANT**: 새 백엔드 서비스는 Docker 편입 3종(`docker-compose.app.yml` 서비스 블록, `application-docker.yml`, 루트 Dockerfile build.gradle COPY)을 함께 반영
 - **IMPORTANT**: 프론트↔백엔드 API 계약 변경 시 백엔드 DTO를 원본으로 프론트 타입·요청 코드·MSW 핸들러를 같은 작업에서 동기화
+- **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다
 - **IMPORTANT**: 파일럿/실사용 검증은 풀 Docker 실서비스 모드로 수행. `bootRun`과 MSW 검증은 각각 서비스 단위·목업 검증으로만 기록
 - docker compose down 사용 (docker stop 금지)
 
