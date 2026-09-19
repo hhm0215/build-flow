@@ -4,6 +4,7 @@ import com.buildflow.auth.domain.user.entity.User;
 import com.buildflow.auth.domain.user.repository.UserRepository;
 import com.buildflow.auth.global.exception.BusinessException;
 import com.buildflow.auth.global.exception.ErrorCode;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ public class AdminBootstrapService {
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final EntityManager entityManager;
 
     @Transactional
     public void create(String loginId, String name, String password) {
@@ -36,7 +38,8 @@ public class AdminBootstrapService {
                 .password(passwordEncoder.encode(password))
                 .name(name)
                 .build();
-        // 고정 PK=1과 UNIQUE login_id가 동시 bootstrap 요청도 DB에서 차단한다.
-        userRepository.saveAndFlush(user);
+        // 할당된 PK에서 repository.save는 merge를 택할 수 있다. INSERT만 허용해 동시 초기화의 덮어쓰기를 막는다.
+        entityManager.persist(user);
+        entityManager.flush();
     }
 }

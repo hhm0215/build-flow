@@ -3,6 +3,7 @@ package com.buildflow.auth.domain.user.service;
 import com.buildflow.auth.domain.user.entity.User;
 import com.buildflow.auth.domain.user.repository.UserRepository;
 import com.buildflow.auth.global.exception.BusinessException;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,6 +24,7 @@ class AdminBootstrapServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock BCryptPasswordEncoder passwordEncoder;
+    @Mock EntityManager entityManager;
     @InjectMocks AdminBootstrapService bootstrapService;
 
     @Test
@@ -32,7 +35,10 @@ class AdminBootstrapServiceTest {
         bootstrapService.create("admin", "관리자", "ninechars");
 
         ArgumentCaptor<User> user = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).saveAndFlush(user.capture());
+        verify(entityManager).persist(user.capture());
+        verify(entityManager).flush();
+        verify(userRepository).count();
+        verifyNoMoreInteractions(userRepository);
         assertEquals(1L, user.getValue().getId());
         assertEquals("admin", user.getValue().getLoginId());
         assertEquals("bcrypt-hash", user.getValue().getPassword());
