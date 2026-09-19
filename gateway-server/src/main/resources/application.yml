@@ -8,7 +8,8 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          # 자동 /{serviceId}/** 경로는 명시 라우트의 JWT 필터를 우회할 수 있다.
+          enabled: false
           lower-case-service-id: true
       routes:
         - id: auth-service

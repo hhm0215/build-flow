@@ -18,16 +18,16 @@
 
 ## 1. buildflow_auth (auth-service)
 
-### users
+### admin_accounts
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
-| id | BIGINT PK | |
-| email | VARCHAR(100) UNIQUE | 로그인 ID |
+| id | BIGINT PK | 단일 관리자 고정값 `1` |
+| login_id | VARCHAR(50) UNIQUE | 관리자 로그인 아이디 |
 | password | VARCHAR(255) | BCrypt 해시 |
-| name | VARCHAR(50) | 이름 |
-| role | ENUM('ADMIN','VIEWER') | 권한 |
-| created_at | DATETIME | |
-| updated_at | DATETIME | |
+| name | VARCHAR(50) | 표시 이름 |
+| created_at | DATETIME(6) | 생성 시각 |
+
+새 설치용 스키마는 `auth-service/src/main/resources/schema.sql`로 생성합니다. 구 `users` 테이블은 자동 삭제하지 않으며 새 인증 경로에서 사용하지 않습니다.
 
 ---
 

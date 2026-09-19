@@ -7,6 +7,7 @@ import koKR from 'antd/locale/ko_KR'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ko'
 import App from './App'
+import { enableMocking, isMockMode } from './mocks/mockMode'
 import './index.css'
 
 dayjs.locale('ko')
@@ -21,22 +22,13 @@ const queryClient = new QueryClient({
 })
 
 // ─────────────────────────────────────────────
-// MSW는 개발 환경에서만 활성화.
-// import.meta.env.DEV = vite dev 실행 시 true
+// MSW는 개발 환경에서 MSW_DISABLED=true가 아닐 때만 활성화.
 // 빌드(production)에서는 실제 API로 요청이 감.
 //
 // worker.start()는 Promise를 반환하므로
 // Service Worker 등록이 완료된 뒤에 앱을 마운트.
 // ─────────────────────────────────────────────
-async function enableMocking() {
-  if (!import.meta.env.DEV) return
-  const { worker } = await import('./mocks/browser')
-  return worker.start({
-    onUnhandledRequest: 'bypass', // 핸들러 없는 요청은 실제 네트워크로 통과
-  })
-}
-
-enableMocking().then(() => {
+enableMocking(isMockMode).then(() => {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>

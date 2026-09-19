@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Zap, UserCog, Lock, ArrowRight, AlertCircle, FlaskConical, ShieldAlert } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import axiosInstance from '../../api/axiosInstance'
+import { isMockMode } from '../../mocks/mockMode'
 
 interface LoginForm {
-  email: string
+  loginId: string
   password: string
 }
 
@@ -22,7 +23,7 @@ export default function LoginPage() {
     setErrorMsg(null)
     try {
       const response = await axiosInstance.post('/auth/login', {
-        email: values.email,
+        loginId: values.loginId,
         password: values.password,
       })
       setTokens(response.data.data.accessToken)
@@ -110,7 +111,7 @@ export default function LoginPage() {
         </motion.div>
 
         {/* 개발 환경 힌트 */}
-        {import.meta.env.DEV && (
+        {isMockMode && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -161,17 +162,17 @@ export default function LoginPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <Form layout="vertical" onFinish={onFinish} size="large">
             <Form.Item
-              name="email"
-              label="관리자 이메일"
+              name="loginId"
+              label="관리자 아이디"
               rules={[
-                { required: true, message: '관리자 이메일을 입력하세요' },
-                { type: 'email', message: '이메일 형식이 올바르지 않습니다' },
+                { required: true, message: '관리자 아이디를 입력하세요' },
+                { pattern: /^[A-Za-z0-9._-]{3,50}$/, message: '영문·숫자·점·밑줄·하이픈 3~50자로 입력하세요' },
               ]}
               style={{ marginBottom: 16 }}
             >
               <Input
                 prefix={<UserCog size={15} color="var(--text-muted)" strokeWidth={1.8} style={{ marginRight: 4 }} />}
-                placeholder="admin@buildflow.dev"
+                placeholder="관리자 아이디 입력"
               />
             </Form.Item>
 

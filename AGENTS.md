@@ -2,7 +2,7 @@
 
 건설·시공 소규모 업체(1~10인)를 위한 현장 업무 관리 MSA 플랫폼.
 현장별 문서(공내역서, 견적서, 세금계산서, 하자보증보험)를 묶어 관리하고,
-AI 대시보드로 마진·손익을 요약. 1인 개발 + 실사용(혜민 관리, 아버지 열람).
+AI 대시보드로 마진·손익을 요약. 1인 개발 + 가족이 단일 관리자 계정을 공유하는 로컬 실사용.
 
 ---
 
@@ -190,7 +190,7 @@ eventId 기반 멱등성 필수.
 
 ### 완료
 - eureka-server, config-server, gateway-server (JWT 검증)
-- auth-service: 회원가입/로그인/토큰 갱신/로그아웃 (JWT + Redis 블랙리스트)
+- auth-service: 단일 관리자 로컬 초기화/아이디 로그인/토큰 갱신/로그아웃 (JWT + Redis 블랙리스트, 공개 회원가입 없음)
 - estimate-service: CRUD + Kafka 발행 + Ollama 공내역서 AI 파싱
 - site-service: CRUD + 손익 계산 + Kafka 소비
 - purchase-service: CRUD + Kafka 발행

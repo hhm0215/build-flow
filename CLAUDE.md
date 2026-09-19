@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 현장별 문서(공내역서, 견적서, 세금계산서, 하자보증보험)를 묶어서 관리하고,
 AI가 요약 대시보드를 생성하여 마진/손익을 한눈에 파악.
 
-1인 개발 + 실사용(혜민 관리, 아버지 열람). MSA 구조로 백엔드 포트폴리오 겸용.
+1인 개발 + 가족이 단일 관리자 계정을 공유하는 로컬 실사용. MSA 구조로 백엔드 포트폴리오 겸용.
 
 ## 빌드 & 실행
 
