@@ -26,6 +26,7 @@ import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
+import { sumConfirmedEstimateAmount } from '../../utils/estimate'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   IN_PROGRESS: '시공 중',
@@ -242,7 +243,7 @@ export default function SiteDetailPage() {
   const sortedTaxes = [...taxes].sort((a, b) => b.issueDate.localeCompare(a.issueDate))
   const sortedWarranties = [...warranties].sort((a, b) => a.endDate.localeCompare(b.endDate))
 
-  const estimateTotal = profit?.totalEstimateAmount ?? estimates.reduce((sum, e) => sum + e.totalAmount, 0)
+  const estimateTotal = profit?.totalEstimateAmount ?? sumConfirmedEstimateAmount(estimates)
   const purchaseTotal = profit?.totalPurchaseAmount ?? purchases.reduce((sum, p) => sum + p.totalAmount, 0)
   const margin = profit?.margin ?? estimateTotal - purchaseTotal
   const marginRate =

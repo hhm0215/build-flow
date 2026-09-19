@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { mockSites } from '../data/sites.data'
 import { ApiResponse, Site, SiteCreateRequest } from '../../types'
+import { mockSites as initialSites } from '../data/sites.data'
 
 let sites = [...mockSites]
 
@@ -34,9 +35,9 @@ export const sitesHandlers = [
   http.post<never, SiteCreateRequest>('/api/v1/sites', async ({ request }) => {
     const body = await request.json()
     const newSite: Site = {
-      id: Math.max(...sites.map((s) => s.id)) + 1,
+      id: Math.max(0, ...sites.map((s) => s.id)) + 1,
       siteName: body.siteName,
-      client: null,
+      client: initialSites.map((s) => s.client).find((client) => client?.id === body.clientId) ?? null,
       address: body.address || '',
       status: 'IN_PROGRESS',
       startDate: body.startDate || '',

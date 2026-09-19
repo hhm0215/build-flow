@@ -15,7 +15,8 @@ import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
 import { useEstimates, useCreateEstimate } from '../../api/estimates.api'
 import UploadParseModal from './UploadParseModal'
-import type { EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
+import EstimateConfirmModal from './EstimateConfirmModal'
+import type { Estimate, EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
 
 const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
@@ -80,6 +81,7 @@ export default function EstimateListPage() {
 
   const [open, setOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [confirmTarget, setConfirmTarget] = useState<Estimate | null>(null)
   const [pendingItems, setPendingItems] = useState<ParsedItemResult[] | null>(null)
   const [form] = Form.useForm()
   const createMutation = useCreateEstimate()
@@ -178,6 +180,13 @@ export default function EstimateListPage() {
         onConfirm={handleParsedConfirm}
       />
 
+      {confirmTarget && (
+        <EstimateConfirmModal
+          estimate={confirmTarget}
+          onClose={() => setConfirmTarget(null)}
+        />
+      )}
+
       <Modal
         title="견적서 작성"
         open={open}
@@ -186,7 +195,7 @@ export default function EstimateListPage() {
         okText="작성"
         cancelText="취소"
         confirmLoading={createMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
         afterOpenChange={handleCreateModalAfterOpen}
         width={720}
       >
@@ -389,7 +398,7 @@ export default function EstimateListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['제목', '상태', '총액', '항목 수', '견적일'].map((h) => (
+                {['제목', '상태', '총액', '항목 수', '견적일', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -431,6 +440,13 @@ export default function EstimateListPage() {
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)' }}>
                     {est.estimateDate}
+                  </td>
+                  <td style={{ padding: '14px 20px' }}>
+                    {est.status === 'DRAFT' ? (
+                      <Button size="small" onClick={() => setConfirmTarget(est)}>
+                        확정
+                      </Button>
+                    ) : '—'}
                   </td>
                 </motion.tr>
               ))}

@@ -1,6 +1,7 @@
 // 모든 핸들러를 하나로 합침 — browser.ts에서 이걸 import
 import { authHandlers } from './auth.handlers'
 import { sitesHandlers } from './sites.handlers'
+import { clientsHandlers } from './clients.handlers'
 import { estimatesHandlers } from './estimates.handlers'
 import { purchasesHandlers } from './purchases.handlers'
 import { taxesHandlers } from './taxes.handlers'
@@ -12,6 +13,7 @@ import { chatHandlers } from './chat.handlers'
 export const handlers = [
   ...authHandlers,
   ...sitesHandlers,
+  ...clientsHandlers,
   ...estimatesHandlers,
   ...purchasesHandlers,
   ...taxesHandlers,
