@@ -5,9 +5,33 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — 실사용 UI 라이프사이클 (2026-09-19)
+
+- 현장 생성과 견적 확정 UI 첫 단계는 완료했다. 남은 거래처 생성·현장 수정·견적 수정/삭제 등은 `.claude/BACKLOG.md` P0 항목을 따른다.
+- 손익 집계의 Kafka 멱등성·재시도·동시 갱신 보강도 별도 P0 작업으로 남아 있다.
+
 ---
 
 ## 완료된 작업
+
+### ✅ 실사용 UI 라이프사이클 — 견적 확정 동선 (2026-09-19)
+- DRAFT 견적 행에만 확정 버튼을 표시하고, 확인 모달에서 기존 API mutation을 연결했다. 중복 요청·진행 중 닫기 방지, 서버 오류 표시·재시도를 추가했다.
+- 현장 허브·상세의 프론트 손익 합계에서 초안 견적 금액을 제외하도록 통일했다.
+- 프론트 lint·Vitest 27개·production build 통과. 프론트 Docker 컨테이너 재빌드·재기동 후 HTTP 200 확인. 실제 Kafka 손익 이벤트 스모크는 집계 신뢰성 P0 이후로 보류했다.
+- 계획: `.claude/plans/2026-09-19-estimate-confirm-ui.md`.
+
+### ✅ 단일 관리자 loginId 인증 전환 (2026-09-19)
+- 실사용 데이터가 없음을 확인하고 관리자 1개를 가족이 공유하기로 결정. 공개 signup·VIEWER 역할을 제거하고 `admin_accounts` 고정 PK 1, 로컬 대화형 관리자 초기화, `loginId/password` 로그인을 구현했다.
+- 최초 관리자 비밀번호 최소 길이를 사용자 요청에 따라 9자로 조정하고 서버·스크립트·테스트·문서를 일치시켰다. 계정 1개와 60자 BCrypt 해시를 DB에서 확인했다.
+- JWT `authVersion=2` 및 Gateway access/ADMIN 검증, Discovery 자동 라우트 비활성화, 프론트·MSW·실서버 개발 모드·로그인 401 표시를 동기화했다.
+- Gradle 전체 테스트, 프론트 lint·Vitest 20개·build, PowerShell 구문 검사 통과. 공개 signup 403, 잘못된 로그인 401, 미인증 현장 요청 401, Discovery 자동 경로 404를 확인했다.
+- 로컬 대화형 `verify-admin.ps1`의 관리자 로그인·현장 생성/조회/삭제 API 스모크 통과. 임시 현장 제거 후 DB는 관리자 1명, 현장 0개, 현장 손익 0건. 기존 BuildFlow 데이터는 없었고 다른 프로젝트 컨테이너·볼륨은 건드리지 않았다.
+- 계획: `.claude/plans/2026-09-19-single-admin-login-id.md`. 기존 실데이터 스키마 마이그레이션 체계는 P1 백로그로 분리했다.
+
+### ✅ 실사용 UI 라이프사이클 — 현장 생성 첫 단계 (2026-09-19)
+- 현장 추가 버튼을 생성 폼·기존 mutation에 연결하고 선택적 거래처 조회, 날짜 변환, 오류 표시, 성공 시 상세 이동을 구현했다. MSW 거래처 목록과 생성 응답도 맞췄다.
+- UI 테스트 4개를 포함한 프론트 20개 테스트, lint, build 통과. 관리자 인증 후 현장 생성/조회/삭제 API 스모크도 통과했다. 브라우저 수동 E2E는 수행하지 않았고 나머지 UI 동선은 P0 백로그에 남는다.
+- 계획: `.claude/plans/2026-09-19-ui-lifecycle-first-slice.md`.
 
 ### ✅ Windows fresh clone 개발 준비 (2026-09-18)
 - PowerShell helper 3종: 안전한 `.env` 생성·전체 스택 관리, 서비스별 환경 로드, 대화형 관리자 생성
@@ -35,10 +59,10 @@
 - **docker-compose.yml** — MySQL, Redis, Kafka(KRaft), Zipkin 로컬 환경 완료
 
 ### ✅ auth-service (Port 8081)
-- 회원가입 / 로그인 / 토큰 갱신 / 로그아웃
+- 단일 관리자 로그인 / 토큰 갱신 / 로그아웃 (공개 회원가입 없음)
 - JWT (access 30분, refresh 7일)
 - Redis 블랙리스트 (로그아웃 시 access token 무효화)
-- 역할: ADMIN(혜민), VIEWER(아버지)
+- 역할: ADMIN 1개 계정 공유
 
 ### ✅ estimate-service (Port 8082) — CRUD + AI 파싱 완료
 - 견적서 CRUD (생성/조회/수정/삭제)
@@ -382,41 +406,17 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-18 갱신 — Windows fresh clone 준비 완료)
+## 다음 세션 진입점 (2026-09-19 갱신)
 
-**현재 git 기준점** (2026-09-18 갱신 — Windows 인계 정리 완료):
-- PR #48 merge 완료: `origin/main = 658f677`, `origin/develop = 34e8c2a` (트리 완전 동기)
-- Windows 준비 본체는 PR #46(`06b1349`, 구현 `1e5f405` + 검증 `96c4785`)·PR #47로 반영됨
-- 미커밋이던 `docs/DECISIONS.md` 마크다운 포매팅을 `34e8c2a`로 커밋·push → PR #48로 main 병합. 로컬 워킹트리 클린
-- 다음 개발은 `develop`에서 진행 (윈도우: `git switch develop` 후 `.\scripts\buildflow.ps1 check`→`up`)
+**Git 상태**: 사용자 승인 후 로컬 `develop`에 인증 전환(`c6cd517`), 현장 생성·견적 확정 UI(`47cb540`), 백로그·진행 문서 갱신을 작업 단위로 커밋했다. 원격 push/PR은 실행하지 않았다.
 
-**Windows 준비 변경**:
-- `scripts/buildflow.ps1`: `.env` 무작위 생성 + check/up/down/status/logs
-- `scripts/boot-service.ps1`: 각 PowerShell 창에서 `.env` 로드, Docker 인프라 host 주소 주입
-- `scripts/create-admin.ps1`: 비밀번호가 기록에 남지 않는 대화형 초기 관리자 생성
-- 기본 Compose 15개 서비스, native Ollama 사용. `container-ollama` profile 사용 시 16개
-- 모든 host publish는 개발 안전 기본값인 `127.0.0.1`로 제한
-- Windows PowerShell 5.1 구문과 `gradlew.bat`을 검증하는 CI job 추가
+**로컬 실행 상태**: Docker Desktop에서 프론트·Gateway·인증·현장 서비스와 필수 인프라가 실행 중이다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 관리자 1명으로 로그인 및 현장 API 스모크를 통과했고 검증용 현장은 삭제했다.
 
-**검증 결과**:
-- Gradle 전체 테스트 성공
-- frontend lint, Vitest 7개, production build 성공 (기존 1.36MB chunk 경고는 P2 유지)
-- 결합 Compose config 성공, 전체 이미지 build 및 15개 기본 서비스 기동, frontend/Gateway HTTP 200
-- 백엔드 Docker context: 기존 약 366MB → 서비스별 약 12~89kB
-- 자동 리뷰 CRITICAL/HIGH 0
+**다음 작업**: `.claude/BACKLOG.md` P0 실사용 UI 라이프사이클의 다음 작은 동선(거래처 생성 등)을 계획·구현한다. 견적 확정이 손익 이벤트를 발행하므로 실제 이벤트 검증은 P0 Kafka 집계 신뢰성 보강과 함께 수행한다. 실데이터 파일럿은 두 P0 위험을 해소한 뒤 진행한다.
 
-**다음 작업**: P0 단일 관리자 `loginId/password` 인증 전환.
+**검증 상태**: Gradle 전체 테스트 및 변경된 인증 모듈 재테스트, 프론트 lint·Vitest 27개·production build, PowerShell 구문 검사, 관리자 로그인·현장 생성/조회/삭제 API 스모크 통과. 기존 프론트 번들 크기 경고는 P2 유지. 브라우저 수동 E2E, 견적 확정 실제 이벤트, 전체 서비스 결합 검증은 아직 수행하지 않았다.
 
-**BACKLOG 현황**: P0 단일 관리자 loginId 인증 전환. P1 로컬 서버 배포 보안 하드닝, 실데이터 파일럿 온보딩.
-
-**✅ 능동 발의 규칙 상시 적용** (ADR-014 v1.0). 로컬 환경: gradle 9.6.1 + openjdk@17, `JAVA_HOME=/opt/homebrew/opt/openjdk@17/...`.
-
-**자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰)
-
-**다음 세션 첫 액션**:
-1. P0 단일 관리자 `loginId/password` 인증 전환 계획 수립
-2. 기존 사용자/DB 백업과 마이그레이션 경로 실측
-3. 공개 signup 제거 + backend/frontend/MSW 계약 동기화
+**자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 
 **활성화된 워크플로우 자동화** (2026-06-13 갱신):
 - ✅ PR 생성 자동 (`gh pr create`)
