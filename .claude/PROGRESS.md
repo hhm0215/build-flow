@@ -7,7 +7,7 @@
 
 ## 현재 진행 중 — 실사용 UI 라이프사이클 (2026-09-20)
 
-- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51로 병합했다. 보증보험 OCR 실패 보정/수정 동선도 구현·검증했다. 확정본 삭제 정책과 매입 UI/Kafka 신뢰성의 선후 순서는 사용자 선택 대기. 남은 작업은 `.claude/BACKLOG.md` P0 항목을 따른다.
+- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52로 병합했다. 확정본 삭제 정책과 매입 UI/Kafka 신뢰성의 선후 순서는 사용자 선택 대기. 남은 작업은 `.claude/BACKLOG.md` P0 항목을 따른다.
 - 손익 집계의 Kafka 멱등성·재시도·동시 갱신 보강도 별도 P0 작업으로 남아 있다.
 
 ---
@@ -17,7 +17,7 @@
 ### ✅ 실사용 UI 라이프사이클 — 보증보험 OCR 실패 수동 보정·수정 (2026-09-20)
 - OCR 실패·부분 추출 항목의 빈 필드를 보정하고 기존 보험을 수정하는 목록 동선을 추가했다. PENDING 수정은 UI/서버에서 차단하고 수동 수정 후 `MANUAL` 상태로 전환한다. 날짜 역전·음수 보증금액은 서버에서도 거절한다.
 - 응답의 nullable 필드와 만료 필터·현장 상세 표시, MSW PUT 계약을 정렬했다. 독립 리뷰 MEDIUM 3건 수정·재검토 완료. 전체 Gradle 테스트, 프론트 Vitest 65개·lint·build 통과. Docker 재빌드 후 프론트·notification health/목록 GET 200, Gateway 미인증 보증보험 API 401 확인. 실제 보험 파일 업로드/보정 PUT 스모크는 수행하지 않았다.
-- 계획: `.claude/plans/2026-09-20-warranty-manual-correction.md`. PR 결과는 병합 후 갱신한다.
+- [PR #52](https://github.com/hhm0215/build-flow/pull/52) CI 6개 성공·2개 커밋 SHA 일치 후 merge commit `af4ad46` 병합. 계획: `.claude/plans/2026-09-20-warranty-manual-correction.md`.
 
 ### ✅ 실사용 UI 라이프사이클 — 작성 중 견적 수정·삭제 (2026-09-20)
 - DRAFT 견적의 항목·제목·날짜·메모 수정과 삭제 확인 동선을 추가했다. 서버 금액 저장 정밀도·항목/총액 범위를 검증하고 수정·확정·삭제를 비관적 행 잠금으로 직렬화했다.
@@ -435,7 +435,7 @@
 
 ## 다음 세션 진입점 (2026-09-20 갱신)
 
-**Git 상태**: PR #49·#50·#51 merge 완료. `origin/main`은 merge commit `3429a88`, `origin/develop`은 `bb6659c`다. PR #51 병합 후처리 문서는 로컬 `b2fe0f3`에 커밋했고 보증보험 보정 변경과 함께 다음 PR에 포함할 예정이다.
+**Git 상태**: PR #49·#50·#51·#52 merge 완료. `origin/main`은 merge commit `af4ad46`, `origin/develop`은 `0e78a30`이다. main은 PR #52의 두 커밋을 포함하고 merge commit 1개가 더 있다. PR #52 병합 후처리 문서를 로컬에 커밋한 뒤 다음 실질 작업 PR에 포함할 예정이다.
 
 **로컬 실행 상태**: Docker Desktop에서 프론트·Gateway·인증·현장·견적·보증보험 서비스와 필수 인프라가 실행 중이다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 관리자 1명으로 로그인 및 현장 API 스모크를 통과했고 검증용 현장은 삭제했다.
 

@@ -35,4 +35,4 @@ OCR 실패 또는 부분 추출된 보증보험을 화면에서 직접 보정하
 - `bun run lint`, `bun run test`, `bun run build`, `./gradlew :notification-service:test` 및 필요 시 전체 회귀 테스트.
 
 ## 결과 (작업 후 기록)
-목록에서 PENDING을 제외한 보험의 수정 모달을 열어 OCR 실패·부분 추출값을 보정한다. PUT은 siteId/filePath를 건드리지 않고 선택 필드의 `null` 삭제를 보존한다. PENDING은 서버 409, 보정 완료는 `MANUAL`; 날짜 역전과 음수 금액은 서버 400으로 차단한다. OCR 응답의 nullable 날짜·보험사·증권번호를 프론트 타입/목록/현장 상세/MSW에 반영했다. 독립 리뷰 MEDIUM 3건(서버 기간 검증, 종료일 없는 유효 필터, MSW 만료 임박) 수정·재검토 완료. 전체 Gradle 테스트, 프론트 65개 테스트·lint·build 통과. Docker 프론트·notification health/목록 GET 200과 Gateway 미인증 API 401 확인. 실제 PDF 업로드와 영속 PUT 스모크는 수행하지 않았다. PR/병합 결과는 완료 후 기록한다.
+목록에서 PENDING을 제외한 보험의 수정 모달을 열어 OCR 실패·부분 추출값을 보정한다. PUT은 siteId/filePath를 건드리지 않고 선택 필드의 `null` 삭제를 보존한다. PENDING은 서버 409, 보정 완료는 `MANUAL`; 날짜 역전과 음수 금액은 서버 400으로 차단한다. OCR 응답의 nullable 날짜·보험사·증권번호를 프론트 타입/목록/현장 상세/MSW에 반영했다. 독립 리뷰 MEDIUM 3건(서버 기간 검증, 종료일 없는 유효 필터, MSW 만료 임박) 수정·재검토 완료. 전체 Gradle 테스트, 프론트 65개 테스트·lint·build 통과. Docker 프론트·notification health/목록 GET 200과 Gateway 미인증 API 401 확인. 실제 PDF 업로드와 영속 PUT 스모크는 수행하지 않았다. PR #52는 CI 6개 성공·2개 커밋 SHA 일치 후 merge commit `af4ad46`으로 병합됐다.
