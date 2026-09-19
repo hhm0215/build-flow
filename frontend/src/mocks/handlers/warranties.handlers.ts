@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import { mockWarranties } from '../data/warranties.data'
-import { ApiResponse, Warranty } from '../../types'
+import { ApiResponse, Warranty, WarrantyUpdateRequest } from '../../types'
 
 let warranties: Warranty[] = [...mockWarranties]
 
@@ -31,7 +31,7 @@ export const warrantiesHandlers = [
     const url = new URL(request.url)
     const days = Number(url.searchParams.get('days') ?? 30)
 
-    const expiring = warranties.filter((w) => !w.expired && w.daysUntilExpiry <= days)
+    const expiring = warranties.filter((w) => !!w.endDate && !w.expired && w.daysUntilExpiry <= days)
 
     return HttpResponse.json<ApiResponse<Warranty[]>>({
       success: true,
@@ -45,6 +45,13 @@ export const warrantiesHandlers = [
     '/api/v1/warranties',
     async ({ request }) => {
       const body = await request.json()
+      if (!body.siteId || !body.insuranceCompany?.trim() || !body.startDate || !body.endDate
+          || body.startDate > body.endDate || (body.coverageAmount != null && body.coverageAmount < 0)) {
+        return HttpResponse.json<ApiResponse<null>>(
+          { success: false, data: null, error: '보증보험 입력값이 올바르지 않습니다.' },
+          { status: 400 },
+        )
+      }
       const endDate = new Date(body.endDate)
       const now = new Date()
       const diffMs = endDate.getTime() - now.getTime()
@@ -59,8 +66,9 @@ export const warrantiesHandlers = [
         startDate: body.startDate,
         endDate: body.endDate,
         memo: body.memo || '',
-        daysUntilExpiry,
+        daysUntilExpiry: Math.max(daysUntilExpiry, 0),
         expired: daysUntilExpiry < 0,
+        ocrStatus: 'MANUAL',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
@@ -82,17 +90,41 @@ export const warrantiesHandlers = [
       )
     }
 
-    const body = (await request.json()) as Partial<Warranty>
-    const endDate = new Date(body.endDate ?? warranties[index].endDate)
+    if (warranties[index].ocrStatus === 'PENDING') {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: 'AI 분석이 끝난 뒤 수정할 수 있습니다.' },
+        { status: 409 },
+      )
+    }
+    const body = (await request.json()) as WarrantyUpdateRequest
+    if (!body.insuranceCompany?.trim() || !body.startDate || !body.endDate) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '보험사·시작일·종료일은 필수입니다.' },
+        { status: 400 },
+      )
+    }
+    if (body.startDate > body.endDate || (body.coverageAmount != null && body.coverageAmount < 0)) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '보증기간 또는 보증금액이 올바르지 않습니다.' },
+        { status: 400 },
+      )
+    }
+    const endDate = new Date(body.endDate)
     const now = new Date()
     const diffMs = endDate.getTime() - now.getTime()
     const daysUntilExpiry = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
 
     warranties[index] = {
       ...warranties[index],
-      ...body,
-      daysUntilExpiry,
+      insuranceCompany: body.insuranceCompany,
+      policyNumber: body.policyNumber === undefined ? warranties[index].policyNumber : body.policyNumber,
+      coverageAmount: body.coverageAmount === undefined ? warranties[index].coverageAmount : body.coverageAmount,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      memo: body.memo === undefined ? warranties[index].memo : body.memo,
+      daysUntilExpiry: Math.max(daysUntilExpiry, 0),
       expired: daysUntilExpiry < 0,
+      ocrStatus: 'MANUAL',
       updatedAt: new Date().toISOString(),
     }
     return HttpResponse.json<ApiResponse<Warranty>>({ success: true, data: warranties[index], error: null })

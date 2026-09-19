@@ -118,6 +118,7 @@ public class DefectWarranty {
         if (policyNumber != null) this.policyNumber = policyNumber.orElse(null);
         if (coverageAmount != null) this.coverageAmount = coverageAmount.orElse(null);
         if (memo != null) this.memo = memo.orElse(null);
+        this.ocrStatus = OcrStatus.MANUAL;
     }
 
     /**

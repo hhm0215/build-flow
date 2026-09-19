@@ -75,4 +75,16 @@ class DefectWarrantyUpdateTest {
         assertThat(w.getStartDate()).isEqualTo(LocalDate.of(2026, 6, 1));
         assertThat(w.getEndDate()).isEqualTo(LocalDate.of(2027, 6, 1));
     }
+
+    @Test
+    void OCR_실패_후_수동_보정하면_MANUAL_상태가_된다() {
+        DefectWarranty w = DefectWarranty.createPending(1L, "warranty.pdf");
+        w.markOcrFailed();
+        w.update("현대해상", LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1),
+                Optional.of("HD-01"), Optional.empty(), Optional.empty());
+
+        assertThat(w.getOcrStatus()).isEqualTo(OcrStatus.MANUAL);
+        assertThat(w.getInsuranceCompany()).isEqualTo("현대해상");
+        assertThat(w.getFilePath()).isEqualTo("warranty.pdf");
+    }
 }

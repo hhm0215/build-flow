@@ -89,7 +89,7 @@ export default function WarrantyUploadModal({ open, onClose, onUploaded }: Warra
         )
       }
       width={640}
-      destroyOnClose
+      destroyOnHidden
     >
       <AnimatePresence mode="wait">
         {step === 'input' ? (

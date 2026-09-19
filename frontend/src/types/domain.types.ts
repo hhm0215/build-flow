@@ -228,13 +228,12 @@ export type OcrStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'MANUAL'
 export interface Warranty {
   id: number
   siteId: number
-  insuranceCompany: string
-  policyNumber: string
-  /** 백엔드 응답에 없을 수 있음 — frontend mock에만 존재 (백엔드 추가는 BACKLOG P2) */
-  coverageAmount?: number
-  startDate: string
-  endDate: string
-  memo: string
+  insuranceCompany: string | null
+  policyNumber: string | null
+  coverageAmount: number | null
+  startDate: string | null
+  endDate: string | null
+  memo: string | null
   daysUntilExpiry: number
   expired: boolean
   filePath?: string
@@ -251,4 +250,13 @@ export interface WarrantyCreateRequest {
   startDate: string
   endDate: string
   memo?: string
+}
+
+export interface WarrantyUpdateRequest {
+  insuranceCompany: string
+  policyNumber: string | null
+  coverageAmount: number | null
+  startDate: string
+  endDate: string
+  memo: string | null
 }
