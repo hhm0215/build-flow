@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
 import { ApiResponse, Estimate, EstimateCreateRequest, ParseResult } from '../types'
+import { SITES_KEY } from './sites.api'
 
 export const ESTIMATES_KEY = {
   all: ['estimates'] as const,
@@ -89,7 +90,11 @@ export function useConfirmEstimate() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: confirmEstimate,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ESTIMATES_KEY.all }),
+    onSuccess: async (estimate) => {
+      await queryClient.invalidateQueries({ queryKey: ESTIMATES_KEY.all })
+      // Kafka 집계는 비동기이므로 다음 현장 상세 진입 시 손익을 다시 읽게 만든다.
+      await queryClient.invalidateQueries({ queryKey: SITES_KEY.profit(estimate.siteId), refetchType: 'none' })
+    },
   })
 }
 

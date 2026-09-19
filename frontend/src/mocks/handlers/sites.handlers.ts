@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { mockSites } from '../data/sites.data'
 import { ApiResponse, Site, SiteCreateRequest } from '../../types'
-import { mockSites as initialSites } from '../data/sites.data'
+import { findMockClientById } from './clients.handlers'
 
 let sites = [...mockSites]
 
@@ -34,10 +34,17 @@ export const sitesHandlers = [
   // 생성 — POST /api/v1/sites
   http.post<never, SiteCreateRequest>('/api/v1/sites', async ({ request }) => {
     const body = await request.json()
+    const client = findMockClientById(body.clientId)
+    if (body.clientId != null && !client) {
+      return HttpResponse.json(
+        { success: false, error: '거래처를 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
     const newSite: Site = {
       id: Math.max(0, ...sites.map((s) => s.id)) + 1,
       siteName: body.siteName,
-      client: initialSites.map((s) => s.client).find((client) => client?.id === body.clientId) ?? null,
+      client,
       address: body.address || '',
       status: 'IN_PROGRESS',
       startDate: body.startDate || '',

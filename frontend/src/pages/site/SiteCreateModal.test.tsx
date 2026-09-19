@@ -1,12 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import dayjs from 'dayjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SiteCreateModal, { toSiteCreateRequest } from './SiteCreateModal'
 
 const mutateAsync = vi.hoisted(() => vi.fn())
+const createClientMutateAsync = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/clients.api', () => ({
   useClients: () => ({ data: [], isError: false }),
+  useCreateClient: () => ({ mutateAsync: createClientMutateAsync, isPending: false }),
 }))
 vi.mock('../../api/sites.api', () => ({
   useCreateSite: () => ({ mutateAsync, isPending: false }),
@@ -14,6 +16,7 @@ vi.mock('../../api/sites.api', () => ({
 
 beforeEach(() => {
   mutateAsync.mockReset()
+  createClientMutateAsync.mockReset()
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: false,
     media: query,
@@ -85,5 +88,50 @@ describe('SiteCreateModal', () => {
     expect(await screen.findByText('거래처를 찾을 수 없습니다.')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('현장명')).toHaveValue('새 현장')
     expect(onCreated).not.toHaveBeenCalled()
+  })
+
+  it('새 거래처를 등록하면 현장 폼에 자동 선택한다', async () => {
+    createClientMutateAsync.mockResolvedValue({ id: 6, companyName: '새 거래처' })
+    mutateAsync.mockResolvedValue({ id: 18 })
+    render(<SiteCreateModal open onClose={vi.fn()} onCreated={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '새 거래처 등록' }))
+    fireEvent.change(screen.getByPlaceholderText('업체명'), { target: { value: '새 거래처' } })
+    fireEvent.click(screen.getByRole('button', { name: '등록' }))
+    await waitFor(() => expect(createClientMutateAsync).toHaveBeenCalled())
+
+    fireEvent.change(screen.getByPlaceholderText('현장명'), { target: { value: '연결된 현장' } })
+    fireEvent.click(screen.getByRole('button', { name: '추가' }))
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      siteName: '연결된 현장',
+      clientId: 6,
+    })))
+  })
+
+  it('추가 버튼을 빠르게 두 번 눌러도 현장을 한 번만 생성한다', async () => {
+    let resolveMutation: ((value: { id: number }) => void) | undefined
+    mutateAsync.mockReturnValue(new Promise((resolve) => { resolveMutation = resolve }))
+    render(<SiteCreateModal open onClose={vi.fn()} onCreated={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('현장명'), { target: { value: '중복 방지 현장' } })
+
+    const addButton = screen.getByRole('button', { name: '추가' })
+    fireEvent.click(addButton)
+    fireEvent.click(addButton)
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
+    await act(async () => { resolveMutation?.({ id: 19 }) })
+  })
+
+  it('현장 생성 중에는 새 거래처 모달을 열지 않는다', async () => {
+    let resolveMutation: ((value: { id: number }) => void) | undefined
+    mutateAsync.mockReturnValue(new Promise((resolve) => { resolveMutation = resolve }))
+    render(<SiteCreateModal open onClose={vi.fn()} onCreated={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('현장명'), { target: { value: '진행 중 현장' } })
+    fireEvent.click(screen.getByRole('button', { name: '추가' }))
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: '새 거래처 등록' }))
+    expect(screen.queryByPlaceholderText('업체명')).not.toBeInTheDocument()
+    await act(async () => { resolveMutation?.({ id: 20 }) })
   })
 })
