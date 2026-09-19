@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import { mockSites } from '../data/sites.data'
-import { ApiResponse, Site, SiteCreateRequest } from '../../types'
+import { ApiResponse, Site, SiteCreateRequest, SiteUpdateRequest } from '../../types'
 import { findMockClientById } from './clients.handlers'
 
 let sites = [...mockSites]
@@ -61,7 +61,7 @@ export const sitesHandlers = [
   }),
 
   // 수정 — PUT /api/v1/sites/:id
-  http.put<{ id: string }, SiteCreateRequest>('/api/v1/sites/:id', async ({ params, request }) => {
+  http.put<{ id: string }, SiteUpdateRequest>('/api/v1/sites/:id', async ({ params, request }) => {
     const body = await request.json()
     const index = sites.findIndex((s) => s.id === Number(params.id))
     if (index === -1) {
@@ -70,7 +70,29 @@ export const sitesHandlers = [
         { status: 404 },
       )
     }
-    sites[index] = { ...sites[index], ...body, updatedAt: new Date().toISOString() }
+    if (!body.siteName?.trim()) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '현장명은 필수입니다.' },
+        { status: 400 },
+      )
+    }
+    const client = findMockClientById(body.clientId ?? undefined)
+    if (body.clientId != null && !client) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '거래처를 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
+    sites[index] = {
+      ...sites[index],
+      siteName: body.siteName,
+      client,
+      address: body.address ?? null,
+      startDate: body.startDate ?? null,
+      endDate: body.endDate ?? null,
+      memo: body.memo ?? null,
+      updatedAt: new Date().toISOString(),
+    }
     return HttpResponse.json<ApiResponse<Site>>({ success: true, data: sites[index], error: null })
   }),
 

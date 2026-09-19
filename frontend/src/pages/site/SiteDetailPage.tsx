@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Select, Tabs, message } from 'antd'
+import { Button, Select, Tabs, message } from 'antd'
 import { motion } from 'motion/react'
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   FileText,
   HardHat,
   MapPin,
+  Pencil,
   ShieldCheck,
   ShoppingBag,
   TrendingUp,
@@ -26,6 +27,7 @@ import { useTaxes } from '../../api/taxes.api'
 import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
 import { calculateDocumentProfit } from '../../utils/estimate'
+import SiteEditModal from './SiteEditModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   IN_PROGRESS: '시공 중',
@@ -160,7 +162,7 @@ function MetaRow({
 }: {
   icon: LucideIcon
   label: string
-  value: string
+  value: string | null
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -258,6 +260,7 @@ export default function SiteDetailPage() {
     ready ? formatCompactKRW(amount) : failed ? '조회 실패' : '불러오는 중'
 
   const [tab, setTab] = useState<string>('estimates')
+  const [editOpen, setEditOpen] = useState(false)
 
   const handleStatusChange = (next: SiteStatus) => {
     if (!site || next === site.status) return
@@ -320,6 +323,7 @@ export default function SiteDetailPage() {
 
       <SiteHeaderHero
         site={site}
+        onEdit={() => setEditOpen(true)}
         onStatusChange={handleStatusChange}
         statusChanging={updateStatus.isPending}
       />
@@ -642,16 +646,19 @@ export default function SiteDetailPage() {
           ]}
         />
       </motion.section>
+      {editOpen && <SiteEditModal site={site} onClose={() => setEditOpen(false)} />}
     </div>
   )
 }
 
 function SiteHeaderHero({
   site,
+  onEdit,
   onStatusChange,
   statusChanging,
 }: {
   site: Site
+  onEdit: () => void
   onStatusChange: (status: SiteStatus) => void
   statusChanging: boolean
 }) {
@@ -745,6 +752,13 @@ function SiteHeaderHero({
             loading={statusChanging}
             style={{ width: '100%' }}
           />
+          <Button
+            icon={<Pencil size={14} />}
+            onClick={onEdit}
+            style={{ width: '100%', marginTop: 12 }}
+          >
+            현장 수정
+          </Button>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 12, marginBottom: 4 }}>
             등록일
           </div>
