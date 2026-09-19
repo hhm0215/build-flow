@@ -41,11 +41,11 @@ export interface Site {
   id: number
   siteName: string
   client: Client | null
-  address: string
+  address: string | null
   status: SiteStatus
-  startDate: string
-  endDate: string
-  memo: string
+  startDate: string | null
+  endDate: string | null
+  memo: string | null
   createdAt: string
   updatedAt: string
 }
@@ -57,6 +57,15 @@ export interface SiteCreateRequest {
   startDate?: string
   endDate?: string
   memo?: string
+}
+
+export interface SiteUpdateRequest {
+  siteName: string
+  clientId: number | null
+  address: string | null
+  startDate: string | null
+  endDate: string | null
+  memo: string | null
 }
 
 // ── Profit (손익) ─────────────────────────────

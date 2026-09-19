@@ -50,4 +50,38 @@ describe('거래처·현장 MSW 계약', () => {
     })
     expect(unknownClient.status).toBe(404)
   })
+
+  it('현장 PUT은 거래처 연결을 해제하고 비운 필드를 null로 교체한다', async () => {
+    const created = await fetch(sitesUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteName: '수정 전 현장', address: '서울' }),
+    })
+    const site = (await created.json() as ApiResponse<Site>).data
+    const siteUrl = new URL(`/api/v1/sites/${site.id}`, document.baseURI)
+
+    const updated = await fetch(siteUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        siteName: '수정 후 현장', clientId: null, address: null,
+        startDate: null, endDate: null, memo: null,
+      }),
+    })
+    expect(updated.status).toBe(200)
+    const result = (await updated.json() as ApiResponse<Site>).data
+    expect(result).toMatchObject({
+      siteName: '수정 후 현장', client: null, address: null,
+      startDate: null, endDate: null, memo: null,
+    })
+    const fetched = await fetch(siteUrl)
+    expect((await fetched.json() as ApiResponse<Site>).data).toMatchObject(result)
+
+    const unknownClient = await fetch(siteUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteName: '무효', clientId: 999999 }),
+    })
+    expect(unknownClient.status).toBe(404)
+  })
 })
