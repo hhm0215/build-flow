@@ -110,6 +110,13 @@ export interface EstimateCreateRequest {
   memo?: string
 }
 
+export interface EstimateUpdateRequest {
+  title: string
+  estimateDate: string
+  items: Pick<EstimateItem, 'itemName' | 'unit' | 'quantity' | 'unitPrice'>[]
+  memo?: string
+}
+
 // ── 공내역서 파싱 (Ollama) ─────────────────
 export interface ParsedItemResult {
   itemName: string

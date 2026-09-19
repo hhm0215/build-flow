@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Estimate, Purchase } from '../types'
-import { calculateDocumentProfit, sumConfirmedEstimateAmount } from './estimate'
+import { calculateDocumentProfit, sumConfirmedEstimateAmount, validateEstimateAmounts } from './estimate'
 
 describe('sumConfirmedEstimateAmount', () => {
   it('확정 전 초안 금액은 손익 합계에서 제외한다', () => {
@@ -28,5 +28,20 @@ describe('calculateDocumentProfit', () => {
       margin: 150000,
       marginRate: 75,
     })
+  })
+})
+
+describe('validateEstimateAmounts', () => {
+  it('DB 소수 2자리 수량·단가와 정확한 항목 금액을 허용한다', () => {
+    expect(validateEstimateAmounts([{ quantity: 1.25, unitPrice: 1000 }])).toBeNull()
+    expect(validateEstimateAmounts([{ quantity: 0.5, unitPrice: 1.1 }])).toBeNull()
+  })
+
+  it('저장 시 0.00으로 반올림되거나 항목 금액이 달라지는 입력을 거절한다', () => {
+    expect(validateEstimateAmounts([{ quantity: 0.004, unitPrice: 1000 }])).not.toBeNull()
+    expect(validateEstimateAmounts([{ quantity: 1000, unitPrice: 0.004 }])).not.toBeNull()
+    expect(validateEstimateAmounts([{ quantity: 0.01, unitPrice: 0.01 }])).not.toBeNull()
+    expect(validateEstimateAmounts([{ quantity: 1.0000000001, unitPrice: 1_000_000_000_000 }])).not.toBeNull()
+    expect(validateEstimateAmounts([])).not.toBeNull()
   })
 })

@@ -1,6 +1,7 @@
 import { http, HttpResponse, delay } from 'msw'
 import { mockEstimates } from '../data/estimates.data'
-import { ApiResponse, Estimate, EstimateCreateRequest, ParseResult } from '../../types'
+import { ApiResponse, Estimate, EstimateCreateRequest, EstimateUpdateRequest, ParseResult } from '../../types'
+import { validateEstimateAmounts } from '../../utils/estimate'
 
 let estimates = [...mockEstimates]
 
@@ -34,6 +35,13 @@ export const estimatesHandlers = [
 
   http.post<never, EstimateCreateRequest>('/api/v1/estimates', async ({ request }) => {
     const body = await request.json()
+    const amountError = validateEstimateAmounts(body.items ?? [])
+    if (amountError) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: amountError },
+        { status: 400 },
+      )
+    }
     const items = (body.items || []).map((item, idx) => ({
       id: Date.now() + idx,
       ...item,
@@ -59,7 +67,53 @@ export const estimatesHandlers = [
     )
   }),
 
+  http.put<{ id: string }, EstimateUpdateRequest>('/api/v1/estimates/:id', async ({ params, request }) => {
+    const index = estimates.findIndex((estimate) => estimate.id === Number(params.id))
+    if (index === -1) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '견적서를 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
+    if (estimates[index].status === 'CONFIRMED') {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '이미 확정된 견적서입니다.' },
+        { status: 409 },
+      )
+    }
+    const body = await request.json()
+    const amountError = validateEstimateAmounts(body.items ?? [])
+    if (!body.title?.trim() || !body.estimateDate || amountError) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: amountError ?? '견적 제목·견적일을 입력하세요.' },
+        { status: 400 },
+      )
+    }
+    const items = body.items.map((item, itemIndex) => ({
+      id: Date.now() + itemIndex,
+      ...item,
+      amount: item.quantity * item.unitPrice,
+    }))
+    const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
+    estimates[index] = {
+      ...estimates[index],
+      title: body.title,
+      estimateDate: body.estimateDate,
+      memo: body.memo ?? '',
+      items,
+      totalAmount,
+      updatedAt: new Date().toISOString(),
+    }
+    return HttpResponse.json<ApiResponse<Estimate>>({ success: true, data: estimates[index], error: null })
+  }),
+
   http.delete<{ id: string }>('/api/v1/estimates/:id', ({ params }) => {
+    if (!estimates.some((estimate) => estimate.id === Number(params.id))) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '견적서를 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
     estimates = estimates.filter((e) => e.id !== Number(params.id))
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
   }),

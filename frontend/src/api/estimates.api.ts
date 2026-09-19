@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, Estimate, EstimateCreateRequest, ParseResult } from '../types'
+import { ApiResponse, Estimate, EstimateCreateRequest, EstimateUpdateRequest, ParseResult } from '../types'
 import { SITES_KEY } from './sites.api'
 
 export const ESTIMATES_KEY = {
@@ -24,7 +24,7 @@ const createEstimate = async (body: EstimateCreateRequest) => {
   return res.data.data
 }
 
-const updateEstimate = async ({ id, ...body }: EstimateCreateRequest & { id: number }) => {
+const updateEstimate = async ({ id, ...body }: EstimateUpdateRequest & { id: number }) => {
   const res = await axiosInstance.put<ApiResponse<Estimate>>(`/estimates/${id}`, body)
   return res.data.data
 }

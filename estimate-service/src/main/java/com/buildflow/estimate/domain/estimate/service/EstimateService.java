@@ -14,12 +14,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class EstimateService {
+
+    private static final BigDecimal MAX_QUANTITY = new BigDecimal("99999999.99");
+    private static final BigDecimal MAX_AMOUNT = new BigDecimal("9999999999999.99");
 
     private final EstimateRepository estimateRepository;
     private final KafkaProducerService kafkaProducerService;
@@ -63,7 +67,7 @@ public class EstimateService {
 
     @Transactional
     public EstimateResponse update(Long id, EstimateUpdateRequest request) {
-        Estimate estimate = getEstimate(id);
+        Estimate estimate = getEstimateForUpdate(id);
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);
@@ -80,7 +84,7 @@ public class EstimateService {
 
     @Transactional
     public void delete(Long id) {
-        Estimate estimate = getEstimate(id);
+        Estimate estimate = getEstimateForUpdate(id);
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             kafkaProducerService.sendEstimateDeleted(EstimateParsedPayload.builder()
@@ -95,7 +99,7 @@ public class EstimateService {
 
     @Transactional
     public EstimateResponse confirm(Long id) {
-        Estimate estimate = getEstimate(id);
+        Estimate estimate = getEstimateForUpdate(id);
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);
@@ -117,10 +121,34 @@ public class EstimateService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.ESTIMATE_NOT_FOUND));
     }
 
+    private Estimate getEstimateForUpdate(Long id) {
+        return estimateRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ESTIMATE_NOT_FOUND));
+    }
+
     private BigDecimal calculateTotal(List<EstimateItemRequest> items) {
-        return items.stream()
-                .map(item -> item.getUnitPrice().multiply(item.getQuantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = BigDecimal.ZERO;
+        for (EstimateItemRequest item : items) {
+            BigDecimal quantity = item.getQuantity();
+            BigDecimal unitPrice = item.getUnitPrice();
+            if (quantity == null || unitPrice == null || quantity.signum() <= 0
+                    || unitPrice.signum() < 0 || quantity.compareTo(MAX_QUANTITY) > 0
+                    || unitPrice.compareTo(MAX_AMOUNT) > 0) {
+                throw new BusinessException(ErrorCode.INVALID_ESTIMATE_AMOUNT);
+            }
+            try {
+                quantity.setScale(2, RoundingMode.UNNECESSARY);
+                unitPrice.setScale(2, RoundingMode.UNNECESSARY);
+                BigDecimal amount = quantity.multiply(unitPrice).setScale(2, RoundingMode.UNNECESSARY);
+                total = total.add(amount);
+                if (total.compareTo(MAX_AMOUNT) > 0) {
+                    throw new BusinessException(ErrorCode.INVALID_ESTIMATE_AMOUNT);
+                }
+            } catch (ArithmeticException ignored) {
+                throw new BusinessException(ErrorCode.INVALID_ESTIMATE_AMOUNT);
+            }
+        }
+        return total;
     }
 
     private void addItems(Estimate estimate, List<EstimateItemRequest> itemRequests) {
