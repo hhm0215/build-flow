@@ -24,6 +24,8 @@ import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { Site, SiteStatus } from '../../types'
+import { sumConfirmedEstimateAmount } from '../../utils/estimate'
+import SiteCreateModal from './SiteCreateModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   IN_PROGRESS: '시공 중',
@@ -257,6 +259,7 @@ export default function SiteListPage() {
     },
   })
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
     if (!filteredSites.length) {
@@ -303,7 +306,7 @@ export default function SiteListPage() {
   )
 
   const { estimateTotal, purchaseTotal, taxTotal, unpaidTotal } = useMemo(() => {
-    const e = siteEstimates.reduce((sum, est) => sum + est.totalAmount, 0)
+    const e = sumConfirmedEstimateAmount(siteEstimates)
     const p = sitePurchases.reduce((sum, pp) => sum + pp.totalAmount, 0)
     const t = siteTaxes.reduce((sum, tt) => sum + tt.totalAmount, 0)
     const u = siteTaxes
@@ -322,6 +325,7 @@ export default function SiteListPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => setCreateOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -341,6 +345,12 @@ export default function SiteListPage() {
             현장 추가
           </motion.button>
         }
+      />
+
+      <SiteCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(id) => navigate(`/sites/${id}`)}
       />
 
       {sitesError ? (
@@ -477,7 +487,7 @@ export default function SiteListPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
                           <CalendarDays size={13} strokeWidth={2} />
-                          {site.startDate} ~ {site.endDate}
+                          {site.startDate || '-'} ~ {site.endDate || '-'}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
                           <TrendingUp size={13} strokeWidth={2} color="var(--text-muted)" />
@@ -548,7 +558,7 @@ export default function SiteListPage() {
                     >
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>진행 기간</div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 12 }}>
-                        {selectedSite.startDate} ~ {selectedSite.endDate}
+                        {selectedSite.startDate || '-'} ~ {selectedSite.endDate || '-'}
                       </div>
                       <motion.button
                         whileHover={{ scale: 1.02 }}

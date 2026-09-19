@@ -18,7 +18,6 @@ import type { LucideIcon } from 'lucide-react'
 import ErrorState from '../../components/ErrorState'
 import {
   useSite,
-  useSiteProfit,
   useUpdateSiteStatus,
 } from '../../api/sites.api'
 import { useEstimates } from '../../api/estimates.api'
@@ -26,6 +25,7 @@ import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
+import { calculateDocumentProfit } from '../../utils/estimate'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   IN_PROGRESS: '시공 중',
@@ -223,13 +223,12 @@ export default function SiteDetailPage() {
   const invalidId = !id || Number.isNaN(siteId)
 
   const { data: site, isLoading: siteLoading, isError: siteError, refetch: siteRefetch } = useSite(siteId)
-  const { data: profit } = useSiteProfit(siteId)
   const updateStatus = useUpdateSiteStatus()
 
   const params = useMemo(() => ({ siteId: String(siteId) }), [siteId])
-  const { data: estimatesData, isLoading: estimatesLoading } = useEstimates(params)
-  const { data: purchasesData, isLoading: purchasesLoading } = usePurchases(params)
-  const { data: taxesData, isLoading: taxesLoading } = useTaxes(params)
+  const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError } = useEstimates(params)
+  const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError } = usePurchases(params)
+  const { data: taxesData, isLoading: taxesLoading, isError: taxesError } = useTaxes(params)
   const { data: warrantiesData, isLoading: warrantiesLoading } = useWarranties(params)
 
   const estimates = (estimatesData ?? []).filter((e) => e.siteId === siteId)
@@ -242,14 +241,21 @@ export default function SiteDetailPage() {
   const sortedTaxes = [...taxes].sort((a, b) => b.issueDate.localeCompare(a.issueDate))
   const sortedWarranties = [...warranties].sort((a, b) => a.endDate.localeCompare(b.endDate))
 
-  const estimateTotal = profit?.totalEstimateAmount ?? estimates.reduce((sum, e) => sum + e.totalAmount, 0)
-  const purchaseTotal = profit?.totalPurchaseAmount ?? purchases.reduce((sum, p) => sum + p.totalAmount, 0)
-  const margin = profit?.margin ?? estimateTotal - purchaseTotal
-  const marginRate =
-    profit?.marginRate ?? (estimateTotal > 0 ? (margin / estimateTotal) * 100 : 0)
+  // Kafka 손익 집계는 늦게 도착할 수 있으므로 이 화면은 최신 문서 목록으로 표시한다.
+  const {
+    totalEstimateAmount: estimateTotal,
+    totalPurchaseAmount: purchaseTotal,
+    margin,
+    marginRate,
+  } = calculateDocumentProfit(estimates, purchases)
   const unpaidTotal = taxes
     .filter((t) => t.type === 'SALES' && !t.paymentConfirmed)
     .reduce((sum, t) => sum + t.totalAmount, 0)
+  const estimateReady = !estimatesLoading && !estimatesError && !!estimatesData
+  const purchaseReady = !purchasesLoading && !purchasesError && !!purchasesData
+  const taxReady = !taxesLoading && !taxesError && !!taxesData
+  const financialValue = (ready: boolean, failed: boolean, amount: number) =>
+    ready ? formatCompactKRW(amount) : failed ? '조회 실패' : '불러오는 중'
 
   const [tab, setTab] = useState<string>('estimates')
 
@@ -328,30 +334,32 @@ export default function SiteDetailPage() {
         <SummaryCard
           icon={FileText}
           title="매출 (견적서 합계)"
-          value={formatCompactKRW(estimateTotal)}
-          description={`${estimates.length}건의 견적서`}
+          value={financialValue(estimateReady, estimatesError, estimateTotal)}
+          description={estimateReady ? `${estimates.length}건의 견적서` : '견적서 조회 상태를 확인하세요'}
           color="#8b5cf6"
         />
         <SummaryCard
           icon={ShoppingBag}
           title="매입 합계"
-          value={formatCompactKRW(purchaseTotal)}
-          description={`${purchases.length}건의 매입`}
+          value={financialValue(purchaseReady, purchasesError, purchaseTotal)}
+          description={purchaseReady ? `${purchases.length}건의 매입` : '매입 조회 상태를 확인하세요'}
           color="#f59e0b"
         />
         <SummaryCard
           icon={TrendingUp}
           title="마진"
-          value={formatCompactKRW(margin)}
-          description={estimateTotal > 0 ? `마진율 ${marginRate.toFixed(1)}%` : '아직 산출 전'}
-          color={margin >= 0 ? '#22c55e' : '#ef4444'}
+          value={financialValue(estimateReady && purchaseReady, estimatesError || purchasesError, margin)}
+          description={estimateReady && purchaseReady
+            ? (estimateTotal > 0 ? `마진율 ${marginRate.toFixed(1)}%` : '아직 산출 전')
+            : '견적서·매입 조회 후 산출'}
+          color={estimateReady && purchaseReady && margin < 0 ? '#ef4444' : '#22c55e'}
         />
         <SummaryCard
           icon={Wallet}
           title="미수금"
-          value={formatCompactKRW(unpaidTotal)}
-          description={unpaidTotal > 0 ? '입금 미확인 매출' : '미수금 없음'}
-          color={unpaidTotal > 0 ? '#ef4444' : '#52525b'}
+          value={financialValue(taxReady, taxesError, unpaidTotal)}
+          description={taxReady ? (unpaidTotal > 0 ? '입금 미확인 매출' : '미수금 없음') : '세금계산서 조회 상태를 확인하세요'}
+          color={taxReady && unpaidTotal > 0 ? '#ef4444' : '#52525b'}
         />
       </div>
 

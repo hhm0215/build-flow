@@ -8,17 +8,16 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "admin_accounts")
 @Getter
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
-    private String email;
+    @Column(nullable = false, unique = true, length = 50)
+    private String loginId;
 
     @Column(nullable = false)
     private String password;
@@ -26,19 +25,15 @@ public class User {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private UserRole role;
-
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    private User(String email, String password, String name, UserRole role) {
-        this.email = email;
+    private User(String loginId, String password, String name) {
+        this.id = 1L;
+        this.loginId = loginId;
         this.password = password;
         this.name = name;
-        this.role = role;
         this.createdAt = LocalDateTime.now();
     }
 }

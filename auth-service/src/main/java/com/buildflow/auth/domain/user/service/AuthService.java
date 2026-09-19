@@ -27,31 +27,16 @@ public class AuthService {
     private final StringRedisTemplate redisTemplate;
     private final BCryptPasswordEncoder passwordEncoder;
 
-    @Transactional
-    public void signUp(SignUpRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
-        }
-
-        User user = User.builder()
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .name(request.name())
-                .role(request.role())
-                .build();
-
-        userRepository.save(user);
-    }
-
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByLoginId(request.loginId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (!Long.valueOf(1L).equals(user.getId())
+                || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getLoginId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
         redisTemplate.opsForValue().set(
@@ -66,7 +51,7 @@ public class AuthService {
 
     public TokenResponse refresh(RefreshRequest request) {
         String refreshToken = request.refreshToken();
-        Long userId = jwtTokenProvider.getUserId(refreshToken);
+        Long userId = jwtTokenProvider.getUserId(refreshToken, "refresh");
 
         String storedToken = redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + userId);
         if (storedToken == null || !storedToken.equals(refreshToken)) {
@@ -75,8 +60,11 @@ public class AuthService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!Long.valueOf(1L).equals(user.getId())) {
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
 
-        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+        String newAccessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getLoginId());
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
         redisTemplate.opsForValue().set(
@@ -90,6 +78,7 @@ public class AuthService {
     }
 
     public void logout(String accessToken) {
+        Long userId = jwtTokenProvider.getUserId(accessToken, "access");
         long remaining = jwtTokenProvider.getRemainingExpiration(accessToken);
         if (remaining > 0) {
             redisTemplate.opsForValue().set(
@@ -100,7 +89,6 @@ public class AuthService {
             );
         }
 
-        Long userId = jwtTokenProvider.getUserId(accessToken);
         redisTemplate.delete(REFRESH_TOKEN_PREFIX + userId);
     }
 }

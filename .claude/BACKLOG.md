@@ -16,26 +16,54 @@
 
 ## P0 — 다음 1~2 작업
 
-### 단일 관리자 loginId 인증 전환
-- **배경**: 로컬 서버 실사용자는 시스템 관리자 1명이며 현재 공개 signup·이메일 형식 로그인·ADMIN/VIEWER 다중 역할은 요구사항과 불일치
-- **산출물**: 기존 사용자 정리/마이그레이션, 공개 signup 제거, 최초 관리자 안전한 bootstrap, `loginId/password` 계약으로 백엔드·Gateway JWT·프론트·MSW·문서 동기화
-- **관련 파일**: `auth-service`, `gateway-server`, `frontend/src/pages/auth`, `frontend/src/mocks`, 인증 관련 문서/테스트
-- **예상 규모**: M
+### GitHub 워크플로우 위임 규칙 정렬
+- **배경**: 현재 문서의 Git 사전 확인·PR 생성 건별 확인과 자율/위임 모드가 충돌한다. 사용자가 이 저장소의 PR 생성 여부 검토부터 머지·후속 작업까지 에이전트에 위임했다.
+- **산출물**: Git/PR 승인 규칙과 자동 실행 안전망을 CLAUDE/자동화 가이드/ADR에 일치시키고, 현재 미커밋 작업의 리뷰·커밋·PR 사이클을 완주
+- **관련 파일**: `CLAUDE.md`, `docs/AUTOMATION_GUIDE.md`, `docs/DECISIONS.md`, `.claude/`
+- **예상 규모**: S
+- **상태**: IN_PROGRESS
+
+### 실사용 UI 라이프사이클 연결
+- **배경**: 현장 생성·거래처 등록·견적 확정 첫 단계는 연결됐지만 현장·견적 수정/삭제 및 여러 도메인의 수정/삭제가 화면에 연결되지 않았다. 화면만으로 전체 입력·보정 흐름을 완주하려면 후속 동선이 필요하다.
+- **산출물**: 현장 수정, 견적 수정/삭제, 매입·세금계산서 수정/삭제, 보증보험 OCR 실패 보정/수정의 화면 동선과 오류 처리; MSW·실서버 계약 테스트
+- **관련 파일**: `frontend/src/pages`, `frontend/src/api`, `frontend/src/mocks`, 도메인별 컨트롤러
+- **예상 규모**: L (파일럿에 필요한 최소 동선부터 분할 가능)
+- **상태**: IN_PROGRESS (현장 생성·거래처 등록·견적 확정 UI 슬라이스 완료, 수정/삭제 동선 남음; 견적 확정 실서비스 이벤트 검증은 Kafka P0 이후)
+
+### Kafka 손익 집계 신뢰성 보강
+- **배경**: `eventId`는 발행하지만 소비자가 중복 처리 여부를 확인하지 않고, 소비자 예외를 로그 후 삼켜 메시지 재처리가 보장되지 않는다. 금액 누적형 `SiteProfit`은 동시 갱신과 발행-DB 커밋 경계에도 취약하다. 문서상 site-service가 소비한다는 `tax.registered`·`tax.payment.confirmed`는 실제 소비자가 없다.
+- **산출물**: 소비자 멱등성, 재시도/DLT, 발행-커밋 일관성(outbox 권장; after-commit은 단기 완화), 동시 갱신 제어, 세금 이벤트 집계 계약 정리, 중복·실패·순서 역전 회귀 테스트
+- **관련 파일**: `site-service/.../KafkaConsumerService.java`, `notification-service/.../KafkaConsumerService.java`, 이벤트 발행 서비스, `SiteProfit`
+- **예상 규모**: L (설계 후 단계 분할)
 - **상태**: TODO
 
 ---
 
 ## P1 — 중기
 
+### 실데이터용 DB 스키마 마이그레이션 체계
+- **배경**: DB 사용 7개 서비스 모두 `ddl-auto: update`이며 버전 관리형 마이그레이션 도구가 없다. 인증 스키마 전환과 실데이터 보존 전에 명시적 백업·복구·검증 경로가 필요하다.
+- **산출물**: 서비스별 버전 마이그레이션 전략, 인증 스키마 전환 스크립트, 백업·복구 검증, 운영 프로파일의 `ddl-auto` 정책
+- **관련 파일**: 7개 서비스 `application*.yml`, 각 서비스 DB 스키마, 배포 문서
+- **예상 규모**: M~L
+- **상태**: TODO
+
+### API 명세를 실제 계약과 동기화
+- **배경**: `docs/API_SPEC.md`에 존재하지 않는 `/api/v1/specifications/**`, `/tax-invoices/**`, `/payments/**`, `/chat/sessions/**` 등이 기재되어 있고 실제 `/estimates/parse`, `/dashboard/stats`, `/chat/stream` 등은 빠져 있다. 오류 래퍼 형태도 구현과 다르다.
+- **산출물**: 컨트롤러/Gateway/프론트 호출 기준 엔드포인트·요청/응답·인증 표 갱신, 미구현 제안 API는 계획으로 명확히 분리
+- **관련 파일**: `docs/API_SPEC.md`, `docs/ARCHITECTURE.md`, `gateway-server`, 각 서비스 컨트롤러
+- **예상 규모**: M
+- **상태**: TODO
+
 ### 로컬 서버 배포 보안 하드닝
-- **배경**: 개발 Compose는 loopback 전용으로 안전하게 제한했지만 향후 LAN 공개 시 Gateway만 노출하고 8081~8087·MySQL·Redis·Kafka 직접 접근을 차단해야 함
+- **배경**: 개발 Compose는 loopback 전용으로 제한했지만 향후 LAN 공개 시 프론트 리버스 프록시만 노출하고 Gateway·8081~8087·MySQL·Redis·Kafka 직접 접근을 차단해야 함
 - **산출물**: 로컬 서버용 Compose override, 외부 노출 포트 정책, Redis/DB 보안, 백업·복구 및 방화벽 런북
 - **관련 파일**: `docker-compose.yml`, `docker-compose.app.yml`, 신규 배포 override, `docs/`
 - **예상 규모**: M
 - **상태**: TODO
 
 ### 실데이터 파일럿 온보딩 (현장 1개 끝까지 입력)
-- **배경**: 기능 라이프사이클 전 구간 완성. 다음 완성도 요구사항은 추측이 아니라 실데이터에서 도출 — USB의 실제 현장 자료 1개를 거래처→현장→견적(공내역서 파싱)→매입→세금계산서→보증보험까지 실제로 입력
+- **배경**: 실사용 UI 동선과 금액 집계 신뢰성을 먼저 보강한 뒤, 추측 대신 실데이터에서 다음 요구사항 도출 — USB의 실제 현장 자료 1개를 거래처→현장→견적(공내역서 파싱)→매입→세금계산서→보증보험까지 실제로 입력
 - **산출물**: 온보딩 중 드러난 갭 목록(입력 필드 부족, 현장별 문서함(원본 파일 보관 — 현재 warranty PDF만 저장됨) 필요성, 과거 현장 일괄 입력 UX 등)을 BACKLOG 신규 항목으로 전환
 - **예상 규모**: S~M (사용자 참여 필요 — USB 자료 준비)
 - **상태**: TODO
@@ -119,3 +147,7 @@
 | 2026-07-22 | 외부 서류 작업 중 근거 실측에서 문서↔실구현 drift 발견 → P2에 "ADR-003 / 아키텍처 문서 drift 정정" 등록 |
 | 2026-09-15 | 실데이터 파일럿 선행 런타임 안정화 완료 → notification DB/volume, site Ollama, Zipkin, managed network, Bun/context, ignore/검증 규칙 정렬 |
 | 2026-09-18 | Windows fresh clone 개발 준비 완료 → PowerShell helper, 비밀값 로컬 생성, README/셋업, loopback Compose, Windows CI 정렬 |
+| 2026-09-19 | 코드·문서 재점검: 실사용 UI, Kafka 집계 신뢰성, DB 마이그레이션, API 명세 정합성을 신규 작업으로 등록 |
+| 2026-09-19 | 단일 관리자 인증 전환 및 현장 생성 첫 단계 검증 완료 — 인증 항목 제거, UI 후속은 P0 유지 |
+| 2026-09-19 | 견적 확정 UI·초안 손익 제외 기준 완료 — UI 후속과 Kafka 집계 신뢰성 P0 유지 |
+| 2026-09-19 | 거래처 생성→현장 자동 선택 동선 완료 — UI 수정/삭제 후속 P0 유지 |

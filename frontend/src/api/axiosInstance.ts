@@ -20,10 +20,16 @@ export function handleSessionExpired() {
   window.location.href = '/login'
 }
 
+/** 로그인 실패(401)는 폼에서 처리하고, 보호 API의 401만 세션 만료로 처리한다. */
+export function shouldHandleSessionExpired(status?: number, requestUrl?: string) {
+  const path = requestUrl?.split('?')[0]
+  return status === 401 && path !== '/auth/login' && path !== '/api/v1/auth/login'
+}
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (shouldHandleSessionExpired(error.response?.status, error.config?.url)) {
       handleSessionExpired()
     }
     return Promise.reject(error)

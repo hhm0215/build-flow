@@ -1,6 +1,5 @@
 package com.buildflow.auth.global.jwt;
 
-import com.buildflow.auth.domain.user.entity.UserRole;
 import com.buildflow.auth.global.exception.BusinessException;
 import com.buildflow.auth.global.exception.ErrorCode;
 import io.jsonwebtoken.*;
@@ -17,6 +16,8 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
+    private static final int AUTH_VERSION = 2;
+
     private final SecretKey secretKey;
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
@@ -31,13 +32,14 @@ public class JwtTokenProvider {
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
-    public String generateAccessToken(Long userId, String email, UserRole role) {
+    public String generateAccessToken(Long userId, String loginId) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("email", email)
-                .claim("role", role.name())
+                .claim("loginId", loginId)
+                .claim("role", "ADMIN")
                 .claim("type", "access")
+                .claim("authVersion", AUTH_VERSION)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + accessTokenExpiration))
                 .signWith(secretKey)
@@ -49,6 +51,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("type", "refresh")
+                .claim("authVersion", AUTH_VERSION)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshTokenExpiration))
                 .signWith(secretKey)
@@ -64,13 +67,24 @@ public class JwtTokenProvider {
                     .getPayload();
         } catch (ExpiredJwtException e) {
             throw new BusinessException(ErrorCode.TOKEN_EXPIRED);
-        } catch (JwtException e) {
+        } catch (JwtException | IllegalArgumentException e) {
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
     }
 
-    public Long getUserId(String token) {
-        return Long.parseLong(parseClaims(token).getSubject());
+    public Long getUserId(String token, String expectedType) {
+        Claims claims = parseClaims(token);
+        Object version = claims.get("authVersion");
+        if (!expectedType.equals(claims.get("type", String.class))
+                || !(version instanceof Number)
+                || ((Number) version).intValue() != AUTH_VERSION) {
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
+        try {
+            return Long.valueOf(claims.getSubject());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
     }
 
     public long getRefreshTokenExpiration() {

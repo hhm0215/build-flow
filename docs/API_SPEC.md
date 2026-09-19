@@ -46,11 +46,11 @@
 
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
-| POST | /api/v1/auth/signup | 회원가입 | X |
-| POST | /api/v1/auth/login | 로그인 → JWT 발급 | X |
-| POST | /api/v1/auth/refresh | 토큰 갱신 | O |
-| POST | /api/v1/auth/logout | 로그아웃 (블랙리스트 등록) | O |
-| GET | /api/v1/auth/me | 내 정보 조회 | O |
+| POST | /api/v1/auth/login | `{loginId, password}`로 관리자 로그인 → JWT 발급 | X |
+| POST | /api/v1/auth/refresh | `{refreshToken}`으로 토큰 갱신 | X (refresh token 필요) |
+| POST | /api/v1/auth/logout | Bearer access token 로그아웃 (블랙리스트 등록) | O |
+
+공개 회원가입·최초 관리자 생성 API는 없습니다. 최초 관리자는 로컬 `scripts/create-admin.ps1` 대화형 명령으로만 생성합니다. access token은 `type=access`, `role=ADMIN`, `authVersion=2`를 포함하며 Gateway가 이를 검증합니다. 전환 이전 토큰은 유효하지 않습니다.
 
 ---
 

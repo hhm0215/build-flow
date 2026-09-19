@@ -42,7 +42,14 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
             }
 
             String token = authHeader.substring(7);
-            if (!isValidToken(token)) {
+            Claims claims;
+            try {
+                claims = getClaims(token);
+            } catch (Exception e) {
+                log.warn("JWT token validation failed");
+                return onError(exchange, HttpStatus.UNAUTHORIZED);
+            }
+            if (!isAuthorizedClaims(claims)) {
                 return onError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
@@ -53,10 +60,11 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
                             return onError(exchange, HttpStatus.UNAUTHORIZED);
                         }
 
-                        Claims claims = getClaims(token);
                         ServerWebExchange modifiedExchange = exchange.mutate()
-                                .request(r -> r.header("X-User-Id", claims.getSubject())
-                                        .header("X-User-Role", claims.get("role", String.class)))
+                                .request(r -> r.headers(headers -> {
+                                    headers.set("X-User-Id", claims.getSubject());
+                                    headers.set("X-User-Role", "ADMIN");
+                                }))
                                 .build();
 
                         return chain.filter(modifiedExchange);
@@ -64,14 +72,14 @@ public class AuthorizationHeaderFilter extends AbstractGatewayFilterFactory<Auth
         };
     }
 
-    private boolean isValidToken(String token) {
-        try {
-            getClaims(token);
-            return true;
-        } catch (Exception e) {
-            log.warn("JWT token validation failed");
-            return false;
-        }
+    static boolean isAuthorizedClaims(Claims claims) {
+        Object version = claims.get("authVersion");
+        return "access".equals(claims.get("type", String.class))
+                && "ADMIN".equals(claims.get("role", String.class))
+                && version instanceof Number
+                && ((Number) version).intValue() == 2
+                && claims.getSubject() != null
+                && !claims.getSubject().isBlank();
     }
 
     private Claims getClaims(String token) {

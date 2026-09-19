@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 현장별 문서(공내역서, 견적서, 세금계산서, 하자보증보험)를 묶어서 관리하고,
 AI가 요약 대시보드를 생성하여 마진/손익을 한눈에 파악.
 
-1인 개발 + 실사용(혜민 관리, 아버지 열람). MSA 구조로 백엔드 포트폴리오 겸용.
+1인 개발 + 가족이 단일 관리자 계정을 공유하는 로컬 실사용. MSA 구조로 백엔드 포트폴리오 겸용.
 
 ## 빌드 & 실행
 
@@ -171,14 +171,15 @@ bun run preview         # 빌드 결과 미리보기
 
 ### Git 규칙
 
-- **IMPORTANT**: git 작업(브랜치 생성/삭제, 커밋, 푸시, 체크아웃) 실행 전 반드시 사용자 확인
-  - "~할까?" = 질문 → 설명 후 대기
-  - "~해줘" = 지시 → 실행
+- **IMPORTANT**: 기본 모드의 git 작업(브랜치 생성/삭제, 커밋, 푸시, 체크아웃)은 사용자 확인 후 실행
+  - "~할까?" = 질문 → 설명 후 대기, "~해줘" = 지시 → 실행
+  - **BuildFlow 위임 예외 (2026-09-19)**: 사용자가 이 저장소의 백로그 작업과 GitHub 관리를 에이전트에 위임했다. 이 위임을 수행하는 작업에서는 대화의 기본/자율 모드 명칭과 무관하게 `develop` 작업 커밋·push·PR 생성 여부 검토·PR 생성·검증 후 merge·후처리를 건별 재확인 없이 진행한다. 다른 저장소/브랜치 보호 설정/파괴적 Git 작업까지 포괄 승인한 것은 아니다. 주요 설계 결정·검증 실패·SHA 불일치는 멈춤 조건이다 (ADR-016).
 - **IMPORTANT**: force 옵션 절대 금지
   - `git add -f` 금지 — `.gitignore`가 거부하면 그 파일은 커밋 대상이 아님
   - `git push --force` 금지
   - `--no-verify` 금지
   - **git이 거부/경고하면 멈추고 사용자에게 보고. force로 우회하지 않는다**
+  - Windows에서 편집 후 LF/CRLF 혼합 경고가 나면 `.gitattributes`와 `git ls-files --eol`로 원인을 확인하고 변경된 텍스트 파일만 기대 줄바꿈으로 정규화한다. 경고를 설정으로 숨기거나 force로 우회하지 않는다
 - PR 생성: Claude가 `gh pr create`로 자동 생성 (사전 검증 체크리스트 통과 시 — "## 개발 워크플로우" 6단계)
 - PR 머지: Claude가 `gh pr merge --merge`로 자동 (SHA 자동 검증 안전망 통과 시 — "## 개발 워크플로우" 7단계). 2026-06-13 ADR-011 v2로 결정 번복됨
 - PR 본문은 텍스트로만 제공. 형식 고정: `## 변경 사항` / `## 상세` 두 섹션만 사용. 개요·테스트·참고 같은 추가 섹션 즉흥 도입 금지
@@ -191,8 +192,8 @@ bun run preview         # 빌드 결과 미리보기
 모든 작업은 아래 사이클을 따른다. 각 단계는 산출물(문서)을 남긴다.
 
 1. **백로그 확인** — `.claude/BACKLOG.md`에서 다음 항목 선택
-2. **계획 작성** — `.claude/plans/YYYY-MM-DD-{slug}.md` 작성 (템플릿은 `.claude/plans/README.md`), 사용자 합의 후 구현 진입
-3. **구현 + 커밋** — 작업 단위로 커밋, 사용자 사전 승인 규칙 준수
+2. **계획 작성** — `.claude/plans/YYYY-MM-DD-{slug}.md` 작성 (템플릿은 `.claude/plans/README.md`). 위임 밖의 작업은 사용자 합의 후 구현; 위임 작업은 에이전트가 범위·리스크를 자체 검토하고, 주요 설계 결정이면 사용자 합의를 받는다
+3. **구현 + 커밋** — 작업 단위로 커밋. 위임 밖의 작업은 사용자 사전 승인, 위임 작업은 위 Git 위임 예외 적용
 4. **결과 반영** (작업 종료 시 필수):
    - 계획 문서 "결과" 섹션 채움
    - BACKLOG.md에서 완료 항목 제거
@@ -203,13 +204,13 @@ bun run preview         # 빌드 결과 미리보기
 6. **PR 생성** (develop ↔ main 차이가 PR 가치 있을 때):
    - `git fetch && git log origin/main..origin/develop`로 머지 대상 커밋 목록 확보
    - 로컬 `develop` SHA = `origin/develop` SHA 확인 (push 누락 검증 — PR #19 사고 가드레일)
-   - 사용자에게 머지될 커밋 목록 요약 + "PR 생성 진행?" 텍스트 확인 1회
+   - 에이전트가 머지될 커밋 목록·변경 범위·5.5 리뷰·테스트 결과를 자체 검토하고 사용자에게 진행 상황을 공유한다. 위임 밖의 작업은 "PR 생성 진행?" 확인 1회, 위임 작업은 건별 확인 없이 진행
    - `gh pr create --base main --head develop --title "..." --body "..."` (본문은 ##변경 사항/##상세 두 섹션 고정)
    - 반환된 PR URL을 사용자에게 전달
 
 7. **PR 자동 머지** (Commits SHA 검증 통과 시):
    - 머지 직전 `gh pr view <num> --json commits --jq '.commits[].oid' | sort` ↔ `git log --format='%H' origin/main..origin/develop | sort` 비교
-   - SHA 일치 시 `gh pr merge <num> --merge` (Create a merge commit 방식)
+   - PR CI 필수 체크 통과 및 SHA 일치 시 `gh pr merge <num> --merge` (Create a merge commit 방식). 실패·미완료 체크는 기다리거나 멈추고, 우회 옵션은 사용하지 않는다
    - **SHA 불일치 시 머지 중단** + 사용자에게 보고 (PR 생성 후 develop에 추가 push가 들어간 경우 — PR 본문 갱신 후 재검증 또는 PR 닫고 새로 생성)
    - 머지 성공 후 `git fetch origin`으로 로컬 origin/main 최신화
 

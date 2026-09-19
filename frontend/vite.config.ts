@@ -7,6 +7,9 @@ const useMock = process.env.MSW_DISABLED !== 'true'
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __BUILDFLOW_MSW_ENABLED__: JSON.stringify(useMock),
+  },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react/jsx-runtime', 'motion/react'],
   },
