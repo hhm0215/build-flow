@@ -12,8 +12,9 @@ import FilterDateRange from '../../components/filters/FilterDateRange'
 import FilterAmountRange from '../../components/filters/FilterAmountRange'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
-import { useTaxes, useConfirmPayment, useCreateTax } from '../../api/taxes.api'
-import type { TaxInvoiceCreateRequest, TaxInvoiceType } from '../../types'
+import { useTaxes, useCreateTax } from '../../api/taxes.api'
+import type { TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceType } from '../../types'
+import TaxPaymentConfirmModal from './TaxPaymentConfirmModal'
 
 type PaymentStatus = 'PAID' | 'UNPAID'
 
@@ -49,9 +50,9 @@ const FILTER_SCHEMA: FilterSchema = {
 
 export default function TaxListPage() {
   const { data, isLoading, isError, refetch } = useTaxes()
-  const { mutate: confirmPayment } = useConfirmPayment()
   const { mutate: createTax, isPending: isCreating } = useCreateTax()
   const [modalOpen, setModalOpen] = useState(false)
+  const [confirmingInvoice, setConfirmingInvoice] = useState<TaxInvoice | null>(null)
   const [form] = Form.useForm()
   const invoices = useMemo(() => data ?? [], [data])
 
@@ -255,7 +256,7 @@ export default function TaxListPage() {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => confirmPayment(inv.id)}
+                        onClick={() => setConfirmingInvoice(inv)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 4,
                           fontSize: 11, fontWeight: 600,
@@ -283,7 +284,7 @@ export default function TaxListPage() {
         okText="등록"
         cancelText="취소"
         confirmLoading={isCreating}
-        destroyOnClose
+        destroyOnHidden
         onCancel={() => { setModalOpen(false); form.resetFields() }}
         onOk={() => {
           form.validateFields().then((values) => {
@@ -342,6 +343,12 @@ export default function TaxListPage() {
           </Form.Item>
         </Form>
       </Modal>
+      {confirmingInvoice && (
+        <TaxPaymentConfirmModal
+          invoice={confirmingInvoice}
+          onClose={() => setConfirmingInvoice(null)}
+        />
+      )}
     </div>
   )
 }
