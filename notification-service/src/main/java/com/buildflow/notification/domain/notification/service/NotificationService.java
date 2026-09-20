@@ -2,7 +2,9 @@ package com.buildflow.notification.domain.notification.service;
 
 import com.buildflow.notification.domain.notification.dto.NotificationResponse;
 import com.buildflow.notification.domain.notification.entity.Notification;
+import com.buildflow.notification.domain.notification.entity.ProcessedNotificationEvent;
 import com.buildflow.notification.domain.notification.repository.NotificationRepository;
+import com.buildflow.notification.domain.notification.repository.ProcessedNotificationEventRepository;
 import com.buildflow.notification.global.exception.BusinessException;
 import com.buildflow.notification.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -19,9 +21,17 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final ProcessedNotificationEventRepository processedEventRepository;
 
     @Transactional
-    public void createNotification(String eventType, String message, Long siteId) {
+    public void createNotification(String eventId, String eventType, String message, Long siteId) {
+        if (processedEventRepository.existsById(eventId)) {
+            log.info("이미 처리한 알림 이벤트: eventId={}", eventId);
+            return;
+        }
+        // DB UNIQUE 제약이 동시 중복 요청의 마지막 방어선이다. 충돌은 재시도로 보내고
+        // 다음 시도에서 이미 처리한 이벤트로 판단한다.
+        processedEventRepository.saveAndFlush(new ProcessedNotificationEvent(eventId));
         Notification notification = Notification.builder()
                 .eventType(eventType)
                 .message(message)
