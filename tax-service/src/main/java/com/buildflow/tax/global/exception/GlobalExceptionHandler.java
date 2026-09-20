@@ -3,6 +3,7 @@ package com.buildflow.tax.global.exception;
 import com.buildflow.tax.global.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -28,6 +29,12 @@ public class GlobalExceptionHandler {
                 .orElse("입력값이 올바르지 않습니다.");
         log.warn("BindException: {}", message);
         return ResponseEntity.badRequest().body(ApiResponse.error(message));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    protected ResponseEntity<ApiResponse<Void>> handleUnreadableRequest(HttpMessageNotReadableException e) {
+        log.warn("요청 본문을 읽을 수 없습니다: {}", e.getMessage());
+        return ResponseEntity.badRequest().body(ApiResponse.error("요청 본문이 올바르지 않습니다."));
     }
 
     @ExceptionHandler(Exception.class)

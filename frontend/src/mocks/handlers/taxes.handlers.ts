@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import dayjs from 'dayjs'
 import { mockTaxInvoices } from '../data/taxes.data'
 import { ApiResponse, TaxInvoice, TaxInvoiceCreateRequest } from '../../types'
 
@@ -46,7 +47,35 @@ export const taxesHandlers = [
   }),
 
   // 입금 확인 — PATCH /api/v1/taxes/:id/confirm-payment
-  http.patch<{ id: string }>('/api/v1/taxes/:id/confirm-payment', ({ params }) => {
+  http.patch<{ id: string }>('/api/v1/taxes/:id/confirm-payment', async ({ params, request }) => {
+    const rawBody = await request.text()
+    if (!rawBody) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '요청 본문이 올바르지 않습니다.' },
+        { status: 400 },
+      )
+    }
+    let body: { paymentDate?: string | null }
+    try {
+      body = JSON.parse(rawBody) as { paymentDate?: string | null }
+    } catch {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '요청 본문이 올바르지 않습니다.' },
+        { status: 400 },
+      )
+    }
+    if (body == null || typeof body !== 'object' ||
+        (body.paymentDate != null && (
+          typeof body.paymentDate !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(body.paymentDate) ||
+          Number.isNaN(Date.parse(body.paymentDate)) ||
+          new Date(body.paymentDate).toISOString().slice(0, 10) !== body.paymentDate
+        ))) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '요청 본문이 올바르지 않습니다.' },
+        { status: 400 },
+      )
+    }
     const index = taxInvoices.findIndex((t) => t.id === Number(params.id))
     if (index === -1) {
       return HttpResponse.json<ApiResponse<null>>(
@@ -54,10 +83,16 @@ export const taxesHandlers = [
         { status: 404 },
       )
     }
+    if (taxInvoices[index].paymentConfirmed) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '이미 입금 확인된 세금계산서입니다.' },
+        { status: 409 },
+      )
+    }
     taxInvoices[index] = {
       ...taxInvoices[index],
       paymentConfirmed: true,
-      paymentDate: new Date().toISOString().split('T')[0],
+      paymentDate: body.paymentDate ?? dayjs().format('YYYY-MM-DD'),
       updatedAt: new Date().toISOString(),
     }
     return HttpResponse.json<ApiResponse<TaxInvoice>>({ success: true, data: taxInvoices[index], error: null })

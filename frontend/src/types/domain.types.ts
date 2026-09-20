@@ -186,6 +186,11 @@ export interface TaxInvoiceCreateRequest {
   memo?: string
 }
 
+export interface PaymentConfirmRequest {
+  id: number
+  paymentDate: string
+}
+
 // ── Dashboard (대시보드) ──────────────────────
 export interface DashboardStats {
   totalSites: number
