@@ -7,16 +7,20 @@
 
 ## 현재 진행 중 — 실사용 UI 라이프사이클 (2026-09-20)
 
-- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다. 확정본 삭제 정책과 매입 UI/Kafka 신뢰성의 선후 순서는 사용자 선택 대기. 남은 작업은 `.claude/BACKLOG.md` P0 항목을 따른다.
+- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다. 사용자가 Kafka 신뢰성 우선, 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지를 승인했다. Kafka Phase 1부터 진행하며 남은 작업은 `.claude/BACKLOG.md` P0를 따른다.
 - 손익 집계의 Kafka 멱등성·재시도·동시 갱신 보강도 별도 P0 작업으로 남아 있다.
 
 ---
 
 ## 완료된 작업
 
+### ✅ Kafka 손익 집계 신뢰성 Phase 1 — 소비자 보호 (2026-09-20)
+- site-service의 고유 eventId 처리 기록과 손익 갱신을 현장 행 잠금 아래 한 트랜잭션으로 묶고, notification-service의 알림·처리 기록도 원자적으로 저장했다. 두 소비자의 예외 삼키기를 제거하고 제한 재시도·원문 DLT를 설정했다. 실제 세금 이벤트 소비자/미수금 계산 계약을 문서에 맞췄다.
+- 전체 Gradle test, 서비스별 H2 중복·동시성·롤백 테스트 통과. 독립 리뷰 CRITICAL/HIGH 0건. Docker 두 서비스 health·목록 GET 200 및 처리 기록 테이블 생성 확인. MySQL 실제 동시 잠금과 Kafka offset 보존은 아직 통합 검증하지 않았다. 계획: `.claude/plans/2026-09-20-kafka-reliability-phase1.md`.
+
 ### ✅ 실사용 UI 라이프사이클 — 세금계산서 입금 확인 계약·오류 처리 (2026-09-20)
 - 프론트 PATCH에 실제 입금일 JSON 본문을 추가하고 대상·금액·입금일 확인 모달, 중복 제출 방지, 오류 표시·재시도를 연결했다. MSW는 빈/잘못된 본문 400, 없는 ID 404, 중복 확인 409를 처리한다. 백엔드의 읽을 수 없는 요청 본문도 400 래퍼로 응답한다.
-- 전체 Gradle test 및 프론트 lint·Vitest 72개·build 통과. 정적 점검에서 서버 DTO·오류·캐시 무효화·UI 경합을 확인했다. Docker 엔진 연결 중단으로 tax-service 재기동 및 실서버 스모크는 보류했다. 계획: `.claude/plans/2026-09-20-tax-payment-confirm-contract.md`.
+- 전체 Gradle test 및 프론트 lint·Vitest 72개·build 통과. 정적 점검에서 서버 DTO·오류·캐시 무효화·UI 경합을 확인했다. Docker 엔진 복구 후 tax-service·프론트를 재빌드·재기동하고 health/화면 200, 본문 없는 PATCH 400, 없는 ID의 유효한 PATCH 404를 실서버에서 확인했다. 영속 데이터 변경 스모크는 수행하지 않았다. 계획: `.claude/plans/2026-09-20-tax-payment-confirm-contract.md`.
 - [PR #53](https://github.com/hhm0215/build-flow/pull/53) GitHub CI 6개 성공·2개 커밋 SHA 일치 후 merge commit `e293e3b` 병합.
 
 ### ✅ 실사용 UI 라이프사이클 — 보증보험 OCR 실패 수동 보정·수정 (2026-09-20)
@@ -440,13 +444,13 @@
 
 ## 다음 세션 진입점 (2026-09-20 갱신)
 
-**Git 상태**: PR #49~#53 merge 완료. `origin/main`은 merge commit `e293e3b`, `origin/develop`은 `9f46228`이다. main은 PR #53의 두 커밋을 포함하고 merge commit 1개가 더 있다. PR #53 병합 후처리 문서는 로컬 develop에 커밋하고 다음 실질 작업 PR에 포함할 예정이다.
+**Git 상태**: PR #49~#53 merge 완료. `origin/main`은 merge commit `e293e3b`, `origin/develop`은 `9f46228`이다. main은 PR #53의 두 커밋을 포함하고 merge commit 1개가 더 있다. PR #53 병합 후처리는 로컬 develop 커밋 `14d976a`이며 Kafka Phase 1 변경과 함께 다음 PR에 포함할 예정이다.
 
-**로컬 실행 상태**: Docker Desktop Linux 엔진 연결이 끊겨 현재 컨테이너 상태와 tax-service 재기동/실서버 스모크를 확인할 수 없다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 이전 세션의 관리자 로그인·현장 API 스모크는 통과했고 검증용 현장은 삭제했다.
+**로컬 실행 상태**: Docker Desktop Linux 엔진이 복구되어 기존 서비스·인프라가 실행 중이다. tax-service·프론트를 PR #53 코드로, site-service·notification-service를 Kafka Phase 1 코드로 재빌드·재기동했다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 이전 세션의 관리자 로그인·현장 API 스모크는 통과했고 검증용 현장은 삭제했다.
 
-**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 매입 수정·삭제 UI와 Kafka 집계 신뢰성의 선후, 확정 견적 삭제와 입금 확인된 세금계산서 수정·삭제 정책은 사용자 결정 대기. 실데이터 파일럿은 두 P0 위험을 해소한 뒤 진행한다.
+**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 사용자 결정에 따라 Kafka 집계 신뢰성을 Phase 1 소비자 보호→Phase 2 outbox 발행 보장→Phase 3 매입 순서 안전으로 우선 구현하고, 이후 확정 견적/입금 확인 세금계산서 보호와 매입·세금계산서 수정/삭제 UI를 연결한다. outbox를 먼저 두는 이유는 롤백된 매입 변경의 높은 revision 이벤트가 projection에 남는 위험을 막기 위해서다. 실데이터 파일럿은 두 P0 위험을 해소한 뒤 진행한다.
 
-**검증 상태**: 입금 확인 수정에 대해 Gradle 전체 테스트 및 프론트 lint·Vitest 72개·production build 통과. PR #52의 Docker 프론트·notification health/목록 GET 200과 Gateway 미인증 보증보험 API 401은 과거 검증이다. 입금 확인 실서버 스모크는 Docker 엔진 중단으로 미실시. 기존 프론트 번들 크기 경고는 P2 유지. 브라우저 수동 E2E, 영속 데이터 변경 실서비스 스모크, 견적 확정 실제 이벤트, 전체 서비스 결합 검증은 아직 수행하지 않았다.
+**검증 상태**: Kafka Phase 1 전체 Gradle test 및 site/notification H2 회귀 테스트 통과, Docker 두 서비스 health/목록 GET 200·처리 기록 테이블 생성 확인. 입금 확인 수정의 프론트 lint·Vitest 72개·production build 및 Docker tax-service health/프론트 GET 200·빈 본문 PATCH 400·없는 ID의 유효한 PATCH 404도 통과. 기존 프론트 번들 크기 경고는 P2 유지. MySQL 실제 동시 잠금·Kafka DLT offset 보존, 브라우저 수동 E2E, 영속 데이터 변경 실서비스 스모크, 견적 확정 실제 이벤트, 전체 서비스 결합 검증은 아직 수행하지 않았다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

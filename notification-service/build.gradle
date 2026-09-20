@@ -19,4 +19,5 @@ dependencies {
 
     runtimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testRuntimeOnly 'com.h2database:h2'
 }

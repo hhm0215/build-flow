@@ -108,8 +108,9 @@ bun run preview         # 빌드 결과 미리보기
 
 - `estimate.parsed` / `estimate.deleted`: estimate-service → site-service (손익 재계산)
 - `purchase.registered` / `purchase.updated` / `purchase.deleted`: purchase-service → site-service
-- `tax.registered` / `tax.payment.confirmed`: tax-service → site-service (미수금 갱신)
+- `tax.registered` / `tax.payment.confirmed`: tax-service → notification-service (알림). 미수금은 tax-service DB에서 직접 계산하며 site-service는 두 토픽을 소비하지 않음
 - notification-service: 모든 토픽 구독 → 인앱 알림
+- 손익용 revision/projection을 도입할 때는 DB 롤백 이벤트가 더 높은 revision으로 남지 않도록 transactional outbox를 먼저 적용한다. 새 eventId 처리 기록을 배포할 때는 기존 consumer offset·집계/알림 기준선을 대조하고 과거 토픽 전체 재생을 금지한다.
 
 ### 현장 문서 라이프사이클
 

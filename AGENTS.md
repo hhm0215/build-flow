@@ -122,8 +122,8 @@ eventId 기반 멱등성 필수.
 | purchase.registered | purchase-service | site-service, notification-service |
 | purchase.updated | purchase-service | site-service |
 | purchase.deleted | purchase-service | site-service |
-| tax.registered | tax-service | site-service, notification-service |
-| tax.payment.confirmed | tax-service | site-service |
+| tax.registered | tax-service | notification-service |
+| tax.payment.confirmed | tax-service | notification-service |
 | warranty.expiring | notification-service | notification-service |
 
 ---
