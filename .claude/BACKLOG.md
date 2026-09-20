@@ -28,7 +28,7 @@
 - **산출물**: 소비자 멱등성, 재시도/DLT, 발행-커밋 일관성(outbox 권장; after-commit은 단기 완화), 동시 갱신 제어, 세금 이벤트 집계 계약 정리, 중복·실패·순서 역전 회귀 테스트
 - **관련 파일**: `site-service/.../KafkaConsumerService.java`, `notification-service/.../KafkaConsumerService.java`, 이벤트 발행 서비스, `SiteProfit`
 - **예상 규모**: L (설계 후 단계 분할)
-- **상태**: IN_PROGRESS (Phase 1 소비자 멱등·재시도/DLT·현장 잠금 구현·로컬 검증 완료. Phase 2 outbox 발행 보장 후 Phase 3 매입 순서 안전을 진행 — 롤백된 높은 revision 이벤트를 먼저 차단)
+- **상태**: IN_PROGRESS (Phase 1 소비자 멱등·재시도/DLT·현장 잠금 PR #54 병합 완료. Phase 2 outbox 발행 보장 후 Phase 3 매입 순서 안전을 진행 — 롤백된 높은 revision 이벤트를 먼저 차단)
 
 ---
 
@@ -150,3 +150,4 @@
 | 2026-09-20 | 보증보험 OCR 실패 수동 보정/수정 PR #52 CI/SHA 검증 후 merge 완료 — UI 라이프사이클 P0의 매입·세금계산서 후속 유지 |
 | 2026-09-20 | 세금계산서 입금 확인의 필수 요청 본문·오류 처리 PR #53 CI/SHA 검증 후 merge 완료 — 매입·세금계산서 수정/삭제와 Kafka 신뢰성 P0 유지 |
 | 2026-09-20 | 사용자 결정: Kafka 신뢰성 우선, 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지. Kafka를 소비자 보호/outbox/순서 안전 3단계로 분할 |
+| 2026-09-20 | Kafka 소비자 보호 Phase 1 PR #54 CI/SHA 검증 후 merge 완료 — outbox/매입 순서 안전 P0 유지 |

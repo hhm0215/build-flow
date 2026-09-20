@@ -17,6 +17,7 @@
 ### ✅ Kafka 손익 집계 신뢰성 Phase 1 — 소비자 보호 (2026-09-20)
 - site-service의 고유 eventId 처리 기록과 손익 갱신을 현장 행 잠금 아래 한 트랜잭션으로 묶고, notification-service의 알림·처리 기록도 원자적으로 저장했다. 두 소비자의 예외 삼키기를 제거하고 제한 재시도·원문 DLT를 설정했다. 실제 세금 이벤트 소비자/미수금 계산 계약을 문서에 맞췄다.
 - 전체 Gradle test, 서비스별 H2 중복·동시성·롤백 테스트 통과. 독립 리뷰 CRITICAL/HIGH 0건. Docker 두 서비스 health·목록 GET 200 및 처리 기록 테이블 생성 확인. MySQL 실제 동시 잠금과 Kafka offset 보존은 아직 통합 검증하지 않았다. 계획: `.claude/plans/2026-09-20-kafka-reliability-phase1.md`.
+- [PR #54](https://github.com/hhm0215/build-flow/pull/54) GitHub CI 6개 성공·2개 커밋 SHA 일치 후 merge commit `637ec5c` 병합.
 
 ### ✅ 실사용 UI 라이프사이클 — 세금계산서 입금 확인 계약·오류 처리 (2026-09-20)
 - 프론트 PATCH에 실제 입금일 JSON 본문을 추가하고 대상·금액·입금일 확인 모달, 중복 제출 방지, 오류 표시·재시도를 연결했다. MSW는 빈/잘못된 본문 400, 없는 ID 404, 중복 확인 409를 처리한다. 백엔드의 읽을 수 없는 요청 본문도 400 래퍼로 응답한다.
@@ -444,7 +445,7 @@
 
 ## 다음 세션 진입점 (2026-09-20 갱신)
 
-**Git 상태**: PR #49~#53 merge 완료. `origin/main`은 merge commit `e293e3b`, `origin/develop`은 `9f46228`이다. main은 PR #53의 두 커밋을 포함하고 merge commit 1개가 더 있다. PR #53 병합 후처리는 로컬 develop 커밋 `14d976a`이며 Kafka Phase 1 변경과 함께 다음 PR에 포함할 예정이다.
+**Git 상태**: PR #49~#54 merge 완료. `origin/main`은 merge commit `637ec5c`, `origin/develop`은 `b333252`이다. main은 PR #54의 두 커밋을 포함하고 merge commit 1개가 더 있다. PR #54 병합 후처리 문서는 로컬 develop에 커밋하고 다음 실질 작업 PR에 포함할 예정이다.
 
 **로컬 실행 상태**: Docker Desktop Linux 엔진이 복구되어 기존 서비스·인프라가 실행 중이다. tax-service·프론트를 PR #53 코드로, site-service·notification-service를 Kafka Phase 1 코드로 재빌드·재기동했다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 이전 세션의 관리자 로그인·현장 API 스모크는 통과했고 검증용 현장은 삭제했다.
 
