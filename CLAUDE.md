@@ -148,6 +148,8 @@ bun run preview         # 빌드 결과 미리보기
 - 메시지: `{ eventId, eventType, timestamp, payload }`
 - Consumer: `{service}-group`
 - eventId 기반 멱등성
+- Outbox 발행의 timeout은 `KafkaTemplate.send()`가 Future를 반환하기 전 메타데이터/버퍼 대기(`max.block.ms`)와 반환 후 broker ACK 대기를 각각 제한하고, 합계가 claim lease보다 충분히 짧은지 확인한다. ACK 직후 상태 기록 실패는 동일 eventId 재전송으로 복구한다.
+- 날짜 쿨다운이 있는 이벤트는 enqueue 시각과 broker ACK 시각을 구분한다. 미전송 outbox가 남아 있으면 쿨다운 경과만으로 새 eventId를 만들지 않으며, 실제 수신 기준 쿨다운은 ACK 날짜로 다시 시작한다.
 
 ### Redis
 

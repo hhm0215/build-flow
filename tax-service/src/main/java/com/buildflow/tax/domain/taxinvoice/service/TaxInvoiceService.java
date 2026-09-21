@@ -87,7 +87,8 @@ public class TaxInvoiceService {
 
     @Transactional
     public TaxInvoiceResponse confirmPayment(Long id, PaymentConfirmRequest request) {
-        TaxInvoice taxInvoice = getTaxInvoice(id);
+        TaxInvoice taxInvoice = taxInvoiceRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TAX_INVOICE_NOT_FOUND));
         LocalDate paymentDate = (request.getPaymentDate() != null)
                 ? request.getPaymentDate()
                 : LocalDate.now();

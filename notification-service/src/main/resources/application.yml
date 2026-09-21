@@ -18,6 +18,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
     show-sql: false
+  task:
+    scheduling:
+      # Outbox ACK 대기와 매일 09:00 보증보험 스캔을 서로 막지 않도록 분리
+      pool:
+        size: 2
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
