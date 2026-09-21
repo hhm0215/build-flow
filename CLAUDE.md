@@ -148,6 +148,8 @@ bun run preview         # 빌드 결과 미리보기
 - 메시지: `{ eventId, eventType, timestamp, payload }`
 - Consumer: `{service}-group`
 - eventId 기반 멱등성
+- Outbox 발행의 timeout은 `KafkaTemplate.send()`가 Future를 반환하기 전 메타데이터/버퍼 대기(`max.block.ms`)와 반환 후 broker ACK 대기를 각각 제한하고, 합계가 claim lease보다 충분히 짧은지 확인한다. ACK 직후 상태 기록 실패는 동일 eventId 재전송으로 복구한다.
+- 날짜 쿨다운이 있는 이벤트는 enqueue 시각과 broker ACK 시각을 구분한다. 미전송 outbox가 남아 있으면 쿨다운 경과만으로 새 eventId를 만들지 않으며, 실제 수신 기준 쿨다운은 ACK 날짜로 다시 시작한다.
 
 ### Redis
 
@@ -332,6 +334,7 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다
 - **IMPORTANT**: 비동기 처리·부분 추출 API 응답은 PENDING/FAILED의 null 필드를 타입·목록·정렬·필터·MSW에 함께 반영하고, 수동 보정의 상태 전환·경합 방지·기간 검증을 서버에서 보장한다
 - **IMPORTANT**: 파일럿/실사용 검증은 풀 Docker 실서비스 모드로 수행. `bootRun`과 MSW 검증은 각각 서비스 단위·목업 검증으로만 기록
+- Docker 전체 병렬 빌드가 외부 의존성 TLS/네트워크 오류로 실패하면 코드 실패와 구분한다. 기존 볼륨·데이터를 초기화하지 말고 인프라 기동 후 변경 서비스 이미지를 순차 재빌드해 확인한다.
 - docker compose down 사용 (docker stop 금지)
 
 ## compact 시 보존

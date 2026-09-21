@@ -66,7 +66,7 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse update(Long id, PurchaseUpdateRequest request) {
-        Purchase purchase = getPurchase(id);
+        Purchase purchase = getPurchaseForUpdate(id);
         BigDecimal oldTotalAmount = purchase.getTotalAmount();
 
         purchase.update(
@@ -92,7 +92,7 @@ public class PurchaseService {
 
     @Transactional
     public void delete(Long id) {
-        Purchase purchase = getPurchase(id);
+        Purchase purchase = getPurchaseForUpdate(id);
 
         kafkaProducerService.sendPurchaseDeleted(
                 PurchaseRegisteredPayload.builder()
@@ -107,6 +107,11 @@ public class PurchaseService {
 
     private Purchase getPurchase(Long id) {
         return purchaseRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PURCHASE_NOT_FOUND));
+    }
+
+    private Purchase getPurchaseForUpdate(Long id) {
+        return purchaseRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PURCHASE_NOT_FOUND));
     }
 }
