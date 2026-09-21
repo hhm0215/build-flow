@@ -42,4 +42,4 @@
 ## 결과 (작업 후 기록)
 네 서비스의 업무 트랜잭션 안에 동일 eventId/JSON의 outbox 행을 기록하고, broker ACK 뒤에만 `SENT`로 바꾸는 dispatcher를 연결했다. 매입 수정·삭제와 세금 입금 확인은 행 잠금으로 직렬화했다. 보증보험은 행 잠금·대기 outbox 조회로 장기 장애 중 중복 enqueue를 막고 ACK 날짜에 쿨다운을 다시 시작한다. 네 서비스 모두 `send()` 자체 대기와 ACK 대기를 각각 5초로 제한한다.
 
-전체 Gradle test 및 보완 후 4개 서비스 test가 통과했다. 독립 교차 리뷰에서 보증보험 장기 장애 중복, 스케줄러 지연, 매입 interrupt 후 추가 claim, Kafka `send()` 사전 차단을 발견해 수정·회귀 테스트를 추가했다. 기존 확정 견적 삭제와 입금 완료 세금계산서 수정·삭제 정책은 이번 outbox 범위가 아니며 별도 P0 후속이다. MySQL/Kafka 실제 ACK와 테이블 생성·비영속 API 스모크는 Docker 엔진 기동 후 확인한다. 엔진이 중지되어 현재 미검증이며 PR·병합도 아직 수행하지 않았다.
+전체 Gradle test 및 보완 후 4개 서비스 test, notification 전체 컨텍스트 기동 테스트가 통과했다. 독립 교차 리뷰에서 보증보험 장기 장애 중복, 스케줄러 지연, 매입 interrupt 후 추가 claim, Kafka `send()` 사전 차단을 발견해 수정·회귀 테스트를 추가했다. 기존 확정 견적 삭제와 입금 완료 세금계산서 수정·삭제 정책은 이번 outbox 범위가 아니며 별도 P0 후속이다. MySQL/Kafka 실제 ACK와 테이블 생성·비영속 API 스모크는 Docker 엔진 기동 후 확인한다. 2026-09-21 Docker Desktop은 `sailor-ingest.sock`을 `.stale`로 옮기지 못해 백엔드가 종료됐다. 데이터에 영향을 줄 수 있는 공장 초기화는 수행하지 않았으며, PR·병합도 아직 수행하지 않았다.

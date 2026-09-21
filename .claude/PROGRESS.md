@@ -9,7 +9,7 @@
 
 - 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다. 사용자가 Kafka 신뢰성 우선, 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지를 승인했다. Kafka Phase 1부터 진행하며 남은 작업은 `.claude/BACKLOG.md` P0를 따른다.
 - 손익 집계의 Kafka 멱등성·재시도·동시 갱신 보강도 별도 P0 작업으로 남아 있다.
-- Kafka Phase 2 outbox를 견적·매입·세금·보증보험 4개 발행 서비스에 구현하고 전체 Gradle test 및 보완 후 4개 서비스 테스트를 통과했다. 독립 리뷰 지적 4건을 수정했으며 Docker 엔진 중지로 실서비스 점검·PR 절차는 대기 중이다. 계획: `.claude/plans/2026-09-20-kafka-reliability-outbox.md`.
+- Kafka Phase 2 outbox를 견적·매입·세금·보증보험 4개 발행 서비스에 구현하고 전체 Gradle test 및 보완 후 4개 서비스 테스트를 통과했다. 독립 리뷰 지적 4건을 수정했으며 Docker Desktop 백엔드의 `sailor-ingest.sock` 오류로 실서비스 점검·PR 절차는 대기 중이다. 공장 초기화는 수행하지 않았다. 로컬 커밋 `5ba7e2d`는 아직 push하지 않았다. 계획: `.claude/plans/2026-09-20-kafka-reliability-outbox.md`.
 
 ---
 
