@@ -28,7 +28,7 @@
 - **산출물**: 소비자 멱등성, 재시도/DLT, 발행-커밋 일관성(outbox 권장; after-commit은 단기 완화), 동시 갱신 제어, 세금 이벤트 집계 계약 정리, 중복·실패·순서 역전 회귀 테스트
 - **관련 파일**: `site-service/.../KafkaConsumerService.java`, `notification-service/.../KafkaConsumerService.java`, 이벤트 발행 서비스, `SiteProfit`
 - **예상 규모**: L (설계 후 단계 분할)
-- **상태**: IN_PROGRESS (Phase 1 소비자 멱등·재시도/DLT·현장 잠금 PR #54 병합 완료. Phase 2 outbox 발행 보장 진행 중, 이후 Phase 3 매입 순서 안전 — 롤백된 높은 revision 이벤트를 먼저 차단)
+- **상태**: IN_PROGRESS (Phase 1 소비자 멱등·재시도/DLT·현장 잠금 PR #54 병합 완료. Phase 2 outbox는 PR #55 CI·Docker 실서비스 검증 완료, 병합 전 최종 점검 중. 이후 Phase 3 매입 순서 안전)
 
 ---
 
