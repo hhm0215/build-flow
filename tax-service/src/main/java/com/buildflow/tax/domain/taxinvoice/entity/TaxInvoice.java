@@ -78,6 +78,7 @@ public class TaxInvoice {
 
     public void update(TaxInvoiceType type, BigDecimal supplyAmount, BigDecimal taxAmount,
                        String counterparty, LocalDate issueDate, String memo) {
+        validateMutable();
         this.type = type;
         this.supplyAmount = supplyAmount;
         this.taxAmount = taxAmount;
@@ -85,6 +86,12 @@ public class TaxInvoice {
         this.counterparty = counterparty;
         this.issueDate = issueDate;
         this.memo = memo;
+    }
+
+    public void validateMutable() {
+        if (this.paymentConfirmed) {
+            throw new BusinessException(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE);
+        }
     }
 
     public void confirmPayment(LocalDate paymentDate) {

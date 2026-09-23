@@ -67,7 +67,7 @@
 | 토픽 | 발행자 | 소비자 | 설명 |
 |------|--------|--------|------|
 | estimate.parsed | estimate-service | site-service · notification-service | 공내역 AI 파싱 완료 → 손익 재계산 + 알림 |
-| estimate.deleted | estimate-service | site-service · notification-service | 견적서 삭제 → 손익 재계산 |
+| estimate.deleted | estimate-service | site-service · notification-service | 과거 확정 삭제 outbox 재전송/재생 호환용; 정상 API는 CONFIRMED 삭제를 409로 거부 |
 | purchase.registered | purchase-service | site-service · notification-service | 매입 revision 1 전체 상태 → projection 반영 + 알림 |
 | purchase.updated | purchase-service | site-service | 증가한 revision의 전체 상태 → projection 교체 |
 | purchase.deleted | purchase-service | site-service | 증가한 revision의 삭제 상태 → tombstone 보존 |

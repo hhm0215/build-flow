@@ -5,6 +5,8 @@ import com.buildflow.estimate.domain.estimate.entity.EstimateStatus;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
 import com.buildflow.estimate.domain.estimate.service.EstimateService;
 import com.buildflow.estimate.domain.estimate.event.EstimateParsedPayload;
+import com.buildflow.estimate.global.exception.BusinessException;
+import com.buildflow.estimate.global.exception.ErrorCode;
 import com.buildflow.estimate.global.kafka.KafkaProducerService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -165,20 +167,73 @@ class OutboxIntegrationTest {
     }
 
     @Test
-    void confirmedDeleteStillEnqueuesDeletionUsingOriginalContract() throws Exception {
+    void confirmedDeleteIsRejectedWithoutChangingEstimateOrOutbox() {
         Long estimateId = draftId();
         estimateService.confirm(estimateId);
 
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> estimateService.delete(estimateId));
+
+        assertEquals(ErrorCode.CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED, exception.getErrorCode());
+        assertEquals(EstimateStatus.CONFIRMED,
+                estimateRepository.findById(estimateId).orElseThrow().getStatus());
+        assertEquals(1, outboxRepository.count());
+        assertTrue(outboxRepository.findAll().stream()
+                .noneMatch(event -> "estimate.deleted".equals(event.getTopic())));
+    }
+
+    @Test
+    void confirmationLockMakesConcurrentDeleteWaitThenReject() throws Exception {
+        Long estimateId = draftId();
+        CountDownLatch lockHeld = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        CountDownLatch deleteStarted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> confirmation = executor.submit(() -> transactions.executeWithoutResult(ignored -> {
+                estimateService.confirm(estimateId);
+                lockHeld.countDown();
+                await(releaseLock);
+            }));
+            assertTrue(lockHeld.await(5, TimeUnit.SECONDS));
+
+            Future<ErrorCode> deletion = executor.submit(() -> {
+                deleteStarted.countDown();
+                try {
+                    estimateService.delete(estimateId);
+                    return null;
+                } catch (BusinessException exception) {
+                    return exception.getErrorCode();
+                }
+            });
+            assertTrue(deleteStarted.await(5, TimeUnit.SECONDS));
+            assertTrue(awaitBlockedSessions(1));
+            assertFalse(deletion.isDone());
+
+            releaseLock.countDown();
+            confirmation.get(5, TimeUnit.SECONDS);
+            assertEquals(ErrorCode.CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED,
+                    deletion.get(5, TimeUnit.SECONDS));
+            assertEquals(EstimateStatus.CONFIRMED,
+                    estimateRepository.findById(estimateId).orElseThrow().getStatus());
+            assertEquals(1, outboxRepository.count());
+        } finally {
+            releaseLock.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void deletingDraftBeforeConfirmationMakesLaterConfirmationNotFound() {
+        Long estimateId = draftId();
         estimateService.delete(estimateId);
 
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> estimateService.confirm(estimateId));
+
+        assertEquals(ErrorCode.ESTIMATE_NOT_FOUND, exception.getErrorCode());
         assertFalse(estimateRepository.existsById(estimateId));
-        assertEquals(2, outboxRepository.count());
-        OutboxEvent deletion = outboxRepository.findAll().stream()
-                .filter(event -> "estimate.deleted".equals(event.getTopic())).findFirst().orElseThrow();
-        JsonNode json = objectMapper.readTree(deletion.getPayloadJson());
-        assertEquals("ESTIMATE_DELETED", json.get("eventType").asText());
-        assertEquals(String.valueOf(estimateId), deletion.getRecordKey());
-        assertEquals(deletion.getEventId(), json.get("eventId").asText());
+        assertEquals(0, outboxRepository.count());
     }
 
     @Test
@@ -252,6 +307,36 @@ class OutboxIntegrationTest {
             start.countDown();
             workers.shutdownNow();
         }
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("lock release timeout");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private boolean awaitBlockedSessions(int expected) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        do {
+            Integer blocked = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE BLOCKER_ID IS NOT NULL",
+                    Integer.class);
+            if (blocked != null && blocked >= expected) {
+                return true;
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        } while (System.nanoTime() < deadline);
+        return false;
     }
 
     private Long draftId() {
