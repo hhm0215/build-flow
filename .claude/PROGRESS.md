@@ -5,7 +5,7 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 다음 P0 진입 대기·실사용 UI 라이프사이클 (2026-09-21)
+## 현재 진행 중 — 다음 P0 진입 대기·실사용 UI 라이프사이클 (2026-09-23)
 
 - 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다. 사용자가 Kafka 신뢰성 우선, 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지를 승인했다. Kafka Phase 1부터 진행하며 남은 작업은 `.claude/BACKLOG.md` P0를 따른다.
 - 손익 집계 Kafka Phase 1·2를 병합했고, Phase 3 매입 순서 안전 및 확정 견적·입금 완료 세금계산서 보호와 UI 후속은 `.claude/BACKLOG.md` P0에 남아 있다.
@@ -18,6 +18,7 @@
 - 건설 현장 관리를 첫 번째 수직 도메인으로 유지하면서 원본·출처·버전·관계·확정 판단을 보존하는 범용 정보관리 플랫폼으로 단계적으로 확장하는 비전을 `docs/PRODUCT_VISION.md`와 ADR-017에 확정했다.
 - 범용 정보 코어 후보·도메인 팩·근거 기반 Assistant의 경계를 정의하고, 원본 불변성·확장 스키마·감사·데이터 이동성·사람의 최종 통제를 불변 원칙으로 기록했다. README·기획·아키텍처·AGENTS·CLAUDE를 같은 방향으로 동기화했다.
 - 현재 P0 순서는 변경하지 않고, P1에 2026년 `.xlsx` 견적만 대상으로 하는 문서 코어 Stage 1을 등록했다. 독립 역할 검토에서 실제 업체명/절대경로 노출, 바이트·출처 모델 혼합, 보존/삭제·사례 격리·보안/복구 기준 누락을 찾아 같은 작업에서 보완했다. 객체 저장소·벡터 DB·멀티테넌시·신규 서비스 경계는 실데이터 검증 전까지 보류했다. 계획: `.claude/plans/2026-09-23-product-vision-information-platform.md`.
+- [PR #56](https://github.com/hhm0215/build-flow/pull/56)에서 공개 develop의 초기 경로 포함 커밋을 정제된 단일 SHA로 교체하고, CI 6개 성공·PR/원격 SHA 일치 후 merge commit `92a828c`로 병합했다.
 
 ### ✅ Kafka 손익 집계 신뢰성 Phase 2 — 트랜잭셔널 outbox (2026-09-21)
 - 견적·매입·세금계산서·보증보험 이벤트를 업무 DB 변경과 같은 트랜잭션에 저장하고, lease/claim token·원본 JSON 재전송·broker ACK 후 `SENT`를 구현했다. 매입 수정·삭제/세금 입금 확인 잠금과 보증보험 장기 장애 중복 방지·ACK 기준 쿨다운을 적용했다.
@@ -453,9 +454,9 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-21 갱신)
+## 다음 세션 진입점 (2026-09-23 갱신)
 
-**Git 상태**: PR #49~#55 merge 완료. `origin/main`은 PR #55 merge commit `504decf`, `origin/develop`은 `c4e1e09`이다. main은 PR #55의 네 커밋을 포함하고 merge commit 1개가 더 있다. PR #55 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
+**Git 상태**: PR #49~#56 merge 완료. `origin/main`은 PR #56 merge commit `92a828c`, `origin/develop`은 제품 비전 커밋 `b2556e7`이다. main은 develop의 단일 커밋을 포함하고 merge commit 1개가 더 있다. PR #56 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
 
 **로컬 실행 상태**: Docker Desktop Linux 엔진 정상. MySQL·Redis·Kafka·Zipkin, Eureka·Config·Gateway, auth/site/frontend 및 Phase 2 코드의 estimate/purchase/tax/notification 서비스가 실행 중이다. chat-service는 이번 검증에서 기동하지 않았다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 임시 outbox 행·Kafka 토픽은 삭제했다.
 
