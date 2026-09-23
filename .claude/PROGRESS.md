@@ -21,6 +21,7 @@
 - Docker baseline에서 source purchase 0건·consumer lag 0·DLT 0을 확인했다. 과거 스모크로 남은 SENT outbox 1건은 이력으로 보존하고, 원본 0건과 불일치한 총매입 400,000원 한 행을 조건부 reconciliation해 0원으로 복구했다. 새 이미지의 두 서비스 health UP, `event_revision` NOT NULL·projection 테이블 생성을 확인했다.
 - 격리 purchaseId로 `delete r3 → update r2 → register r1`을 실제 Kafka에 발행해 revision 3 삭제 tombstone, 처리 ledger 3건, 현장 총매입 0원으로 수렴함을 확인했다. tombstone/ledger는 재생 안전성을 위해 보존하며 손익 기여는 0이다. 혼합 버전 방지 배포 순서·기존 데이터 backfill/seed 조건·삭제 DLT 대조 절차를 운영 문서에 기록했다.
 - 계획: `.claude/plans/2026-09-23-kafka-purchase-revision-projection.md`.
+- [PR #57](https://github.com/hhm0215/build-flow/pull/57) 로컬·원격·PR head `aa41814` 일치와 CI 6개 성공을 확인한 뒤 merge commit `36508bf`로 병합했다.
 
 ### ✅ 제품 비전 v2 — 범용 정보관리 플랫폼 방향 정립 (2026-09-23)
 - 건설 현장 관리를 첫 번째 수직 도메인으로 유지하면서 원본·출처·버전·관계·확정 판단을 보존하는 범용 정보관리 플랫폼으로 단계적으로 확장하는 비전을 `docs/PRODUCT_VISION.md`와 ADR-017에 확정했다.
@@ -464,7 +465,7 @@
 
 ## 다음 세션 진입점 (2026-09-23 갱신)
 
-**Git 상태**: PR #49~#56 merge 완료. `origin/main`은 PR #56 merge commit `92a828c`, `origin/develop`은 제품 비전 커밋 `b2556e7`이다. main은 develop의 단일 커밋을 포함하고 merge commit 1개가 더 있다. PR #56 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
+**Git 상태**: PR #49~#57 merge 완료. `origin/main`은 PR #57 merge commit `36508bf`, `origin/develop`과 로컬 develop은 Phase 3 head `aa41814`다. main은 develop의 두 신규 커밋을 포함하고 merge commit 1개가 더 있다. 이 PR #57 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
 
 **로컬 실행 상태**: Docker Desktop Linux 엔진 정상. MySQL·Redis·Kafka·Zipkin, Eureka·Config 및 Phase 3 새 이미지의 site/purchase 서비스가 실행 중이다. 나머지 앱 컨테이너는 이번 최소 검증에서 기동하지 않았다. `.env`는 로컬에서 생성했고 Git에서 제외된다.
 
