@@ -754,6 +754,8 @@ public class KafkaEvent<T> {
 
 `purchase.updated`와 `purchase.deleted`도 증가한 `revision`과 현재 전체 금액을 보낸다. 세 이벤트는 토픽이 서로 달라 도착 순서가 바뀔 수 있으므로 site-service는 가장 높은 revision만 유효하게 본다. 삭제가 먼저 도착하면 tombstone을 저장하고, 늦은 하위 revision은 손익을 변경하지 않는다.
 
+매입 생성·수정은 API 경계와 Entity에서 금액을 이중 보호한다. 수량은 1 이상의 정수, 단가는 0 이상·정수 10자리/소수 2자리 이하이며, `수량 × 단가`는 `DECIMAL(15,2)` 범위를 넘을 수 없다. 수정 요청은 기존 `siteId`를 바꾸지 않고, update/delete 모두 비관적 행 잠금 뒤 revision과 outbox를 함께 갱신한다. 프론트는 성공 후 매입 목록을 갱신하되 Kafka 집계가 아직 도착하지 않았을 수 있는 현장 손익·대시보드는 즉시 재조회하지 않고 stale 처리한다.
+
 ### 멱등성 처리
 
 **문제**: 네트워크 장애 등으로 Kafka 메시지가 중복 전달될 수 있다.

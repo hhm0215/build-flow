@@ -140,15 +140,24 @@ export interface Purchase {
   quantity: number
   unitPrice: number
   totalAmount: number
-  supplier: string
-  purchaseDate: string
-  memo: string
+  supplier: string | null
+  purchaseDate: string | null
+  memo: string | null
   createdAt: string
   updatedAt: string
 }
 
 export interface PurchaseCreateRequest {
   siteId: number
+  itemName: string
+  quantity: number
+  unitPrice: number
+  supplier?: string
+  purchaseDate?: string
+  memo?: string
+}
+
+export interface PurchaseUpdateRequest {
   itemName: string
   quantity: number
   unitPrice: number

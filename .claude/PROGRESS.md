@@ -8,17 +8,24 @@
 ## 현재 진행 중 — 실사용 UI 라이프사이클 후속 (2026-09-24)
 
 - 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다.
-- Kafka 손익 집계 Phase 1~3과 확정 견적·입금 확인 세금계산서 변경 보호를 완료했다. 다음 P0는 매입 금액 서버 검증과 수정/삭제 UI이며, 이후 세금계산서 금액 검증과 수정/삭제 UI를 잇는다.
+- Kafka 손익 집계 Phase 1~3, 확정 견적·입금 확인 세금계산서 변경 보호, 매입 금액 검증 및 수정/삭제 UI를 완료했다. 다음 P0는 세금계산서 금액 검증과 수정/삭제 UI다.
 
 ---
 
 ## 완료된 작업
+
+### ✅ 실사용 UI 라이프사이클 — 매입 금액 검증 및 수정·삭제 (2026-09-24)
+- 생성·수정 DTO와 Entity에서 수량 1 이상 정수, 단가 0 이상·정수 10자리/소수 2자리, 계산 총액 DECIMAL(15,2) 범위를 강제한다. 소수 수량 JSON은 운영 ObjectMapper도 400으로 거부하며 invalid create/update의 DB·revision·outbox 불변을 검증했다.
+- siteId 없는 전용 수정 요청 타입, 기존값 사전 채움 수정 모달, 삭제 확인 모달, 서버 오류 표시·입력 보존·재시도, 중복 제출 및 진행 중 닫기 방지를 구현했다. 등록 모달도 같은 중복 방지·오류 처리로 보강했다.
+- nullable 매입 응답으로 인한 SiteList/SiteDetail 날짜 정렬 크래시를 막고, MSW PUT/DELETE 성공·404·금액 400 계약과 행별 대상 선택을 테스트했다. 변경 후 매입 목록, 해당 현장 손익, 대시보드 캐시를 올바르게 stale 처리한다.
+- 독립 세 역할 리뷰가 큰 정상 2자리 단가의 부동소수 오거절을 발견해 BigInt cents 계산으로 수정했다. 전체 Gradle test, purchase-service 재실행, 프론트 Vitest 29파일 89개·lint·build를 통과했다. Docker 컨테이너 스모크는 기존 Desktop stale socket 장애로 후속이다. 계획: `.claude/plans/2026-09-24-purchase-edit-delete-ui.md`.
 
 ### ✅ 회계 확정 상태 변경 보호 (2026-09-24)
 - CONFIRMED 견적 삭제와 입금 확인된 세금계산서 수정·삭제를 전용 409로 거부한다. 견적 삭제와 세금계산서 update/delete/confirm은 비관적 행 잠금 뒤 상태를 판정하며, 거부 시 DB와 outbox가 변하지 않는다.
 - DRAFT 견적 삭제와 미입금 세금계산서 수정·삭제 회귀, MockMvc 실제 HTTP 409 JSON 계약, H2의 실제 서비스 경합 및 차단 세션을 검증했다. 견적 MSW도 확정 삭제 409와 원본 유지를 모사한다.
 - 전체 Gradle test, 프론트 Vitest 73개·lint·build, 독립 역할 재검토를 통과했다. 리뷰가 발견한 handler 직접 호출과 sleep 기반 경합 테스트를 실제 ControllerAdvice 및 `BLOCKER_ID` 확인으로 보강했다.
 - Docker Desktop 4.91이 stale `sailor-ingest.sock` 접근 거부로 기동하지 않아 컨테이너 스모크는 후속으로 남겼다. 임시 소켓 외 이미지·볼륨·DB는 건드리지 않았고 공장 초기화도 하지 않았다. 계획: `.claude/plans/2026-09-23-accounting-finalization-guards.md`.
+- [PR #58](https://github.com/hhm0215/build-flow/pull/58) CI 6개 성공과 로컬·원격·PR head `db5250b` 일치를 확인한 뒤 merge commit `b068f19`로 병합했다.
 
 ### ✅ Kafka 손익 집계 신뢰성 Phase 3 — 매입 revision/projection (2026-09-23)
 - purchase-service에 생성 1부터 수정·삭제마다 증가하는 명시적 `eventRevision`을 추가하고 등록·수정·삭제 outbox payload에 revision과 전체 현재 상태를 저장했다.
@@ -471,13 +478,13 @@
 
 ## 다음 세션 진입점 (2026-09-24 갱신)
 
-**Git 상태**: PR #49~#57 merge 완료. 로컬 develop은 PR #57 병합 후처리 문서 커밋 `ba4ed9f` 위에 회계 확정 상태 변경 보호 작업이 있으며, 이 작업을 다음 PR로 올린다.
+**Git 상태**: PR #49~#58 merge 완료. `origin/main`은 PR #58 merge commit `b068f19`, `origin/develop`은 PR head `db5250b`, 로컬 develop은 PR #58 병합 후처리 문서 `014ed6b` 위에서 매입 수정/삭제 작업 중이다.
 
 **로컬 실행 상태**: Docker Desktop 4.91 백엔드가 `sailor-ingest.sock`을 `.stale`로 rename하지 못하는 Windows 접근 거부로 종료된다. 두 0바이트 소켓의 보존 이동·삭제도 OS가 거부했다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. 재부팅 또는 4.92 업데이트 후 Docker health와 실제 409/DB 불변 스모크를 재개한다. `.env`는 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 매입 금액 DTO의 음수·소수 정밀도 검증과 수정/삭제 UI를 먼저 연결하고, 이어서 세금계산서 금액 검증과 수정/삭제 UI를 구현한다. 실데이터 파일럿은 이 UI 보정을 마친 뒤 진행한다.
+**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 세금계산서 금액 검증과 수정/삭제 UI를 구현한다. 실데이터 파일럿은 이 UI 보정을 마친 뒤 진행한다.
 
-**검증 상태**: 회계 확정 보호의 전체 Gradle test, 두 서비스 캐시 없는 테스트, 프론트 Vitest 73개·lint·build, MockMvc HTTP 계약, H2 실제 서비스 잠금 경합, 독립 2역할 최종 재검토를 통과했다. Docker 컨테이너 스모크만 위 로컬 엔진 장애로 남아 있다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다.
+**검증 상태**: 매입 작업의 전체 Gradle test, purchase-service 재실행, 프론트 Vitest 29파일 89개·lint·build, 독립 3역할 리뷰와 수정 후 재검토를 통과했다. Docker 컨테이너 스모크만 위 로컬 엔진 장애로 남아 있다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

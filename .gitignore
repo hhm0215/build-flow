@@ -30,6 +30,9 @@ Thumbs.db
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # Uploads (warranty PDF 등 — 로컬 파일시스템 저장)
 uploads/

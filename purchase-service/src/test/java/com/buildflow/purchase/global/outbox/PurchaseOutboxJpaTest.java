@@ -5,6 +5,8 @@ import com.buildflow.purchase.domain.purchase.dto.PurchaseUpdateRequest;
 import com.buildflow.purchase.domain.purchase.repository.PurchaseRepository;
 import com.buildflow.purchase.domain.purchase.service.PurchaseService;
 import com.buildflow.purchase.global.config.JpaAuditingConfig;
+import com.buildflow.purchase.global.exception.BusinessException;
+import com.buildflow.purchase.global.exception.ErrorCode;
 import com.buildflow.purchase.global.kafka.KafkaProducerService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -146,6 +148,50 @@ class PurchaseOutboxJpaTest {
 
         assertTrue(purchaseRepository.existsById(id));
         assertEquals(1L, purchaseRepository.findById(id).orElseThrow().getEventRevision());
+        assertEquals(1, outboxRepository.count());
+    }
+
+    @Test
+    void invalidCreateAmountDoesNotWritePurchaseOrOutbox() {
+        PurchaseCreateRequest invalid = request();
+        ReflectionTestUtils.setField(invalid, "quantity", 1001);
+        ReflectionTestUtils.setField(invalid, "unitPrice", new BigDecimal("9999999999.99"));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> purchaseService.create(invalid));
+
+        assertEquals(ErrorCode.INVALID_PURCHASE_AMOUNT, exception.getErrorCode());
+        assertEquals(0, purchaseRepository.count());
+        assertEquals(0, outboxRepository.count());
+    }
+
+    @Test
+    void invalidUpdateAmountLeavesPurchaseAndOutboxUnchanged() {
+        Long id = purchaseService.create(request()).getId();
+        PurchaseUpdateRequest invalid = updateRequest();
+        ReflectionTestUtils.setField(invalid, "quantity", 1001);
+        ReflectionTestUtils.setField(invalid, "unitPrice", new BigDecimal("9999999999.99"));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> purchaseService.update(id, invalid));
+
+        assertEquals(ErrorCode.INVALID_PURCHASE_AMOUNT, exception.getErrorCode());
+        var unchanged = purchaseRepository.findById(id).orElseThrow();
+        assertEquals(0, unchanged.getTotalAmount().compareTo(new BigDecimal("3000.00")));
+        assertEquals(1L, unchanged.getEventRevision());
+        assertEquals(1, outboxRepository.count());
+    }
+
+    @Test
+    void maximumUnitPriceWithThousandQuantityFitsDatabaseTotalRange() {
+        PurchaseCreateRequest boundary = request();
+        ReflectionTestUtils.setField(boundary, "quantity", 1000);
+        ReflectionTestUtils.setField(boundary, "unitPrice", new BigDecimal("9999999999.99"));
+
+        var created = purchaseService.create(boundary);
+
+        assertEquals(0, created.getTotalAmount().compareTo(new BigDecimal("9999999999990.00")));
+        assertEquals(1, purchaseRepository.count());
         assertEquals(1, outboxRepository.count());
     }
 

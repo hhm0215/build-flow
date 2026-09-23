@@ -3,6 +3,7 @@ import axiosInstance from './axiosInstance'
 import { ApiResponse, DashboardStats, DashboardSummary } from '../types'
 
 export const DASHBOARD_KEY = {
+  all: ['dashboard'] as const,
   stats: ['dashboard', 'stats'] as const,
   summary: ['dashboard', 'summary'] as const,
 }

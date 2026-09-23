@@ -239,7 +239,8 @@ export default function SiteDetailPage() {
   const warranties = (warrantiesData ?? []).filter((w) => w.siteId === siteId)
 
   const sortedEstimates = [...estimates].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  const sortedPurchases = [...purchases].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate))
+  const sortedPurchases = [...purchases].sort((a, b) =>
+    (b.purchaseDate ?? '').localeCompare(a.purchaseDate ?? ''))
   const sortedTaxes = [...taxes].sort((a, b) => b.issueDate.localeCompare(a.issueDate))
   const sortedWarranties = [...warranties].sort((a, b) => (a.endDate ?? '9999-12-31').localeCompare(b.endDate ?? '9999-12-31'))
 
@@ -463,7 +464,7 @@ export default function SiteDetailPage() {
                             {purchase.itemName}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                            거래처 {purchase.supplier || '-'} · 매입일 {purchase.purchaseDate}
+                            거래처 {purchase.supplier || '-'} · 매입일 {purchase.purchaseDate || '-'}
                           </div>
                         </div>
                       </div>

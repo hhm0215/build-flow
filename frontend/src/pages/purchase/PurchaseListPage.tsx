@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { ShoppingBag, Plus } from 'lucide-react'
-import { Modal, Form, Input, InputNumber, DatePicker } from 'antd'
+import { ShoppingBag, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Alert, Button, Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
@@ -13,7 +13,10 @@ import FilterAmountRange from '../../components/filters/FilterAmountRange'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
 import { usePurchases, useCreatePurchase } from '../../api/purchases.api'
-import type { PurchaseCreateRequest } from '../../types'
+import PurchaseEditModal from './PurchaseEditModal'
+import PurchaseDeleteModal from './PurchaseDeleteModal'
+import type { Purchase, PurchaseCreateRequest } from '../../types'
+import { validatePurchaseAmount } from '../../utils/purchase'
 
 interface PurchaseFilters {
   q: string
@@ -58,24 +61,50 @@ export default function PurchaseListPage() {
   const totalAmount = filtered.reduce((sum, p) => sum + p.totalAmount, 0)
 
   const [open, setOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<Purchase | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const createInFlight = useRef(false)
   const [form] = Form.useForm()
   const createMutation = useCreatePurchase()
 
-  const handleOk = () => {
-    form.validateFields().then((values) => {
+  const closeCreate = () => {
+    if (createInFlight.current || createMutation.isPending) return
+    setOpen(false)
+    setCreateError(null)
+    form.resetFields()
+  }
+
+  const handleOk = async () => {
+    if (createInFlight.current || createMutation.isPending) return
+    createInFlight.current = true
+    try {
+      const values = await form.validateFields()
+      const amountError = validatePurchaseAmount(values.quantity, values.unitPrice)
+      if (amountError) {
+        setCreateError(amountError)
+        return
+      }
       const body: PurchaseCreateRequest = {
         ...values,
+        itemName: values.itemName.trim(),
+        supplier: values.supplier?.trim() || undefined,
+        memo: values.memo?.trim() || undefined,
         purchaseDate: values.purchaseDate
           ? dayjs(values.purchaseDate).format('YYYY-MM-DD')
           : undefined,
       }
-      createMutation.mutate(body, {
-        onSuccess: () => {
-          setOpen(false)
-          form.resetFields()
-        },
-      })
-    })
+      setCreateError(null)
+      await createMutation.mutateAsync(body)
+      setOpen(false)
+      form.resetFields()
+    } catch (cause: unknown) {
+      if (cause && typeof cause === 'object' && 'errorFields' in cause) return
+      const responseError = (cause as { response?: { data?: { error?: string } } })?.response?.data?.error
+      setCreateError(responseError ?? '매입 내역을 등록하지 못했습니다. 다시 시도해 주세요.')
+    } finally {
+      createInFlight.current = false
+    }
   }
 
   return (
@@ -104,17 +133,26 @@ export default function PurchaseListPage() {
         }
       />
 
+      {editTarget && <PurchaseEditModal purchase={editTarget} onClose={() => setEditTarget(null)} />}
+      {deleteTarget && <PurchaseDeleteModal purchase={deleteTarget} onClose={() => setDeleteTarget(null)} />}
+
       <Modal
         title="매입 등록"
         open={open}
         onOk={handleOk}
-        onCancel={() => { setOpen(false); form.resetFields() }}
+        onCancel={closeCreate}
         okText="등록"
         cancelText="취소"
+        okButtonProps={{ disabled: createMutation.isPending }}
+        cancelButtonProps={{ disabled: createMutation.isPending }}
         confirmLoading={createMutation.isPending}
-        destroyOnClose
+        closable={!createMutation.isPending}
+        maskClosable={!createMutation.isPending}
+        keyboard={!createMutation.isPending}
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          {createError && <Alert type="error" message={createError} showIcon style={{ marginBottom: 16 }} />}
           <Form.Item
             name="siteId"
             label="현장"
@@ -125,16 +163,18 @@ export default function PurchaseListPage() {
           <Form.Item
             name="itemName"
             label="품목명"
-            rules={[{ required: true, message: '품목명을 입력하세요' }]}
+            rules={[{ required: true, whitespace: true, message: '품목명을 입력하세요' }]}
           >
-            <Input placeholder="품목명" />
+            <Input placeholder="품목명" maxLength={200} />
           </Form.Item>
           <Form.Item
             name="quantity"
             label="수량"
             rules={[{ required: true, message: '수량을 입력하세요' }]}
           >
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="수량" />
+            <InputNumber<number>
+              style={{ width: '100%' }} min={1} max={2_147_483_647} precision={0} placeholder="수량"
+            />
           </Form.Item>
           <Form.Item
             name="unitPrice"
@@ -144,13 +184,15 @@ export default function PurchaseListPage() {
             <InputNumber<number>
               style={{ width: '100%' }}
               min={0}
+              max={9_999_999_999.99}
+              precision={2}
               placeholder="단가"
               formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
               parser={(v) => Number(v?.replace(/,/g, '') ?? 0)}
             />
           </Form.Item>
           <Form.Item name="supplier" label="공급업체">
-            <Input placeholder="공급업체명" />
+            <Input placeholder="공급업체명" maxLength={200} />
           </Form.Item>
           <Form.Item name="purchaseDate" label="매입일">
             <DatePicker style={{ width: '100%' }} placeholder="매입일 선택" />
@@ -235,7 +277,7 @@ export default function PurchaseListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['품목명', '수량', '단가', '금액', '거래처', '매입일'].map((h) => (
+                {['품목명', '수량', '단가', '금액', '거래처', '매입일', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -271,7 +313,13 @@ export default function PurchaseListPage() {
                     {p.supplier || '-'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)' }}>
-                    {p.purchaseDate}
+                    {p.purchaseDate || '-'}
+                  </td>
+                  <td style={{ padding: '14px 20px' }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <Button size="small" icon={<Pencil size={12} />} onClick={() => setEditTarget(p)}>수정</Button>
+                      <Button size="small" danger icon={<Trash2 size={12} />} onClick={() => setDeleteTarget(p)}>삭제</Button>
+                    </div>
                   </td>
                 </motion.tr>
               ))}

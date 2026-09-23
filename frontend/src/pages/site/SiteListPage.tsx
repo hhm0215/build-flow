@@ -291,7 +291,7 @@ export default function SiteListPage() {
         ? []
         : purchases
             .filter((purchase) => purchase.siteId === selectedSiteIdResolved)
-            .sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate)),
+            .sort((a, b) => (b.purchaseDate ?? '').localeCompare(a.purchaseDate ?? '')),
     [purchases, selectedSiteIdResolved],
   )
 
@@ -825,7 +825,7 @@ export default function SiteListPage() {
                                 {purchase.itemName}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                                거래처 {purchase.supplier || '-'} · 매입일 {purchase.purchaseDate}
+                                거래처 {purchase.supplier || '-'} · 매입일 {purchase.purchaseDate || '-'}
                               </div>
                             </div>
                           </div>
