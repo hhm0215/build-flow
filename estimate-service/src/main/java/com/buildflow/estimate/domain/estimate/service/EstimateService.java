@@ -87,11 +87,7 @@ public class EstimateService {
         Estimate estimate = getEstimateForUpdate(id);
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
-            kafkaProducerService.sendEstimateDeleted(EstimateParsedPayload.builder()
-                    .estimateId(estimate.getId())
-                    .siteId(estimate.getSiteId())
-                    .totalAmount(estimate.getTotalAmount())
-                    .build());
+            throw new BusinessException(ErrorCode.CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED);
         }
 
         estimateRepository.delete(estimate);

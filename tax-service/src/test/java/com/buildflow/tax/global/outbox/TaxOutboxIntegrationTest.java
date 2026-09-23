@@ -2,11 +2,14 @@ package com.buildflow.tax.global.outbox;
 
 import com.buildflow.tax.domain.taxinvoice.dto.PaymentConfirmRequest;
 import com.buildflow.tax.domain.taxinvoice.dto.TaxInvoiceCreateRequest;
+import com.buildflow.tax.domain.taxinvoice.dto.TaxInvoiceUpdateRequest;
+import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoice;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoiceType;
 import com.buildflow.tax.domain.taxinvoice.repository.TaxInvoiceRepository;
 import com.buildflow.tax.domain.taxinvoice.service.TaxInvoiceService;
 import com.buildflow.tax.global.config.JpaAuditingConfig;
 import com.buildflow.tax.global.exception.BusinessException;
+import com.buildflow.tax.global.exception.ErrorCode;
 import com.buildflow.tax.global.kafka.KafkaProducerService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +18,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -54,11 +58,12 @@ class TaxOutboxIntegrationTest {
     private final OutboxWriter outboxWriter;
     private final PlatformTransactionManager transactionManager;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     TaxOutboxIntegrationTest(TaxInvoiceService taxService, TaxInvoiceRepository taxRepository,
                              OutboxEventRepository outboxRepository, OutboxClaimService claimService,
                              OutboxWriter outboxWriter, PlatformTransactionManager transactionManager,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper, JdbcTemplate jdbcTemplate) {
         this.taxService = taxService;
         this.taxRepository = taxRepository;
         this.outboxRepository = outboxRepository;
@@ -66,6 +71,7 @@ class TaxOutboxIntegrationTest {
         this.outboxWriter = outboxWriter;
         this.transactionManager = transactionManager;
         this.objectMapper = objectMapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @BeforeEach
@@ -99,6 +105,84 @@ class TaxOutboxIntegrationTest {
         assertThat(confirmedJson.get("eventType").asText()).isEqualTo("TAX_PAYMENT_CONFIRMED");
         assertThat(confirmedJson.get("eventId").asText()).isEqualTo(confirmed.getEventId());
         assertThat(outboxRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void unconfirmedInvoiceCanBeUpdatedAndDeleted() {
+        long id = taxService.create(createRequest()).getId();
+
+        var updated = taxService.update(id, updateRequest());
+        assertThat(updated.getTotalAmount()).isEqualByComparingTo("220.00");
+        assertThat(updated.getCounterparty()).isEqualTo("수정 거래처");
+
+        taxService.delete(id);
+
+        assertThat(taxRepository.existsById(id)).isFalse();
+        assertThat(outboxRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void confirmedInvoiceRejectsUpdateAndDeleteWithoutChangingStateOrOutbox() {
+        long id = taxService.create(createRequest()).getId();
+        taxService.confirmPayment(id, paymentRequest());
+
+        assertThatThrownBy(() -> taxService.update(id, updateRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE));
+        assertThatThrownBy(() -> taxService.delete(id))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE));
+
+        var unchanged = taxRepository.findById(id).orElseThrow();
+        assertThat(unchanged.isPaymentConfirmed()).isTrue();
+        assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
+        assertThat(unchanged.getCounterparty()).isEqualTo("거래처");
+        assertThat(outboxRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void confirmationLockMakesConcurrentUpdateAndDeleteWaitThenReject() throws Exception {
+        long id = taxService.create(createRequest()).getId();
+        CountDownLatch lockHeld = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        CountDownLatch mutationsStarted = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        try {
+            Future<?> confirmation = executor.submit(() -> {
+                new TransactionTemplate(transactionManager).executeWithoutResult(ignored -> {
+                    taxService.confirmPayment(id, paymentRequest());
+                    lockHeld.countDown();
+                    await(releaseLock);
+                });
+            });
+            assertTrue(lockHeld.await(5, TimeUnit.SECONDS));
+
+            Future<ErrorCode> update = executor.submit(() -> rejectedMutation(
+                    mutationsStarted, () -> taxService.update(id, updateRequest())));
+            Future<ErrorCode> delete = executor.submit(() -> rejectedMutation(
+                    mutationsStarted, () -> taxService.delete(id)));
+            assertTrue(mutationsStarted.await(5, TimeUnit.SECONDS));
+            assertThat(awaitBlockedSessions(2)).isTrue();
+            assertThat(update.isDone()).isFalse();
+            assertThat(delete.isDone()).isFalse();
+
+            releaseLock.countDown();
+            confirmation.get(5, TimeUnit.SECONDS);
+            assertThat(update.get(5, TimeUnit.SECONDS))
+                    .isEqualTo(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE);
+            assertThat(delete.get(5, TimeUnit.SECONDS))
+                    .isEqualTo(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE);
+
+            TaxInvoice unchanged = taxRepository.findById(id).orElseThrow();
+            assertThat(unchanged.isPaymentConfirmed()).isTrue();
+            assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
+            assertThat(outboxRepository.count()).isEqualTo(2);
+        } finally {
+            releaseLock.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -196,6 +280,56 @@ class TaxOutboxIntegrationTest {
         PaymentConfirmRequest request = new PaymentConfirmRequest();
         ReflectionTestUtils.setField(request, "paymentDate", LocalDate.of(2026, 9, 20));
         return request;
+    }
+
+    private TaxInvoiceUpdateRequest updateRequest() {
+        TaxInvoiceUpdateRequest request = new TaxInvoiceUpdateRequest();
+        ReflectionTestUtils.setField(request, "type", TaxInvoiceType.SALES);
+        ReflectionTestUtils.setField(request, "supplyAmount", new BigDecimal("200.00"));
+        ReflectionTestUtils.setField(request, "taxAmount", new BigDecimal("20.00"));
+        ReflectionTestUtils.setField(request, "counterparty", "수정 거래처");
+        ReflectionTestUtils.setField(request, "issueDate", LocalDate.of(2026, 9, 21));
+        return request;
+    }
+
+    private ErrorCode rejectedMutation(CountDownLatch started, Runnable mutation) {
+        started.countDown();
+        try {
+            mutation.run();
+            return null;
+        } catch (BusinessException exception) {
+            return exception.getErrorCode();
+        }
+    }
+
+    private boolean awaitBlockedSessions(int expected) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        do {
+            Integer blocked = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE BLOCKER_ID IS NOT NULL",
+                    Integer.class);
+            if (blocked != null && blocked >= expected) {
+                return true;
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        } while (System.nanoTime() < deadline);
+        return false;
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("lock release timeout");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
     }
 
     @TestConfiguration

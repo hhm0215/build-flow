@@ -108,10 +108,17 @@ export const estimatesHandlers = [
   }),
 
   http.delete<{ id: string }>('/api/v1/estimates/:id', ({ params }) => {
-    if (!estimates.some((estimate) => estimate.id === Number(params.id))) {
+    const estimate = estimates.find((item) => item.id === Number(params.id))
+    if (!estimate) {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '견적서를 찾을 수 없습니다.' },
         { status: 404 },
+      )
+    }
+    if (estimate.status === 'CONFIRMED') {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '확정된 견적서는 삭제할 수 없습니다.' },
+        { status: 409 },
       )
     }
     estimates = estimates.filter((e) => e.id !== Number(params.id))

@@ -5,14 +5,20 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 실사용 UI 라이프사이클 후속 (2026-09-23)
+## 현재 진행 중 — 실사용 UI 라이프사이클 후속 (2026-09-24)
 
 - 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다.
-- Kafka 손익 집계 Phase 1~3 구현·로컬 실환경 검증을 완료했다. 다음 P0는 사용자 결정대로 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지 서버 정책을 먼저 적용하고 매입·세금계산서 수정/삭제 UI를 잇는다.
+- Kafka 손익 집계 Phase 1~3과 확정 견적·입금 확인 세금계산서 변경 보호를 완료했다. 다음 P0는 매입 금액 서버 검증과 수정/삭제 UI이며, 이후 세금계산서 금액 검증과 수정/삭제 UI를 잇는다.
 
 ---
 
 ## 완료된 작업
+
+### ✅ 회계 확정 상태 변경 보호 (2026-09-24)
+- CONFIRMED 견적 삭제와 입금 확인된 세금계산서 수정·삭제를 전용 409로 거부한다. 견적 삭제와 세금계산서 update/delete/confirm은 비관적 행 잠금 뒤 상태를 판정하며, 거부 시 DB와 outbox가 변하지 않는다.
+- DRAFT 견적 삭제와 미입금 세금계산서 수정·삭제 회귀, MockMvc 실제 HTTP 409 JSON 계약, H2의 실제 서비스 경합 및 차단 세션을 검증했다. 견적 MSW도 확정 삭제 409와 원본 유지를 모사한다.
+- 전체 Gradle test, 프론트 Vitest 73개·lint·build, 독립 역할 재검토를 통과했다. 리뷰가 발견한 handler 직접 호출과 sleep 기반 경합 테스트를 실제 ControllerAdvice 및 `BLOCKER_ID` 확인으로 보강했다.
+- Docker Desktop 4.91이 stale `sailor-ingest.sock` 접근 거부로 기동하지 않아 컨테이너 스모크는 후속으로 남겼다. 임시 소켓 외 이미지·볼륨·DB는 건드리지 않았고 공장 초기화도 하지 않았다. 계획: `.claude/plans/2026-09-23-accounting-finalization-guards.md`.
 
 ### ✅ Kafka 손익 집계 신뢰성 Phase 3 — 매입 revision/projection (2026-09-23)
 - purchase-service에 생성 1부터 수정·삭제마다 증가하는 명시적 `eventRevision`을 추가하고 등록·수정·삭제 outbox payload에 revision과 전체 현재 상태를 저장했다.
@@ -463,15 +469,15 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-23 갱신)
+## 다음 세션 진입점 (2026-09-24 갱신)
 
-**Git 상태**: PR #49~#57 merge 완료. `origin/main`은 PR #57 merge commit `36508bf`, `origin/develop`과 로컬 develop은 Phase 3 head `aa41814`다. main은 develop의 두 신규 커밋을 포함하고 merge commit 1개가 더 있다. 이 PR #57 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
+**Git 상태**: PR #49~#57 merge 완료. 로컬 develop은 PR #57 병합 후처리 문서 커밋 `ba4ed9f` 위에 회계 확정 상태 변경 보호 작업이 있으며, 이 작업을 다음 PR로 올린다.
 
-**로컬 실행 상태**: Docker Desktop Linux 엔진 정상. MySQL·Redis·Kafka·Zipkin, Eureka·Config 및 Phase 3 새 이미지의 site/purchase 서비스가 실행 중이다. 나머지 앱 컨테이너는 이번 최소 검증에서 기동하지 않았다. `.env`는 로컬에서 생성했고 Git에서 제외된다.
+**로컬 실행 상태**: Docker Desktop 4.91 백엔드가 `sailor-ingest.sock`을 `.stale`로 rename하지 못하는 Windows 접근 거부로 종료된다. 두 0바이트 소켓의 보존 이동·삭제도 OS가 거부했다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. 재부팅 또는 4.92 업데이트 후 Docker health와 실제 409/DB 불변 스모크를 재개한다. `.env`는 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 확정 견적 삭제 금지·입금 확인 세금계산서 수정/삭제 금지 서버 정책을 적용한 뒤 매입·세금계산서 수정/삭제 UI를 연결한다. 실데이터 파일럿은 이 P0 보호 정책과 UI 보정을 마친 뒤 진행한다.
+**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 매입 금액 DTO의 음수·소수 정밀도 검증과 수정/삭제 UI를 먼저 연결하고, 이어서 세금계산서 금액 검증과 수정/삭제 UI를 구현한다. 실데이터 파일럿은 이 UI 보정을 마친 뒤 진행한다.
 
-**검증 상태**: Phase 3 캐시 없는 purchase/site 테스트와 전체 Gradle test, 독립 3역할 리뷰, Docker 새 이미지 health·스키마·baseline reconciliation, 실제 역순 Kafka 수렴을 확인했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. 같은 purchase의 MySQL 실동시 revision 경합, Kafka DLT offset 보존, 브라우저 수동 E2E는 후속 통합 검증으로 남아 있다.
+**검증 상태**: 회계 확정 보호의 전체 Gradle test, 두 서비스 캐시 없는 테스트, 프론트 Vitest 73개·lint·build, MockMvc HTTP 계약, H2 실제 서비스 잠금 경합, 독립 2역할 최종 재검토를 통과했다. Docker 컨테이너 스모크만 위 로컬 엔진 장애로 남아 있다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

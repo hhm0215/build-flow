@@ -12,18 +12,13 @@
 // 성공
 {
   "success": true,
-  "data": { ... },
-  "error": null
+  "data": { ... }
 }
 
 // 실패
 {
   "success": false,
-  "data": null,
-  "error": {
-    "code": "SITE_NOT_FOUND",
-    "message": "현장을 찾을 수 없습니다."
-  }
+  "error": "현장을 찾을 수 없습니다."
 }
 
 // 목록 (페이징)
@@ -35,10 +30,11 @@
     "size": 20,
     "totalElements": 45,
     "totalPages": 3
-  },
-  "error": null
+  }
 }
 ```
+
+`data`와 `error` 중 값이 `null`인 필드는 응답 JSON에서 생략된다.
 
 ---
 
@@ -75,7 +71,7 @@
 | GET | /api/v1/estimates/{id} | 견적서 상세 | O |
 | PUT | /api/v1/estimates/{id} | 견적서 수정 (금액, 메모 등) | O (ADMIN) |
 | GET | /api/v1/estimates/{id}/download | 파일 다운로드 | O |
-| DELETE | /api/v1/estimates/{id} | 삭제 | O (ADMIN) |
+| DELETE | /api/v1/estimates/{id} | DRAFT 삭제 (`CONFIRMED`는 409) | O (ADMIN) |
 | GET | /api/v1/estimates/total?siteId={id} | 현장별 견적 합계 (OpenFeign용) | O |
 
 ---
@@ -125,19 +121,13 @@
 
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
-| POST | /api/v1/tax-invoices | 세금계산서 등록 | O (ADMIN) |
-| GET | /api/v1/tax-invoices?siteId={id}&type={SALES/PURCHASE} | 목록 (현장, 유형 필터) | O |
-| GET | /api/v1/tax-invoices/{id} | 상세 | O |
-| PUT | /api/v1/tax-invoices/{id} | 수정 | O (ADMIN) |
-| DELETE | /api/v1/tax-invoices/{id} | 삭제 | O (ADMIN) |
-| GET | /api/v1/tax-invoices/outstanding?siteId={id} | 미수금 조회 (OpenFeign용) | O |
-
-### 입금 확인
-
-| 메서드 | 경로 | 설명 | 인증 |
-|--------|------|------|------|
-| POST | /api/v1/payments | 입금 확인 등록 | O (ADMIN) |
-| GET | /api/v1/payments?taxInvoiceId={id} | 세금계산서별 입금 내역 | O |
+| POST | /api/v1/taxes | 세금계산서 등록 | O (ADMIN) |
+| GET | /api/v1/taxes?siteId={id}&type={SALES/PURCHASE} | 목록 (현장, 유형 필터) | O |
+| GET | /api/v1/taxes/{id} | 상세 | O |
+| PUT | /api/v1/taxes/{id} | 수정. 입금 확인된 건은 409 | O (ADMIN) |
+| PATCH | /api/v1/taxes/{id}/confirm-payment | 입금 확인. 요청 본문에 선택적 `paymentDate` | O (ADMIN) |
+| DELETE | /api/v1/taxes/{id} | 삭제. 입금 확인된 건은 409 | O (ADMIN) |
+| GET | /api/v1/taxes/outstanding?siteId={id} | 미수금 조회 (OpenFeign용) | O |
 
 ---
 

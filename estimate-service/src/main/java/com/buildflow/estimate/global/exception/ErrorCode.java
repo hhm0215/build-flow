@@ -11,6 +11,7 @@ public enum ErrorCode {
     // Estimate
     ESTIMATE_NOT_FOUND(HttpStatus.NOT_FOUND, "견적서를 찾을 수 없습니다."),
     ESTIMATE_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "이미 확정된 견적서입니다."),
+    CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED(HttpStatus.CONFLICT, "확정된 견적서는 삭제할 수 없습니다."),
     ESTIMATE_ITEMS_REQUIRED(HttpStatus.BAD_REQUEST, "견적 항목이 최소 1개 이상 필요합니다."),
     INVALID_ESTIMATE_AMOUNT(HttpStatus.BAD_REQUEST, "견적 수량·단가·금액은 저장 가능한 소수 2자리와 범위에 맞아야 합니다."),
 

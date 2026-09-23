@@ -73,7 +73,7 @@ public class TaxInvoiceService {
 
     @Transactional
     public TaxInvoiceResponse update(Long id, TaxInvoiceUpdateRequest request) {
-        TaxInvoice taxInvoice = getTaxInvoice(id);
+        TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
         taxInvoice.update(
                 request.getType(),
                 request.getSupplyAmount(),
@@ -87,8 +87,7 @@ public class TaxInvoiceService {
 
     @Transactional
     public TaxInvoiceResponse confirmPayment(Long id, PaymentConfirmRequest request) {
-        TaxInvoice taxInvoice = taxInvoiceRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.TAX_INVOICE_NOT_FOUND));
+        TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
         LocalDate paymentDate = (request.getPaymentDate() != null)
                 ? request.getPaymentDate()
                 : LocalDate.now();
@@ -109,7 +108,8 @@ public class TaxInvoiceService {
 
     @Transactional
     public void delete(Long id) {
-        TaxInvoice taxInvoice = getTaxInvoice(id);
+        TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
+        taxInvoice.validateMutable();
         taxInvoiceRepository.delete(taxInvoice);
     }
 
@@ -142,6 +142,11 @@ public class TaxInvoiceService {
 
     private TaxInvoice getTaxInvoice(Long id) {
         return taxInvoiceRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TAX_INVOICE_NOT_FOUND));
+    }
+
+    private TaxInvoice getTaxInvoiceForUpdate(Long id) {
+        return taxInvoiceRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TAX_INVOICE_NOT_FOUND));
     }
 }

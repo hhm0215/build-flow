@@ -58,6 +58,24 @@ describe('견적 MSW 수정·삭제 계약', () => {
     expect((await fetch(itemUrl, { method: 'DELETE' })).status).toBe(404)
   })
 
+  it('확정 견적 DELETE는 409이고 원본은 유지한다', async () => {
+    const created = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        siteId: 3, title: '삭제 금지 견적', estimateDate: '2026-09-19',
+        items: [{ itemName: '자재', unit: 'EA', quantity: 1, unitPrice: 1000, amount: 1000 }],
+      }),
+    })
+    const estimate = (await created.json() as ApiResponse<Estimate>).data
+    const itemUrl = new URL(`/api/v1/estimates/${estimate.id}`, document.baseURI)
+    await fetch(new URL(`/api/v1/estimates/${estimate.id}/confirm`, document.baseURI), { method: 'PATCH' })
+
+    const blocked = await fetch(itemUrl, { method: 'DELETE' })
+    expect(blocked.status).toBe(409)
+    expect((await blocked.json() as ApiResponse<null>).error).toBe('확정된 견적서는 삭제할 수 없습니다.')
+    expect((await fetch(itemUrl)).status).toBe(200)
+  })
+
   it('DB 정밀도에서 항목 금액이 달라지는 요청은 400으로 거절한다', async () => {
     const invalid = await fetch(url, {
       method: 'POST', headers,

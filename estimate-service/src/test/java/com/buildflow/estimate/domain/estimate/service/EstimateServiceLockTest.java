@@ -4,6 +4,8 @@ import com.buildflow.estimate.domain.estimate.dto.EstimateItemRequest;
 import com.buildflow.estimate.domain.estimate.dto.EstimateUpdateRequest;
 import com.buildflow.estimate.domain.estimate.entity.Estimate;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
+import com.buildflow.estimate.global.exception.BusinessException;
+import com.buildflow.estimate.global.exception.ErrorCode;
 import com.buildflow.estimate.global.kafka.KafkaProducerService;
 import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -82,6 +85,20 @@ class EstimateServiceLockTest {
 
         verify(estimateRepository).findByIdForUpdate(7L);
         verify(estimateRepository).delete(estimate);
+    }
+
+    @Test
+    void confirmedEstimateCannotBeDeletedOrPublishDeletion() {
+        Estimate estimate = draft();
+        estimate.confirm();
+        when(estimateRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(estimate));
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> estimateService.delete(7L));
+
+        assertEquals(ErrorCode.CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED, exception.getErrorCode());
+        verify(estimateRepository, never()).delete(any());
+        verify(kafkaProducerService, never()).sendEstimateDeleted(any());
     }
 
     private Estimate draft() {

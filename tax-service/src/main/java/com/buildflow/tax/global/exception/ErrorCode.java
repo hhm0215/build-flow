@@ -10,7 +10,9 @@ public enum ErrorCode {
 
     // TaxInvoice
     TAX_INVOICE_NOT_FOUND(HttpStatus.NOT_FOUND, "세금계산서를 찾을 수 없습니다."),
-    ALREADY_PAYMENT_CONFIRMED(HttpStatus.CONFLICT, "이미 입금 확인된 세금계산서입니다.");
+    ALREADY_PAYMENT_CONFIRMED(HttpStatus.CONFLICT, "이미 입금 확인된 세금계산서입니다."),
+    PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE(
+            HttpStatus.CONFLICT, "입금 확인된 세금계산서는 수정하거나 삭제할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
