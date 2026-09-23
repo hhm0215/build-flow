@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: purchase-service
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   config:
     import: optional:configserver:http://localhost:8888
   datasource:

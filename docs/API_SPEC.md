@@ -106,12 +106,13 @@
 
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
-| POST | /api/v1/purchases | 매입 등록 | O (ADMIN) |
+| POST | /api/v1/purchases | 매입 등록. 수량은 1 이상 정수, 단가는 0 이상·정수 10자리/소수 2자리 이하, 총액은 DECIMAL(15,2) 범위 | O (ADMIN) |
 | GET | /api/v1/purchases?siteId={id} | 현장별 매입 목록 | O |
 | GET | /api/v1/purchases/{id} | 매입 상세 | O |
-| PUT | /api/v1/purchases/{id} | 매입 수정 | O (ADMIN) |
+| PUT | /api/v1/purchases/{id} | 매입 수정. 현장 ID는 변경하지 않으며 등록과 같은 금액 제약 적용 | O (ADMIN) |
 | DELETE | /api/v1/purchases/{id} | 삭제 | O (ADMIN) |
-| GET | /api/v1/purchases/total?siteId={id} | 현장별 매입 합계 (OpenFeign용) | O |
+
+금액 검증 실패는 400 문자열 오류로 응답한다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
 
 ---
 
