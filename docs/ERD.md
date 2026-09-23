@@ -9,9 +9,9 @@
 
 - Database per Service: 각 서비스는 자기 스키마만 접근
 - 다른 서비스의 데이터는 ID만 저장 (FK 없음, 외래키 제약 없음)
-- 모든 테이블에 created_at, updated_at 포함
-- PK는 BIGINT AUTO_INCREMENT
-- 금액 컬럼은 BIGINT (원 단위, 소수점 없음)
+- 변경 이력을 가지는 업무 엔터티는 created_at, updated_at을 포함한다. immutable event ledger와 파생 projection은 처리 목적에 맞게 예외를 명시한다.
+- 업무 엔터티 PK는 BIGINT AUTO_INCREMENT를 기본으로 한다. Kafka eventId ledger와 다른 서비스 ID를 그대로 쓰는 projection은 자연키 PK를 허용한다.
+- 금액 컬럼은 `DECIMAL(15,2)`를 기본으로 사용해 원 단위와 필요한 소수 금액을 정확히 저장한다.
 - soft delete가 필요한 테이블은 deleted_at 컬럼 추가
 
 ---
@@ -186,17 +186,38 @@ RelationProposal 1 ── N ReviewDecision
 | created_at | DATETIME | |
 | updated_at | DATETIME | |
 
-### site_profit_cache (현장 손익 캐시 — 비정규화)
+### site_profits (현장 손익 projection — 비정규화)
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | id | BIGINT PK | |
-| site_id | BIGINT FK UNIQUE | sites.id |
-| total_revenue | BIGINT | 총 매출 (견적서 합계) |
-| total_expense | BIGINT | 총 매입 |
-| margin | BIGINT | 마진 (매출 - 매입) |
+| site_id | BIGINT UNIQUE | 현장 ID; site-service 내부에서 존재 검증 |
+| total_estimate_amount | DECIMAL(15,2) | 확정 견적 합계 |
+| total_purchase_amount | DECIMAL(15,2) | 매입 projection 기여분 합계 |
+| margin | DECIMAL(15,2) | 견적 합계 - 매입 합계 |
 | margin_rate | DECIMAL(5,2) | 마진율 (%) |
-| outstanding | BIGINT | 미수금 |
-| last_calculated_at | DATETIME | 마지막 계산 시점 |
+| created_at | DATETIME(6) | |
+| updated_at | DATETIME(6) | |
+
+### processed_profit_events
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| event_id | VARCHAR(36) PK | Kafka eventId 멱등 ledger |
+| site_id | BIGINT | 대상 현장 |
+| event_type | VARCHAR(40) | 반영한 이벤트 유형 |
+
+### purchase_profit_projections
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| purchase_id | BIGINT PK | purchase-service 매입 ID |
+| site_id | BIGINT INDEX | 대상 현장; 기존 projection과 불일치하면 이벤트 거부 |
+| last_revision | BIGINT | 마지막으로 관찰한 source revision |
+| current_amount | DECIMAL(15,2) | source의 마지막 전체 금액; 삭제 tombstone에도 마지막 금액 보존 |
+| deleted | BOOLEAN | true면 손익 기여분은 0이며 늦은 하위 revision 부활 차단 |
+| last_event_id | VARCHAR(36) | 마지막 상태를 만든 Kafka eventId |
+
+매입 이벤트는 site 행 잠금 아래 `processed_profit_events`, `purchase_profit_projections`, `site_profits`를 한 트랜잭션으로 변경한다. revision gap은 전체 상태 snapshot으로 수렴시키기 위해 허용하며, 낮은 revision은 stale 처리하고 같은 revision의 상충 상태는 DLT로 보낸다.
 
 ---
 
@@ -207,14 +228,16 @@ RelationProposal 1 ── N ReviewDecision
 |------|------|------|
 | id | BIGINT PK | |
 | site_id | BIGINT | 현장 ID |
-| purchase_type | ENUM('MATERIAL','SERVICE') | 자재/서비스 구분 |
-| supplier_name | VARCHAR(200) | 공급업체명 |
-| description | VARCHAR(500) | 내용 |
-| amount | BIGINT | 금액 |
+| item_name | VARCHAR(200) | 품명 |
+| quantity | INT | 수량 |
+| unit_price | DECIMAL(12,2) | 단가 |
+| total_amount | DECIMAL(15,2) | 단가 × 수량 |
+| supplier | VARCHAR(200) | 공급업체명 |
 | purchase_date | DATE | 매입일 |
 | memo | TEXT | 메모 |
-| created_at | DATETIME | |
-| updated_at | DATETIME | |
+| event_revision | BIGINT NOT NULL | 생성 1, 수정·삭제 이벤트마다 행 잠금 아래 +1 |
+| created_at | DATETIME(6) | |
+| updated_at | DATETIME(6) | |
 
 ---
 
@@ -306,13 +329,14 @@ RelationProposal 1 ── N ReviewDecision
 
 ## 8. 공통 — Kafka 멱등성
 
-### processed_events (각 소비 서비스의 스키마에 존재)
+### processed events (소비 서비스별 실제 ledger)
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
-| id | BIGINT PK | |
-| event_id | VARCHAR(36) UNIQUE | UUID (Kafka 메시지의 eventId) |
-| event_type | VARCHAR(100) | 이벤트 타입 |
-| processed_at | DATETIME | 처리 시점 |
+| event_id | VARCHAR(36) PK | UUID (Kafka 메시지의 eventId) |
+| event_type | VARCHAR(40~100) | 이벤트 타입 |
+| domain key | 서비스별 | 예: `processed_profit_events.site_id` |
+
+테이블명과 부가 컬럼은 소비 서비스별로 다르다. site-service는 앞서 정의한 `processed_profit_events`, notification-service는 `processed_notification_events`를 사용하며 업무 반영과 같은 트랜잭션으로 저장한다.
 
 ---
 
@@ -323,16 +347,15 @@ MSA에서 각 서비스의 DB는 독립적입니다. 서비스 A의 테이블이
 직접 참조하면, B의 스키마가 바뀔 때 A도 영향을 받습니다.
 그래서 다른 서비스의 ID만 BIGINT으로 저장하고, 실제 데이터는 API로 조회합니다.
 
-### Q: site_profit_cache 테이블은 왜 비정규화했나요?
+### Q: site_profits 테이블은 왜 비정규화했나요?
 현장 손익을 조회할 때마다 estimate-service, tax-service에 OpenFeign 호출하면
 응답이 느려집니다. Kafka 이벤트로 변경이 발생할 때만 재계산해서
-캐시 테이블에 저장해두면, 대시보드 조회는 자기 DB만 읽으면 됩니다.
+projection 테이블에 저장해두면, 대시보드 조회는 자기 DB만 읽으면 됩니다.
 이게 CQRS(Command Query Responsibility Segregation)의 간소화 버전입니다.
 
-### Q: 금액을 왜 BIGINT으로 했나요?
-건설업 견적서에서 소수점이 나오는 경우가 거의 없고,
-원 단위로 저장하면 부동소수점 오차를 완전히 피할 수 있습니다.
-필요하면 DECIMAL(15,0)도 가능하지만 BIGINT이 연산 성능이 더 좋습니다.
+### Q: 금액을 왜 DECIMAL로 했나요?
+금액 계산은 이진 부동소수점 오차가 없어야 하고 매입 수량·단가에는 소수 금액이 들어올 수 있습니다.
+그래서 엔티티와 DB 모두 `BigDecimal`/`DECIMAL(15,2)`를 사용하고 반올림 규칙을 명시합니다.
 
 ### Q: processed_events 테이블의 역할은?
 Kafka 소비자의 멱등성을 보장합니다. 네트워크 문제로 같은 메시지가

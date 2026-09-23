@@ -79,6 +79,7 @@ class PurchaseOutboxJpaTest {
         assertEquals(event.getEventId(), json.get("eventId").asText());
         assertEquals("PURCHASE_REGISTERED", json.get("eventType").asText());
         assertEquals(created.getId(), json.get("payload").get("purchaseId").asLong());
+        assertEquals(1L, json.get("payload").get("revision").asLong());
         assertEquals(0, new BigDecimal(json.get("payload").get("totalAmount").asText())
                 .compareTo(created.getTotalAmount()));
     }
@@ -107,6 +108,7 @@ class PurchaseOutboxJpaTest {
                 .filter(event -> event.getTopic().equals("purchase.updated")).findFirst().orElseThrow();
         JsonNode updateJson = objectMapper.readTree(updated.getPayloadJson());
         assertEquals("PURCHASE_UPDATED", updateJson.get("eventType").asText());
+        assertEquals(2L, updateJson.get("payload").get("revision").asLong());
         assertEquals(0, new BigDecimal(updateJson.get("payload").get("oldTotalAmount").asText())
                 .compareTo(new BigDecimal("3000.00")));
         assertEquals(0, new BigDecimal(updateJson.get("payload").get("newTotalAmount").asText())
@@ -115,6 +117,7 @@ class PurchaseOutboxJpaTest {
                 .filter(event -> event.getTopic().equals("purchase.deleted")).findFirst().orElseThrow();
         JsonNode deleteJson = objectMapper.readTree(deleted.getPayloadJson());
         assertEquals("PURCHASE_DELETED", deleteJson.get("eventType").asText());
+        assertEquals(3L, deleteJson.get("payload").get("revision").asLong());
         assertEquals(0, new BigDecimal(deleteJson.get("payload").get("totalAmount").asText())
                 .compareTo(new BigDecimal("6000.00")));
     }
@@ -129,6 +132,7 @@ class PurchaseOutboxJpaTest {
 
         assertEquals(0, purchaseRepository.findById(id).orElseThrow().getTotalAmount()
                 .compareTo(new BigDecimal("3000.00")));
+        assertEquals(1L, purchaseRepository.findById(id).orElseThrow().getEventRevision());
         assertEquals(1, outboxRepository.count());
     }
 
@@ -141,7 +145,25 @@ class PurchaseOutboxJpaTest {
         assertThrows(IllegalStateException.class, () -> purchaseService.delete(id));
 
         assertTrue(purchaseRepository.existsById(id));
+        assertEquals(1L, purchaseRepository.findById(id).orElseThrow().getEventRevision());
         assertEquals(1, outboxRepository.count());
+    }
+
+    @Test
+    void revisionsAreMonotonicPerPurchaseAndStartAtOne() throws Exception {
+        Long firstId = purchaseService.create(request()).getId();
+        Long secondId = purchaseService.create(request()).getId();
+
+        purchaseService.update(firstId, updateRequest());
+        purchaseService.update(firstId, updateRequest());
+        purchaseService.delete(firstId);
+
+        assertEquals(5, outboxRepository.count());
+        assertEquals(1L, revisionFor(secondId, "purchase.registered"));
+        assertEquals(1L, revisionsFor(firstId, "purchase.registered")[0]);
+        assertEquals(2L, revisionsFor(firstId, "purchase.updated")[0]);
+        assertEquals(3L, revisionsFor(firstId, "purchase.updated")[1]);
+        assertEquals(4L, revisionFor(firstId, "purchase.deleted"));
     }
 
     @Test
@@ -229,5 +251,25 @@ class PurchaseOutboxJpaTest {
         ReflectionTestUtils.setField(request, "quantity", 3);
         ReflectionTestUtils.setField(request, "unitPrice", new BigDecimal("2000.00"));
         return request;
+    }
+
+    private long revisionFor(Long purchaseId, String topic) throws Exception {
+        return revisionsFor(purchaseId, topic)[0];
+    }
+
+    private long[] revisionsFor(Long purchaseId, String topic) throws Exception {
+        return outboxRepository.findAll().stream()
+                .filter(event -> event.getTopic().equals(topic))
+                .filter(event -> event.getRecordKey().equals(String.valueOf(purchaseId)))
+                .mapToLong(event -> {
+                    try {
+                        return objectMapper.readTree(event.getPayloadJson())
+                                .get("payload").get("revision").asLong();
+                    } catch (Exception e) {
+                        throw new IllegalStateException(e);
+                    }
+                })
+                .sorted()
+                .toArray();
     }
 }

@@ -1,5 +1,6 @@
 package com.buildflow.purchase.global.kafka;
 
+import com.buildflow.purchase.domain.purchase.event.PurchaseDeletedPayload;
 import com.buildflow.purchase.domain.purchase.event.PurchaseRegisteredPayload;
 import com.buildflow.purchase.domain.purchase.event.PurchaseUpdatedPayload;
 import com.buildflow.purchase.global.event.KafkaEvent;
@@ -36,7 +37,7 @@ public class KafkaProducerService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void sendPurchaseDeleted(PurchaseRegisteredPayload payload) {
+    public void sendPurchaseDeleted(PurchaseDeletedPayload payload) {
         enqueue(TOPIC_PURCHASE_DELETED, payload.getPurchaseId(),
                 KafkaEvent.of("PURCHASE_DELETED", payload));
     }

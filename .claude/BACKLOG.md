@@ -21,14 +21,7 @@
 - **산출물**: 현장 수정, 견적 수정/삭제, 매입·세금계산서 수정/삭제, 보증보험 OCR 실패 보정/수정의 화면 동선과 오류 처리; MSW·실서버 계약 테스트
 - **관련 파일**: `frontend/src/pages`, `frontend/src/api`, `frontend/src/mocks`, 도메인별 컨트롤러
 - **예상 규모**: L (파일럿에 필요한 최소 동선부터 분할 가능)
-- **상태**: IN_PROGRESS (현장 생성·거래처 등록·견적 확정·현장 수정·DRAFT 견적 수정/삭제·보증보험 OCR 실패 수동 보정/수정·세금계산서 입금 확인 계약/오류 처리 완료. 사용자 결정: Kafka 신뢰성 먼저, 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지. 서버 정책 반영 및 매입·세금계산서 수정/삭제 화면은 Kafka P0 후속)
-
-### Kafka 손익 집계 신뢰성 보강
-- **배경**: `eventId`는 발행하지만 소비자가 중복 처리 여부를 확인하지 않고, 소비자 예외를 로그 후 삼켜 메시지 재처리가 보장되지 않는다. 금액 누적형 `SiteProfit`은 동시 갱신과 발행-DB 커밋 경계에도 취약하다. 문서상 site-service가 소비한다는 `tax.registered`·`tax.payment.confirmed`는 실제 소비자가 없다.
-- **산출물**: 소비자 멱등성, 재시도/DLT, 발행-커밋 일관성(outbox 권장; after-commit은 단기 완화), 동시 갱신 제어, 세금 이벤트 집계 계약 정리, 중복·실패·순서 역전 회귀 테스트
-- **관련 파일**: `site-service/.../KafkaConsumerService.java`, `notification-service/.../KafkaConsumerService.java`, 이벤트 발행 서비스, `SiteProfit`
-- **예상 규모**: L (설계 후 단계 분할)
-- **상태**: IN_PROGRESS (Phase 1 소비자 보호 PR #54, Phase 2 outbox 발행 보장 PR #55 병합 완료. 다음은 Phase 3 매입 revision/projection으로 토픽 간 순서 역전 방지)
+- **상태**: IN_PROGRESS (현장 생성·거래처 등록·견적 확정·현장 수정·DRAFT 견적 수정/삭제·보증보험 OCR 실패 수동 보정/수정·세금계산서 입금 확인 계약/오류 처리·Kafka 손익 신뢰성 Phase 1~3 완료. 다음은 확정 견적 삭제 금지와 입금 확인된 세금계산서 수정·삭제 금지 서버 정책, 매입·세금계산서 수정/삭제 UI)
 
 ---
 

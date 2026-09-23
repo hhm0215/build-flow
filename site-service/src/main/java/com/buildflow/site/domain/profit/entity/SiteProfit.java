@@ -55,18 +55,17 @@ public class SiteProfit {
         recalculate();
     }
 
-    public void addPurchaseAmount(BigDecimal amount) {
-        this.totalPurchaseAmount = this.totalPurchaseAmount.add(amount);
-        recalculate();
-    }
-
     public void subtractEstimateAmount(BigDecimal amount) {
         this.totalEstimateAmount = this.totalEstimateAmount.subtract(amount);
         recalculate();
     }
 
-    public void subtractPurchaseAmount(BigDecimal amount) {
-        this.totalPurchaseAmount = this.totalPurchaseAmount.subtract(amount);
+    public void adjustPurchaseAmount(BigDecimal delta) {
+        BigDecimal adjusted = this.totalPurchaseAmount.add(delta);
+        if (adjusted.signum() < 0) {
+            throw new IllegalStateException("현장 총매입은 음수가 될 수 없습니다.");
+        }
+        this.totalPurchaseAmount = adjusted;
         recalculate();
     }
 
