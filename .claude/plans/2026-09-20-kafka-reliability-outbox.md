@@ -3,7 +3,7 @@
 - **시작일**: 2026-09-20
 - **BACKLOG 항목**: P0 Kafka 손익 집계 신뢰성 보강
 - **예상 규모**: L
-- **상태**: IN_PROGRESS
+- **상태**: DONE
 
 ## 목표
 견적·매입·세금계산서·보증보험 이벤트를 원본 DB 변경과 같은 트랜잭션에 저장하고, 커밋된 outbox 행만 Kafka에 발행한다. DB 롤백 이벤트 유출과 broker 일시 장애 시 발행 유실을 막는다. 이 단계만으로 매입 토픽 간 순서 역전은 해결하지 않는다.
@@ -25,7 +25,7 @@
 - [x] tax-service outbox·dispatcher·입금 확인 잠금·테스트
 - [x] notification-service warranty outbox·scheduler 경합 보호·테스트
 - [x] eventId/JSON·ACK/재시도/lease·롤백 회귀 검증, 독립 정적 리뷰
-- [ ] 전체 Gradle test·Docker 비영속 점검·문서·PR/CI/SHA/병합
+- [x] 전체 Gradle test·Docker 비영속 점검·문서·PR/CI/SHA/병합
 
 ## 리스크 / 모르는 것
 - MySQL `SKIP LOCKED`와 실제 Kafka ACK·offset은 H2/Mockito만으로 입증할 수 없다. Docker 검증 범위를 분리해 기록한다.
@@ -44,4 +44,4 @@
 
 전체 Gradle test 및 보완 후 4개 서비스 test, notification 전체 컨텍스트 기동 테스트가 통과했다. 독립 교차 리뷰에서 보증보험 장기 장애 중복, 스케줄러 지연, 매입 interrupt 후 추가 claim, Kafka `send()` 사전 차단을 발견해 수정·회귀 테스트를 추가했다. 기존 확정 견적 삭제와 입금 완료 세금계산서 수정·삭제 정책은 이번 outbox 범위가 아니며 별도 P0 후속이다.
 
-2026-09-21 Docker 엔진 복구 후 병렬 이미지 빌드가 Maven TLS handshake 실패로 중단됐으나, 인프라를 기존 이미지로 기동하고 변경된 네 서비스를 순차 빌드해 모두 성공했다. 네 서비스 health 200, MySQL `outbox_events` 테이블 4개 생성, 목록 API 200/빈 목록, Gateway 미인증 401을 확인했다. 기존 outbox 행은 0건이었다. 격리된 임시 토픽에 각 서비스 outbox 행 1건씩만 넣어 broker 수락 후 `SENT` 4건과 Kafka 원본 eventId 메시지 4건을 확인했고, 정확히 그 테스트 행과 토픽을 제거했다. 최종 outbox 행은 네 DB 모두 0건이다. 실제 다중 MySQL dispatcher 경합·broker 장애 재시도는 H2/Mockito 범위로 남는다. PR #55 CI 6개 통과 및 3개 커밋 SHA 일치를 확인했고 병합 직전 재검증이 남았다.
+2026-09-21 Docker 엔진 복구 후 병렬 이미지 빌드가 Maven TLS handshake 실패로 중단됐으나, 인프라를 기존 이미지로 기동하고 변경된 네 서비스를 순차 빌드해 모두 성공했다. 네 서비스 health 200, MySQL `outbox_events` 테이블 4개 생성, 목록 API 200/빈 목록, Gateway 미인증 401을 확인했다. 기존 outbox 행은 0건이었다. 격리된 임시 토픽에 각 서비스 outbox 행 1건씩만 넣어 broker 수락 후 `SENT` 4건과 Kafka 원본 eventId 메시지 4건을 확인했고, 정확히 그 테스트 행과 토픽을 제거했다. 최종 outbox 행은 네 DB 모두 0건이다. 실제 다중 MySQL dispatcher 경합·broker 장애 재시도는 H2/Mockito 범위로 남는다. [PR #55](https://github.com/hhm0215/build-flow/pull/55) 최신 CI 6개 통과 및 4개 커밋 SHA 일치 후 merge commit `504decf`로 병합했다.

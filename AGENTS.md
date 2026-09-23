@@ -1,8 +1,10 @@
 # BuildFlow — Agent Instructions
 
-건설·시공 소규모 업체(1~10인)를 위한 현장 업무 관리 MSA 플랫폼.
+현재는 건설·시공 소규모 업체(1~10인)를 위한 현장 업무 관리 MSA 플랫폼.
 현장별 문서(공내역서, 견적서, 세금계산서, 하자보증보험)를 묶어 관리하고,
 AI 대시보드로 마진·손익을 요약. 1인 개발 + 가족이 단일 관리자 계정을 공유하는 로컬 실사용.
+
+장기적으로 건설 도메인을 첫 검증 영역으로 삼아, 서로 다른 파일·폴더·양식의 원본·출처·버전·관계·확정 판단을 보존하는 유연한 정보관리 플랫폼으로 확장한다. 제품 비전 기준은 `docs/PRODUCT_VISION.md`이며 현재 건설 실사용 우선순위는 `.claude/BACKLOG.md`를 따른다.
 
 ---
 
@@ -167,6 +169,8 @@ eventId 기반 멱등성 필수.
 - Entity 직접 반환
 - `docker stop` (반드시 `docker compose down`)
 - `npm` / `yarn` (프론트엔드는 `bun`)
+- AI 결과로 원본 파일 덮어쓰기·임의 이름 변경
+- 사용자 확정 없이 AI 제안을 금액·계약·삭제·보존 만료의 최종 사실로 반영
 
 ---
 
@@ -175,6 +179,7 @@ eventId 기반 멱등성 필수.
 | 파일 | 용도 |
 |------|------|
 | `CLAUDE.md` | 전체 개발 가이드 (사람 + AI용, 상세) |
+| `docs/PRODUCT_VISION.md` | 제품 철학·정보 보존 원칙·단계별 장기 로드맵 |
 | `.claude/BACKLOG.md` | 다음 작업 우선순위 (P0/P1/P2) |
 | `.claude/PROGRESS.md` | 완료 이력 + 현재 git 상태 |
 | `docs/ARCHITECTURE.md` | 시스템 전체 구조 상세 |
@@ -198,10 +203,5 @@ eventId 기반 멱등성 필수.
 - notification-service: Kafka 구독 알림 + 하자보증보험 OCR(PDF)
 - frontend: 로그인/현장관리/견적/매입/세금계산서/하자보증보험 페이지 (Ant Design dark)
 
-### 백로그 (P1)
-- `WarrantyOcrParser.findPeriod` 200자 윈도우 개선 (날짜 오매칭 위험)
-- `DefectWarranty.update` PATCH/PUT 시맨틱 분리 (null vs absent 구분)
-- `useListFilters` 훅 추상화 (5개 ListPage 중복 제거)
-
 ### 백로그
-- `.claude/BACKLOG.md`를 단일 진실원으로 사용
+- 고정 목록을 이 문서에 복제하지 않는다. `.claude/BACKLOG.md`를 단일 진실원으로 사용한다.
