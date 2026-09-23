@@ -35,22 +35,22 @@ class KafkaConsumerServiceTest {
         consumer.consumeEstimateDeleted(message("ESTIMATE_DELETED",
                 "{\"estimateId\":1,\"siteId\":2,\"totalAmount\":100}"));
         consumer.consumePurchaseRegistered(message("PURCHASE_REGISTERED",
-                "{\"purchaseId\":3,\"siteId\":2,\"totalAmount\":40}"));
+                "{\"purchaseId\":3,\"siteId\":2,\"revision\":1,\"totalAmount\":40}"));
         consumer.consumePurchaseUpdated(message("PURCHASE_UPDATED",
-                "{\"purchaseId\":3,\"siteId\":2,\"oldTotalAmount\":40,\"newTotalAmount\":50}"));
+                "{\"purchaseId\":3,\"siteId\":2,\"revision\":2,\"oldTotalAmount\":40,\"newTotalAmount\":50}"));
         consumer.consumePurchaseDeleted(message("PURCHASE_DELETED",
-                "{\"purchaseId\":3,\"siteId\":2,\"totalAmount\":50}"));
+                "{\"purchaseId\":3,\"siteId\":2,\"revision\":3,\"totalAmount\":50}"));
 
         verify(profitService).applyEvent(EVENT_ID, ProfitEventType.ESTIMATE_PARSED,
                 2L, new BigDecimal("100"), null);
         verify(profitService).applyEvent(EVENT_ID, ProfitEventType.ESTIMATE_DELETED,
                 2L, new BigDecimal("100"), null);
-        verify(profitService).applyEvent(EVENT_ID, ProfitEventType.PURCHASE_REGISTERED,
-                2L, new BigDecimal("40"), null);
-        verify(profitService).applyEvent(EVENT_ID, ProfitEventType.PURCHASE_UPDATED,
-                2L, new BigDecimal("50"), new BigDecimal("40"));
-        verify(profitService).applyEvent(EVENT_ID, ProfitEventType.PURCHASE_DELETED,
-                2L, new BigDecimal("50"), null);
+        verify(profitService).applyPurchaseEvent(EVENT_ID, ProfitEventType.PURCHASE_REGISTERED,
+                3L, 2L, 1L, new BigDecimal("40"));
+        verify(profitService).applyPurchaseEvent(EVENT_ID, ProfitEventType.PURCHASE_UPDATED,
+                3L, 2L, 2L, new BigDecimal("50"));
+        verify(profitService).applyPurchaseEvent(EVENT_ID, ProfitEventType.PURCHASE_DELETED,
+                3L, 2L, 3L, new BigDecimal("50"));
     }
 
     @Test
@@ -63,18 +63,23 @@ class KafkaConsumerServiceTest {
         assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseUpdated(
                 message("PURCHASE_UPDATED", "{\"purchaseId\":3,\"siteId\":2,\"newTotalAmount\":50}")));
         assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseDeleted(
-                message("PURCHASE_DELETED", "{\"purchaseId\":3,\"siteId\":2,\"totalAmount\":-5}")));
+                message("PURCHASE_DELETED", "{\"purchaseId\":3,\"siteId\":2,\"revision\":2,\"totalAmount\":-5}")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseRegistered(
+                message("PURCHASE_REGISTERED", "{\"purchaseId\":3,\"siteId\":2,\"revision\":0,\"totalAmount\":5}")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseRegistered(
+                message("PURCHASE_REGISTERED", "{\"purchaseId\":3,\"siteId\":2,\"revision\":1.5,\"totalAmount\":5}")));
         verifyNoInteractions(profitService);
     }
 
     @Test
     void domainFailurePropagatesToKafkaErrorHandler() {
         doThrow(new IllegalStateException("database unavailable"))
-                .when(profitService).applyEvent(eq(EVENT_ID), eq(ProfitEventType.PURCHASE_REGISTERED),
-                        eq(2L), eq(new BigDecimal("40")), eq(null));
+                .when(profitService).applyPurchaseEvent(eq(EVENT_ID), eq(ProfitEventType.PURCHASE_REGISTERED),
+                        eq(3L), eq(2L), eq(1L), eq(new BigDecimal("40")));
 
         assertThrows(IllegalStateException.class, () -> consumer.consumePurchaseRegistered(
-                message("PURCHASE_REGISTERED", "{\"purchaseId\":3,\"siteId\":2,\"totalAmount\":40}")));
+                message("PURCHASE_REGISTERED",
+                        "{\"purchaseId\":3,\"siteId\":2,\"revision\":1,\"totalAmount\":40}")));
     }
 
     private String message(String type, String payload) {

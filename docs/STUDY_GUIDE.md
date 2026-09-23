@@ -743,13 +743,16 @@ public class KafkaEvent<T> {
 [발행] purchase-service (구현 완료)
   매입 등록 시 발행
   → KafkaEvent<PurchaseRegisteredPayload>
-    payload: { purchaseId, siteId, totalAmount }
+    payload: { purchaseId, siteId, revision: 1, totalAmount }
 
 [소비] site-service (이미 구현)
-  ProfitService.addPurchaseAmount(siteId, totalAmount)
-  → SiteProfit.totalPurchaseAmount 갱신
+  ProfitService.applyPurchaseEvent(...)
+  → purchase_profit_projections에 purchase별 최신 전체 상태 저장
+  → 이전 기여분과 새 기여분의 차이만 SiteProfit.totalPurchaseAmount에 반영
   → 마진/마진율 자동 재계산
 ```
+
+`purchase.updated`와 `purchase.deleted`도 증가한 `revision`과 현재 전체 금액을 보낸다. 세 이벤트는 토픽이 서로 달라 도착 순서가 바뀔 수 있으므로 site-service는 가장 높은 revision만 유효하게 본다. 삭제가 먼저 도착하면 tombstone을 저장하고, 늦은 하위 revision은 손익을 변경하지 않는다.
 
 ### 멱등성 처리
 
@@ -761,8 +764,10 @@ public class KafkaEvent<T> {
 컨벤션:
 - 토픽 이름: {domain}.{event} (예: estimate.parsed)
 - Consumer Group: {service}-group (예: site-service-group)
-- 메시지 키: 관련 엔티티 ID (파티션 키로 순서 보장)
+- 메시지 키: 관련 엔티티 ID (같은 토픽·파티션 안에서만 순서 보장)
 ```
+
+매입처럼 한 생명주기의 이벤트가 여러 토픽에 나뉘면 메시지 키만으로 전체 순서를 보장할 수 없다. 그래서 source revision과 consumer projection을 함께 사용한다. `eventId`는 같은 이벤트의 중복 처리를 막고, `revision`은 서로 다른 이벤트 중 어떤 상태가 더 최신인지 판단한다.
 
 ---
 
@@ -853,6 +858,14 @@ site_profits
 ├── total_purchase_amount (DECIMAL(15,2))
 ├── margin, margin_rate
 ├── created_at, updated_at
+
+purchase_profit_projections
+├── purchase_id (PK — purchase-service 매입 ID)
+├── site_id
+├── last_revision
+├── current_amount
+├── deleted (삭제 tombstone 여부)
+└── last_event_id
 ```
 
 ---

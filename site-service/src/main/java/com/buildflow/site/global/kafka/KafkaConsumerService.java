@@ -42,28 +42,27 @@ public class KafkaConsumerService {
     public void consumePurchaseRegistered(String message) {
         KafkaEvent<Map<String, Object>> event = readEvent(message, ProfitEventType.PURCHASE_REGISTERED);
         Map<String, Object> payload = event.getPayload();
-        requiredId(payload, "purchaseId");
-        profitService.applyEvent(event.getEventId(), ProfitEventType.PURCHASE_REGISTERED,
-                requiredId(payload, "siteId"), requiredAmount(payload, "totalAmount"), null);
+        profitService.applyPurchaseEvent(event.getEventId(), ProfitEventType.PURCHASE_REGISTERED,
+                requiredId(payload, "purchaseId"), requiredId(payload, "siteId"),
+                requiredRevision(payload), requiredAmount(payload, "totalAmount"));
     }
 
     @KafkaListener(topics = "purchase.updated", groupId = "site-service-group")
     public void consumePurchaseUpdated(String message) {
         KafkaEvent<Map<String, Object>> event = readEvent(message, ProfitEventType.PURCHASE_UPDATED);
         Map<String, Object> payload = event.getPayload();
-        requiredId(payload, "purchaseId");
-        profitService.applyEvent(event.getEventId(), ProfitEventType.PURCHASE_UPDATED,
-                requiredId(payload, "siteId"), requiredAmount(payload, "newTotalAmount"),
-                requiredAmount(payload, "oldTotalAmount"));
+        profitService.applyPurchaseEvent(event.getEventId(), ProfitEventType.PURCHASE_UPDATED,
+                requiredId(payload, "purchaseId"), requiredId(payload, "siteId"),
+                requiredRevision(payload), requiredAmount(payload, "newTotalAmount"));
     }
 
     @KafkaListener(topics = "purchase.deleted", groupId = "site-service-group")
     public void consumePurchaseDeleted(String message) {
         KafkaEvent<Map<String, Object>> event = readEvent(message, ProfitEventType.PURCHASE_DELETED);
         Map<String, Object> payload = event.getPayload();
-        requiredId(payload, "purchaseId");
-        profitService.applyEvent(event.getEventId(), ProfitEventType.PURCHASE_DELETED,
-                requiredId(payload, "siteId"), requiredAmount(payload, "totalAmount"), null);
+        profitService.applyPurchaseEvent(event.getEventId(), ProfitEventType.PURCHASE_DELETED,
+                requiredId(payload, "purchaseId"), requiredId(payload, "siteId"),
+                requiredRevision(payload), requiredAmount(payload, "totalAmount"));
     }
 
     private KafkaEvent<Map<String, Object>> readEvent(String message, ProfitEventType expectedType) {
@@ -104,5 +103,9 @@ public class KafkaConsumerService {
             // Report a stable validation error to the Kafka error handler.
         }
         throw new IllegalArgumentException("Kafka 손익 이벤트에 유효한 " + field + "가 없습니다");
+    }
+
+    private long requiredRevision(Map<String, Object> payload) {
+        return requiredId(payload, "revision");
     }
 }

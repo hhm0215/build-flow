@@ -62,15 +62,15 @@
 즉시 응답이 필요 없고, 이벤트 발생을 알리는 경우.
 발행자는 이벤트를 던지고 끝. 소비자가 각자 처리.
 
-#### 구현된 토픽 (2026-06-09 기준)
+#### 구현된 토픽 (2026-09-23 기준)
 
 | 토픽 | 발행자 | 소비자 | 설명 |
 |------|--------|--------|------|
 | estimate.parsed | estimate-service | site-service · notification-service | 공내역 AI 파싱 완료 → 손익 재계산 + 알림 |
 | estimate.deleted | estimate-service | site-service · notification-service | 견적서 삭제 → 손익 재계산 |
-| purchase.registered | purchase-service | site-service · notification-service | 매입 등록 → 손익 재계산 + 알림 |
-| purchase.updated | purchase-service | site-service | 매입 수정 → 손익 재계산 |
-| purchase.deleted | purchase-service | site-service | 매입 삭제 → 손익 재계산 |
+| purchase.registered | purchase-service | site-service · notification-service | 매입 revision 1 전체 상태 → projection 반영 + 알림 |
+| purchase.updated | purchase-service | site-service | 증가한 revision의 전체 상태 → projection 교체 |
+| purchase.deleted | purchase-service | site-service | 증가한 revision의 삭제 상태 → tombstone 보존 |
 | tax.registered | tax-service | notification-service | 세금계산서 등록 → 알림 (미수금은 tax-service DB에서 직접 계산) |
 | tax.payment.confirmed | tax-service | notification-service | 입금 확인 → 알림 (미수금은 tax-service DB에서 직접 계산) |
 | warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 인앱 알림 (스케줄러 매일 09:00, cooldown 7일) |
@@ -86,12 +86,14 @@
 ```json
 {
   "eventId": "550e8400-e29b-41d4-a716-446655440000",
-  "eventType": "estimate.uploaded",
+  "eventType": "PURCHASE_UPDATED",
   "timestamp": "2026-04-04T10:30:00Z",
   "payload": {
+    "purchaseId": 42,
     "siteId": 1,
-    "estimateId": 42,
-    "totalAmount": 52000000
+    "revision": 2,
+    "oldTotalAmount": 50000000,
+    "newTotalAmount": 52000000
   }
 }
 ```
@@ -99,6 +101,9 @@
 - eventId: UUID. 멱등성 보장용 (소비자가 중복 처리 방지)
 - Consumer 그룹: {서비스명}-group (예: site-service-group)
 - 직렬화: JSON (JsonSerializer/JsonDeserializer)
+- record key: 관련 엔티티 ID. 같은 토픽·파티션 내부 순서에만 사용하며 서로 다른 토픽 사이의 순서는 보장하지 않는다.
+- 매입 payload: `purchaseId`, `siteId`, `revision`, 현재 전체 금액을 필수로 포함한다. site-service는 가장 높은 revision만 `purchase_profit_projections`에 반영하고 삭제 tombstone을 보존한다.
+- 같은 revision의 동일 상태는 no-op, 상충 상태는 계약 오류로 DLT 처리한다. revision이 낮은 지연 이벤트는 처리 ledger만 남기고 손익을 변경하지 않는다.
 
 ---
 

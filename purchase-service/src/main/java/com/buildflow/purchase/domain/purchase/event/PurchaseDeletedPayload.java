@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PurchaseRegisteredPayload {
+public class PurchaseDeletedPayload {
 
     private Long purchaseId;
     private Long siteId;

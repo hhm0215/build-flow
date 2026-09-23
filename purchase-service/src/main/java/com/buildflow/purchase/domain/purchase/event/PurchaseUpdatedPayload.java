@@ -15,6 +15,7 @@ public class PurchaseUpdatedPayload {
 
     private Long purchaseId;
     private Long siteId;
+    private Long revision;
     private BigDecimal oldTotalAmount;
     private BigDecimal newTotalAmount;
 }

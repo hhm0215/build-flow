@@ -4,6 +4,7 @@ import com.buildflow.purchase.domain.purchase.dto.PurchaseCreateRequest;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseResponse;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseUpdateRequest;
 import com.buildflow.purchase.domain.purchase.entity.Purchase;
+import com.buildflow.purchase.domain.purchase.event.PurchaseDeletedPayload;
 import com.buildflow.purchase.domain.purchase.event.PurchaseRegisteredPayload;
 import com.buildflow.purchase.domain.purchase.event.PurchaseUpdatedPayload;
 import com.buildflow.purchase.domain.purchase.repository.PurchaseRepository;
@@ -43,6 +44,7 @@ public class PurchaseService {
                 PurchaseRegisteredPayload.builder()
                         .purchaseId(saved.getId())
                         .siteId(saved.getSiteId())
+                        .revision(saved.getEventRevision())
                         .totalAmount(saved.getTotalAmount())
                         .build()
         );
@@ -82,6 +84,7 @@ public class PurchaseService {
                 PurchaseUpdatedPayload.builder()
                         .purchaseId(purchase.getId())
                         .siteId(purchase.getSiteId())
+                        .revision(purchase.getEventRevision())
                         .oldTotalAmount(oldTotalAmount)
                         .newTotalAmount(purchase.getTotalAmount())
                         .build()
@@ -93,11 +96,13 @@ public class PurchaseService {
     @Transactional
     public void delete(Long id) {
         Purchase purchase = getPurchaseForUpdate(id);
+        long deleteRevision = purchase.incrementEventRevision();
 
         kafkaProducerService.sendPurchaseDeleted(
-                PurchaseRegisteredPayload.builder()
+                PurchaseDeletedPayload.builder()
                         .purchaseId(purchase.getId())
                         .siteId(purchase.getSiteId())
+                        .revision(deleteRevision)
                         .totalAmount(purchase.getTotalAmount())
                         .build()
         );

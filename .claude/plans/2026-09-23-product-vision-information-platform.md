@@ -58,3 +58,5 @@ USB 견적 자료를 검토하면서 같은 파일명과 날짜만으로 수정�
 | 변경·운영 감사 | 실제 업체명·절대경로 노출, Stage 1을 현재 기능처럼 서술, 가져오기 보안 기준과 문서 정합성 누락 | 추적 문서에서 경로 제거, 미래형으로 정정, 파서·경로·로그·ACL 위협 기준 및 stale AGENTS 목록 정리 |
 
 재검토에서 남은 실행 경계도 보완했다. Stage 1 목표 ERD에 Blob/Source/Observation/ExtractionRun과 EstimateWork/Revision의 cardinality를 명시하고, 미확정 작업은 회계 유효 버전 0개·확정 후에도 최대 1개만 허용한다. 백업은 완료된 배치 checkpoint에서 DB와 Blob을 함께 고정하고, 내부 `storageKey`와 휴대용 `packageRelativePath`를 분리한다. 성공 기준은 플랫폼이 원본에 수행한 변경 0건과 외부 변경 감지 후 성공 처리 0건으로 나눴다.
+
+[PR #56](https://github.com/hhm0215/build-flow/pull/56)은 공개 develop의 초기 경로 포함 커밋을 정제된 단일 커밋 `b2556e7`로 교체한 뒤 생성했다. GitHub CI 6개 성공과 PR/원격 SHA 일치를 확인하고 merge commit `92a828c`로 병합했다.

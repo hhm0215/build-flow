@@ -47,6 +47,9 @@ public class Purchase {
     @Column(columnDefinition = "TEXT")
     private String memo;
 
+    @Column(nullable = false)
+    private long eventRevision = 1L;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -66,6 +69,7 @@ public class Purchase {
         this.supplier = supplier;
         this.purchaseDate = purchaseDate;
         this.memo = memo;
+        this.eventRevision = 1L;
     }
 
     public void update(String itemName, Integer quantity, BigDecimal unitPrice,
@@ -77,5 +81,11 @@ public class Purchase {
         this.supplier = supplier;
         this.purchaseDate = purchaseDate;
         this.memo = memo;
+        this.eventRevision = Math.addExact(this.eventRevision, 1L);
+    }
+
+    public long incrementEventRevision() {
+        this.eventRevision = Math.addExact(this.eventRevision, 1L);
+        return this.eventRevision;
     }
 }

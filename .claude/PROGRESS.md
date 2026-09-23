@@ -5,19 +5,28 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 다음 P0 진입 대기·실사용 UI 라이프사이클 (2026-09-21)
+## 현재 진행 중 — 실사용 UI 라이프사이클 후속 (2026-09-23)
 
-- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다. 사용자가 Kafka 신뢰성 우선, 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지를 승인했다. Kafka Phase 1부터 진행하며 남은 작업은 `.claude/BACKLOG.md` P0를 따른다.
-- 손익 집계 Kafka Phase 1·2를 병합했고, Phase 3 매입 순서 안전 및 확정 견적·입금 완료 세금계산서 보호와 UI 후속은 `.claude/BACKLOG.md` P0에 남아 있다.
+- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다.
+- Kafka 손익 집계 Phase 1~3 구현·로컬 실환경 검증을 완료했다. 다음 P0는 사용자 결정대로 확정 견적 삭제 금지, 입금 확인된 세금계산서 수정·삭제 금지 서버 정책을 먼저 적용하고 매입·세금계산서 수정/삭제 UI를 잇는다.
 
 ---
 
 ## 완료된 작업
 
+### ✅ Kafka 손익 집계 신뢰성 Phase 3 — 매입 revision/projection (2026-09-23)
+- purchase-service에 생성 1부터 수정·삭제마다 증가하는 명시적 `eventRevision`을 추가하고 등록·수정·삭제 outbox payload에 revision과 전체 현재 상태를 저장했다.
+- site-service에 purchase별 최신 상태·삭제 tombstone을 보존하는 `purchase_profit_projections`를 추가했다. 낮은 revision은 stale ledger 처리, 같은 revision의 동일 상태는 no-op, 상충 상태는 DLT, 높은 revision은 gap을 허용해 이전 기여분과의 delta만 손익에 반영한다. ledger·projection·손익은 현장 행 잠금 아래 한 트랜잭션으로 commit/rollback한다.
+- 6개 생명주기 순열, update/delete 선도착, stale, 동일 revision 충돌, 유형별 잘못된 revision, 다중/동시 purchase, outbox revision/rollback을 검증했다. projection을 우회하던 공개 매입 증감 API는 독립 리뷰에서 발견해 제거했다. 캐시를 끈 purchase/site 테스트와 전체 Gradle test가 성공했다.
+- Docker baseline에서 source purchase 0건·consumer lag 0·DLT 0을 확인했다. 과거 스모크로 남은 SENT outbox 1건은 이력으로 보존하고, 원본 0건과 불일치한 총매입 400,000원 한 행을 조건부 reconciliation해 0원으로 복구했다. 새 이미지의 두 서비스 health UP, `event_revision` NOT NULL·projection 테이블 생성을 확인했다.
+- 격리 purchaseId로 `delete r3 → update r2 → register r1`을 실제 Kafka에 발행해 revision 3 삭제 tombstone, 처리 ledger 3건, 현장 총매입 0원으로 수렴함을 확인했다. tombstone/ledger는 재생 안전성을 위해 보존하며 손익 기여는 0이다. 혼합 버전 방지 배포 순서·기존 데이터 backfill/seed 조건·삭제 DLT 대조 절차를 운영 문서에 기록했다.
+- 계획: `.claude/plans/2026-09-23-kafka-purchase-revision-projection.md`.
+
 ### ✅ 제품 비전 v2 — 범용 정보관리 플랫폼 방향 정립 (2026-09-23)
 - 건설 현장 관리를 첫 번째 수직 도메인으로 유지하면서 원본·출처·버전·관계·확정 판단을 보존하는 범용 정보관리 플랫폼으로 단계적으로 확장하는 비전을 `docs/PRODUCT_VISION.md`와 ADR-017에 확정했다.
 - 범용 정보 코어 후보·도메인 팩·근거 기반 Assistant의 경계를 정의하고, 원본 불변성·확장 스키마·감사·데이터 이동성·사람의 최종 통제를 불변 원칙으로 기록했다. README·기획·아키텍처·AGENTS·CLAUDE를 같은 방향으로 동기화했다.
 - 현재 P0 순서는 변경하지 않고, P1에 2026년 `.xlsx` 견적만 대상으로 하는 문서 코어 Stage 1을 등록했다. 독립 역할 검토에서 실제 업체명/절대경로 노출, 바이트·출처 모델 혼합, 보존/삭제·사례 격리·보안/복구 기준 누락을 찾아 같은 작업에서 보완했다. 객체 저장소·벡터 DB·멀티테넌시·신규 서비스 경계는 실데이터 검증 전까지 보류했다. 계획: `.claude/plans/2026-09-23-product-vision-information-platform.md`.
+- [PR #56](https://github.com/hhm0215/build-flow/pull/56)에서 공개 develop의 초기 경로 포함 커밋을 정제된 단일 SHA로 교체하고, CI 6개 성공·PR/원격 SHA 일치 후 merge commit `92a828c`로 병합했다.
 
 ### ✅ Kafka 손익 집계 신뢰성 Phase 2 — 트랜잭셔널 outbox (2026-09-21)
 - 견적·매입·세금계산서·보증보험 이벤트를 업무 DB 변경과 같은 트랜잭션에 저장하고, lease/claim token·원본 JSON 재전송·broker ACK 후 `SENT`를 구현했다. 매입 수정·삭제/세금 입금 확인 잠금과 보증보험 장기 장애 중복 방지·ACK 기준 쿨다운을 적용했다.
@@ -453,15 +462,15 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-21 갱신)
+## 다음 세션 진입점 (2026-09-23 갱신)
 
-**Git 상태**: PR #49~#55 merge 완료. `origin/main`은 PR #55 merge commit `504decf`, `origin/develop`은 `c4e1e09`이다. main은 PR #55의 네 커밋을 포함하고 merge commit 1개가 더 있다. PR #55 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
+**Git 상태**: PR #49~#56 merge 완료. `origin/main`은 PR #56 merge commit `92a828c`, `origin/develop`은 제품 비전 커밋 `b2556e7`이다. main은 develop의 단일 커밋을 포함하고 merge commit 1개가 더 있다. PR #56 병합 후처리 문서는 로컬 develop의 다음 작업 PR에 포함한다.
 
-**로컬 실행 상태**: Docker Desktop Linux 엔진 정상. MySQL·Redis·Kafka·Zipkin, Eureka·Config·Gateway, auth/site/frontend 및 Phase 2 코드의 estimate/purchase/tax/notification 서비스가 실행 중이다. chat-service는 이번 검증에서 기동하지 않았다. `.env`는 로컬에서 생성했고 Git에서 제외된다. 임시 outbox 행·Kafka 토픽은 삭제했다.
+**로컬 실행 상태**: Docker Desktop Linux 엔진 정상. MySQL·Redis·Kafka·Zipkin, Eureka·Config 및 Phase 3 새 이미지의 site/purchase 서비스가 실행 중이다. 나머지 앱 컨테이너는 이번 최소 검증에서 기동하지 않았다. `.env`는 로컬에서 생성했고 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. Kafka Phase 3 매입 revision/projection 순서 안전을 먼저 구현하고, 이후 확정 견적 삭제 금지·입금 확인 세금계산서 수정/삭제 금지와 매입·세금계산서 UI를 연결한다. 실데이터 파일럿은 두 P0 위험을 해소한 뒤 진행한다.
+**다음 작업**: `.claude/BACKLOG.md` P0를 따른다. 확정 견적 삭제 금지·입금 확인 세금계산서 수정/삭제 금지 서버 정책을 적용한 뒤 매입·세금계산서 수정/삭제 UI를 연결한다. 실데이터 파일럿은 이 P0 보호 정책과 UI 보정을 마친 뒤 진행한다.
 
-**검증 상태**: Phase 2 전체 Gradle test·변경 4개 서비스 회귀 테스트, PR CI 6개, Docker 4개 새 이미지·health/API·MySQL 테이블·실 Kafka ACK/SENT 4건·임시 항목 제거를 확인했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. MySQL 실제 다중 dispatcher 경합·Kafka DLT offset 보존, 브라우저 수동 E2E, 실제 업무 트랜잭션/견적 확정 이벤트 실서버 스모크는 아직 수행하지 않았다.
+**검증 상태**: Phase 3 캐시 없는 purchase/site 테스트와 전체 Gradle test, 독립 3역할 리뷰, Docker 새 이미지 health·스키마·baseline reconciliation, 실제 역순 Kafka 수렴을 확인했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. 같은 purchase의 MySQL 실동시 revision 경합, Kafka DLT offset 보존, 브라우저 수동 E2E는 후속 통합 검증으로 남아 있다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

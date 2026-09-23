@@ -3,6 +3,7 @@ package com.buildflow.site.domain.profit.service;
 import com.buildflow.site.domain.profit.entity.SiteProfit;
 import com.buildflow.site.domain.profit.event.ProfitEventType;
 import com.buildflow.site.domain.profit.repository.ProcessedProfitEventRepository;
+import com.buildflow.site.domain.profit.repository.PurchaseProfitProjectionRepository;
 import com.buildflow.site.domain.profit.repository.SiteProfitRepository;
 import com.buildflow.site.domain.site.entity.Site;
 import com.buildflow.site.domain.site.repository.SiteRepository;
@@ -40,21 +41,25 @@ class ProfitServiceKafkaTest {
     private final SiteRepository siteRepository;
     private final SiteProfitRepository profitRepository;
     private final ProcessedProfitEventRepository processedRepository;
+    private final PurchaseProfitProjectionRepository purchaseProjectionRepository;
 
     private Long siteId;
 
     ProfitServiceKafkaTest(ProfitService profitService, SiteRepository siteRepository,
                            SiteProfitRepository profitRepository,
-                           ProcessedProfitEventRepository processedRepository) {
+                           ProcessedProfitEventRepository processedRepository,
+                           PurchaseProfitProjectionRepository purchaseProjectionRepository) {
         this.profitService = profitService;
         this.siteRepository = siteRepository;
         this.profitRepository = profitRepository;
         this.processedRepository = processedRepository;
+        this.purchaseProjectionRepository = purchaseProjectionRepository;
     }
 
     @BeforeEach
     void setUp() {
         processedRepository.deleteAll();
+        purchaseProjectionRepository.deleteAll();
         profitRepository.deleteAll();
         siteRepository.deleteAll();
         siteId = siteRepository.saveAndFlush(Site.builder().siteName("동시 처리 현장").build()).getId();
@@ -87,8 +92,8 @@ class ProfitServiceKafkaTest {
                 futures.add(executor.submit(() -> {
                     ready.countDown();
                     start.await();
-                    return profitService.applyEvent(eventId, ProfitEventType.PURCHASE_REGISTERED,
-                            siteId, new BigDecimal("25.00"), null);
+                    return profitService.applyPurchaseEvent(eventId, ProfitEventType.PURCHASE_REGISTERED,
+                            1L, siteId, 1L, new BigDecimal("25.00"));
                 }));
             }
             assertTrue(ready.await(5, TimeUnit.SECONDS));
@@ -112,11 +117,12 @@ class ProfitServiceKafkaTest {
 
         // The ledger insert is flushed first; the site_profits DECIMAL(15,2)
         // column then rejects this value, so both writes must roll back.
-        assertThrows(RuntimeException.class, () -> profitService.applyEvent(
-                eventId, ProfitEventType.PURCHASE_REGISTERED, siteId,
-                new BigDecimal("100000000000000.00"), null));
+        assertThrows(RuntimeException.class, () -> profitService.applyPurchaseEvent(
+                eventId, ProfitEventType.PURCHASE_REGISTERED, 1L, siteId,
+                1L, new BigDecimal("100000000000000.00")));
 
         assertTrue(profitRepository.findBySiteId(siteId).isEmpty());
+        assertFalse(purchaseProjectionRepository.existsById(1L));
         assertFalse(processedRepository.existsById(eventId));
     }
 
@@ -130,11 +136,12 @@ class ProfitServiceKafkaTest {
             List<Future<Boolean>> futures = new ArrayList<>();
             for (int i = 0; i < eventCount; i++) {
                 String eventId = UUID.randomUUID().toString();
+                long purchaseId = i + 1L;
                 futures.add(executor.submit(() -> {
                     ready.countDown();
                     start.await();
-                    return profitService.applyEvent(eventId, ProfitEventType.PURCHASE_REGISTERED,
-                            siteId, new BigDecimal("10.00"), null);
+                    return profitService.applyPurchaseEvent(eventId, ProfitEventType.PURCHASE_REGISTERED,
+                            purchaseId, siteId, 1L, new BigDecimal("10.00"));
                 }));
             }
             assertTrue(ready.await(5, TimeUnit.SECONDS));
@@ -147,6 +154,7 @@ class ProfitServiceKafkaTest {
             assertEquals(0, profit.getTotalPurchaseAmount().compareTo(new BigDecimal("40.00")));
             assertEquals(1, profitRepository.count());
             assertEquals(eventCount, processedRepository.count());
+            assertEquals(eventCount, purchaseProjectionRepository.count());
         } finally {
             start.countDown();
             executor.shutdownNow();
