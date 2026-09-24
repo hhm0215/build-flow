@@ -8,10 +8,16 @@ const invoices = vi.hoisted(() => ({ items: [] as TaxInvoice[] }))
 
 vi.mock('../../api/taxes.api', () => ({
   useTaxes: () => ({ data: invoices.items, isLoading: false, isError: false, refetch: vi.fn() }),
-  useCreateTax: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateTax: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 vi.mock('./TaxPaymentConfirmModal', () => ({
   default: ({ invoice }: { invoice: TaxInvoice }) => <div data-testid="confirm-target">{invoice.id}</div>,
+}))
+vi.mock('./TaxEditModal', () => ({
+  default: ({ invoice }: { invoice: TaxInvoice }) => <div data-testid="edit-target">{invoice.id}</div>,
+}))
+vi.mock('./TaxDeleteModal', () => ({
+  default: ({ invoice }: { invoice: TaxInvoice }) => <div data-testid="delete-target">{invoice.id}</div>,
 }))
 
 const invoice = (id: number, type: TaxInvoice['type'], paymentConfirmed: boolean): TaxInvoice => ({
@@ -53,5 +59,23 @@ describe('TaxListPage', () => {
     expect(screen.getAllByRole('button', { name: '입금 확인' })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: '입금 확인' }))
     expect(screen.getByTestId('confirm-target')).toHaveTextContent('1')
+  })
+
+  it('미확정 건에만 수정·삭제를 노출하고 행별 대상을 선택한다', () => {
+    render(<MemoryRouter><TaxListPage /></MemoryRouter>)
+    expect(screen.getAllByRole('button', { name: /세금계산서 수정/ })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /세금계산서 삭제/ })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: '2번 세금계산서 수정' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '3번 세금계산서 수정' }))
+    expect(screen.getByTestId('edit-target')).toHaveTextContent('3')
+    fireEvent.click(screen.getByRole('button', { name: '1번 세금계산서 삭제' }))
+    expect(screen.getByTestId('delete-target')).toHaveTextContent('1')
+  })
+
+  it('nullable 거래처를 안전하게 표시한다', () => {
+    invoices.items = [{ ...invoice(1, 'SALES', false), counterparty: null, issueDate: null, memo: null }]
+    render(<MemoryRouter><TaxListPage /></MemoryRouter>)
+    expect(screen.getByText('-')).toBeInTheDocument()
   })
 })

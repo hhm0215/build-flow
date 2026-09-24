@@ -3,6 +3,7 @@ package com.buildflow.tax.global.exception;
 import com.buildflow.tax.domain.taxinvoice.controller.TaxInvoiceController;
 import com.buildflow.tax.domain.taxinvoice.service.TaxInvoiceService;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +33,26 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error")
                         .value("입금 확인된 세금계산서는 수정하거나 삭제할 수 없습니다."));
+    }
+
+    @Test
+    void 매입_세금계산서_입금_확정은_HTTP_409를_반환한다() throws Exception {
+        TaxInvoiceService service = mock(TaxInvoiceService.class);
+        doThrow(new BusinessException(ErrorCode.PURCHASE_TAX_INVOICE_PAYMENT_NOT_ALLOWED))
+                .when(service).confirmPayment(org.mockito.ArgumentMatchers.eq(42L),
+                        org.mockito.ArgumentMatchers.any());
+        MockMvc mockMvc = MockMvcBuilders
+                .standaloneSetup(new TaxInvoiceController(service))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        mockMvc.perform(patch("/api/v1/taxes/{id}/confirm-payment", 42L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error")
+                        .value("매입 세금계산서는 입금 확인할 수 없습니다."));
     }
 
     @Test

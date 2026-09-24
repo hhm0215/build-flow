@@ -122,6 +122,56 @@ class TaxOutboxIntegrationTest {
     }
 
     @Test
+    void invalidCreateAmountDoesNotWriteInvoiceOrOutbox() {
+        TaxInvoiceCreateRequest invalid = createRequest();
+        ReflectionTestUtils.setField(invalid, "supplyAmount", new BigDecimal("9999999999999.99"));
+        ReflectionTestUtils.setField(invalid, "taxAmount", new BigDecimal("0.01"));
+
+        assertThatThrownBy(() -> taxService.create(invalid))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.INVALID_TAX_INVOICE_AMOUNT));
+
+        assertThat(taxRepository.count()).isZero();
+        assertThat(outboxRepository.count()).isZero();
+    }
+
+    @Test
+    void invalidUpdateAmountLeavesInvoiceAndOutboxUnchanged() {
+        long id = taxService.create(createRequest()).getId();
+        TaxInvoiceUpdateRequest invalid = updateRequest();
+        ReflectionTestUtils.setField(invalid, "supplyAmount", new BigDecimal("1.001"));
+
+        assertThatThrownBy(() -> taxService.update(id, invalid))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.INVALID_TAX_INVOICE_AMOUNT));
+
+        TaxInvoice unchanged = taxRepository.findById(id).orElseThrow();
+        assertThat(unchanged.getType()).isEqualTo(TaxInvoiceType.SALES);
+        assertThat(unchanged.getSupplyAmount()).isEqualByComparingTo("100.00");
+        assertThat(unchanged.getTaxAmount()).isEqualByComparingTo("10.00");
+        assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
+        assertThat(unchanged.getCounterparty()).isEqualTo("거래처");
+        assertThat(outboxRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void databaseAmountBoundaryIsAcceptedExactly() {
+        TaxInvoiceCreateRequest boundary = createRequest();
+        ReflectionTestUtils.setField(boundary, "supplyAmount", new BigDecimal("9999999999999.98"));
+        ReflectionTestUtils.setField(boundary, "taxAmount", new BigDecimal("0.01"));
+
+        var created = taxService.create(boundary);
+
+        assertThat(created.getSupplyAmount()).isEqualByComparingTo("9999999999999.98");
+        assertThat(created.getTaxAmount()).isEqualByComparingTo("0.01");
+        assertThat(created.getTotalAmount()).isEqualByComparingTo("9999999999999.99");
+        assertThat(taxRepository.count()).isEqualTo(1);
+        assertThat(outboxRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void confirmedInvoiceRejectsUpdateAndDeleteWithoutChangingStateOrOutbox() {
         long id = taxService.create(createRequest()).getId();
         taxService.confirmPayment(id, paymentRequest());
@@ -140,6 +190,42 @@ class TaxOutboxIntegrationTest {
         assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
         assertThat(unchanged.getCounterparty()).isEqualTo("거래처");
         assertThat(outboxRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void confirmedInvoiceRejectsInvalidUpdateWithImmutableConflictFirst() {
+        long id = taxService.create(createRequest()).getId();
+        taxService.confirmPayment(id, paymentRequest());
+        TaxInvoiceUpdateRequest invalid = updateRequest();
+        ReflectionTestUtils.setField(invalid, "supplyAmount", new BigDecimal("-0.01"));
+
+        assertThatThrownBy(() -> taxService.update(id, invalid))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE));
+
+        TaxInvoice unchanged = taxRepository.findById(id).orElseThrow();
+        assertThat(unchanged.isPaymentConfirmed()).isTrue();
+        assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
+        assertThat(outboxRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void purchaseInvoiceRejectsPaymentConfirmationWithoutChangingDatabaseOrOutbox() {
+        TaxInvoiceCreateRequest purchase = createRequest();
+        ReflectionTestUtils.setField(purchase, "type", TaxInvoiceType.PURCHASE);
+        long id = taxService.create(purchase).getId();
+
+        assertThatThrownBy(() -> taxService.confirmPayment(id, paymentRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PURCHASE_TAX_INVOICE_PAYMENT_NOT_ALLOWED));
+
+        TaxInvoice unchanged = taxRepository.findById(id).orElseThrow();
+        assertThat(unchanged.getType()).isEqualTo(TaxInvoiceType.PURCHASE);
+        assertThat(unchanged.isPaymentConfirmed()).isFalse();
+        assertThat(unchanged.getPaymentDate()).isNull();
+        assertThat(outboxRepository.count()).isEqualTo(1);
     }
 
     @Test

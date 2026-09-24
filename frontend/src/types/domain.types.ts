@@ -176,11 +176,11 @@ export interface TaxInvoice {
   supplyAmount: number
   taxAmount: number
   totalAmount: number
-  counterparty: string
-  issueDate: string
+  counterparty: string | null
+  issueDate: string | null
   paymentConfirmed: boolean
   paymentDate: string | null
-  memo: string
+  memo: string | null
   createdAt: string
   updatedAt: string
 }
@@ -190,8 +190,17 @@ export interface TaxInvoiceCreateRequest {
   type: TaxInvoiceType
   supplyAmount: number
   taxAmount: number
-  counterparty: string
-  issueDate: string
+  counterparty?: string
+  issueDate?: string
+  memo?: string
+}
+
+export interface TaxInvoiceUpdateRequest {
+  type: TaxInvoiceType
+  supplyAmount: number
+  taxAmount: number
+  counterparty?: string
+  issueDate?: string
   memo?: string
 }
 

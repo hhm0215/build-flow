@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, PaymentConfirmRequest, TaxInvoice, TaxInvoiceCreateRequest } from '../types'
+import { ApiResponse, PaymentConfirmRequest, TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceUpdateRequest } from '../types'
 
 export const TAXES_KEY = {
   all: ['taxes'] as const,
@@ -18,12 +18,17 @@ const createTax = async (body: TaxInvoiceCreateRequest) => {
   return res.data.data
 }
 
-const updateTax = async ({ id, ...body }: TaxInvoiceCreateRequest & { id: number }) => {
+const updateTax = async ({ id, ...body }: TaxInvoiceUpdateRequest & { id: number }) => {
   const res = await axiosInstance.put<ApiResponse<TaxInvoice>>(`/taxes/${id}`, body)
   return res.data.data
 }
 
-const deleteTax = async (id: number) => {
+interface DeleteTaxVariables {
+  id: number
+  siteId: number
+}
+
+const deleteTax = async ({ id }: DeleteTaxVariables) => {
   await axiosInstance.delete(`/taxes/${id}`)
 }
 

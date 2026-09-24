@@ -122,11 +122,11 @@
 
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
-| POST | /api/v1/taxes | 세금계산서 등록 | O (ADMIN) |
+| POST | /api/v1/taxes | 세금계산서 등록. 공급가액·세액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위 | O (ADMIN) |
 | GET | /api/v1/taxes?siteId={id}&type={SALES/PURCHASE} | 목록 (현장, 유형 필터) | O |
 | GET | /api/v1/taxes/{id} | 상세 | O |
-| PUT | /api/v1/taxes/{id} | 수정. 입금 확인된 건은 409 | O (ADMIN) |
-| PATCH | /api/v1/taxes/{id}/confirm-payment | 입금 확인. 요청 본문에 선택적 `paymentDate` | O (ADMIN) |
+| PUT | /api/v1/taxes/{id} | 수정. 현장 연결은 유지하며 입금 확인된 건은 409 | O (ADMIN) |
+| PATCH | /api/v1/taxes/{id}/confirm-payment | 매출 세금계산서 입금 확인. 요청 본문에 선택적 `paymentDate`; 매입 건·이미 확인된 건은 409 | O (ADMIN) |
 | DELETE | /api/v1/taxes/{id} | 삭제. 입금 확인된 건은 409 | O (ADMIN) |
 | GET | /api/v1/taxes/outstanding?siteId={id} | 미수금 조회 (OpenFeign용) | O |
 
