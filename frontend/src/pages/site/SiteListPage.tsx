@@ -301,7 +301,7 @@ export default function SiteListPage() {
         ? []
         : taxes
             .filter((tax) => tax.siteId === selectedSiteIdResolved)
-            .sort((a, b) => b.issueDate.localeCompare(a.issueDate)),
+            .sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '')),
     [taxes, selectedSiteIdResolved],
   )
 
@@ -732,10 +732,10 @@ export default function SiteListPage() {
                           >
                             <div>
                               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {invoice.counterparty}
+                                {invoice.counterparty ?? '거래처 미지정'}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                                발행일 {invoice.issueDate}
+                                발행일 {invoice.issueDate ?? '-'}
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

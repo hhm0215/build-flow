@@ -4,20 +4,32 @@ import { ApiResponse, Purchase, PurchaseCreateRequest, PurchaseUpdateRequest } f
 
 let purchases = [...mockPurchases]
 
+function toCents(value: number): bigint | null {
+  if (!Number.isFinite(value) || value < 0) return null
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.toString())
+  if (!match) return null
+  const fraction = (match[2] ?? '').padEnd(2, '0')
+  return BigInt(match[1]) * 100n + BigInt(fraction)
+}
+
 function purchaseRequestError(quantity: number, unitPrice: number): string | null {
   if (!Number.isInteger(quantity) || quantity > 2_147_483_647) {
     return '요청 본문이 올바르지 않습니다.'
   }
   if (quantity < 1) return 'quantity: 수량은 1 이상이어야 합니다.'
   if (unitPrice < 0) return 'unitPrice: 단가는 0 이상이어야 합니다.'
-  if (unitPrice > 9_999_999_999.99
-      || Math.abs(unitPrice * 100 - Math.round(unitPrice * 100)) >= 1e-7) {
+  const unitPriceCents = toCents(unitPrice)
+  if (unitPriceCents == null || unitPriceCents > 999_999_999_999n) {
     return 'unitPrice: 단가는 정수 10자리·소수 2자리 이하여야 합니다.'
   }
-  if (quantity * unitPrice > 9_999_999_999_999.99) {
+  if (BigInt(quantity) * unitPriceCents > 999_999_999_999_999n) {
     return '매입 금액이 허용 범위를 벗어났습니다.'
   }
   return null
+}
+
+function purchaseTotal(quantity: number, unitPrice: number): number {
+  return Number(BigInt(quantity) * toCents(unitPrice)!) / 100
 }
 
 export const purchasesHandlers = [
@@ -61,7 +73,7 @@ export const purchasesHandlers = [
       itemName: body.itemName.trim(),
       quantity: body.quantity,
       unitPrice: body.unitPrice,
-      totalAmount: body.quantity * body.unitPrice,
+      totalAmount: purchaseTotal(body.quantity, body.unitPrice),
       supplier: body.supplier?.trim() || null,
       purchaseDate: body.purchaseDate || null,
       memo: body.memo?.trim() || null,
@@ -98,7 +110,7 @@ export const purchasesHandlers = [
       itemName: body.itemName.trim(),
       quantity: body.quantity,
       unitPrice: body.unitPrice,
-      totalAmount: body.quantity * body.unitPrice,
+      totalAmount: purchaseTotal(body.quantity, body.unitPrice),
       supplier: body.supplier?.trim() || null,
       purchaseDate: body.purchaseDate || null,
       memo: body.memo?.trim() || null,

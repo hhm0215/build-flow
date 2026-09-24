@@ -248,26 +248,17 @@ RelationProposal 1 ── N ReviewDecision
 |------|------|------|
 | id | BIGINT PK | |
 | site_id | BIGINT | 현장 ID |
-| invoice_type | ENUM('SALES','PURCHASE') | 매출/매입 구분 |
-| counterpart_name | VARCHAR(200) | 거래처명 |
-| counterpart_biz_no | VARCHAR(20) | 사업자번호 |
-| supply_amount | BIGINT | 공급가액 |
-| tax_amount | BIGINT | 세액 |
-| total_amount | BIGINT | 합계 (공급가액 + 세액) |
-| issue_date | DATE | 발행일 |
-| memo | TEXT | 메모 |
+| type | VARCHAR(20) | 매출/매입 구분 (`SALES`/`PURCHASE`) |
+| supply_amount | DECIMAL(15,2) | 공급가액 |
+| tax_amount | DECIMAL(15,2) | 세액 |
+| total_amount | DECIMAL(15,2) | 합계 (공급가액 + 세액) |
+| counterparty | VARCHAR(200) NULL | 거래처명 |
+| issue_date | DATE NULL | 발행일 |
+| payment_confirmed | BOOLEAN | 입금 확인 여부 |
+| payment_date | DATE NULL | 입금 확인일 |
+| memo | TEXT NULL | 메모 |
 | created_at | DATETIME | |
-| updated_at | DATETIME | |
-
-### payments (입금 확인)
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | BIGINT PK | |
-| tax_invoice_id | BIGINT FK | tax_invoices.id (매출 세금계산서) |
-| amount | BIGINT | 입금 금액 |
-| payment_date | DATE | 입금일 |
-| memo | TEXT | 메모 |
-| created_at | DATETIME | |
+| updated_at | DATETIME NULL | |
 
 ---
 

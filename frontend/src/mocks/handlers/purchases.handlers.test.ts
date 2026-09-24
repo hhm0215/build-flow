@@ -69,6 +69,33 @@ describe('매입 MSW 수정·삭제 계약', () => {
       .toBe('매입 금액이 허용 범위를 벗어났습니다.')
   })
 
+  it('큰 정상 2자리 단가를 부동소수 오차 없이 허용한다', async () => {
+    const createdResponse = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({ siteId: 3, itemName: '큰 단가', quantity: 1, unitPrice: 9_999_999_999.97 }),
+    })
+    expect(createdResponse.status).toBe(201)
+    const created = (await createdResponse.json() as ApiResponse<Purchase>).data
+    const itemUrl = new URL(`/api/v1/purchases/${created.id}`, document.baseURI)
+
+    const updatedResponse = await fetch(itemUrl, {
+      method: 'PUT', headers,
+      body: JSON.stringify({ itemName: '수정 큰 단가', quantity: 1, unitPrice: 9_999_999_999.12 }),
+    })
+    expect(updatedResponse.status).toBe(200)
+    expect((await updatedResponse.json() as ApiResponse<Purchase>).data.unitPrice)
+      .toBe(9_999_999_999.12)
+  })
+
+  it('소수 단가 총액을 실서버 BigDecimal과 같은 값으로 계산한다', async () => {
+    const response = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({ siteId: 3, itemName: '소수 단가', quantity: 3, unitPrice: 0.1 }),
+    })
+    expect(response.status).toBe(201)
+    expect((await response.json() as ApiResponse<Purchase>).data.totalAmount).toBe(0.3)
+  })
+
   it('DELETE 후 조회와 반복 PUT·DELETE는 404를 반환한다', async () => {
     const createdResponse = await fetch(url, {
       method: 'POST', headers,

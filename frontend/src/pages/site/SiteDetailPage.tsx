@@ -241,7 +241,8 @@ export default function SiteDetailPage() {
   const sortedEstimates = [...estimates].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const sortedPurchases = [...purchases].sort((a, b) =>
     (b.purchaseDate ?? '').localeCompare(a.purchaseDate ?? ''))
-  const sortedTaxes = [...taxes].sort((a, b) => b.issueDate.localeCompare(a.issueDate))
+  const sortedTaxes = [...taxes].sort((a, b) =>
+    (b.issueDate ?? '').localeCompare(a.issueDate ?? ''))
   const sortedWarranties = [...warranties].sort((a, b) => (a.endDate ?? '9999-12-31').localeCompare(b.endDate ?? '9999-12-31'))
 
   // Kafka 손익 집계는 늦게 도착할 수 있으므로 이 화면은 최신 문서 목록으로 표시한다.
@@ -516,10 +517,10 @@ export default function SiteDetailPage() {
                       >
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                            {invoice.counterparty}
+                            {invoice.counterparty ?? '거래처 미지정'}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                            발행일 {invoice.issueDate}
+                            발행일 {invoice.issueDate ?? '-'}
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
