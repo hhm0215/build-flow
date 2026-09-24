@@ -20,6 +20,7 @@
 - 미입금 건 수정·삭제 모달, nullable 안전 표시·정렬, siteId 없는 수정 요청, 오류 후 입력 보존·재시도, 중복 요청·진행 중 닫기 방지와 tax prefix 캐시 무효화를 구현했다.
 - MSW의 정적 outstanding 라우트 우선순위, 공급가·세액·미수금 exact cents 계산, 404/409 상태 불변을 실서버 계약과 맞췄다. 직전 매입 MSW의 큰 2자리 단가 오거절과 소수 총액 부동소수 오차도 함께 회귀 보정했다.
 - 전체 Gradle 41 tasks, tax-service 26 tests, 프론트 Vitest 32파일 108개·lint·build와 독립 역할 재검토를 통과했다. Docker 컨테이너 스모크는 기존 Desktop stale socket 장애로 후속이다. 계획: `.claude/plans/2026-09-24-tax-edit-delete-ui.md`.
+- [PR #60](https://github.com/hhm0215/build-flow/pull/60) CI 6개 성공과 로컬·원격·PR head `8181432` 일치를 확인한 뒤 merge commit `bed27c9`로 병합했다.
 
 ### ✅ 실사용 UI 라이프사이클 — 매입 금액 검증 및 수정·삭제 (2026-09-24)
 - 생성·수정 DTO와 Entity에서 수량 1 이상 정수, 단가 0 이상·정수 10자리/소수 2자리, 계산 총액 DECIMAL(15,2) 범위를 강제한다. 소수 수량 JSON은 운영 ObjectMapper도 400으로 거부하며 invalid create/update의 DB·revision·outbox 불변을 검증했다.
@@ -486,7 +487,7 @@
 
 ## 다음 세션 진입점 (2026-09-24 갱신)
 
-**Git 상태**: PR #49~#59 merge 완료. `origin/main`은 PR #59 merge commit `91d7868`, `origin/develop`과 로컬 develop은 PR head `9285fe2`다. PR #59 병합 기록과 다음 P0 계획을 로컬에서 갱신 중이다.
+**Git 상태**: PR #49~#60 merge 완료. `origin/main`은 PR #60 merge commit `bed27c9`, `origin/develop`과 로컬 develop은 PR head `8181432`다. PR #60 병합 기록과 다음 P1 계획을 로컬에서 갱신 중이다.
 
 **로컬 실행 상태**: Docker Desktop 4.91 백엔드가 `sailor-ingest.sock`을 `.stale`로 rename하지 못하는 Windows 접근 거부로 종료된다. 두 0바이트 소켓의 보존 이동·삭제도 OS가 거부했다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. 재부팅 또는 4.92 업데이트 후 Docker health와 실제 409/DB 불변 스모크를 재개한다. `.env`는 Git에서 제외된다.
 
