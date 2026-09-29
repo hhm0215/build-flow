@@ -190,7 +190,7 @@ try {
         $copyTask = $process.StandardOutput.BaseStream.CopyToAsync($fileStream)
         $errorTask = $process.StandardError.ReadToEndAsync()
         $process.WaitForExit()
-        $copyTask.GetAwaiter().GetResult()
+        [void]$copyTask.GetAwaiter().GetResult()
         $stderr = $errorTask.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) { throw "mysqldump failed with exit code $($process.ExitCode): $($stderr.Trim())" }
         if (-not [string]::IsNullOrWhiteSpace($stderr)) { throw "mysqldump wrote unexpected stderr: $($stderr.Trim())" }

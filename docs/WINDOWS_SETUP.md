@@ -222,6 +222,29 @@ gh pr list
 
 ## 8. 문제 해결
 
+### `sailor-ingest.sock` 또는 `engine.sock` 오류로 반복 종료
+
+Docker Desktop가 비정상 종료된 뒤 `%LOCALAPPDATA%` 아래의 임시 AF_UNIX 소켓이 Windows 재분석 지점으로 남으면, 다음 시작에서 소켓을 `.stale`로 바꾸지 못하고 접근 오류 1920과 함께 백엔드가 종료될 수 있습니다. 이는 BuildFlow의 DB 비밀번호나 Compose 설정 문제가 아닙니다.
+
+공장 초기화나 volume 삭제를 먼저 하지 않습니다. Docker Desktop을 완전히 종료한 뒤 다음 순서로 임시 런타임 폴더만 격리합니다. 이 스크립트는 이미지·컨테이너·volume·WSL 데이터 디스크를 삭제하지 않고, 원래 폴더를 같은 상위 경로의 `*.quarantine-*` 이름으로 이동합니다.
+
+```powershell
+Get-Process | Where-Object ProcessName -In "Docker Desktop", "com.docker.backend"
+.\scripts\repair-docker-runtime.ps1 -WhatIf
+.\scripts\repair-docker-runtime.ps1
+```
+
+그 다음 Docker Desktop을 다시 실행하고 확인합니다.
+
+```powershell
+docker info
+.\scripts\buildflow.ps1 check
+```
+
+재발 가능성을 줄이려면 Windows 재부팅·절전·Docker Desktop 업데이트 전에 `.\scripts\buildflow.ps1 down`으로 BuildFlow를 정상 종료하고, Docker가 시작하거나 종료하는 중에 `com.docker.backend`를 강제 종료하지 않습니다. DB 백업은 `docs/DATABASE_OPERATIONS.md`에 따라 별도 보관합니다.
+
+관련 Docker Desktop 공개 이슈: [stale `sailor-ingest.sock` 접근 오류](https://github.com/docker/desktop-feedback/issues/675), [여러 Windows socket의 stale 상태](https://github.com/docker/desktop-feedback/issues/554)
+
 ### Docker Desktop에 연결할 수 없음
 
 Docker Desktop을 실행하고 Linux containers 모드인지 확인한 뒤 다시 검사합니다.
@@ -252,7 +275,6 @@ git status --short
 ### AI 요청만 실패
 
 ```powershell
-ollama list
 Invoke-RestMethod http://localhost:11434/api/tags
 docker compose -f docker-compose.yml -f docker-compose.app.yml logs --tail 100 estimate-service site-service chat-service
 ```

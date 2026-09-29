@@ -5,21 +5,29 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 (2026-09-29)
+## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 Phase B (2026-09-29)
 
-- 7개 스키마의 백업·오프라인 검증 도구와 운영 가드레일은 정적으로 완료했다.
-- Docker Engine 복구 후 실제 dump → 격리 임시 volume 복원 → auth-service Flyway 파일럿 순으로 진행한다. 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
+- Phase A의 7개 스키마 실제 dump·오프라인 검증과 새 관리자 전용 기준 백업을 완료했다.
+- 다음은 기존 Compose project/volume을 건드리지 않는 격리 임시 volume 복원 검증이며, 그 다음 auth-service Flyway 파일럿으로 진행한다. 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
 
 ---
 
 ## 완료된 작업
 
-### ✅ DB 마이그레이션 기반 Phase A — 백업·오프라인 검증 도구 (정적 완료, 2026-09-29)
+### ✅ Docker Desktop 런타임 복구 및 새 로컬 환경 기준선 (2026-09-29)
+- Docker Desktop 4.91의 `sailor-ingest.sock`/`engine.sock` Windows 재분석 지점 오류를 DB·volume과 무관한 임시 런타임 소켓 장애로 확인했다. Docker 프로세스를 완전히 종료한 뒤 `%LOCALAPPDATA%`의 두 런타임 폴더만 삭제 없이 quarantine 이름으로 이동해 Engine 29.8.0을 복구했다.
+- 공장 초기화 전 대응 절차를 `scripts/repair-docker-runtime.ps1`과 Windows 설정 문서에 고정했다. 스크립트는 Docker 실행 중 중단하고, 고정된 두 경로만 같은 상위 폴더로 이동하며 이미지·컨테이너·volume·WSL 데이터를 건드리지 않는다.
+- 기존 DB를 먼저 백업한 뒤 BuildFlow Compose의 네 volume만 제거해 새 환경을 구축했으며, 다른 Compose 프로젝트의 컨테이너와 volume은 보존했다. 기존 관리자 계정 1명만 digest가 일치하도록 복원하고 견적·현장·매입·세금·알림·채팅 업무 데이터는 0행으로 시작했다.
+- 새 기준 백업 `backups/db/20260929T125754Z`를 생성·재검증했다. auth 1행 외 estimate/site/purchase/tax/notification/chat은 모두 0행이며, 백업 파일은 Git 제외 상태다.
+- 전체 15개 컨테이너를 재기동해 API 8081~8087 health `UP`과 프론트 3000 HTTP 200을 확인했다. 기존 `qwen2.5:7b-instruct`에 서비스가 요구하는 `qwen2.5:7b` 별칭을 추가했고 Ollama API도 정상이다. `buildflow.ps1 check`의 Ollama 확인은 멈출 수 있는 CLI 호출 대신 3초 제한 HTTP 조회로 전환했다.
+
+### ✅ DB 마이그레이션 기반 Phase A — 백업·오프라인 검증 도구 (완료, 2026-09-29)
 - 7개 BuildFlow 스키마 고정 allowlist, 실제 Compose mysql container/working directory/image/named volume label 검증, DB writer·외부 연결 차단 확인 후 `mysqldump`를 수행하는 PowerShell 도구를 추가했다.
 - dump SHA-256·byte size·스키마/테이블별 exact row count·Flyway history 유무·단일 관리자 비노출 digest와 원본 volume 신원을 manifest로 기록한다. 백업 전후 inventory/digest가 달라지면 승인하지 않는다.
 - stderr/stdout을 분리하고 정상 명령의 stderr도 실패 처리하며, `.partial-*` + `INCOMPLETE`에서 시작해 오프라인 검증 직전만 최종 디렉터리로 승격한다.
 - 오프라인 검증은 7개 DB·테이블 정의·관리자 INSERT·mysqldump footer·manifest 교차 일치와 변조를 검사한다. 민감 평문 백업 보관 규칙과 Flyway 단계별 전환 가드레일을 `docs/DATABASE_OPERATIONS.md`에 기록했다.
-- PowerShell 구문, 정상 fixture, dump 변조 거부, Windows 공백/따옴표/끝 역슬래시/빈 인자 전달 테스트를 통과했다. Docker Desktop 엔진 파이프 부재로 실제 dump와 격리 복원은 후속이다. 계획: `.claude/plans/2026-09-24-db-migration-foundation.md`.
+- PowerShell 구문, 정상 fixture, dump 변조 거부, Windows 공백/따옴표/끝 역슬래시/빈 인자 전달 테스트를 통과했다. Docker 복구 후 기존 실제 DB `20260929T123815Z`와 새 관리자 전용 기준 DB `20260929T125754Z`의 실제 dump·오프라인 검증까지 완료했다. 격리 복원은 Phase B다. 계획: `.claude/plans/2026-09-24-db-migration-foundation.md`.
+- [PR #61](https://github.com/hhm0215/build-flow/pull/61) CI 6개 성공과 로컬·원격·PR head `f8b087f` 일치를 확인한 뒤 merge commit `29319f5`로 병합했다.
 
 ### ✅ 실사용 UI 라이프사이클 — 세금계산서 금액 검증 및 수정·삭제 (2026-09-24)
 - 생성·수정 DTO와 Entity가 공급가액·세액의 비음수, 정수 13자리/소수 2자리, 합계 `DECIMAL(15,2)` 범위를 반올림 없이 검증한다. 실패 시 생성 DB/outbox 및 수정 전 필드가 보존되며 HTTP 400/Jackson 계약도 고정했다.
@@ -494,13 +502,13 @@
 
 ## 다음 세션 진입점 (2026-09-29 갱신)
 
-**Git 상태**: PR #49~#60 merge 완료. `origin/main`은 PR #60 merge commit `bed27c9`, `origin/develop`은 PR head `8181432`다. 로컬 develop에는 PR #60 병합 기록 커밋 `dff7b13`과 DB 마이그레이션 기반 Phase A 변경이 있다.
+**Git 상태**: PR #49~#61 merge 완료. `origin/main`은 PR #61 merge commit `29319f5`, `origin/develop`과 로컬 develop은 PR head `f8b087f`다. PR #61 병합 기록을 로컬에서 갱신 중이다.
 
-**로컬 실행 상태**: 2026-09-29 재확인에도 Docker Engine named pipe가 없어 연결할 수 없다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. Docker 복구 후 `scripts/db/backup.ps1` 실제 dump·오프라인 검증과 별도 임시 volume 복원 검증을 재개한다. `.env`와 `backups/`는 Git에서 제외된다.
+**로컬 실행 상태**: 2026-09-29 Docker Desktop 임시 런타임 소켓만 quarantine해 Engine 29.8.0을 복구하고 BuildFlow 환경을 새로 구축했다. 기존 관리자 1명만 복원했으며 업무 데이터는 0행이다. 15개 컨테이너, API 8081~8087 health, 프론트 3000 HTTP 200, native Ollama `qwen2.5:7b`가 정상이다. `.env`와 `backups/`는 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. DB 마이그레이션 Phase A의 실제 dump 검증 → Phase B 격리 복원 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
+**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. DB 마이그레이션 Phase B 격리 복원 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
-**검증 상태**: 세금계산서 작업의 전체 Gradle 41 tasks, tax-service 26 tests, 프론트 Vitest 32파일 108개·lint·build, 독립 역할 리뷰와 수정 후 재검토를 통과했다. Docker 컨테이너 스모크만 위 로컬 엔진 장애로 남아 있다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다.
+**검증 상태**: DB backup 도구 회귀, PowerShell parser, 독립 안전성 리뷰, 실제 dump 2건의 manifest/SHA/행 수/관리자 digest 검증과 전체 Docker/Ollama health를 통과했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. host Bun 1.3.14와 고정 1.3.11 차이는 Docker 실행에는 영향 없는 로컬 경고다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

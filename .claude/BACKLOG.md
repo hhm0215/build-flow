@@ -26,7 +26,7 @@
 - **배경**: 인증 서비스는 `schema.sql` + `ddl-auto: validate`, 나머지 DB 사용 6개 서비스는 `ddl-auto: update`이며 버전 관리형 마이그레이션 도구가 없다. 인증 스키마 전환과 실데이터 보존 전에 명시적 백업·복구·검증 경로가 필요하다.
 - **단계**: A) 7개 스키마 백업·오프라인 무결성 검증 → B) 격리 임시 volume 복원·관리자 로그인 검증 → C) auth Flyway 파일럿 → D) chat/estimate → purchase/tax → site/notification 순차 전환 → E) runtime DB 사용자 최소 권한 분리
 - **안전 기준**: 실제 MySQL `SHOW CREATE TABLE`/no-data dump 전에는 V1을 추정 작성하지 않음, 기존 DB는 백업·복원 성공 후 명시적 일회성 baseline, 상시 `baseline-on-migrate=true` 및 Flyway+Hibernate `update` 동시 사용 금지
-- **현재 진행**: Phase A 스크립트·런북 작성 중. Docker Desktop 엔진 복구 후 실제 덤프 검증이 필요함.
+- **현재 진행**: Phase A 완료. 2026-09-29 실제 DB 덤프·오프라인 검증과 새 관리자 전용 기준 백업까지 통과했으며, 다음은 Phase B 격리 임시 volume 복원 검증이다.
 - **산출물**: 서비스별 버전 마이그레이션 전략, 인증 스키마 전환 스크립트, 백업·격리 복구 검증, 운영 프로파일의 `ddl-auto` 정책
 - **관련 파일**: 7개 서비스 `application*.yml`, 각 서비스 DB 스키마, 배포 문서
 - **예상 규모**: M~L
