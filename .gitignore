@@ -41,6 +41,9 @@ uploads/
 # Docker volumes
 docker/volumes/
 
+# Database backups (contain real business data and credentials hashes)
+backups/
+
 # claude (selective tracking — settings.local.json은 머신별이라 제외)
 .claude/settings.local.json
 
