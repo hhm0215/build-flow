@@ -128,17 +128,24 @@ function Show-OptionalTools {
 }
 
 function Test-Ollama {
-    if (-not (Test-CommandAvailable -Name "ollama" -InstallHint "AI features require Ollama for Windows and qwen2.5:7b." -Required $false)) {
+    try {
+        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 3
+    }
+    catch {
+        Write-Warning "Cannot reach Ollama at http://localhost:11434. Start the Ollama app."
         return
     }
 
-    $models = (& ollama list 2>$null | Out-String)
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Cannot reach Ollama. Start the Ollama app."
+    if ($null -eq $response -or $null -eq $response.PSObject.Properties["models"]) {
+        Write-Warning "Ollama returned an unexpected response without a models list."
         return
     }
 
-    if ($models -match "qwen2\.5:7b") {
+    $modelNames = @($response.models | ForEach-Object {
+        if ($null -ne $_.PSObject.Properties["name"]) { [string]$_.name }
+        elseif ($null -ne $_.PSObject.Properties["model"]) { [string]$_.model }
+    })
+    if ($modelNames -contains "qwen2.5:7b") {
         Write-Host "[OK] Ollama qwen2.5:7b"
     }
     else {

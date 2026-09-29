@@ -10,7 +10,7 @@
 - `auth-service`는 `schema.sql` 초기화와 `ddl-auto: validate`를 사용한다.
 - 나머지 6개 DB 서비스는 `ddl-auto: update`를 사용한다.
 - MySQL 데이터는 Compose named volume `mysql_data`에 보존된다.
-- 2026-09-24 현재 Docker Desktop 엔진 파이프가 없어 실제 DDL 덤프와 복원 시험은 실행할 수 없다.
+- 2026-09-29 Docker Desktop 런타임 소켓을 데이터 volume과 분리해 복구했고 실제 DDL 덤프와 오프라인 검증을 완료했다.
 
 ## 단계
 
@@ -22,7 +22,7 @@
 - [x] 백업 산출물 Git 제외
 - [x] 운영 런북과 금지 규칙 문서화
 - [x] PowerShell 구문 분석 및 독립 역할 리뷰
-- [ ] Docker 복구 후 실제 덤프 생성·오프라인 검증
+- [x] Docker 복구 후 실제 덤프 생성·오프라인 검증
 
 ### Phase B — 격리 복원 검증
 
@@ -59,4 +59,6 @@
 - native process 인자 인코딩은 공백 경로, 따옴표, 끝 역슬래시, 빈 문자열 회귀를 통과했다.
 - 독립 운영·보안 리뷰에서 발견한 stderr 혼입, 원본 volume 신원, 민감 평문, dump↔manifest 교차검증, 불완전 산출물 구분 문제를 반영했다.
 - 수정 후 독립 재검토에서 CRITICAL/HIGH 0건을 확인했다.
-- 진행 중. Docker 엔진 복구 전에는 Phase A의 실제 덤프 검증부터 보류한다.
+- 실제 기존 DB 백업 `20260929T123815Z`의 SHA-256·7개 스키마·테이블·관리자 digest를 검증했다.
+- 업무 데이터를 비운 새 환경에 기존 관리자 1명만 정확히 복원하고, 관리자 1행·업무 데이터 0행 기준 백업 `20260929T125754Z`를 다시 생성·오프라인 검증했다.
+- Phase A 완료. 다음은 기존 Compose project/volume과 완전히 분리한 Phase B 복원 검증이다.
