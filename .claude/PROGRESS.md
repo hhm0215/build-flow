@@ -5,14 +5,21 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 세금계산서 변경 흐름 마무리 (2026-09-24)
+## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 (2026-09-29)
 
-- 현장 생성·거래처 등록·견적 확정은 PR #49, 현장 수정은 PR #50, 작성 중(DRAFT) 견적 수정·삭제는 PR #51, 보증보험 OCR 실패 보정/수정은 PR #52, 세금계산서 입금 확인 계약/오류 처리는 PR #53으로 병합했다.
-- Kafka 손익 집계 Phase 1~3, 확정 상태 보호, 매입·세금계산서 금액 검증 및 수정/삭제 UI까지 완료했다. PR 검증·병합 후 다음 우선순위는 실데이터용 DB 스키마 마이그레이션 체계다.
+- 7개 스키마의 백업·오프라인 검증 도구와 운영 가드레일은 정적으로 완료했다.
+- Docker Engine 복구 후 실제 dump → 격리 임시 volume 복원 → auth-service Flyway 파일럿 순으로 진행한다. 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
 
 ---
 
 ## 완료된 작업
+
+### ✅ DB 마이그레이션 기반 Phase A — 백업·오프라인 검증 도구 (정적 완료, 2026-09-29)
+- 7개 BuildFlow 스키마 고정 allowlist, 실제 Compose mysql container/working directory/image/named volume label 검증, DB writer·외부 연결 차단 확인 후 `mysqldump`를 수행하는 PowerShell 도구를 추가했다.
+- dump SHA-256·byte size·스키마/테이블별 exact row count·Flyway history 유무·단일 관리자 비노출 digest와 원본 volume 신원을 manifest로 기록한다. 백업 전후 inventory/digest가 달라지면 승인하지 않는다.
+- stderr/stdout을 분리하고 정상 명령의 stderr도 실패 처리하며, `.partial-*` + `INCOMPLETE`에서 시작해 오프라인 검증 직전만 최종 디렉터리로 승격한다.
+- 오프라인 검증은 7개 DB·테이블 정의·관리자 INSERT·mysqldump footer·manifest 교차 일치와 변조를 검사한다. 민감 평문 백업 보관 규칙과 Flyway 단계별 전환 가드레일을 `docs/DATABASE_OPERATIONS.md`에 기록했다.
+- PowerShell 구문, 정상 fixture, dump 변조 거부, Windows 공백/따옴표/끝 역슬래시/빈 인자 전달 테스트를 통과했다. Docker Desktop 엔진 파이프 부재로 실제 dump와 격리 복원은 후속이다. 계획: `.claude/plans/2026-09-24-db-migration-foundation.md`.
 
 ### ✅ 실사용 UI 라이프사이클 — 세금계산서 금액 검증 및 수정·삭제 (2026-09-24)
 - 생성·수정 DTO와 Entity가 공급가액·세액의 비음수, 정수 13자리/소수 2자리, 합계 `DECIMAL(15,2)` 범위를 반올림 없이 검증한다. 실패 시 생성 DB/outbox 및 수정 전 필드가 보존되며 HTTP 400/Jackson 계약도 고정했다.
@@ -20,6 +27,7 @@
 - 미입금 건 수정·삭제 모달, nullable 안전 표시·정렬, siteId 없는 수정 요청, 오류 후 입력 보존·재시도, 중복 요청·진행 중 닫기 방지와 tax prefix 캐시 무효화를 구현했다.
 - MSW의 정적 outstanding 라우트 우선순위, 공급가·세액·미수금 exact cents 계산, 404/409 상태 불변을 실서버 계약과 맞췄다. 직전 매입 MSW의 큰 2자리 단가 오거절과 소수 총액 부동소수 오차도 함께 회귀 보정했다.
 - 전체 Gradle 41 tasks, tax-service 26 tests, 프론트 Vitest 32파일 108개·lint·build와 독립 역할 재검토를 통과했다. Docker 컨테이너 스모크는 기존 Desktop stale socket 장애로 후속이다. 계획: `.claude/plans/2026-09-24-tax-edit-delete-ui.md`.
+- [PR #60](https://github.com/hhm0215/build-flow/pull/60) CI 6개 성공과 로컬·원격·PR head `8181432` 일치를 확인한 뒤 merge commit `bed27c9`로 병합했다.
 
 ### ✅ 실사용 UI 라이프사이클 — 매입 금액 검증 및 수정·삭제 (2026-09-24)
 - 생성·수정 DTO와 Entity에서 수량 1 이상 정수, 단가 0 이상·정수 10자리/소수 2자리, 계산 총액 DECIMAL(15,2) 범위를 강제한다. 소수 수량 JSON은 운영 ObjectMapper도 400으로 거부하며 invalid create/update의 DB·revision·outbox 불변을 검증했다.
@@ -484,13 +492,13 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-24 갱신)
+## 다음 세션 진입점 (2026-09-29 갱신)
 
-**Git 상태**: PR #49~#59 merge 완료. `origin/main`은 PR #59 merge commit `91d7868`, `origin/develop`과 로컬 develop은 PR head `9285fe2`다. PR #59 병합 기록과 다음 P0 계획을 로컬에서 갱신 중이다.
+**Git 상태**: PR #49~#60 merge 완료. `origin/main`은 PR #60 merge commit `bed27c9`, `origin/develop`은 PR head `8181432`다. 로컬 develop에는 PR #60 병합 기록 커밋 `dff7b13`과 DB 마이그레이션 기반 Phase A 변경이 있다.
 
-**로컬 실행 상태**: Docker Desktop 4.91 백엔드가 `sailor-ingest.sock`을 `.stale`로 rename하지 못하는 Windows 접근 거부로 종료된다. 두 0바이트 소켓의 보존 이동·삭제도 OS가 거부했다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. 재부팅 또는 4.92 업데이트 후 Docker health와 실제 409/DB 불변 스모크를 재개한다. `.env`는 Git에서 제외된다.
+**로컬 실행 상태**: 2026-09-29 재확인에도 Docker Engine named pipe가 없어 연결할 수 없다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. Docker 복구 후 `scripts/db/backup.ps1` 실제 dump·오프라인 검증과 별도 임시 volume 복원 검증을 재개한다. `.env`와 `backups/`는 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. UI 라이프사이클 P0 종료 후 P1 첫 항목인 실데이터용 DB 스키마 마이그레이션 체계를 설계·구현한다.
+**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. DB 마이그레이션 Phase A의 실제 dump 검증 → Phase B 격리 복원 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
 **검증 상태**: 세금계산서 작업의 전체 Gradle 41 tasks, tax-service 26 tests, 프론트 Vitest 32파일 108개·lint·build, 독립 역할 리뷰와 수정 후 재검토를 통과했다. Docker 컨테이너 스모크만 위 로컬 엔진 장애로 남아 있다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다.
 

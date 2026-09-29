@@ -154,6 +154,7 @@ bun run dev
 | `docs/API_SPEC.md` | API 명세 |
 | `docs/ERD.md` | 데이터 모델 |
 | `docs/DECISIONS.md` | 아키텍처 결정 기록 |
+| `docs/DATABASE_OPERATIONS.md` | DB 백업·복원·마이그레이션 운영 기준 |
 
 ## 핵심 규칙
 
