@@ -20,6 +20,7 @@
 - stderr/stdout을 분리하고 정상 명령의 stderr도 실패 처리하며, `.partial-*` + `INCOMPLETE`에서 시작해 오프라인 검증 직전만 최종 디렉터리로 승격한다.
 - 오프라인 검증은 7개 DB·테이블 정의·관리자 INSERT·mysqldump footer·manifest 교차 일치와 변조를 검사한다. 민감 평문 백업 보관 규칙과 Flyway 단계별 전환 가드레일을 `docs/DATABASE_OPERATIONS.md`에 기록했다.
 - PowerShell 구문, 정상 fixture, dump 변조 거부, Windows 공백/따옴표/끝 역슬래시/빈 인자 전달 테스트를 통과했다. Docker Desktop 엔진 파이프 부재로 실제 dump와 격리 복원은 후속이다. 계획: `.claude/plans/2026-09-24-db-migration-foundation.md`.
+- [PR #61](https://github.com/hhm0215/build-flow/pull/61) CI 6개 성공과 로컬·원격·PR head `f8b087f` 일치를 확인한 뒤 merge commit `29319f5`로 병합했다.
 
 ### ✅ 실사용 UI 라이프사이클 — 세금계산서 금액 검증 및 수정·삭제 (2026-09-24)
 - 생성·수정 DTO와 Entity가 공급가액·세액의 비음수, 정수 13자리/소수 2자리, 합계 `DECIMAL(15,2)` 범위를 반올림 없이 검증한다. 실패 시 생성 DB/outbox 및 수정 전 필드가 보존되며 HTTP 400/Jackson 계약도 고정했다.
@@ -494,9 +495,9 @@
 
 ## 다음 세션 진입점 (2026-09-29 갱신)
 
-**Git 상태**: PR #49~#60 merge 완료. `origin/main`은 PR #60 merge commit `bed27c9`, `origin/develop`은 PR head `8181432`다. 로컬 develop에는 PR #60 병합 기록 커밋 `dff7b13`과 DB 마이그레이션 기반 Phase A 변경이 있다.
+**Git 상태**: PR #49~#61 merge 완료. `origin/main`은 PR #61 merge commit `29319f5`, `origin/develop`과 로컬 develop은 PR head `f8b087f`다. PR #61 병합 기록을 로컬에서 갱신 중이다.
 
-**로컬 실행 상태**: 2026-09-29 재확인에도 Docker Engine named pipe가 없어 연결할 수 없다. 이미지·볼륨·DB와 공장 초기화는 건드리지 않았다. Docker 복구 후 `scripts/db/backup.ps1` 실제 dump·오프라인 검증과 별도 임시 volume 복원 검증을 재개한다. `.env`와 `backups/`는 Git에서 제외된다.
+**로컬 실행 상태**: 2026-09-29 Docker Desktop 4.91을 다시 기동했지만 `sailor-ingest.sock`을 `.stale`로 rename할 수 없다는 동일한 Windows 접근 오류로 backend가 종료됐다. 이미지·볼륨·DB, 해당 socket 파일, 공장 초기화는 건드리지 않았다. Windows 재부팅 또는 Docker Desktop 복구 후 `scripts/db/backup.ps1` 실제 dump·오프라인 검증과 별도 임시 volume 복원 검증을 재개한다. `.env`와 `backups/`는 Git에서 제외된다.
 
 **다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. DB 마이그레이션 Phase A의 실제 dump 검증 → Phase B 격리 복원 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
