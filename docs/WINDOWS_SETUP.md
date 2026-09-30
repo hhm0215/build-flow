@@ -284,3 +284,5 @@ native Ollama에 `qwen2.5:7b`가 있고, Docker 앱의 `OLLAMA_URL`이 `host.doc
 ## 9. 로컬 서버 공개 전 주의
 
 기본 Compose는 Windows 개발 PC의 loopback에서만 접근하도록 구성합니다. LAN 사용자에게 공개하는 구성은 단순 포트 개방으로 만들지 않습니다. Gateway만 외부에 노출하고 업무 서비스·MySQL·Redis·Kafka는 내부 네트워크에 유지하는 배포 override와 단일 관리자 인증 전환을 먼저 완료해야 합니다.
+
+실사용 DB에 테스트 데이터를 남기지 않는 반복 시현 절차는 `docs/DEMO_GUIDE.md`를 따릅니다.

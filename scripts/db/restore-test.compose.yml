@@ -1,0 +1,56 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${RESTORE_TEST_DB_PASSWORD:?RESTORE_TEST_DB_PASSWORD must be set by restore-test.ps1}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    labels:
+      com.buildflow.restore-test: ${RESTORE_TEST_NONCE:?RESTORE_TEST_NONCE must be set by restore-test.ps1}
+    volumes:
+      - restore_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7.2-alpine
+    profiles: ["auth-validation"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  auth-service:
+    image: build-flow-auth-service
+    profiles: ["auth-validation"]
+    ports:
+      - "127.0.0.1::8081"
+    environment:
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      SPRING_SQL_INIT_MODE: never
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: ${RESTORE_TEST_DB_PASSWORD:?RESTORE_TEST_DB_PASSWORD must be set by restore-test.ps1}
+      REDIS_HOST: redis
+      JWT_SECRET: ${RESTORE_TEST_JWT_SECRET:?RESTORE_TEST_JWT_SECRET must be set by restore-test.ps1}
+      MANAGEMENT_TRACING_ENABLED: "false"
+    labels:
+      com.buildflow.restore-test: ${RESTORE_TEST_NONCE:?RESTORE_TEST_NONCE must be set by restore-test.ps1}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  restore_mysql_data:
+    labels:
+      com.buildflow.restore-test: ${RESTORE_TEST_NONCE:?RESTORE_TEST_NONCE must be set by restore-test.ps1}

@@ -43,9 +43,31 @@ docker compose up -d mysql
 
 성공 조건은 dump가 비어 있지 않고, manifest의 SHA-256과 일치하며, 7개 스키마·테이블 정의·단일 관리자 행·mysqldump 완료 footer가 manifest와 일치하는 것이다. 이 검증은 파일 손상 여부를 확인하지만 실제 복원 성공을 대신하지 않으며, dump와 manifest를 함께 바꾸는 공격을 막는 전자서명도 아니다.
 
-## 복원 검증 원칙
+## 격리 복원 검증
 
-복원 시험은 다음 Phase에서 자동화하며, 그 전에도 아래 규칙은 예외 없이 적용한다.
+검증된 백업을 전용 Compose project, 임시 MySQL volume, 자동 생성 네트워크에 복원한다. 기존 Compose 파일은 `buildflow-mysql`과 `buildflow-net` 이름이 고정돼 있으므로 복원 시험에 재사용하지 않는다.
+
+```powershell
+.\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp>
+```
+
+이 명령은 다음을 자동 확인한 뒤 임시 환경을 제거한다.
+
+- 복원 컨테이너·volume의 project/nonce label과 원본 컨테이너·volume 비일치
+- manifest와 정확히 일치하는 7개 스키마·테이블·행 수·Flyway history 유무
+- 모든 테이블의 `CHECK TABLE ... status OK`
+- 관리자 계정 수와 비노출 digest 일치
+- 복원된 인증 스키마에서 SQL 초기화를 끄고 Hibernate `ddl-auto=validate`로 auth-service 기동 및 health `UP`
+
+관리자 자격 증명까지 확인하는 최종 로그인·로그아웃 검증은 값을 파일·명령행에 남기지 않는 대화형 옵션으로 수행한다.
+
+```powershell
+.\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp> -ValidateLogin
+```
+
+### 복원 검증 원칙
+
+복원 시험은 위 스크립트로 자동화하며 아래 규칙을 예외 없이 적용한다.
 
 1. 실행 중인 `buildflow-mysql` 컨테이너와 현재 `mysql_data` named volume에 복원하지 않는다.
 2. 별도 Compose project 이름과 새 임시 named volume을 사용한다.

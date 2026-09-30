@@ -58,7 +58,7 @@ jobs:
         shell: powershell
         run: |
           $failed = $false
-          Get-ChildItem scripts/*.ps1 | ForEach-Object {
+          Get-ChildItem scripts -Filter *.ps1 -Recurse -File | ForEach-Object {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
@@ -68,6 +68,9 @@ jobs:
             }
           }
           if ($failed) { exit 1 }
+      - name: Validate database backup tools
+        shell: powershell
+        run: .\scripts\db\test-backup-tools.ps1
       - name: Validate Gradle Wrapper
         shell: powershell
         run: .\gradlew.bat --version

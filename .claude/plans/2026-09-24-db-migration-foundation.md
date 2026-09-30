@@ -26,9 +26,10 @@
 
 ### Phase B — 격리 복원 검증
 
-- 기존 `buildflow-mysql` 컨테이너와 `mysql_data` 볼륨을 절대 대상으로 삼지 않는 별도 Compose project/임시 volume에 복원한다.
-- 원본 manifest와 스키마/테이블별 행 수, 관리자 digest를 비교하고 `CHECK TABLE`을 수행한다.
-- 인증 로그인과 서비스 `ddl-auto: validate` 기동을 확인한다.
+- [x] 기존 `buildflow-mysql` 컨테이너와 `mysql_data` 볼륨을 절대 대상으로 삼지 않는 별도 Compose project/임시 volume에 복원한다.
+- [x] 원본 manifest와 스키마/테이블별 행 수, 관리자 digest를 비교하고 `CHECK TABLE`을 수행한다.
+- [x] auth-service를 SQL 초기화 금지·`ddl-auto: validate`로 기동하고 전후 DB 불변을 확인한다.
+- [ ] 관리자 비밀번호를 저장하지 않는 대화형 옵션으로 복원 환경의 실제 로그인·로그아웃을 확인한다.
 
 ### Phase C — auth-service Flyway 파일럿
 
@@ -61,4 +62,5 @@
 - 수정 후 독립 재검토에서 CRITICAL/HIGH 0건을 확인했다.
 - 실제 기존 DB 백업 `20260929T123815Z`의 SHA-256·7개 스키마·테이블·관리자 digest를 검증했다.
 - 업무 데이터를 비운 새 환경에 기존 관리자 1명만 정확히 복원하고, 관리자 1행·업무 데이터 0행 기준 백업 `20260929T125754Z`를 다시 생성·오프라인 검증했다.
-- Phase A 완료. 다음은 기존 Compose project/volume과 완전히 분리한 Phase B 복원 검증이다.
+- 전용 `restore-test.compose.yml`과 무작위 project/nonce를 사용해 기준 백업을 임시 volume에 실제 복원했다. 7개 스키마·19개 테이블·정확한 행 수·관리자 digest·모든 `CHECK TABLE`이 일치했고, auth-service의 `ddl-auto=validate` 기동 후 DB가 변하지 않았다. 임시 컨테이너·volume은 label 검증 후 제거됐으며 운영 DB는 관리자 1행·업무 데이터 0행 그대로다.
+- Phase B는 대화형 관리자 로그인·로그아웃 1건만 남았다.
