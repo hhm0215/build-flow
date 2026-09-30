@@ -5,14 +5,21 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 Phase B (2026-09-29)
+## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 Phase B (2026-09-30)
 
-- Phase A의 7개 스키마 실제 dump·오프라인 검증과 새 관리자 전용 기준 백업을 완료했다.
-- 다음은 기존 Compose project/volume을 건드리지 않는 격리 임시 volume 복원 검증이며, 그 다음 auth-service Flyway 파일럿으로 진행한다. 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
+- Phase A와 Phase B의 격리 실제 복원·무결성·auth `ddl-auto=validate` 기동·전후 DB 불변 검증을 완료했다.
+- Phase B는 관리자 비밀번호를 저장하지 않는 대화형 로그인·로그아웃 1건만 남았다. 통과 후 auth-service Flyway 파일럿으로 진행하며 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
 
 ---
 
 ## 완료된 작업
+
+### ✅ DB 마이그레이션 기반 Phase B — 격리 복원 핵심 검증 (로그인 제외, 2026-09-30)
+- 기존 Compose의 고정 `container_name`·network name을 재사용하지 않는 전용 MySQL/Redis/auth Compose와 무작위 project·nonce 기반 복원 도구를 추가했다. 임시 MySQL은 호스트 포트를 열지 않으며 container·volume label과 원본 불일치를 확인한 뒤에만 복원·자동 정리를 허용한다.
+- 기준 백업 `20260929T125754Z`를 실제 복원해 7개 스키마·19개 테이블·정확한 행 수·Flyway history 유무·관리자 비노출 digest·모든 `CHECK TABLE ... status OK`를 manifest와 대조했다.
+- 복원 auth-service는 Config/Eureka를 끄고 SQL init 금지·Hibernate `ddl-auto=validate`로 기동해 health `UP`을 확인했다. 기동 후 동일 무결성 검사를 다시 수행해 DB 불변을 확인한다.
+- 임시 project의 container·volume이 모두 제거되고 운영 환경은 15개 컨테이너 정상, 관리자 1행·견적/현장/매입/세금 0행 그대로임을 확인했다. 실제 관리자 로그인·로그아웃은 대화형 `-ValidateLogin` 실행만 남았다.
+- Windows CI의 PowerShell 검사를 `scripts/` 전체 재귀로 확장하고 Docker 없는 백업 도구 회귀를 연결했다. 로컬 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·프로덕션 빌드, 전체 PowerShell parser와 실제 격리 복원을 통과했다. 되돌릴 수 있는 UI 시현과 확정/입금/OCR 샌드박스 경계를 `docs/DEMO_GUIDE.md`에 기록했다.
 
 ### ✅ Docker Desktop 런타임 복구 및 새 로컬 환경 기준선 (2026-09-29)
 - Docker Desktop 4.91의 `sailor-ingest.sock`/`engine.sock` Windows 재분석 지점 오류를 DB·volume과 무관한 임시 런타임 소켓 장애로 확인했다. Docker 프로세스를 완전히 종료한 뒤 `%LOCALAPPDATA%`의 두 런타임 폴더만 삭제 없이 quarantine 이름으로 이동해 Engine 29.8.0을 복구했다.
@@ -502,13 +509,13 @@
 
 ## 다음 세션 진입점 (2026-09-29 갱신)
 
-**Git 상태**: PR #49~#61 merge 완료. `origin/main`은 PR #61 merge commit `29319f5`, `origin/develop`과 로컬 develop은 PR head `f8b087f`다. PR #61 병합 기록을 로컬에서 갱신 중이다.
+**Git 상태**: PR #49~#62 merge 완료. `origin/main`은 PR #62 merge commit `f8f9ff9`, `origin/develop`과 로컬 develop은 PR head `2f8ace8`이다. PR #62 병합 기록을 로컬에서 갱신 중이다.
 
 **로컬 실행 상태**: 2026-09-29 Docker Desktop 임시 런타임 소켓만 quarantine해 Engine 29.8.0을 복구하고 BuildFlow 환경을 새로 구축했다. 기존 관리자 1명만 복원했으며 업무 데이터는 0행이다. 15개 컨테이너, API 8081~8087 health, 프론트 3000 HTTP 200, native Ollama `qwen2.5:7b`가 정상이다. `.env`와 `backups/`는 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. DB 마이그레이션 Phase B 격리 복원 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
+**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. Phase B 대화형 관리자 로그인·로그아웃 검증 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
-**검증 상태**: DB backup 도구 회귀, PowerShell parser, 독립 안전성 리뷰, 실제 dump 2건의 manifest/SHA/행 수/관리자 digest 검증과 전체 Docker/Ollama health를 통과했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. host Bun 1.3.14와 고정 1.3.11 차이는 Docker 실행에는 영향 없는 로컬 경고다.
+**검증 상태**: DB backup 도구 회귀, 전체 PowerShell parser, 실제 dump manifest/SHA 검증, 격리 복원 전후 7스키마·19테이블·행 수·관리자 digest·`CHECK TABLE`, auth `ddl-auto=validate`, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build와 전체 Docker/Ollama health를 통과했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. host Bun 1.3.14와 고정 1.3.11 차이는 Docker 실행에는 영향 없는 로컬 경고다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

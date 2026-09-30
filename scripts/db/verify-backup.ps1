@@ -51,7 +51,13 @@ foreach ($schemaEntry in $manifest.schemas) {
     Assert-MySqlIdentifier -Value $schemaName
     if ($schemaName -notin $schemas) { throw "Unexpected schema in manifest: $schemaName" }
     $tableNames = @()
-    foreach ($table in @($schemaEntry.tables | Where-Object { $null -ne $_ })) {
+    foreach ($table in @($schemaEntry.tables)) {
+        # Windows PowerShell 5.1 ConvertFrom-Json represents an empty JSON array
+        # as a property-less PSCustomObject instead of producing no pipeline items.
+        if ($null -eq $table -or @($table.PSObject.Properties).Count -eq 0) { continue }
+        if ($null -eq $table.PSObject.Properties["name"] -or $null -eq $table.PSObject.Properties["rowCount"]) {
+            throw "Table inventory entry is missing required fields: $schemaName"
+        }
         $tableName = [string]$table.name
         Assert-MySqlIdentifier -Value $tableName
         if ([long]$table.rowCount -lt 0) { throw "Negative row count in manifest: $schemaName.$tableName" }
