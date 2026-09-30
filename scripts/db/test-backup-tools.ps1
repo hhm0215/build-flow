@@ -106,9 +106,11 @@ try {
     $expectedArguments = @("value with space\", 'quote"value', "")
     $hostExecutable = (Get-Process -Id $PID).Path
     $argumentResult = Invoke-NativeProcess -FileName $hostExecutable -Arguments (@("-NoProfile", "-File", $echoScript) + $expectedArguments) -WorkingDirectory $testRoot -RejectStandardError
-    $actualArguments = @($argumentResult.StandardOutput | ConvertFrom-Json)
+    # Windows PowerShell 5.1 emits a JSON array as one array-valued pipeline
+    # object, so cast explicitly to get the individual string arguments.
+    $actualArguments = [string[]]($argumentResult.StandardOutput | ConvertFrom-Json)
     if (($actualArguments | ConvertTo-Json -Compress) -cne ($expectedArguments | ConvertTo-Json -Compress)) {
-        throw "Native argument quoting did not preserve spaces, quotes, trailing backslashes, and empty values."
+        throw "Native argument quoting did not preserve spaces, quotes, trailing backslashes, and empty values. Expected: $($expectedArguments | ConvertTo-Json -Compress); actual: $($actualArguments | ConvertTo-Json -Compress)"
     }
 
     $stderrScript = Join-Path $spaceDirectory "stderr.ps1"
