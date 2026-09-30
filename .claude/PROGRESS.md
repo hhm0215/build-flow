@@ -19,7 +19,7 @@
 - 기준 백업 `20260929T125754Z`를 실제 복원해 7개 스키마·19개 테이블·정확한 행 수·Flyway history 유무·관리자 비노출 digest·모든 `CHECK TABLE ... status OK`를 manifest와 대조했다.
 - 복원 auth-service는 Config/Eureka를 끄고 SQL init 금지·Hibernate `ddl-auto=validate`로 기동해 health `UP`을 확인했다. 기동 후 동일 무결성 검사를 다시 수행해 DB 불변을 확인한다.
 - 임시 project의 container·volume이 모두 제거되고 운영 환경은 15개 컨테이너 정상, 관리자 1행·견적/현장/매입/세금 0행 그대로임을 확인했다. 실제 관리자 로그인·로그아웃은 대화형 `-ValidateLogin` 실행만 남았다.
-- Windows CI의 PowerShell 검사를 `scripts/` 전체 재귀로 확장하고 Docker 없는 백업 도구 회귀를 연결했다. 로컬 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·프로덕션 빌드, 전체 PowerShell parser와 실제 격리 복원을 통과했다. 되돌릴 수 있는 UI 시현과 확정/입금/OCR 샌드박스 경계를 `docs/DEMO_GUIDE.md`에 기록했다.
+- Windows CI의 PowerShell 검사를 `scripts/` 전체 재귀로 확장하고 Docker 없는 백업 도구 회귀를 연결했다. Windows PowerShell 5.1의 빈 JSON 배열·배열 파이프라인 차이도 회귀에서 발견해 수정했다. 로컬 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·프로덕션 빌드, 전체 PowerShell parser와 실제 격리 복원을 통과했다. 되돌릴 수 있는 UI 시현과 확정/입금/OCR 샌드박스 경계를 `docs/DEMO_GUIDE.md`에 기록했다. PR #63은 CI 6개 성공과 head SHA 일치를 확인한 뒤 main에 병합했다.
 
 ### ✅ Docker Desktop 런타임 복구 및 새 로컬 환경 기준선 (2026-09-29)
 - Docker Desktop 4.91의 `sailor-ingest.sock`/`engine.sock` Windows 재분석 지점 오류를 DB·volume과 무관한 임시 런타임 소켓 장애로 확인했다. Docker 프로세스를 완전히 종료한 뒤 `%LOCALAPPDATA%`의 두 런타임 폴더만 삭제 없이 quarantine 이름으로 이동해 Engine 29.8.0을 복구했다.
@@ -509,13 +509,13 @@
 
 ## 다음 세션 진입점 (2026-09-29 갱신)
 
-**Git 상태**: PR #49~#62 merge 완료. `origin/main`은 PR #62 merge commit `f8f9ff9`, `origin/develop`과 로컬 develop은 PR head `2f8ace8`이다. PR #62 병합 기록을 로컬에서 갱신 중이다.
+**Git 상태**: PR #49~#63 merge 완료. `origin/main`은 PR #63 merge commit `cd840eb`, `origin/develop`과 로컬 develop은 PR head `39eff45`이다. PR #63 병합 기록을 로컬에서 갱신 중이다.
 
 **로컬 실행 상태**: 2026-09-29 Docker Desktop 임시 런타임 소켓만 quarantine해 Engine 29.8.0을 복구하고 BuildFlow 환경을 새로 구축했다. 기존 관리자 1명만 복원했으며 업무 데이터는 0행이다. 15개 컨테이너, API 8081~8087 health, 프론트 3000 HTTP 200, native Ollama `qwen2.5:7b`가 정상이다. `.env`와 `backups/`는 Git에서 제외된다.
 
 **다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. Phase B 대화형 관리자 로그인·로그아웃 검증 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
-**검증 상태**: DB backup 도구 회귀, 전체 PowerShell parser, 실제 dump manifest/SHA 검증, 격리 복원 전후 7스키마·19테이블·행 수·관리자 digest·`CHECK TABLE`, auth `ddl-auto=validate`, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build와 전체 Docker/Ollama health를 통과했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. host Bun 1.3.14와 고정 1.3.11 차이는 Docker 실행에는 영향 없는 로컬 경고다.
+**검증 상태**: DB backup 도구 회귀와 전체 PowerShell parser를 Windows PowerShell 5.1에서 통과했고, 실제 dump manifest/SHA 검증, 격리 복원 전후 7스키마·19테이블·행 수·관리자 digest·`CHECK TABLE`, auth `ddl-auto=validate`, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build와 전체 Docker/Ollama health를 통과했다. PR #63의 백엔드·프론트·Windows CI 6개도 전부 성공했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. host Bun 1.3.14와 고정 1.3.11 차이는 Docker 실행에는 영향 없는 로컬 경고다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 
