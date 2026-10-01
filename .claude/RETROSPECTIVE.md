@@ -368,6 +368,18 @@
 
 ---
 
+## 2026-10-01 — VPS Compose 빌드 동시성 제한 오판
+
+**무엇이 일어났는지**: 7.8 GiB·swap 없는 VPS에서 `COMPOSE_PARALLEL_LIMIT=1 docker compose ... build`를 시작했지만 Compose 5.5.1은 여러 Gradle 이미지를 동시에 빌드했다. 메모리 압박을 발견해 해당 빌드 작업만 중단하고 앱 컨테이너·볼륨을 보존했다. 서비스별 단일 빌드로 전환한 뒤 11개 앱 이미지를 모두 성공시켰다.
+
+**원인**: Compose 명령의 병렬 제한 환경변수가 Docker BuildKit을 통한 다중 서비스 이미지 빌드까지 직렬화한다고 가정했다. 정적 Compose 설정 검사로는 이 런타임 동작을 확인할 수 없었다.
+
+**재발 방지 규칙**: 제한된 메모리의 VPS에서는 `docker compose build`에 서비스 목록 전체를 넘기지 않고, 한 서비스씩 빌드한다. 빌드 중 `free -h`와 진행 로그를 확인하며, 중단 시 데이터 볼륨을 초기화하지 않는다.
+
+**반영 위치**: `scripts/vps/build_images.sh`의 단일 서비스 루프, `docs/VPS_PRIVATE_PILOT.md` 운영 절차, `.claude/BACKLOG.md`·`.claude/PROGRESS.md`의 실측 결과.
+
+---
+
 ## 변경 이력
 
 | 날짜 | 작업 |
@@ -387,3 +399,4 @@
 | 2026-09-20 | Kafka revision/projection보다 outbox를 먼저 적용하도록 Phase 순서와 재발 방지 규칙 정렬 |
 | 2026-09-21 | outbox 전송 시작 전 차단·장기 장애 후 보증보험 알림 중복 위험을 timeout/쿨다운 검증 규칙으로 반영 |
 | 2026-09-21 | Docker 병렬 Maven TLS 실패를 순차 빌드로 재검증 — 코드 실패와 환경 실패 구분 규칙 추가 |
+| 2026-10-01 | VPS에서 Compose 병렬 제한 환경변수가 이미지 빌드 직렬화를 보장하지 않아 서비스별 빌드 스크립트로 전환 |
