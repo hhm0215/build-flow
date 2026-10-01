@@ -30,3 +30,4 @@
 - 독립 보안 리뷰의 SSH 터널 CORS 차단 지적을 수정했다. 프론트 lint·108개 테스트·프로덕션 빌드와 백엔드 전체 Gradle 41 tasks를 통과했다. 기존 프론트 대형 chunk/React Router 경고는 별도 백로그의 기존 이슈다.
 - 로컬 Docker Engine은 현재 꺼져 있어 컨테이너 런타임 검증은 미완료. Python VPS 도구는 기존 `.env` 보존과 비대화형 관리자 실행 거부를 확인했지만, 새 Linux 환경의 실제 초기화는 아직 검증하지 못했다.
 - VPS OS/서비스는 아직 변경하지 않았다.
+- [PR #64](https://github.com/hhm0215/build-flow/pull/64)는 GitHub CI 6개 성공, 로컬·원격·PR 3개 커밋 SHA 일치 후 merge commit `ced4fca`로 병합했다. 이 병합은 준비 코드만 포함하며 실제 서버 배포 완료를 뜻하지 않는다.
