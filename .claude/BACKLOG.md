@@ -25,7 +25,7 @@
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
 - **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
-- **현재 진행**: Plain OS Ubuntu 24.04 LTS 변경·새 host key 확인, 비root 배포 계정 키 접속, Docker 공식 apt 설치, root 소유 코드 배치 완료. 서버 전용 비밀값(`0600`) 생성, 순차 빌드로 앱 이미지 11개 성공, 컨테이너 15개 기동. 8081~8087 health `UP`, 프론트 200·비인증 현장 API 401·재시작/OOM 0·비loopback published port 0 확인. 사용자가 Web Console에서 새 관리자 계정을 직접 생성했고 성공 메시지를 확인했다. PC의 SSH 터널 URL도 HTTP 200/비인증 401이지만 관리자 로그인·CRUD/PDF·재부팅 복구 및 DB+업로드 파일 외부 백업/격리 복원은 미완료. 로컬 Docker Engine은 꺼져 있다. AI 모델과 도메인 공개는 범위 밖.
+- **현재 진행**: Plain OS Ubuntu 24.04 LTS 변경·새 host key 확인, 비root 배포 계정 키 접속, Docker 공식 apt 설치, root 소유 코드 배치 완료. 서버 전용 비밀값(`0600`) 생성, 순차 빌드로 앱 이미지 11개 성공, 컨테이너 15개 기동. 8081~8087 health `UP`, 프론트 200·비인증 현장 API 401·재시작/OOM 0·비loopback published port 0 확인. 사용자가 Web Console에서 새 관리자 계정을 직접 생성했고, SSH 터널의 웹 로그인 후 대시보드·빈 현장 목록이 표시됨을 확인했다. CRUD/PDF·재부팅 복구 및 DB+업로드 파일 외부 백업/격리 복원은 미완료. 로컬 Docker Engine은 꺼져 있다. AI 모델과 도메인 공개는 범위 밖.
 - **관련 파일**: `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `.claude/plans/2026-10-01-vps-private-pilot.md`
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
@@ -39,6 +39,14 @@
 - **관련 파일**: 7개 서비스 `application*.yml`, 각 서비스 DB 스키마, 배포 문서
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
+
+### 단일 VPS 운영 릴리스 CI/CD
+- **배경**: ADR-018에 따라 로컬 `develop` 개발·GitHub CI와 VPS의 `main` 운영 릴리스를 분리한다. 현재 CI는 테스트·빌드를 검증하지만 VPS 자동 배포와 안전한 승격 경로는 없다.
+- **선행조건**: VPS 파일럿 CRUD/PDF·재부팅 회귀, 버전 관리형 DB 마이그레이션, DB+업로드 파일 외부 백업·격리 복원 및 최소 권한 DB 계정 완료. 그 전에는 운영 DB 대상 자동 배포를 켜지 않는다.
+- **산출물**: CI 성공·PR/SHA 검증 후 릴리스 고정, 배포 전 백업/복원 가능성·마이그레이션 점검, 순차 배포·헬스/스모크·실패 시 중단과 복귀 절차. GitHub에서 VPS로의 배포 인증은 최소 권한과 비밀값 관리 기준을 별도 설계한다.
+- **관련 파일**: `.github/workflows/`, `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `docs/DECISIONS.md`
+- **예상 규모**: M
+- **상태**: TODO
 
 ### 문서 코어 Stage 1 — 원본 보존·가져오기·관계 검토 기반
 - **배경**: USB 실제 자료는 폴더·파일명·날짜만으로 수정본, 추가공사, 다른 현장을 안전하게 구분할 수 없다. 실데이터 입력 전에 원본과 해석을 분리하고 사용자의 확정 판단을 축적할 기반이 필요하다. 장기 원칙은 `docs/PRODUCT_VISION.md`와 ADR-017을 따른다.

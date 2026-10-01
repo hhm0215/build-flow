@@ -15,12 +15,12 @@
 | 초기 자원 | RAM 7.8 GiB (swap 0), `/` 96 GB 중 사용 798 MB. `docker` 실행 파일 없음. 리스닝 포트는 SSH 22와 로컬 DNS 53만 확인 |
 | 접속 | `buildflow-deploy` 일반 계정 생성, 소유권·권한 `~ 750`/`.ssh 700`/`authorized_keys 600`, PC 공개키 지문 일치 및 별도 SSH 키 로그인 성공. sudo·Docker 그룹 권한 없음 |
 | Docker | Docker 공식 Ubuntu apt 저장소에서 Engine 29.8.2, Compose 5.5.1, Buildx 0.37.1 설치. Docker/containerd `active`·`enabled`, 컨테이너 0개, 외부 리스닝 포트 SSH 22만 확인 |
-| 코드 배치 | 공개 `develop` 코드 SHA `94a3df0`을 root 소유 배포 경로에 clone. Compose 5.5.1 설정 검증 통과, 15개 published port 모두 `127.0.0.1` |
+| 코드 배치 | 공개 `develop` 코드 SHA `94a3df0`을 root 소유 배포 경로에 clone한 뒤 문서 변경분 `ee45dfb`까지 갱신. Compose 5.5.1 설정 검증 통과, 15개 published port 모두 `127.0.0.1` |
 | 비밀값 | 서버 전용 신규 `.env` 생성. 소유권 `root:root`, 권한 `0600`; 값은 출력·복사하지 않음 |
 | 빌드·기동 | 동시 Gradle 빌드를 예방하도록 서비스별 순차 빌드해 앱 이미지 11개 성공. MySQL·Redis·Kafka 포함 컨테이너 15개 기동. 8081~8087 health `UP`, Gateway health `UP`, 프론트 HTTP 200, 비인증 현장 API 401, 재시작/OOM 0건 |
-| 현재 단계 | **SSH 터널 전용 파일럿 스택 기동 완료.** 사용자가 Web Console의 대화형 명령으로 새 관리자 계정을 생성했고 성공 메시지를 확인. 터널 로그인·CRUD/PDF·재부팅 및 DB+파일 복구 검증은 미완료 |
+| 현재 단계 | **SSH 터널 전용 파일럿 스택 기동 완료.** 사용자가 Web Console의 대화형 명령으로 새 관리자 계정을 생성했고, 웹 로그인 뒤 대시보드·빈 현장 목록 표시를 확인. CRUD/PDF·재부팅 및 DB+파일 복구 검증은 미완료 |
 
-실제 서버 식별자·IP·지문·시각·운영 명령은 Git 제외 파일 `docs/VPS_LOCAL_OPERATIONS.md`에 기록한다. 이 파일에도 비밀번호·개인키·`.env` 값을 넣지 않는다. 스택과 관리자 계정은 준비됐지만 로그인·복구 검증 전에는 실제 업무 데이터를 입력해서는 안 된다.
+실제 서버 식별자·IP·지문·시각·운영 명령은 Git 제외 파일 `docs/VPS_LOCAL_OPERATIONS.md`에 기록한다. 이 파일에도 비밀번호·개인키·`.env` 값을 넣지 않는다. 웹 로그인 검증은 완료됐지만 복구 검증 전에는 실제 업무 데이터를 입력해서는 안 된다. ADR-018에 따라 이 VPS는 운영 후보이며, 로컬 개발·GitHub CI와 데이터를 공유하지 않는다.
 
 ## 사전 확인
 
