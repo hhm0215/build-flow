@@ -1,6 +1,7 @@
 # 기본 텍스트 자동 감지
 * text=auto
 .gitattributes text eol=lf
+.gitignore text eol=lf
 *.md text eol=lf
 docker-compose.vps.yml text eol=lf
 frontend/nginx.conf text eol=lf

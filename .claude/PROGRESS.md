@@ -14,11 +14,17 @@
 
 - 사용자가 기존 VPS에 보존할 데이터·서비스가 없음을 확인했고, Hostinger 주간 백업 2026-09-27/20 두 건을 확인했다. 복원은 옛 Docker·Traefik 템플릿과 SSH 상태 전체로 돌아가는 임시 안전망이며 자동 순환된다.
 - Ubuntu Plain OS용 비공개 SSH 터널 배포 override·런북·서버 전용 비밀값/관리자 초기화 도구를 준비했다. Compose 15개 서비스 정적 검증(외부 공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·108 tests·build를 통과했다.
-- VPS OS·실행 서비스는 아직 변경하지 않았다. 로컬 Docker Desktop Engine이 꺼져 있어 컨테이너 런타임 검증은 미완료다. 다음은 OS 변경 직전 백업 재확인 → 새 SSH host key 확인 → 새 서버에서 단계별 런타임 검증이다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다.
+- Hostinger에서 두 주간 백업을 다시 확인하고 사용자가 최종 삭제 경고 및 새 root 비밀번호 단계를 직접 완료해 Plain OS Ubuntu 24.04 LTS로 전환했다. Web Console은 Ubuntu 24.04.5 LTS와 새 ED25519 host key 지문을 확인했다. 기존 Docker·Traefik/OpenClaw 템플릿은 현재 OS가 아니다.
+- `buildflow-deploy` 일반 계정에 기존 PC 공개키를 등록하고 서버·PC 지문, 소유권·권한, 고정 host key를 사용한 별도 SSH 키 로그인을 검증했다. sudo·Docker 그룹 권한은 주지 않았다. 현재 새 VPS에는 Docker가 없고 SSH 22 외 앱 포트는 열려 있지 않다. Docker/Compose, BuildFlow 배포와 컨테이너 런타임 검증은 미완료다. 로컬 Docker Desktop Engine도 꺼져 있다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다. 공개 절차는 `docs/VPS_PRIVATE_PILOT.md`, 실제 식별자는 Git 제외 로컬 기록을 따른다.
 
 ---
 
 ## 완료된 작업
+
+### ✅ VPS 비공개 파일럿 코드·런북 준비 (실제 배포는 진행 중, 2026-10-01)
+- `docker-compose.vps.yml`에 SSH 터널용 loopback 공개 정책을 유지하며 재시작·메모리·JVM heap·로그 회전과 Linux AI 내부 주소를 추가했다. 서버 전용 랜덤 `.env` 생성, 일회성 비웹 관리자 초기화, Hostinger OS/SSH/복구 런북을 준비했다.
+- 프론트 프록시의 업로드 한도·Host 포트 전달과 백엔드 multipart 여유를 맞추고 Gateway 터널 origin을 허용했다. Compose 15개 서비스 병합에서 공개 포트 0, 자원/재시작 누락 0을 확인했다. 독립 보안 리뷰와 전체 Gradle 41 tasks, 프론트 lint·108 tests·build를 통과했다. 컨테이너 실기동은 Docker Engine이 꺼져 있어 아직 미검증이다.
+- [PR #64](https://github.com/hhm0215/build-flow/pull/64)는 CI 6개 성공과 로컬·원격·PR head 및 커밋 3개 SHA 일치 후 merge commit `ced4fca`로 병합했다. VPS OS/서비스는 변경하지 않았다.
 
 ### ✅ DB 마이그레이션 기반 Phase B — 격리 복원 핵심 검증 (로그인 제외, 2026-09-30)
 - 기존 Compose의 고정 `container_name`·network name을 재사용하지 않는 전용 MySQL/Redis/auth Compose와 무작위 project·nonce 기반 복원 도구를 추가했다. 임시 MySQL은 호스트 포트를 열지 않으며 container·volume label과 원본 불일치를 확인한 뒤에만 복원·자동 정리를 허용한다.
@@ -515,7 +521,7 @@
 
 ## 다음 세션 진입점 (2026-10-01 갱신)
 
-**Git 상태**: PR #49~#63 merge 완료. `origin/main`은 PR #63 merge commit `cd840eb`이고, 로컬 `develop`에는 PR #63 후처리 문서 커밋과 VPS 준비 커밋이 추가됐다. VPS 준비 PR의 CI·SHA 검증 후 이 항목을 다시 갱신한다.
+**Git 상태**: PR #49~#64 merge 완료. `origin/main`은 PR #64 merge commit `ced4fca`이다. 로컬 `develop`과 `origin/develop`은 PR head `a89a9c2`였으며, 이 병합 기록은 후처리 문서 커밋으로 반영한다.
 
 **로컬 실행 상태**: 2026-09-29에는 새 로컬 환경의 15개 컨테이너와 Ollama가 정상임을 확인했으나, 2026-10-01 현재 Docker Desktop Engine은 실행되지 않는다. 현재 컨테이너/API 상태는 미검증이다. 기존 관리자 1명 외 업무 데이터 0행 기준이었으며 `.env`와 `backups/`는 Git에서 제외된다.
 

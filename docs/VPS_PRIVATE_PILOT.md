@@ -2,6 +2,22 @@
 
 > 목표: 기존 OpenClaw 템플릿을 깨끗한 Ubuntu 24.04로 교체한 뒤, BuildFlow를 **SSH 터널에서만** 검증한다. 도메인·공개 HTTPS 운영 절차가 아니다.
 
+## 실제 VPS 작업 기록 (2026-10-01)
+
+| 항목 | 확인 결과 |
+|------|-----------|
+| 대상 | Hostinger VPS (실제 식별자·IP는 Git 제외 로컬 기록에만 보관) |
+| 변경 전 | Ubuntu 24.04 with Docker and Traefik 템플릿. OpenClaw·Ollama는 사용하지 않으며 보존할 VPS 데이터가 없다고 사용자 확인 |
+| 복구 안전망 | hPanel에서 주간 백업 두 건을 변경 직전 확인. 자동 순환 백업이므로 영구 보존 아님 |
+| 변경 | 사용자가 최종 삭제 경고를 확인하고 새 root 비밀번호 입력 및 `Change OS` 제출. `Reinstall`은 사용하지 않음 |
+| 변경 후 | hPanel 현재 OS `Ubuntu 24.04 LTS`, Web Console 로그인 배너 `Ubuntu 24.04.5 LTS` 확인 |
+| 새 SSH host key | Web Console에서 `/etc/ssh/ssh_host_ed25519_key.pub`의 ED25519 지문을 확인. 이전 지문은 폐기. 로컬 `known_hosts` 갱신 전 Git 제외 로컬 기록의 새 지문과 대조할 것 |
+| 초기 자원 | RAM 7.8 GiB (swap 0), `/` 96 GB 중 사용 798 MB. `docker` 실행 파일 없음. 리스닝 포트는 SSH 22와 로컬 DNS 53만 확인 |
+| 접속 | `buildflow-deploy` 일반 계정 생성, 소유권·권한 `~ 750`/`.ssh 700`/`authorized_keys 600`, PC 공개키 지문 일치 및 별도 SSH 키 로그인 성공. sudo·Docker 그룹 권한 없음 |
+| 현재 단계 | OS 변경과 비root SSH 접속 검증 완료. Docker/Compose, BuildFlow 배포와 런타임 검증은 아직 미완료 |
+
+실제 서버 식별자·IP·지문·시각·운영 명령은 Git 제외 파일 `docs/VPS_LOCAL_OPERATIONS.md`에 기록한다. 이 파일에도 비밀번호·개인키·`.env` 값을 넣지 않는다. 현 단계에서 BuildFlow 서비스나 업무 데이터가 VPS에 올라간 것으로 간주하지 않는다.
+
 ## 사전 확인
 
 - Hostinger hPanel의 `Backups & Monitoring → Snapshots & Backups`에서 정기 백업의 **현재 존재와 날짜를 OS 변경 직전에 다시 확인**한다. 2026-10-01 화면에는 9월 27일·20일 백업이 있었지만, 오래된 백업은 자동 교체된다.
