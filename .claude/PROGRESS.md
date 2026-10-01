@@ -18,6 +18,7 @@
 - `buildflow-deploy` 일반 계정에 기존 PC 공개키를 등록하고 서버·PC 지문, 소유권·권한, 고정 host key를 사용한 별도 SSH 키 로그인을 검증했다. sudo·Docker 그룹 권한은 주지 않았다. Docker 공식 apt 저장소의 Engine 29.8.2/Compose 5.5.1을 설치하고 공개 `develop` 코드를 root 소유 경로에 clone했다. 서버 전용 DB/JWT 비밀값을 `root:root 0600` `.env`에 생성하고 VPS Compose 설정에서 15개 published port 전부 loopback임을 검증했다. Compose의 `COMPOSE_PARALLEL_LIMIT=1`만으로는 이미지 빌드가 직렬화되지 않아 첫 병렬 빌드 작업만 중단하고, 서비스별 단일 빌드로 11개 앱 이미지를 성공시켰다. MySQL·Redis·Kafka 포함 15개 컨테이너가 실행되고 8081~8087/Gateway health `UP`, 프론트 200, 비인증 현장 API 401, 재시작/OOM 0, 비loopback published port 0을 확인했다. Gateway 초기 healthy까지 약 144초 소요. 사용자가 Web Console에서 대화형 관리자 계정을 직접 생성했고 성공 메시지를 확인했다. PC의 SSH 터널 URL에서 웹 로그인 후 대시보드·빈 현장 목록 표시를 확인했다. CRUD/PDF·재부팅 및 DB+파일 복구 검증은 남았다. 로컬 Docker Desktop Engine은 꺼져 있다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다. 공개 절차는 `docs/VPS_PRIVATE_PILOT.md`, 실제 식별자는 Git 제외 로컬 기록을 따른다.
 - 사용자와 ADR-018로 로컬 개발(`develop`)·GitHub CI·단일 VPS 운영(`main` 릴리스) 분리를 확정했다. CI/CD 배포 자동화는 DB/파일 복원과 마이그레이션 게이트 뒤에 구현하며, 같은 VPS에 개발용 전체 스택을 상시 이중 기동하지 않는다.
 - [PR #66](https://github.com/hhm0215/build-flow/pull/66)은 VPS 기동 실측 문서와 순차 빌드 스크립트를 포함했고, CI 6개 성공 및 PR/원격 3개 커밋 SHA 일치 확인 후 merge commit `0b5c931`으로 병합했다. `develop`도 같은 커밋으로 fast-forward했다. [PR #65](https://github.com/hhm0215/build-flow/pull/65)는 앞선 OS/SSH 기록을 병합했다.
+- [PR #67](https://github.com/hhm0215/build-flow/pull/67)은 ADR-018 운영 경계와 VPS 로그인 확인 기록을 포함했다. CI 6개 통과·PR/원격 커밋 3개 SHA 일치 후 merge commit `c8306f5`로 병합했고 `develop`도 fast-forward했다. VPS에는 이 문서 전용 커밋을 재배포하지 않았다.
 
 ---
 
@@ -523,7 +524,7 @@
 
 ## 다음 세션 진입점 (2026-10-01 갱신)
 
-**Git 상태**: PR #49~#66 merge 완료. `origin/main`·로컬/원격 `develop`은 PR #66 merge commit `0b5c931`으로 동기화했다. 이 병합 기록은 후처리 문서 커밋으로 반영한다.
+**Git 상태**: PR #49~#67 merge 완료. `origin/main`·로컬/원격 `develop`은 PR #67 merge commit `c8306f5`로 동기화했다. 이 병합 기록은 후처리 문서 커밋으로 반영한다.
 
 **로컬 실행 상태**: 2026-09-29에는 새 로컬 환경의 15개 컨테이너와 Ollama가 정상임을 확인했으나, 2026-10-01 현재 Docker Desktop Engine은 실행되지 않는다. 현재 컨테이너/API 상태는 미검증이다. 기존 관리자 1명 외 업무 데이터 0행 기준이었으며 `.env`와 `backups/`는 Git에서 제외된다.
 
