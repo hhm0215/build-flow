@@ -15,7 +15,7 @@
 - 사용자가 기존 VPS에 보존할 데이터·서비스가 없음을 확인했고, Hostinger 주간 백업 2026-09-27/20 두 건을 확인했다. 복원은 옛 Docker·Traefik 템플릿과 SSH 상태 전체로 돌아가는 임시 안전망이며 자동 순환된다.
 - Ubuntu Plain OS용 비공개 SSH 터널 배포 override·런북·서버 전용 비밀값/관리자 초기화 도구를 준비했다. Compose 15개 서비스 정적 검증(외부 공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·108 tests·build를 통과했다.
 - Hostinger에서 두 주간 백업을 다시 확인하고 사용자가 최종 삭제 경고 및 새 root 비밀번호 단계를 직접 완료해 Plain OS Ubuntu 24.04 LTS로 전환했다. Web Console은 Ubuntu 24.04.5 LTS와 새 ED25519 host key 지문을 확인했다. 기존 Docker·Traefik/OpenClaw 템플릿은 현재 OS가 아니다.
-- `buildflow-deploy` 일반 계정에 기존 PC 공개키를 등록하고 서버·PC 지문, 소유권·권한, 고정 host key를 사용한 별도 SSH 키 로그인을 검증했다. sudo·Docker 그룹 권한은 주지 않았다. 현재 새 VPS에는 Docker가 없고 SSH 22 외 앱 포트는 열려 있지 않다. Docker/Compose, BuildFlow 배포와 컨테이너 런타임 검증은 미완료다. 로컬 Docker Desktop Engine도 꺼져 있다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다. 공개 절차는 `docs/VPS_PRIVATE_PILOT.md`, 실제 식별자는 Git 제외 로컬 기록을 따른다.
+- `buildflow-deploy` 일반 계정에 기존 PC 공개키를 등록하고 서버·PC 지문, 소유권·권한, 고정 host key를 사용한 별도 SSH 키 로그인을 검증했다. sudo·Docker 그룹 권한은 주지 않았다. Docker 공식 apt 저장소의 Engine 29.8.2/Compose 5.5.1을 설치해 서비스 활성·자동 시작, 빈 컨테이너 목록, SSH 22 외 공개 포트 없음까지 확인했다. 공개 `develop` 코드를 root 소유 경로에 clone해 SHA 일치를 확인했고, VPS Compose 설정에서 15개 published port 전부 loopback임을 구조 검사했다. 서버 전용 비밀값·이미지 빌드·앱 기동은 아직 미완료다. 로컬 Docker Desktop Engine도 꺼져 있다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다. 공개 절차는 `docs/VPS_PRIVATE_PILOT.md`, 실제 식별자는 Git 제외 로컬 기록을 따른다.
 - [PR #65](https://github.com/hhm0215/build-flow/pull/65)는 문서·Git 제외 규칙만 포함했고, CI 6개 성공 및 PR/원격 커밋 SHA 일치 확인 후 merge commit `131f056`으로 병합했다. `develop`도 같은 커밋으로 fast-forward했다.
 
 ---
@@ -526,9 +526,9 @@
 
 **로컬 실행 상태**: 2026-09-29에는 새 로컬 환경의 15개 컨테이너와 Ollama가 정상임을 확인했으나, 2026-10-01 현재 Docker Desktop Engine은 실행되지 않는다. 현재 컨테이너/API 상태는 미검증이다. 기존 관리자 1명 외 업무 데이터 0행 기준이었으며 `.env`와 `backups/`는 Git에서 제외된다.
 
-**다음 작업**: VPS Plain OS·새 host key·비root SSH 키 접속은 완료했다. Docker/Compose 설치 → 비공개 BuildFlow 배포 → 터널·CRUD/PDF·재부팅 검증 순서로 진행한다. 실데이터 입력 전 DB Phase B 로그인 검증과 Flyway·DB/업로드 파일 복구 체계를 완료한다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
+**다음 작업**: VPS Plain OS·새 host key·비root SSH 키 접속·Docker/Compose 설치·코드 배치는 완료했다. 서버 전용 `.env` 생성 → 비공개 BuildFlow 배포 → 터널·CRUD/PDF·재부팅 검증 순서로 진행한다. 실데이터 입력 전 DB Phase B 로그인 검증과 Flyway·DB/업로드 파일 복구 체계를 완료한다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
-**검증 상태**: 2026-10-01 VPS override Compose 15개 서비스 정적 검증(공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build 통과. 새 VPS OS와 별도 SSH 키 로그인은 실측 성공했다. VPS·로컬 컨테이너 런타임 스모크는 아직 미실시다. PR #65 CI 6개 성공. 기존 DB 격리 복원과 PR #63 CI는 이전 세션에서 성공했다. Config Client 중복 접속/프론트 번들 크기 경고는 P2 백로그다.
+**검증 상태**: 2026-10-01 VPS override Compose 15개 서비스 정적 검증(공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build 통과. 새 VPS OS·별도 SSH 키 로그인·Docker daemon/Compose 버전은 실측 성공했다. VPS BuildFlow·로컬 컨테이너 런타임 스모크는 아직 미실시다. PR #65 CI 6개 성공. 기존 DB 격리 복원과 PR #63 CI는 이전 세션에서 성공했다. Config Client 중복 접속/프론트 번들 크기 경고는 P2 백로그다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

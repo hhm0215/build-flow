@@ -14,7 +14,9 @@
 | 새 SSH host key | Web Console에서 `/etc/ssh/ssh_host_ed25519_key.pub`의 ED25519 지문을 확인. 이전 지문은 폐기. 로컬 `known_hosts` 갱신 전 Git 제외 로컬 기록의 새 지문과 대조할 것 |
 | 초기 자원 | RAM 7.8 GiB (swap 0), `/` 96 GB 중 사용 798 MB. `docker` 실행 파일 없음. 리스닝 포트는 SSH 22와 로컬 DNS 53만 확인 |
 | 접속 | `buildflow-deploy` 일반 계정 생성, 소유권·권한 `~ 750`/`.ssh 700`/`authorized_keys 600`, PC 공개키 지문 일치 및 별도 SSH 키 로그인 성공. sudo·Docker 그룹 권한 없음 |
-| 현재 단계 | OS 변경과 비root SSH 접속 검증 완료. Docker/Compose, BuildFlow 배포와 런타임 검증은 아직 미완료 |
+| Docker | Docker 공식 Ubuntu apt 저장소에서 Engine 29.8.2, Compose 5.5.1, Buildx 0.37.1 설치. Docker/containerd `active`·`enabled`, 컨테이너 0개, 외부 리스닝 포트 SSH 22만 확인 |
+| 코드 배치 | 공개 `develop` 커밋을 root 소유 배포 경로에 clone하고 로컬 커밋 SHA와 일치 확인. VPS의 Compose 5.5.1에서 설정 검증 통과, 15개 서비스 published port 15개 모두 `127.0.0.1`. 비밀값 생성·이미지 빌드·앱 기동은 아직 미완료 |
+| 현재 단계 | OS·비root SSH·Docker 설치 완료. BuildFlow 이미지 빌드, 비공개 기동, 런타임·복구 검증은 아직 미완료 |
 
 실제 서버 식별자·IP·지문·시각·운영 명령은 Git 제외 파일 `docs/VPS_LOCAL_OPERATIONS.md`에 기록한다. 이 파일에도 비밀번호·개인키·`.env` 값을 넣지 않는다. 현 단계에서 BuildFlow 서비스나 업무 데이터가 VPS에 올라간 것으로 간주하지 않는다.
 
