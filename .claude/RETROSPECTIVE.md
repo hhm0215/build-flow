@@ -380,6 +380,18 @@
 
 ---
 
+## 2026-10-01 — 공개 파일럿 런북의 서버 checkout 누락
+
+**무엇이 일어났는지**: 공개 HTTPS 런북 초안은 서버에서 `origin/main`을 fetch하고 SHA를 표시했지만, 실제 checkout은 이전 `develop`에 둔 채 새 Compose 파일을 사용하려 했다. PR 전 독립 리뷰에서 발견해 검증된 `origin/main`으로 detached switch하고 `HEAD` 일치를 확인하도록 수정했다. 공개 배포 전에 발견되어 서버 변경은 없었다.
+
+**원인**: 원격 ref 최신화와 서버 작업 디렉터리의 실제 코드 갱신을 같은 것으로 착각했다. 정적 Compose 검증은 배포 대상 checkout의 신선도를 확인하지 않는다.
+
+**재발 방지 규칙**: VPS 배포 전에 서버 작업 트리 청결·CI 통과 SHA·`origin/main`·실제 `HEAD`를 대조한다. fetch만 하고 기존 checkout으로 빌드하지 않는다.
+
+**반영 위치**: `CLAUDE.md` VPS 배포 규칙, `docs/VPS_PUBLIC_PILOT.md`의 `git switch --detach origin/main` 및 SHA 확인 절차.
+
+---
+
 ## 변경 이력
 
 | 날짜 | 작업 |
@@ -400,3 +412,4 @@
 | 2026-09-21 | outbox 전송 시작 전 차단·장기 장애 후 보증보험 알림 중복 위험을 timeout/쿨다운 검증 규칙으로 반영 |
 | 2026-09-21 | Docker 병렬 Maven TLS 실패를 순차 빌드로 재검증 — 코드 실패와 환경 실패 구분 규칙 추가 |
 | 2026-10-01 | VPS에서 Compose 병렬 제한 환경변수가 이미지 빌드 직렬화를 보장하지 않아 서비스별 빌드 스크립트로 전환 |
+| 2026-10-01 | 공개 VPS 런북의 stale checkout 위험을 PR 전 발견해 SHA 고정·대조 규칙 추가 |

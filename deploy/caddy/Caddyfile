@@ -1,0 +1,16 @@
+{$PUBLIC_HOST} {
+    encode zstd gzip
+
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        X-Frame-Options DENY
+        -Server
+    }
+
+    reverse_proxy frontend:80 {
+        # Do not forward a client-supplied X-Forwarded-For value to Nginx's
+        # per-client login limiter.
+        header_up X-Forwarded-For {remote_host}
+    }
+}

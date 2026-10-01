@@ -4,7 +4,13 @@
 .gitignore text eol=lf
 *.md text eol=lf
 docker-compose.vps.yml text eol=lf
+docker-compose.public.yml text eol=lf
+.env.example text eol=lf
+.github/workflows/ci.yml text eol=lf
 frontend/nginx.conf text eol=lf
+frontend/src/api/sites.api.ts text eol=lf
+frontend/src/api/sites.api.test.tsx text eol=lf
+deploy/caddy/Caddyfile text eol=lf
 estimate-service/src/main/resources/application.yml text eol=lf
 notification-service/src/main/resources/application.yml text eol=lf
 

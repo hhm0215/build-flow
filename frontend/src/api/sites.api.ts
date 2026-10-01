@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
 import { ApiResponse, Site, SiteCreateRequest, SiteUpdateRequest, Profit } from '../types'
+import { DASHBOARD_KEY } from './dashboard.api'
 
 export const SITES_KEY = {
   all: ['sites'] as const,
@@ -44,6 +46,11 @@ const fetchProfit = async (siteId: number) => {
   return res.data.data
 }
 
+async function invalidateSiteDependents(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: SITES_KEY.all })
+  await queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY.all, refetchType: 'none' })
+}
+
 // ── TanStack Query 훅 ──────────────────────────
 export function useSites(params?: Record<string, string>) {
   return useQuery({
@@ -64,7 +71,7 @@ export function useCreateSite() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createSite,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+    onSuccess: () => invalidateSiteDependents(queryClient),
   })
 }
 
@@ -72,7 +79,7 @@ export function useUpdateSite() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateSite,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+    onSuccess: () => invalidateSiteDependents(queryClient),
   })
 }
 
@@ -80,7 +87,7 @@ export function useDeleteSite() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: deleteSite,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+    onSuccess: () => invalidateSiteDependents(queryClient),
   })
 }
 
@@ -88,7 +95,7 @@ export function useUpdateSiteStatus() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateSiteStatus,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: SITES_KEY.all }),
+    onSuccess: () => invalidateSiteDependents(queryClient),
   })
 }
 
