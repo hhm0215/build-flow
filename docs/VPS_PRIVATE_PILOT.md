@@ -14,16 +14,20 @@
 | 새 SSH host key | Web Console에서 `/etc/ssh/ssh_host_ed25519_key.pub`의 ED25519 지문을 확인. 이전 지문은 폐기. 로컬 `known_hosts` 갱신 전 Git 제외 로컬 기록의 새 지문과 대조할 것 |
 | 초기 자원 | RAM 7.8 GiB (swap 0), `/` 96 GB 중 사용 798 MB. `docker` 실행 파일 없음. 리스닝 포트는 SSH 22와 로컬 DNS 53만 확인 |
 | 접속 | `buildflow-deploy` 일반 계정 생성, 소유권·권한 `~ 750`/`.ssh 700`/`authorized_keys 600`, PC 공개키 지문 일치 및 별도 SSH 키 로그인 성공. sudo·Docker 그룹 권한 없음 |
-| 현재 단계 | OS 변경과 비root SSH 접속 검증 완료. Docker/Compose, BuildFlow 배포와 런타임 검증은 아직 미완료 |
+| Docker | Docker 공식 Ubuntu apt 저장소에서 Engine 29.8.2, Compose 5.5.1, Buildx 0.37.1 설치. Docker/containerd `active`·`enabled`, 컨테이너 0개, 외부 리스닝 포트 SSH 22만 확인 |
+| 코드 배치 | 공개 `develop` 코드 SHA `94a3df0`을 root 소유 배포 경로에 clone. Compose 5.5.1 설정 검증 통과, 15개 published port 모두 `127.0.0.1` |
+| 비밀값 | 서버 전용 신규 `.env` 생성. 소유권 `root:root`, 권한 `0600`; 값은 출력·복사하지 않음 |
+| 빌드·기동 | 동시 Gradle 빌드를 예방하도록 서비스별 순차 빌드해 앱 이미지 11개 성공. MySQL·Redis·Kafka 포함 컨테이너 15개 기동. 8081~8087 health `UP`, Gateway health `UP`, 프론트 HTTP 200, 비인증 현장 API 401, 재시작/OOM 0건 |
+| 현재 단계 | **SSH 터널 전용 파일럿 스택 기동 완료.** 새 관리자 계정의 사용자 직접 입력, 터널 로그인·CRUD/PDF·재부팅 및 DB+파일 복구 검증은 미완료 |
 
-실제 서버 식별자·IP·지문·시각·운영 명령은 Git 제외 파일 `docs/VPS_LOCAL_OPERATIONS.md`에 기록한다. 이 파일에도 비밀번호·개인키·`.env` 값을 넣지 않는다. 현 단계에서 BuildFlow 서비스나 업무 데이터가 VPS에 올라간 것으로 간주하지 않는다.
+실제 서버 식별자·IP·지문·시각·운영 명령은 Git 제외 파일 `docs/VPS_LOCAL_OPERATIONS.md`에 기록한다. 이 파일에도 비밀번호·개인키·`.env` 값을 넣지 않는다. 스택은 실행 중이지만 아직 관리자가 없고 업무 데이터를 입력해서는 안 된다.
 
 ## 사전 확인
 
 - Hostinger hPanel의 `Backups & Monitoring → Snapshots & Backups`에서 정기 백업의 **현재 존재와 날짜를 OS 변경 직전에 다시 확인**한다. 2026-10-01 화면에는 9월 27일·20일 백업이 있었지만, 오래된 백업은 자동 교체된다.
 - 사용자는 현 VPS에서 보존할 OpenClaw·Ollama 외 파일이나 서비스가 없다고 확인했다. 이 확인은 로컬 BuildFlow 데이터의 삭제·이관 승인이 아니다.
 - OS 변경 시 현재 VPS 파일과 수동 스냅샷은 삭제된다. 기존 정기 백업은 유지되지만 복원하면 과거 Docker·Traefik 템플릿, 당시 SSH 설정까지 통째로 돌아간다. 새 BuildFlow 데이터의 백업으로 사용하지 않는다.
-- 로컬 `docker compose config` 검증은 통과했지만 로컬 Docker Engine이 꺼져 있어 런타임 시험은 아직 통과하지 않았다.
+- 로컬 Docker Engine은 꺼져 있지만, 새 VPS에서는 Compose 빌드와 기본 런타임 헬스 검증을 통과했다. 로컬 컨테이너 상태를 VPS 검증 결과로 대체하지 않는다.
 
 ## 1. 새 OS와 SSH
 
@@ -39,15 +43,17 @@
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml config --quiet
-COMPOSE_PARALLEL_LIMIT=1 docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml build
+bash scripts/vps/build_images.sh
 docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml up -d --wait mysql redis
-python3 scripts/vps/create_admin.py
 docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml up -d --no-build
 docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml ps
+python3 scripts/vps/create_admin.py
 ```
 
 - `container-ollama` profile은 첫 배포에서 켜지 않는다. VPS override는 AI 서비스의 URL을 Compose 내부 `ollama:11434`로 맞추지만 모델 컨테이너가 없으므로 파싱·챗봇·대시보드 AI 요약은 이 파일럿에서 사용할 수 없다. 대시보드의 손익 통계는 별도 API로 계속 동작한다. 8 GiB에서 7B 모델의 동시 구동은 별도 자원 시험 후 판단한다.
+- Compose 5.5.1에서 `COMPOSE_PARALLEL_LIMIT=1`을 지정해도 여러 Gradle 이미지가 동시에 빌드되는 것을 VPS에서 확인했다. 8 GiB·swap 0 서버에서는 위 스크립트로 **서비스별 단일 이미지**를 순서대로 빌드한다. 중단된 빌드의 Docker 캐시는 재사용되며 앱 볼륨은 변경되지 않는다.
 - 서비스 OOM, `unhealthy`, 반복 재시작이 있으면 입력을 중단하고 `docker compose ... ps/logs`와 호스트 메모리를 확인한다. 메모리 수치는 초기 상한이며 실측 후 조정한다.
+- 첫 기동에서 Gateway가 헬스 체크를 통과하는 데 약 144초가 걸렸다. 프론트는 Gateway가 healthy가 된 뒤에 시작했다. 장시간 `Waiting` 중이라고 즉시 중복 기동하지 말고, 최종 상태와 로그를 확인한다.
 
 Windows 로컬 PC에서 포트 13000을 통해 비공개 접속한다(실제 키 경로와 VPS 호스트명 대입):
 
