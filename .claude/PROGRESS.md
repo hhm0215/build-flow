@@ -14,7 +14,8 @@
 
 - 사용자가 기존 VPS에 보존할 데이터·서비스가 없음을 확인했고, Hostinger 주간 백업 2026-09-27/20 두 건을 확인했다. 복원은 옛 Docker·Traefik 템플릿과 SSH 상태 전체로 돌아가는 임시 안전망이며 자동 순환된다.
 - Ubuntu Plain OS용 비공개 SSH 터널 배포 override·런북·서버 전용 비밀값/관리자 초기화 도구를 준비했다. Compose 15개 서비스 정적 검증(외부 공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·108 tests·build를 통과했다.
-- VPS OS·실행 서비스는 아직 변경하지 않았다. 로컬 Docker Desktop Engine이 꺼져 있어 컨테이너 런타임 검증은 미완료다. 다음은 OS 변경 직전 백업 재확인 → 새 SSH host key 확인 → 새 서버에서 단계별 런타임 검증이다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다.
+- Hostinger에서 두 주간 백업을 다시 확인하고 사용자가 최종 삭제 경고 및 새 root 비밀번호 단계를 직접 완료해 Plain OS Ubuntu 24.04 LTS로 전환했다. Web Console은 Ubuntu 24.04.5 LTS와 새 ED25519 host key 지문을 확인했다. 기존 Docker·Traefik/OpenClaw 템플릿은 현재 OS가 아니다.
+- `buildflow-deploy` 일반 계정에 기존 PC 공개키를 등록하고 서버·PC 지문, 소유권·권한, 고정 host key를 사용한 별도 SSH 키 로그인을 검증했다. sudo·Docker 그룹 권한은 주지 않았다. 현재 새 VPS에는 Docker가 없고 SSH 22 외 앱 포트는 열려 있지 않다. Docker/Compose, BuildFlow 배포와 컨테이너 런타임 검증은 미완료다. 로컬 Docker Desktop Engine도 꺼져 있다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다. 공개 절차는 `docs/VPS_PRIVATE_PILOT.md`, 실제 식별자는 Git 제외 로컬 기록을 따른다.
 
 ---
 

@@ -25,7 +25,7 @@
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
 - **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
-- **현재 진행**: VPS override·런북·초기화 도구 준비, Compose 정적 검증, 독립 보안 리뷰, 전체 Gradle·프론트 테스트/빌드 완료. 로컬 Docker Engine이 꺼져 있어 컨테이너 런타임 검증, VPS OS 변경 및 배포는 미완료. AI 모델과 도메인 공개는 범위 밖.
+- **현재 진행**: VPS override·런북·초기화 도구 준비, Compose 정적 검증, 독립 보안 리뷰, 전체 Gradle·프론트 테스트/빌드 완료. 2026-10-01 기존 백업 재확인 후 Plain OS Ubuntu 24.04 LTS 변경·새 host key 확인, 비root 배포 계정의 키 접속 검증 완료. Docker 설치·VPS 컨테이너 런타임 검증은 미완료. 로컬 Docker Engine은 꺼져 있다. AI 모델과 도메인 공개는 범위 밖.
 - **관련 파일**: `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `.claude/plans/2026-10-01-vps-private-pilot.md`
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
