@@ -10,6 +10,12 @@
 - Phase A와 Phase B의 격리 실제 복원·무결성·auth `ddl-auto=validate` 기동·전후 DB 불변 검증을 완료했다.
 - Phase B는 관리자 비밀번호를 저장하지 않는 대화형 로그인·로그아웃 1건만 남았다. 통과 후 auth-service Flyway 파일럿으로 진행하며 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
 
+## 현재 진행 중 — VPS 비공개 파일럿 (2026-10-01)
+
+- 사용자가 기존 VPS에 보존할 데이터·서비스가 없음을 확인했고, Hostinger 주간 백업 2026-09-27/20 두 건을 확인했다. 복원은 옛 Docker·Traefik 템플릿과 SSH 상태 전체로 돌아가는 임시 안전망이며 자동 순환된다.
+- Ubuntu Plain OS용 비공개 SSH 터널 배포 override·런북·서버 전용 비밀값/관리자 초기화 도구를 준비했다. Compose 15개 서비스 정적 검증(외부 공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·108 tests·build를 통과했다.
+- VPS OS·실행 서비스는 아직 변경하지 않았다. 로컬 Docker Desktop Engine이 꺼져 있어 컨테이너 런타임 검증은 미완료다. 다음은 OS 변경 직전 백업 재확인 → 새 SSH host key 확인 → 새 서버에서 단계별 런타임 검증이다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다.
+
 ---
 
 ## 완료된 작업
@@ -19,7 +25,7 @@
 - 기준 백업 `20260929T125754Z`를 실제 복원해 7개 스키마·19개 테이블·정확한 행 수·Flyway history 유무·관리자 비노출 digest·모든 `CHECK TABLE ... status OK`를 manifest와 대조했다.
 - 복원 auth-service는 Config/Eureka를 끄고 SQL init 금지·Hibernate `ddl-auto=validate`로 기동해 health `UP`을 확인했다. 기동 후 동일 무결성 검사를 다시 수행해 DB 불변을 확인한다.
 - 임시 project의 container·volume이 모두 제거되고 운영 환경은 15개 컨테이너 정상, 관리자 1행·견적/현장/매입/세금 0행 그대로임을 확인했다. 실제 관리자 로그인·로그아웃은 대화형 `-ValidateLogin` 실행만 남았다.
-- Windows CI의 PowerShell 검사를 `scripts/` 전체 재귀로 확장하고 Docker 없는 백업 도구 회귀를 연결했다. 로컬 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·프로덕션 빌드, 전체 PowerShell parser와 실제 격리 복원을 통과했다. 되돌릴 수 있는 UI 시현과 확정/입금/OCR 샌드박스 경계를 `docs/DEMO_GUIDE.md`에 기록했다.
+- Windows CI의 PowerShell 검사를 `scripts/` 전체 재귀로 확장하고 Docker 없는 백업 도구 회귀를 연결했다. Windows PowerShell 5.1의 빈 JSON 배열·배열 파이프라인 차이도 회귀에서 발견해 수정했다. 로컬 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·프로덕션 빌드, 전체 PowerShell parser와 실제 격리 복원을 통과했다. 되돌릴 수 있는 UI 시현과 확정/입금/OCR 샌드박스 경계를 `docs/DEMO_GUIDE.md`에 기록했다. PR #63은 CI 6개 성공과 head SHA 일치를 확인한 뒤 main에 병합했다.
 
 ### ✅ Docker Desktop 런타임 복구 및 새 로컬 환경 기준선 (2026-09-29)
 - Docker Desktop 4.91의 `sailor-ingest.sock`/`engine.sock` Windows 재분석 지점 오류를 DB·volume과 무관한 임시 런타임 소켓 장애로 확인했다. Docker 프로세스를 완전히 종료한 뒤 `%LOCALAPPDATA%`의 두 런타임 폴더만 삭제 없이 quarantine 이름으로 이동해 Engine 29.8.0을 복구했다.
@@ -507,15 +513,15 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-09-29 갱신)
+## 다음 세션 진입점 (2026-10-01 갱신)
 
-**Git 상태**: PR #49~#62 merge 완료. `origin/main`은 PR #62 merge commit `f8f9ff9`, `origin/develop`과 로컬 develop은 PR head `2f8ace8`이다. PR #62 병합 기록을 로컬에서 갱신 중이다.
+**Git 상태**: PR #49~#63 merge 완료. `origin/main`은 PR #63 merge commit `cd840eb`이고, 로컬 `develop`에는 PR #63 후처리 문서 커밋과 VPS 준비 커밋이 추가됐다. VPS 준비 PR의 CI·SHA 검증 후 이 항목을 다시 갱신한다.
 
-**로컬 실행 상태**: 2026-09-29 Docker Desktop 임시 런타임 소켓만 quarantine해 Engine 29.8.0을 복구하고 BuildFlow 환경을 새로 구축했다. 기존 관리자 1명만 복원했으며 업무 데이터는 0행이다. 15개 컨테이너, API 8081~8087 health, 프론트 3000 HTTP 200, native Ollama `qwen2.5:7b`가 정상이다. `.env`와 `backups/`는 Git에서 제외된다.
+**로컬 실행 상태**: 2026-09-29에는 새 로컬 환경의 15개 컨테이너와 Ollama가 정상임을 확인했으나, 2026-10-01 현재 Docker Desktop Engine은 실행되지 않는다. 현재 컨테이너/API 상태는 미검증이다. 기존 관리자 1명 외 업무 데이터 0행 기준이었으며 `.env`와 `backups/`는 Git에서 제외된다.
 
-**다음 작업**: `.claude/BACKLOG.md` 우선순위를 따른다. Phase B 대화형 관리자 로그인·로그아웃 검증 → auth-service Flyway 파일럿 순서다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
+**다음 작업**: 사용자 요청에 따라 VPS 비공개 파일럿을 진행한다. OS 변경 직전 hPanel 백업 재확인 → Plain OS Ubuntu 24.04 → 새 SSH host key 확인 → Docker/Compose 단계별 배포 순서다. 실데이터 입력 전 DB Phase B 로그인 검증과 Flyway·DB/업로드 파일 복구 체계를 완료한다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
-**검증 상태**: DB backup 도구 회귀, 전체 PowerShell parser, 실제 dump manifest/SHA 검증, 격리 복원 전후 7스키마·19테이블·행 수·관리자 digest·`CHECK TABLE`, auth `ddl-auto=validate`, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build와 전체 Docker/Ollama health를 통과했다. 기존 Config Client의 선택적 `localhost:8888` 중복 접속 경고와 프론트 번들 크기 경고는 P2 백로그다. host Bun 1.3.14와 고정 1.3.11 차이는 Docker 실행에는 영향 없는 로컬 경고다.
+**검증 상태**: 2026-10-01 VPS override Compose 15개 서비스 정적 검증(공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build 통과. VPS·로컬 컨테이너 런타임 스모크는 아직 미실시다. 기존 DB 격리 복원과 PR #63 CI는 이전 세션에서 성공했다. Config Client 중복 접속/프론트 번들 크기 경고는 P2 백로그다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 

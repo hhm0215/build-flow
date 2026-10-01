@@ -2,9 +2,14 @@
 * text=auto
 .gitattributes text eol=lf
 *.md text eol=lf
+docker-compose.vps.yml text eol=lf
+frontend/nginx.conf text eol=lf
+estimate-service/src/main/resources/application.yml text eol=lf
+notification-service/src/main/resources/application.yml text eol=lf
 
 # Unix 스크립트는 Windows checkout에서도 LF 유지
 *.sh text eol=lf
+*.py text eol=lf
 gradlew text eol=lf
 
 # Windows 실행 스크립트는 CRLF 유지

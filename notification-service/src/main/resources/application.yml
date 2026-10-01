@@ -43,9 +43,9 @@ spring:
       ack-mode: record
   servlet:
     multipart:
-      # PDF 업로드 한도 — 백엔드 한도 = frontend 한도(20MB)와 일치
+      # PDF 자체는 20 MiB, multipart 요청에는 헤더/경계 여유 1 MiB.
       max-file-size: 20MB
-      max-request-size: 20MB
+      max-request-size: 21MB
 
 app:
   warranty:
