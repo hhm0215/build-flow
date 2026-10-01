@@ -44,6 +44,32 @@ jobs:
       - name: Build
         run: bun run build
 
+  public-compose:
+    name: VPS HTTPS (Compose · Caddy)
+    runs-on: ubuntu-24.04
+    env:
+      DB_PASSWORD: ci-placeholder-only
+      JWT_SECRET: ci-placeholder-only
+      PUBLIC_HOST: example.org
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test exposure validator
+        run: python3 -m unittest discover -s scripts/vps -p 'test_verify_public_compose.py'
+      - name: Validate Compose exposure and CORS
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml config --format json \
+            | python3 scripts/vps/verify_public_compose.py
+      - name: Validate Caddyfile syntax
+        run: |
+          docker run --rm --entrypoint caddy -e PUBLIC_HOST=example.org \
+            -v "$PWD/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine adapt --config /etc/caddy/Caddyfile --validate
+      - name: Validate frontend Nginx syntax
+        run: |
+          docker run --rm --add-host gateway-server:127.0.0.1 \
+            -v "$PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:alpine nginx -t
+
   windows-readiness:
     name: Windows (PowerShell · Gradle Wrapper)
     runs-on: windows-2022

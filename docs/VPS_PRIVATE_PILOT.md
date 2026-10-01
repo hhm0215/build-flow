@@ -1,6 +1,6 @@
 # VPS 비공개 파일럿 운영 절차
 
-> 목표: 기존 OpenClaw 템플릿을 깨끗한 Ubuntu 24.04로 교체한 뒤, BuildFlow를 **SSH 터널에서만** 검증한다. 도메인·공개 HTTPS 운영 절차가 아니다.
+> 목표: 기존 OpenClaw 템플릿을 깨끗한 Ubuntu 24.04로 교체한 뒤, BuildFlow를 **SSH 터널에서만** 검증한다. 별도 테스트 데이터 공개 시현은 [VPS 공개 HTTPS 테스트 파일럿](VPS_PUBLIC_PILOT.md)을 따른다. 이는 실데이터 운영 승격이 아니다.
 
 ## 실제 VPS 작업 기록 (2026-10-01)
 
@@ -67,7 +67,7 @@ ssh -i <PRIVATE_KEY_PATH> -N -L 13000:127.0.0.1:3000 buildflow-deploy@<VPS_HOST>
 
 1. [DB 운영 가이드](DATABASE_OPERATIONS.md)의 Flyway 전환과 서비스별 최소 권한 DB 계정을 완료한다. 현재 다수 서비스의 Hibernate `ddl-auto: update`와 DB root 공유는 실데이터 운영 기준이 아니다.
 2. DB 7개 스키마와 `warranty_uploads` 볼륨을 **같은 쓰기 중지 시점**에 다른 물리 대상에 백업하고, 빈 환경에 격리 복원해 DB 행·파일 체크섬·관리자 로그인을 검증한다. 현재 Windows SQL 백업 도구만으로는 업로드 PDF가 보존되지 않는다. Hostinger 주간 이미지 백업만으로 이 게이트를 대체하지 않는다.
-3. 공개 도메인은 별도 단계에서 HTTPS reverse proxy, 로그인 시도 제한, 방화벽/포트, 외부 백업, 용량 실측을 완료한 뒤 연결한다. 초기 파일럿에서 HTTP 서비스를 인터넷에 열지 않는다.
+3. 실데이터 운영용 공개 도메인은 HTTPS reverse proxy, 로그인 시도 제한, 방화벽/포트, 외부 백업, 용량 실측을 완료한 뒤 연결한다. ADR-019의 테스트 데이터 전용 공개 HTTPS 시현은 별도 절차이며, 인증서 실패를 우회해 HTTP 서비스를 인터넷에 열지 않는다.
 
 ## 문제가 생겼을 때
 

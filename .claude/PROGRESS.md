@@ -5,6 +5,13 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — VPS 공개 HTTPS 테스트 파일럿 (2026-10-01)
+
+- 사용자가 Tailscale 대신 외부 브라우저의 공개 HTTPS를 선택했고, 자체 도메인 없이 VPS 기본 호스트명으로 공인 인증서 발급 가능성을 실측하기로 했다. ADR-019에 따라 **테스트 데이터만** 접속하며 실데이터 운영 게이트와 CI/CD 자동 배포는 아직 열지 않는다.
+- 80/443 Caddy 프록시 override, Gateway HTTPS CORS, 프론트 로그인 API IP별 제한, Compose 공개 포트 검증기·CI 구문 검사와 운영/롤백 런북을 준비했다. 실제 VPS는 현재 기존 15개 컨테이너와 SSH 22만 공개된 상태다. Web Console 새 세션으로 root 접근을 확인했다.
+- VPS 테스트 현장 1건 생성·수정에서 대시보드 수치가 SPA 이동 직후 갱신되지 않는 캐시 문제를 발견해 현장 변이 후 대시보드 캐시 무효화와 4개 회귀 테스트를 추가했다. 테스트 현장 삭제와 HTTPS 실측은 아직 남았다.
+- 프론트 lint, 33파일 112테스트, 프로덕션 빌드, Python 검증기 5테스트, 4파일 Compose 병합·공개 포트 검증을 통과했다. Docker Engine이 꺼진 로컬에서는 Caddy/Nginx 이미지 구문 검사를 실행하지 못해 CI에 연결했다. 보안·배포 독립 리뷰에서 stale server checkout 위험을 발견해 `origin/main` 고정과 SHA 대조를 런북에 추가했다.
+
 ## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 Phase B (2026-09-30)
 
 - Phase A와 Phase B의 격리 실제 복원·무결성·auth `ddl-auto=validate` 기동·전후 DB 불변 검증을 완료했다.
