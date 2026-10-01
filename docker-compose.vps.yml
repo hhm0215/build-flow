@@ -1,0 +1,118 @@
+# Private, SSH-tunnel-only pilot on a clean Ubuntu VPS.
+# Use after docker-compose.yml and docker-compose.app.yml.
+# No public port is added here; the base files bind published ports to 127.0.0.1.
+# Do not start the container-ollama profile on the 8 GiB pilot before profiling.
+
+x-vps-logging: &vps-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  mysql:
+    restart: unless-stopped
+    mem_limit: 768m
+    command: ["--innodb-buffer-pool-size=256M", "--max-connections=80"]
+    logging: *vps-logging
+
+  redis:
+    restart: unless-stopped
+    mem_limit: 192m
+    logging: *vps-logging
+
+  kafka:
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx384m"
+    logging: *vps-logging
+
+  zipkin:
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx192m"
+    logging: *vps-logging
+
+  eureka-server:
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx192m"
+    logging: *vps-logging
+
+  config-server:
+    restart: unless-stopped
+    mem_limit: 384m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx192m"
+    logging: *vps-logging
+
+  gateway-server:
+    restart: unless-stopped
+    mem_limit: 448m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx224m"
+      CORS_ALLOWED_ORIGINS: http://localhost:13000,http://127.0.0.1:13000
+    logging: *vps-logging
+
+  auth-service:
+    restart: unless-stopped
+    mem_limit: 448m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx224m"
+    logging: *vps-logging
+
+  estimate-service:
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+    logging: *vps-logging
+
+  site-service:
+    restart: unless-stopped
+    mem_limit: 448m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx224m"
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+    logging: *vps-logging
+
+  purchase-service:
+    restart: unless-stopped
+    mem_limit: 448m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx224m"
+    logging: *vps-logging
+
+  tax-service:
+    restart: unless-stopped
+    mem_limit: 448m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx224m"
+    logging: *vps-logging
+
+  notification-service:
+    restart: unless-stopped
+    mem_limit: 640m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx320m"
+    logging: *vps-logging
+
+  chat-service:
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      JAVA_TOOL_OPTIONS: "-Xms64m -Xmx256m"
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+    logging: *vps-logging
+
+  frontend:
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *vps-logging

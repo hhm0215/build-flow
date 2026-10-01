@@ -22,6 +22,14 @@
 
 ## P1 — 중기
 
+### VPS 비공개 파일럿 배포
+- **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
+- **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
+- **현재 진행**: VPS override·런북·초기화 도구 준비, Compose 정적 검증, 독립 보안 리뷰, 전체 Gradle·프론트 테스트/빌드 완료. 로컬 Docker Engine이 꺼져 있어 컨테이너 런타임 검증, VPS OS 변경 및 배포는 미완료. AI 모델과 도메인 공개는 범위 밖.
+- **관련 파일**: `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `.claude/plans/2026-10-01-vps-private-pilot.md`
+- **예상 규모**: M~L
+- **상태**: IN_PROGRESS
+
 ### 실데이터용 DB 스키마 마이그레이션 체계
 - **배경**: 인증 서비스는 `schema.sql` + `ddl-auto: validate`, 나머지 DB 사용 6개 서비스는 `ddl-auto: update`이며 버전 관리형 마이그레이션 도구가 없다. 인증 스키마 전환과 실데이터 보존 전에 명시적 백업·복구·검증 경로가 필요하다.
 - **단계**: A) 7개 스키마 백업·오프라인 무결성 검증 → B) 격리 임시 volume 복원·관리자 로그인 검증 → C) auth Flyway 파일럿 → D) chat/estimate → purchase/tax → site/notification 순차 전환 → E) runtime DB 사용자 최소 권한 분리

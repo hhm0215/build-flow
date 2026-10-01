@@ -10,6 +10,12 @@
 - Phase A와 Phase B의 격리 실제 복원·무결성·auth `ddl-auto=validate` 기동·전후 DB 불변 검증을 완료했다.
 - Phase B는 관리자 비밀번호를 저장하지 않는 대화형 로그인·로그아웃 1건만 남았다. 통과 후 auth-service Flyway 파일럿으로 진행하며 실제 DDL 확인 전에는 V1을 추정 작성하지 않는다.
 
+## 현재 진행 중 — VPS 비공개 파일럿 (2026-10-01)
+
+- 사용자가 기존 VPS에 보존할 데이터·서비스가 없음을 확인했고, Hostinger 주간 백업 2026-09-27/20 두 건을 확인했다. 복원은 옛 Docker·Traefik 템플릿과 SSH 상태 전체로 돌아가는 임시 안전망이며 자동 순환된다.
+- Ubuntu Plain OS용 비공개 SSH 터널 배포 override·런북·서버 전용 비밀값/관리자 초기화 도구를 준비했다. Compose 15개 서비스 정적 검증(외부 공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·108 tests·build를 통과했다.
+- VPS OS·실행 서비스는 아직 변경하지 않았다. 로컬 Docker Desktop Engine이 꺼져 있어 컨테이너 런타임 검증은 미완료다. 다음은 OS 변경 직전 백업 재확인 → 새 SSH host key 확인 → 새 서버에서 단계별 런타임 검증이다. AI 모델/공개 도메인/업무 데이터 입력은 후속 게이트다.
+
 ---
 
 ## 완료된 작업
