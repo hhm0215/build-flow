@@ -11,6 +11,7 @@
 - 80/443 Caddy 프록시 override, Gateway HTTPS CORS, 프론트 로그인 API IP별 제한, Compose 공개 포트 검증기·CI 구문 검사와 운영/롤백 런북을 준비했다. 실제 VPS는 현재 기존 15개 컨테이너와 SSH 22만 공개된 상태다. Web Console 새 세션으로 root 접근을 확인했다.
 - VPS 테스트 현장 1건 생성·수정에서 대시보드 수치가 SPA 이동 직후 갱신되지 않는 캐시 문제를 발견해 현장 변이 후 대시보드 캐시 무효화와 4개 회귀 테스트를 추가했다. 테스트 현장 삭제와 HTTPS 실측은 아직 남았다.
 - 프론트 lint, 33파일 112테스트, 프로덕션 빌드, Python 검증기 5테스트, 4파일 Compose 병합·공개 포트 검증을 통과했다. Docker Engine이 꺼진 로컬에서는 Caddy/Nginx 이미지 구문 검사를 실행하지 못해 CI에 연결했다. 보안·배포 독립 리뷰에서 stale server checkout 위험을 발견해 `origin/main` 고정과 SHA 대조를 런북에 추가했다.
+- [PR #68](https://github.com/hhm0215/build-flow/pull/68)은 공개 HTTPS 설정·검증·런북 및 대시보드 캐시 수정을 포함했고, push/PR 8개 CI 검사와 PR/원격 두 커밋 SHA 대조 후 merge commit `49f7274`로 병합했다. `develop`도 같은 커밋으로 fast-forward했다. VPS 공개 적용은 사용자 확인과 공인 인증서 실측 전이라 아직 수행하지 않았다.
 
 ## 현재 진행 중 — 실데이터용 DB 마이그레이션 기반 Phase B (2026-09-30)
 
@@ -531,13 +532,13 @@
 
 ## 다음 세션 진입점 (2026-10-01 갱신)
 
-**Git 상태**: PR #49~#67 merge 완료. `origin/main`·로컬/원격 `develop`은 PR #67 merge commit `c8306f5`로 동기화했다. 이 병합 기록은 후처리 문서 커밋으로 반영한다.
+**Git 상태**: PR #49~#68 merge 완료. `origin/main`·로컬/원격 `develop`은 PR #68 merge commit `49f7274`로 동기화했다. 이 병합 기록은 후처리 문서 커밋으로 반영한다.
 
 **로컬 실행 상태**: 2026-09-29에는 새 로컬 환경의 15개 컨테이너와 Ollama가 정상임을 확인했으나, 2026-10-01 현재 Docker Desktop Engine은 실행되지 않는다. 현재 컨테이너/API 상태는 미검증이다. 기존 관리자 1명 외 업무 데이터 0행 기준이었으며 `.env`와 `backups/`는 Git에서 제외된다.
 
-**다음 작업**: VPS 비공개 스택과 웹 로그인·빈 현장 목록 확인까지 완료했다. CRUD/PDF·재부팅 검증을 진행한다. 실데이터 입력 전 DB Phase B의 격리 복원 관리자 대화형 로그인·로그아웃 검증과 Flyway·DB/업로드 파일 복구 체계를 완료한다. CI/CD의 운영 자동 배포는 그 이후 작업이다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
+**다음 작업**: VPS 비공개 스택과 웹 로그인·테스트 현장 생성/수정 확인까지 완료했다. PR #68 코드의 공개 HTTPS 적용은 사용자 확인 후 인증서·포트·로그인 검증이 필요하다. CRUD/PDF·재부팅 검증도 남았다. 실데이터 입력 전 DB Phase B의 격리 복원 관리자 대화형 로그인·로그아웃 검증과 Flyway·DB/업로드 파일 복구 체계를 완료한다. CI/CD의 운영 자동 배포는 그 이후 작업이다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
 
-**검증 상태**: 2026-10-01 VPS override Compose 15개 서비스 정적 검증(공개 포트 0), 독립 보안 리뷰, 전체 Gradle 41 tasks, 프론트 lint·32파일 108테스트·build 통과. 새 VPS OS·별도 SSH 키 로그인·Docker daemon/Compose 버전, VPS BuildFlow 기본 런타임 health/401 및 웹 로그인 후 대시보드·빈 현장 목록 표시를 실측 성공했다. 업무 CRUD/PDF·재부팅/복구 및 로컬 컨테이너 런타임 스모크는 미실시다. PR #66 CI 6개 성공. 기존 DB 격리 복원과 PR #63 CI는 이전 세션에서 성공했다. Config Client 중복 접속/프론트 번들 크기 경고는 P2 백로그다.
+**검증 상태**: 2026-10-01 VPS private override Compose 15개 서비스 공개 포트 0, public override는 Caddy 80/443 외 비loopback 포트 0을 정적 검증했다. 독립 보안·배포 리뷰, 전체 Gradle 41 tasks(기존), 프론트 lint·33파일 112테스트·build, Python 5테스트, PR #68 CI 8개 성공. 새 VPS OS·별도 SSH 키 로그인·Docker daemon/Compose, 기본 런타임 health/401 및 웹 로그인·테스트 현장 생성/수정을 실측 성공했다. 공개 HTTPS, 업무 전체 CRUD/PDF·재부팅/복구 및 로컬 컨테이너 런타임 스모크는 미실시다. Config Client 중복 접속/프론트 번들 크기 경고는 P2 백로그다.
 
 **자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
 
