@@ -8,14 +8,13 @@ import {
   Receipt,
   Bell,
   ShieldCheck,
-  LogOut,
   Zap,
   ChevronRight,
 } from 'lucide-react'
-import { useAuthStore } from '../stores/authStore'
 import { useSite } from '../api/sites.api'
 import NotificationBell from '../components/NotificationBell'
 import ChatPanel from '../components/chat/ChatPanel'
+import LogoutButton from '../components/LogoutButton'
 
 const menuItems = [
   { key: '/dashboard', icon: LayoutDashboard, label: '대시보드' },
@@ -30,7 +29,6 @@ const menuItems = [
 export default function MainLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const logout = useAuthStore((s) => s.logout)
 
   const currentPage = menuItems.find((m) => m.key === location.pathname)
 
@@ -158,36 +156,7 @@ export default function MainLayout() {
         <div style={{ height: 1, background: 'var(--border)', margin: '12px 4px' }} />
 
         {/* Logout */}
-        <motion.button
-          whileHover={{ x: 2 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => { logout(); navigate('/login') }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '9px 10px',
-            borderRadius: 'var(--radius-sm)',
-            border: 'none',
-            cursor: 'pointer',
-            background: 'transparent',
-            color: 'var(--text-muted)',
-            fontSize: 14,
-            width: '100%',
-            transition: 'color 0.15s, background 0.15s',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = 'var(--danger)'
-            ;(e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)'
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'
-            ;(e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-          }}
-        >
-          <LogOut size={15} strokeWidth={1.8} />
-          로그아웃
-        </motion.button>
+        <LogoutButton />
       </motion.aside>
 
       {/* Main */}

@@ -18,6 +18,12 @@ describe('401 세션 만료 처리', () => {
     expect(shouldHandleSessionExpired(403, '/sites')).toBe(false)
   })
 
+  it('로그아웃 실패는 호출 화면에서 처리하도록 전역 상태를 유지한다', () => {
+    expect(shouldHandleSessionExpired(401, '/auth/logout')).toBe(false)
+    expect(shouldHandleSessionExpired(401, '/api/v1/auth/logout')).toBe(false)
+    expect(shouldHandleSessionExpired(401, '/auth/logout?source=sidebar')).toBe(false)
+  })
+
   it('로그인 API의 401에서 전역 인터셉터가 기존 인증 상태를 지우지 않는다', async () => {
     useAuthStore.getState().setTokens('active-token')
 
