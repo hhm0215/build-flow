@@ -336,7 +336,8 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다
 - **IMPORTANT**: 비동기 처리·부분 추출 API 응답은 PENDING/FAILED의 null 필드를 타입·목록·정렬·필터·MSW에 함께 반영하고, 수동 보정의 상태 전환·경합 방지·기간 검증을 서버에서 보장한다
 - **IMPORTANT**: 파일럿/실사용 검증은 풀 Docker 실서비스 모드로 수행. `bootRun`과 MSW 검증은 각각 서비스 단위·목업 검증으로만 기록
-- **IMPORTANT**: VPS 배포 런북은 새 파일·이미지 사용 전에 서버 작업 트리 청결, CI 검증된 `origin/main` SHA, 실제 서버 `HEAD` 일치를 확인한다. `fetch`만 하고 이전 checkout에서 빌드하지 않는다.
+- **IMPORTANT**: VPS 배포 런북은 새 파일·이미지 사용 전에 서버 작업 트리 청결, CI 검증된 `origin/main` SHA, 실제 서버 `HEAD` 일치를 확인한다. 단일 브랜치 clone은 `main`을 명시적 refspec으로 fetch한다. `fetch`만 하고 이전 checkout에서 빌드하지 않는다.
+- **IMPORTANT**: 공개 포트 개방·인증/권한 변경·VPS 배포·실데이터 입력 전 `docs/SECURITY_OPERATIONS.md`의 보안/인프라 게이트를 실측하고, 보안·인프라 독립 역할(`.claude/agents/`)의 결과를 주 에이전트가 통합한다. 정적 검사와 running 수만으로 공인 TLS·외부 차단·서비스 health를 통과 처리하지 않는다. 정기 점검은 읽기 전용이며 변경은 기존 승인/PR/배포 절차를 따른다.
 - **IMPORTANT**: 문서·파일 기능은 원본과 해석 결과를 분리한다. 원본을 AI 결과로 덮어쓰거나 임의로 이름 변경하지 않고, 체크섬·출처·파서/모델 버전·사용자 확정 이력을 보존한다 (`docs/PRODUCT_VISION.md`)
 - **IMPORTANT**: 범용 정보 코어 후보는 실제 도메인 두 곳 이상에서 같은 의미로 확인되기 전에 코어로 승격하거나 성급히 추상화하지 않는다. 현재 건설 도메인 완성과 실데이터 검증을 우선한다
 - Docker 전체 병렬 빌드가 외부 의존성 TLS/네트워크 오류로 실패하면 코드 실패와 구분한다. 기존 볼륨·데이터를 초기화하지 말고 인프라 기동 후 변경 서비스 이미지를 순차 재빌드해 확인한다.

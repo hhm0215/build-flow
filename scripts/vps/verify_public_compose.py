@@ -1,7 +1,30 @@
 """Fail CI if the public VPS Compose stack exposes a non-web service."""
 
 import json
+import posixpath
 import sys
+
+
+def verify_service_isolation(service_name: str, service: dict, volumes: dict) -> None:
+    if service.get("network_mode") == "host":
+        raise ValueError(f"{service_name} uses host networking")
+    if service.get("privileged"):
+        raise ValueError(f"{service_name} is privileged")
+
+    for mount in service.get("volumes", []):
+        source = posixpath.normpath(mount.get("source", ""))
+        target = posixpath.normpath(mount.get("target", ""))
+        # A socket can be mounted under another filename, or exposed through
+        # a bind mount of its parent directory. Read-only still permits API use.
+        socket_mount = any(posixpath.basename(path) == "docker.sock" for path in (source, target))
+        socket_parent = mount.get("type") == "bind" and source in {"/", "/var", "/var/run", "/run"}
+        if mount.get("type") == "volume":
+            # A named local volume can itself bind a host path via driver_opts.
+            device = posixpath.normpath((volumes.get(source) or {}).get("driver_opts", {}).get("device", ""))
+            socket_mount = socket_mount or posixpath.basename(device) == "docker.sock"
+            socket_parent = socket_parent or device in {"/", "/var", "/var/run", "/run"}
+        if socket_mount or socket_parent:
+            raise ValueError(f"{service_name} mounts the Docker socket or its host directory")
 
 
 def verify(config: dict) -> None:
@@ -11,6 +34,7 @@ def verify(config: dict) -> None:
 
     public_ports = set()
     for service_name, service in services.items():
+        verify_service_isolation(service_name, service, config.get("volumes", {}))
         for port in service.get("ports", []):
             published = str(port["published"])
             host_ip = port.get("host_ip", "")
@@ -39,4 +63,4 @@ def verify(config: dict) -> None:
 
 if __name__ == "__main__":
     verify(json.load(sys.stdin))
-    print("public Compose ports, CORS, and Caddy persistence verified")
+    print("public Compose isolation, ports, CORS, and Caddy persistence verified")

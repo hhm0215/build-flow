@@ -36,6 +36,66 @@ class PublicComposeVerifierTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "mysql:3306"):
             verify(config)
 
+    def test_rejects_host_networking_without_published_ports(self):
+        config = valid_config()
+        config["services"]["mysql"] = {"network_mode": "host"}
+        with self.assertRaisesRegex(ValueError, "mysql uses host networking"):
+            verify(config)
+
+    def test_rejects_privileged_service(self):
+        config = valid_config()
+        config["services"]["frontend"]["privileged"] = True
+        with self.assertRaisesRegex(ValueError, "frontend is privileged"):
+            verify(config)
+
+    def test_rejects_docker_socket_mounts_even_read_only_or_renamed(self):
+        mounts = [
+            {"type": "bind", "source": "/var/run/docker.sock", "target": "/socket", "read_only": True},
+            {"type": "bind", "source": "/run/docker.sock", "target": "/socket"},
+            {"type": "bind", "source": "/custom/socket", "target": "/var/run/docker.sock"},
+            {"type": "bind", "source": "/var/run/../run/docker.sock", "target": "/socket"},
+        ]
+        for mount in mounts:
+            with self.subTest(mount=mount):
+                config = valid_config()
+                config["services"]["frontend"]["volumes"] = [mount]
+                with self.assertRaisesRegex(ValueError, "frontend mounts the Docker socket"):
+                    verify(config)
+
+    def test_rejects_host_socket_parent_directory_mounts(self):
+        for source in ("/", "/var", "/var/run/", "/run", "/var/run/../run"):
+            with self.subTest(source=source):
+                config = valid_config()
+                config["services"]["frontend"]["volumes"] = [
+                    {"type": "bind", "source": source, "target": "/host", "read_only": True}
+                ]
+                with self.assertRaisesRegex(ValueError, "frontend mounts the Docker socket"):
+                    verify(config)
+
+    def test_accepts_unprivileged_service_and_regular_mounts(self):
+        config = valid_config()
+        config["services"]["frontend"].update({
+            "privileged": False,
+            "volumes": [
+                {"type": "bind", "source": "/opt/buildflow/frontend/nginx.conf", "target": "/etc/nginx/conf.d/default.conf", "read_only": True},
+                {"type": "volume", "source": "frontend_data", "target": "/data"},
+            ],
+        })
+        verify(config)
+
+    def test_rejects_named_volume_binding_socket_or_parent_directory(self):
+        for device in ("/var/run/docker.sock", "/run", "/var/run"):
+            with self.subTest(device=device):
+                config = valid_config()
+                config["volumes"] = {
+                    "host_socket": {"driver": "local", "driver_opts": {"type": "none", "o": "bind", "device": device}}
+                }
+                config["services"]["frontend"]["volumes"] = [
+                    {"type": "volume", "source": "host_socket", "target": "/data", "read_only": True}
+                ]
+                with self.assertRaisesRegex(ValueError, "frontend mounts the Docker socket"):
+                    verify(config)
+
     def test_rejects_extra_public_port(self):
         config = valid_config()
         config["services"]["caddy"]["ports"].append({"published": "2019"})
