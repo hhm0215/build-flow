@@ -392,6 +392,18 @@
 
 ---
 
+## 2026-10-02 — VPS 단일 브랜치 clone의 main ref 미수신
+
+**무엇이 일어났는지**: 공개 파일럿 적용 전 서버에서 일반 `git fetch origin`을 했지만 `origin/main`이 없었다. 서버 clone은 `develop`만 가져오는 refspec이었고, 명시적 `main:refs/remotes/origin/main` fetch로 CI 검증 SHA를 받은 후 detached checkout했다. 실행 중인 컨테이너·볼륨은 변경되지 않았다.
+
+**원인**: 로컬 전체 clone과 VPS 단일 브랜치 clone의 fetch refspec 차이를 런북에서 고려하지 않았다.
+
+**재발 방지 규칙**: 서버 릴리스 fetch는 `main` refspec을 명시하고, 실제 `HEAD`가 CI 검증된 SHA인지 확인한 뒤에만 이미지를 빌드한다.
+
+**반영 위치**: `docs/VPS_PUBLIC_PILOT.md`의 명시적 fetch 명령, `CLAUDE.md` VPS 배포 규칙.
+
+---
+
 ## 변경 이력
 
 | 날짜 | 작업 |
@@ -413,3 +425,4 @@
 | 2026-09-21 | Docker 병렬 Maven TLS 실패를 순차 빌드로 재검증 — 코드 실패와 환경 실패 구분 규칙 추가 |
 | 2026-10-01 | VPS에서 Compose 병렬 제한 환경변수가 이미지 빌드 직렬화를 보장하지 않아 서비스별 빌드 스크립트로 전환 |
 | 2026-10-01 | 공개 VPS 런북의 stale checkout 위험을 PR 전 발견해 SHA 고정·대조 규칙 추가 |
+| 2026-10-02 | VPS 단일 브랜치 clone의 main ref 누락을 명시적 fetch refspec·SHA 검증으로 수정 |

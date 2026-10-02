@@ -15,7 +15,7 @@
 ```bash
 cd /opt/buildflow
 git status --short --branch
-git fetch origin
+git fetch origin main:refs/remotes/origin/main
 git log -1 --format='%H %s' origin/main
 git switch --detach origin/main
 git rev-parse HEAD
@@ -26,7 +26,7 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose
 ss -lntp
 ```
 
-작업 트리가 깨끗하고, 병합된 `main` 커밋의 SHA와 CI 결과를 확인하기 전에는 `git switch`/배포를 하지 않는다. `git switch --detach origin/main`은 서버를 검증된 릴리스에 고정하며 기존 `.env`는 Git 제외 상태로 유지한다. 현재 앱 상태와 기존 loopback 포트·`docker compose ... ps` 결과를 기록한다. 서버 방화벽/Hostinger 방화벽에서 80/443의 실제 허용 여부를 확인하되 SSH 22를 닫지 않는다. 기본 호스트명 DNS와 인증서 검증이 끝나기 전에는 업무 데이터를 입력하지 않는다.
+서버 clone은 `develop` 단일 브랜치 refspec이라 일반 `git fetch origin`만으로 `origin/main`이 생기지 않았다. 위와 같이 `main`을 명시적으로 가져온다. 작업 트리가 깨끗하고, 병합된 `main` 커밋의 SHA와 CI 결과를 확인하기 전에는 `git switch`/배포를 하지 않는다. `git switch --detach origin/main`은 서버를 검증된 릴리스에 고정하며 기존 `.env`는 Git 제외 상태로 유지한다. 현재 앱 상태와 기존 loopback 포트·`docker compose ... ps` 결과를 기록한다. 서버 방화벽/Hostinger 방화벽에서 80/443의 실제 허용 여부를 확인하되 SSH 22를 닫지 않는다. 기본 호스트명 DNS와 인증서 검증이 끝나기 전에는 업무 데이터를 입력하지 않는다.
 
 ## 제한된 적용
 
