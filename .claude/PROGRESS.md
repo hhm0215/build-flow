@@ -11,6 +11,8 @@
 - 프론트 로그아웃은 서버 성공 확인 후에만 로컬 상태를 삭제하도록 수정했고 실패 시 토큰을 유지해 재시도한다. Compose 검증기에 host networking·privileged·Docker socket 마운트 차단을 추가했다. 로컬 lint, 프론트 34파일 118테스트/빌드, Python 11테스트, 4파일 Compose 검증 통과. 테스트·빌드는 Windows 샌드박스 상위 경로 접근 제약으로 권한 확장 재실행해 성공했다.
 - Codex 앱의 일일 보안/인프라 읽기 전용 heartbeat 두 건을 등록했다(현지 09:00/09:15 의도). 정상/변화 없음은 조용히, 실패·노출 변화·복구·사용자 판단 필요 시 보고한다. 메일/Discord 수신 채널은 아직 연결되지 않았다.
 - **80/443 공개는 여전히 미기동.** 새 수정의 CI/`main`/VPS 반영과 로그아웃 전 토큰 재사용 401·공인 TLS/포트 검증을 마친 뒤 공개 판정한다. SSH root/password 및 커널 업데이트는 미해결이며, 실데이터 운영 게이트도 별도다.
+- [PR #69](https://github.com/hhm0215/build-flow/pull/69)은 8개 CI와 local/origin/PR head `0264eb8` 대조 후 merge commit `5a372f2`로 병합했고 `develop`도 fast-forward했다. VPS 서버는 clean checkout을 `5a372f2`에 고정하고 직전 **빌드된** frontend image(`buildflow-frontend:latest`)에 `pre-pr69` 태그를 남긴 뒤 frontend만 재빌드·재기동했다. 앞서 실행 중이던 더 오래된 image ID `542aedda26da`는 저장소에서 이미 제거되어 직접 태그할 수 없었으므로, 이 태그를 실제 직전 실행 이미지의 완전한 롤백 증거로 보지 않는다. private 15개 실행, frontend 200, 무인증 sites 401, 비loopback SSH 22만 확인했다. 공개 Caddy는 아직 기동하지 않았다.
+- SSH 정책 변경은 원격 잠금 위험으로 자동 안전 검토가 중단했다. 서버 설정 파일은 생성되지 않았고 정책도 그대로다. Web Console root 경로와 비root 키 재접속은 확인했으며, 사용자에게 설정 범위·복구 절차를 명시해 승인을 요청했다. 커널 패치/재부팅도 아직 수행하지 않았다.
 
 ## 현재 진행 중 — VPS 공개 HTTPS 테스트 파일럿 (2026-10-01)
 

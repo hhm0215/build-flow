@@ -13,11 +13,11 @@
 
 | ID | 점검 | 통과 근거 | 2026-10-02 상태 |
 |---|---|---|---|
-| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS — PR #68 SHA `49f7274` 서버 고정 |
+| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(private) — PR #69 merge SHA `5a372f2` 서버 고정, frontend 단일 재빌드 |
 | S02 | `.env`와 키 보호 | 서버 `.env` 소유/모드 `root:root 0600`, 값 비출력; 개인키 미복사 | PASS — 서버 메타데이터 확인 |
 | S03 | 내부 서비스 포트 비공개 | Compose 검증 + 호스트 IPv4/IPv6 리스닝 + 외부망 접속 확인. public은 22/80/443만, private은 22만 | PENDING — 정적/호스트 private 통과, public 실측 전 |
 | S04 | 관리자 인증 | 공개 회원가입 없음; 무인증 업무 API 401; 로그인 후 권한 경계 | PASS(private) / PENDING(public) |
-| S05 | 로그아웃 토큰 폐기 | UI 로그아웃이 서버 API를 호출하고 **로그아웃 전 발급된 동일 토큰** 재사용이 401 | FAIL — 기존 UI는 로컬 상태만 삭제, 수정·회귀 검증 전 공개 보류 |
+| S05 | 로그아웃 토큰 폐기 | UI 로그아웃이 서버 API를 호출하고 **로그아웃 전 발급된 동일 토큰** 재사용이 401 | PENDING — PR #69 수정·118개 프론트 테스트 통과, 실제 로그인/폐기 재사용 실측 전 공개 보류 |
 | S06 | TLS·호스트 | 공인 신뢰 인증서, 호스트명 일치, HTTP→HTTPS, 만료/갱신 경로; 잘못된 Host/SNI 거부 | PENDING — 80/443 미기동 |
 | S07 | 웹 남용·CORS | 실제 공개 경로의 로그인 429, 변형 경로/위조 XFF 우회 실패, 미허용 Origin 거부 | PENDING — 설정·CI만 통과 |
 | S08 | SSH 복구·하드닝 | 일반 계정 키·Web Console 복구 확인 후 root/password 정책과 `sshd -t`·별도 재접속 검증 | PENDING — 현재 root/password 허용; 무검증 변경 금지 |
@@ -25,7 +25,7 @@
 | S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(private 기본 health) / PENDING(public) |
 | S11 | 실패 복귀 | SSH 터널 200/401 보존, 공개 실패 시 Caddy 제거 후 private 복귀, named volume 유지 | PENDING — 런북만 작성 |
 
-**공개 결정:** S05는 현재 실패이므로 80/443 개방을 보류한다. 수정·CI·서버 반영 후 S01–S11을 다시 실측한다. S08/S09는 테스트 파일럿에서도 우선 개선하며, 변경 전 복구 경로를 검증한다. 남은 위험을 승인 없이 `PASS`로 바꾸지 않는다.
+**공개 결정:** S05의 실제 토큰 재사용, S06/S07 공인 경로, S08 SSH 정책, S09 패치·재부팅 검증이 아직 끝나지 않아 80/443 개방을 보류한다. S08 변경은 복구 경로와 명시적 승인을 확인한 뒤에만 수행한다. 남은 위험을 승인 없이 `PASS`로 바꾸지 않는다.
 
 ## 실데이터 운영 승격 게이트
 
@@ -50,6 +50,6 @@
 
 ## 역할과 실행 경계
 
-`security-reviewer`는 독립 보안 검토, `infrastructure-reviewer`는 가용성·배포·복구 검토를 담당한다. 이들은 상주 프로세스가 아니다. 작업 시 주 에이전트가 독립 서브에이전트로 위임하고 결과를 통합한다. 정기 실행은 Codex heartbeat 자동화가 같은 체크리스트를 다시 평가하도록 별도로 등록한다. 자동화 알림은 Codex 앱 내 보고이며 이메일·Discord 전송은 별도 수신 채널 설정/검증 전까지 완료로 표시하지 않는다.
+`security-reviewer`는 독립 보안 검토, `infrastructure-reviewer`는 가용성·배포·복구 검토를 담당한다. 이들은 상주 프로세스가 아니다. 작업 시 주 에이전트가 독립 서브에이전트로 위임하고 결과를 통합한다. 정기 실행은 Codex heartbeat 자동화가 같은 체크리스트를 다시 평가하도록 별도로 등록한다. 이는 앱 스케줄러·이 PC·네트워크 가용성에 의존하는 주기 점검이지 24시간 서버 감시나 장애 대응 SLA가 아니다. 자동화 알림은 Codex 앱 내 보고이며 이메일·Discord 전송은 별도 수신 채널 설정/검증 전까지 완료로 표시하지 않는다.
 
 참고 기준: [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/), [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html), [Docker 포트 공개](https://docs.docker.com/engine/network/port-publishing/), [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https/).
