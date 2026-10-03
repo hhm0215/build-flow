@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw'
 import { mockNotifications } from '../data/notifications.data'
 import { ApiResponse, Notification } from '../../types'
+import type { NotificationWire } from '../../api/notifications.api'
 
 let notifications = [...mockNotifications]
+const toWire = ({ type, ...notification }: Notification): NotificationWire => ({ ...notification, eventType: type })
 
 export const notificationsHandlers = [
   // 전체 알림 목록
@@ -10,9 +12,9 @@ export const notificationsHandlers = [
     const sorted = [...notifications].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
-    return HttpResponse.json<ApiResponse<Notification[]>>({
+    return HttpResponse.json<ApiResponse<NotificationWire[]>>({
       success: true,
-      data: sorted,
+      data: sorted.map(toWire),
       error: null,
     })
   }),
@@ -20,9 +22,9 @@ export const notificationsHandlers = [
   // 미읽음 건수
   http.get('/api/v1/notifications/unread-count', () => {
     const count = notifications.filter((n) => !n.read).length
-    return HttpResponse.json<ApiResponse<number>>({
+    return HttpResponse.json<ApiResponse<{ count: number }>>({
       success: true,
-      data: count,
+      data: { count },
       error: null,
     })
   }),
@@ -37,9 +39,9 @@ export const notificationsHandlers = [
       )
     }
     notifications[index] = { ...notifications[index], read: true }
-    return HttpResponse.json<ApiResponse<Notification>>({
+    return HttpResponse.json<ApiResponse<NotificationWire>>({
       success: true,
-      data: notifications[index],
+      data: toWire(notifications[index]),
       error: null,
     })
   }),
