@@ -97,6 +97,9 @@ jobs:
       - name: Validate database backup tools
         shell: powershell
         run: .\scripts\db\test-backup-tools.ps1
+      - name: Validate administrator smoke verifier
+        shell: powershell
+        run: .\scripts\test-verify-admin.ps1
       - name: Validate Gradle Wrapper
         shell: powershell
         run: .\gradlew.bat --version
