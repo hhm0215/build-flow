@@ -5,12 +5,19 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — VPS 비공개 인증 실측 (2026-10-03)
+
+- 고정 host key·비root SSH로 서버 clean checkout `5a372f2`, `.env` `root:root 0600`, 비loopback SSH 22만 리스닝, 프론트 200, 무인증 현장 API 401, Gateway·8081~8087 health `UP`을 재확인했다. 최신 `main` `0c18b7e`와 차이는 문서 변경뿐이며 서버에 공개 프록시는 없다. 커널 `6.8.0-146` 업데이트와 재부팅은 여전히 대기 중이다.
+- 사용자 직접 로그인한 SSH 터널 웹에서 대시보드·현장·견적·매입·세금계산서·보증보험·알림의 목록 화면을 확인했다. UI 로그아웃은 로그인 화면으로 이동했고 보호 대시보드 재진입을 막았다. 터널 API는 무인증 401, 공개 가입 403을 반환했다.
+- `scripts/verify-admin.ps1`에 로그아웃 후 **동일 access token**의 보호 API 401 확인을 추가했다. 사용자 직접 대화형 실행에서 관리자 로그인·임시 현장 생성/조회/삭제·이전 토큰 401이 모두 통과했다. 모의 성공/실패 PowerShell 테스트와 인증·Gateway Gradle 테스트, 구문 검사가 통과했다. `security-reviewer` 독립 검토는 차단 결함 없음. S05는 private PASS, public 재확인은 대기 중이다.
+- PR #70 문서 후속 작업은 8개 CI 통과 후 `main` merge SHA `0c18b7e`로 병합했고 `develop`도 fast-forward했다. 80/443 공개, SSH 정책 변경, 커널 패치·재부팅, 전체 업무 CRUD/PDF 및 DB+파일 외부 백업·복원은 아직 수행하지 않았다.
+
 ## 현재 진행 중 — 공개 전 보안·인프라 하네스 (2026-10-02)
 
 - 공개 전 독립 보안·인프라 리뷰에서 UI 로그아웃이 서버 토큰을 폐기하지 않는 문제와 Compose 포트 검증의 host-network/권한 우회 가능성을 확인했다. `docs/SECURITY_OPERATIONS.md`에 `PASS/FAIL/PENDING/UNVERIFIED` 근거와 공개/실데이터 게이트를 분리하고, `AGENTS.md`·`CLAUDE.md`·`.claude/agents/`에 두 역할을 연결했다.
 - 프론트 로그아웃은 서버 성공 확인 후에만 로컬 상태를 삭제하도록 수정했고 실패 시 토큰을 유지해 재시도한다. Compose 검증기에 host networking·privileged·Docker socket 마운트 차단을 추가했다. 로컬 lint, 프론트 34파일 118테스트/빌드, Python 11테스트, 4파일 Compose 검증 통과. 테스트·빌드는 Windows 샌드박스 상위 경로 접근 제약으로 권한 확장 재실행해 성공했다.
 - Codex 앱의 일일 보안/인프라 읽기 전용 heartbeat 두 건을 등록했다(현지 09:00/09:15 의도). 정상/변화 없음은 조용히, 실패·노출 변화·복구·사용자 판단 필요 시 보고한다. 메일/Discord 수신 채널은 아직 연결되지 않았다.
-- **80/443 공개는 여전히 미기동.** 새 수정의 CI/`main`/VPS 반영과 로그아웃 전 토큰 재사용 401·공인 TLS/포트 검증을 마친 뒤 공개 판정한다. SSH root/password 및 커널 업데이트는 미해결이며, 실데이터 운영 게이트도 별도다.
+- **80/443 공개는 여전히 미기동.** 이후 2026-10-03 비공개 경로의 로그아웃 전 토큰 재사용 401을 실측했다. 공인 TLS/포트, SSH root/password, 커널 업데이트·재부팅과 실데이터 운영 게이트는 별도 미해결 항목이다.
 - [PR #69](https://github.com/hhm0215/build-flow/pull/69)은 8개 CI와 local/origin/PR head `0264eb8` 대조 후 merge commit `5a372f2`로 병합했고 `develop`도 fast-forward했다. VPS 서버는 clean checkout을 `5a372f2`에 고정하고 직전 **빌드된** frontend image(`buildflow-frontend:latest`)에 `pre-pr69` 태그를 남긴 뒤 frontend만 재빌드·재기동했다. 앞서 실행 중이던 더 오래된 image ID `542aedda26da`는 저장소에서 이미 제거되어 직접 태그할 수 없었으므로, 이 태그를 실제 직전 실행 이미지의 완전한 롤백 증거로 보지 않는다. private 15개 실행, frontend 200, 무인증 sites 401, 비loopback SSH 22만 확인했다. 공개 Caddy는 아직 기동하지 않았다.
 - SSH 정책 변경은 원격 잠금 위험으로 자동 안전 검토가 중단했다. 서버 설정 파일은 생성되지 않았고 정책도 그대로다. Web Console root 경로와 비root 키 재접속은 확인했으며, 사용자에게 설정 범위·복구 절차를 명시해 승인을 요청했다. 커널 패치/재부팅도 아직 수행하지 않았다.
 

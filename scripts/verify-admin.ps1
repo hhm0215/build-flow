@@ -17,6 +17,8 @@ $accessToken = $null
 $siteId = $null
 $cleanupFailed = $false
 $verified = $false
+$revocationVerified = $false
+$revocationFailed = $false
 $apiUrl = "$($BaseUrl.TrimEnd('/'))/api/v1"
 
 try {
@@ -69,6 +71,33 @@ finally {
         }
     }
 
+    if ($null -ne $headers) {
+        try {
+            $logout = Invoke-RestMethod -Uri "$apiUrl/auth/logout" -Method Post -Headers $headers -TimeoutSec 15
+            if (-not $logout.success) {
+                throw "Admin logout was not confirmed."
+            }
+
+            $reusedTokenStatus = $null
+            try {
+                Invoke-RestMethod -Uri "$apiUrl/sites" -Method Get -Headers $headers -TimeoutSec 15 | Out-Null
+                $reusedTokenStatus = 200
+            }
+            catch {
+                if ($null -eq $_.Exception.Response) { throw }
+                $reusedTokenStatus = [int]$_.Exception.Response.StatusCode
+            }
+            if ($reusedTokenStatus -ne 401) {
+                throw "Logged-out access token was not rejected with 401 (status: $reusedTokenStatus)."
+            }
+            $revocationVerified = $true
+        }
+        catch {
+            $revocationFailed = $true
+            Write-Warning "Logout or old-token rejection failed; inspect the private pilot before public exposure."
+        }
+    }
+
     if ($null -ne $loginBody) { [Array]::Clear($loginBody, 0, $loginBody.Length) }
     if ($null -ne $siteBody) { [Array]::Clear($siteBody, 0, $siteBody.Length) }
     if ($passwordPointer -ne [IntPtr]::Zero) {
@@ -80,4 +109,7 @@ finally {
 }
 
 if ($cleanupFailed) { throw "Smoke test passed but temporary site cleanup failed." }
-if ($verified) { Write-Host "Admin login and site API smoke test passed; temporary site was removed." }
+if ($revocationFailed) { throw "Admin logout revocation smoke test failed." }
+if ($verified -and $revocationVerified) {
+    Write-Host "Admin login, site API, and old-token rejection smoke tests passed; temporary site was removed."
+}
