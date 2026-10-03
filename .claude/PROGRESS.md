@@ -5,9 +5,15 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — CI와 SSH 접근 분리 (2026-10-03)
+
+- PR #72의 8개 CI를 확인해 `main`·`develop`을 merge SHA `7f1b780`으로 동기화했다. API 명세 48개 실제 라우트 정렬과 알림 응답 계약 수정을 포함하지만 VPS는 아직 이전 SHA `5a372f2`이므로 해당 수정이 배포됐다고 보지 않는다.
+- 현재 CI는 테스트·빌드만 실행하며 VPS 배포 job은 없다. ADR-020과 S08에 터널·일일 점검의 SSH 의존성, 온디맨드 22 차단의 선행조건, 공개 저장소의 운영 VPS self-hosted runner 위험을 기록했다. `main` 병합 후 정확한 SHA도 CI에서 재검증하고 토큰을 읽기 전용으로 제한하는 변경을 준비했다. SSH·방화벽·VPS 배포는 변경하지 않았다.
+- 로컬 Docker의 격리 임시 volume 복원에서 7개 스키마·manifest/행 수/digest/`CHECK TABLE`·auth `ddl-auto=validate`·원본 DB 불변을 재확인했다. 관리자 비밀번호를 직접 입력하는 Phase B 로그인·로그아웃 검증은 사용자 실행 결과를 기다린다.
+
 ## 현재 진행 중 — VPS 비공개 인증 실측 (2026-10-03)
 
-- 고정 host key·비root SSH로 서버 clean checkout `5a372f2`, `.env` `root:root 0600`, 비loopback SSH 22만 리스닝, 프론트 200, 무인증 현장 API 401, Gateway·8081~8087 health `UP`을 재확인했다. 최신 `main` `0c18b7e`와 차이는 문서 변경뿐이며 서버에 공개 프록시는 없다. 커널 `6.8.0-146` 업데이트와 재부팅은 여전히 대기 중이다.
+- 고정 host key·비root SSH로 서버 clean checkout `5a372f2`, `.env` `root:root 0600`, 비loopback SSH 22만 리스닝, 프론트 200, 무인증 현장 API 401, Gateway·8081~8087 health `UP`을 재확인했다. 당시 `main` `0c18b7e`와 차이는 문서 변경뿐이었고 서버에 공개 프록시는 없었다. 이후 코드 변경이 병합됐으므로 현재 SHA 차이는 위 기록을 따른다. 커널 `6.8.0-146` 업데이트와 재부팅은 여전히 대기 중이다.
 - 사용자 직접 로그인한 SSH 터널 웹에서 대시보드·현장·견적·매입·세금계산서·보증보험·알림의 목록 화면을 확인했다. UI 로그아웃은 로그인 화면으로 이동했고 보호 대시보드 재진입을 막았다. 터널 API는 무인증 401, 공개 가입 403을 반환했다.
 - `scripts/verify-admin.ps1`에 로그아웃 후 **동일 access token**의 보호 API 401 확인을 추가했다. 사용자 직접 대화형 실행에서 관리자 로그인·임시 현장 생성/조회/삭제·이전 토큰 401이 모두 통과했다. 모의 성공/실패 PowerShell 테스트와 인증·Gateway Gradle 테스트, 구문 검사가 통과했다. `security-reviewer` 독립 검토는 차단 결함 없음. S05는 private PASS, public 재확인은 대기 중이다.
 - PR #70 문서 후속 작업은 8개 CI 통과 후 `main` merge SHA `0c18b7e`로 병합했고 `develop`도 fast-forward했다. 80/443 공개, SSH 정책 변경, 커널 패치·재부팅, 전체 업무 CRUD/PDF 및 DB+파일 외부 백업·복원은 아직 수행하지 않았다.

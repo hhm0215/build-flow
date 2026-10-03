@@ -631,6 +631,26 @@ VPS 로그인 이후 CRUD·PDF·재부팅 회귀, 버전 관리형 DB 마이그�
 
 ---
 
+## ADR-020: CI/CD와 SSH 접근 분리 — 2026-10-03
+
+### 현재 상태와 결정
+
+- GitHub-hosted CI는 `develop` push, `main` PR 및 병합된 `main` push의 정확한 SHA에 대해 테스트·정적 검증한다. **CI 성공은 VPS 배포 성공이 아니다.** 현재 배포 job이나 운영 VPS의 self-hosted runner는 없다.
+- 비공개 파일럿의 웹 접속은 SSH 터널, 읽기 전용 서버 점검은 비root SSH에 의존한다. 따라서 이 두 경로가 필요한 동안 외부 SSH 22를 임의로 차단하지 않는다.
+- 테스트 데이터 전용 비공개/공개 파일럿의 코드 반영은 검증된 `main` SHA를 확인해 수동으로 수행한다. ADR-018의 백업·복구·마이그레이션 게이트가 끝나기 전 실데이터 운영 DB 자동 배포를 켜지 않는다.
+- 장기적으로 외부 SSH를 평소 차단할 수 있다. 그 전에 공개 HTTPS 또는 별도 사용자 접속, 독립적인 점검·알림, Web Console 복구, 원격에서 22를 재개방하는 절차와 대체 배포 경로를 실제로 검증한다. 외부 방화벽의 22 차단과 `sshd`의 root 허용 변경은 별개로 다룬다.
+- SSH를 닫은 채 무인 배포하려면 VPS가 릴리스를 outbound로 가져오는 방식 등을 **후보로** 별도 설계·위협 모델링한다. 고정 SHA/image digest, 출처·무결성, 좁은 실행 권한, 명시적 승격과 롤백을 검증하기 전에는 활성화하지 않는다. 현재 PUBLIC 저장소의 비신뢰 워크플로 코드를 운영 VPS에서 실행하는 일반 self-hosted GitHub Actions runner를 배포 지름길로 사용하지 않는다.
+
+### 이유와 재검토 조건
+
+GitHub-hosted runner에서 SSH로 VPS에 밀어 넣는 배포는 22가 닫히면 동작하지 않는다. runner의 동적 IP 범위 전체를 VPS 허용 목록으로 삼는 것도 적합하지 않다. 반대로 SSH를 닫기 위해 운영 서버에 Docker/root 권한 runner를 두면 PR·워크플로 코드가 운영 호스트 권한을 얻는 위험이 커진다. 현재의 단순한 수동 반영과 키 기반 접근을 유지하면서, 복구 가능한 릴리스 경로를 만든 뒤 접근 정책을 다시 결정한다.
+
+병합 후 `main` push CI는 정확한 병합 SHA의 추가 검사이며 병합을 막는 PR 필수 검사나 VPS 릴리스 승격을 대신하지 않는다.
+
+참고: [GitHub-hosted runner 네트워크](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), [self-hosted runner 보안](https://docs.github.com/en/actions/reference/security/secure-use).
+
+---
+
 ## 변경 이력
 
 | 버전 | 날짜       | 변경                                                                                                                                  |
@@ -648,6 +668,7 @@ VPS 로그인 이후 CRUD·PDF·재부팅 회귀, 버전 관리형 DB 마이그�
 | v2.0 | 2026-09-23 | ADR-017 — 건설 실사용에서 범용 정보관리 플랫폼으로 단계적으로 진화하는 제품 경계·불변 원칙 확정 |
 | v2.1 | 2026-10-01 | ADR-018 — 로컬 개발·GitHub CI·단일 VPS 운영의 분리와 실데이터 투입 게이트 확정 |
 | v2.2 | 2026-10-01 | ADR-019 — 실데이터 게이트 이전 공개 HTTPS는 테스트 데이터 전용 시현으로 한정 |
+| v2.3 | 2026-10-03 | ADR-020 — CI 검증과 배포·SSH 접근 분리, 온디맨드 SSH 선행조건 명시 |
 
 ---
 
