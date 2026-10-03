@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — auth Flyway 격리 파일럿 (2026-10-03)
+
+- 사용자의 추가 수동 실행 요청을 멈추고 P1 DB 마이그레이션의 독립 진행 가능 부분을 시작했다. 실제 2026-09-29 MySQL no-data dump의 `admin_accounts` DDL로 V1을 작성하고, 기본 Flyway 비활성화·전용 `auth-flyway` 프로파일·MySQL 8 CI 통합 검증을 준비했다. 기존 로컬·VPS DB, 관리자 데이터, 프로파일은 변경하지 않았다.
+- auth-service 단위 테스트와 Flyway core/MySQL 모듈 10.10.0 의존성 확인 통과. 빈 DB CI 결과와 기존 DB 명시적 baseline은 별도 게이트다. Phase B 복원 관리자 로그인은 여전히 PENDING이며 새 파일럿으로 대체하지 않는다.
+
 ## 현재 진행 중 — CI와 SSH 접근 분리 (2026-10-03)
 
 - PR #72의 8개 CI를 확인해 `main`·`develop`을 merge SHA `7f1b780`으로 동기화했다. API 명세 48개 실제 라우트 정렬과 알림 응답 계약 수정을 포함하지만 VPS는 아직 이전 SHA `5a372f2`이므로 해당 수정이 배포됐다고 보지 않는다.

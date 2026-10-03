@@ -89,6 +89,14 @@ docker compose up -d mysql
 
 전환 순서는 auth-service 파일럿 → chat/estimate → purchase/tax → site/notification이다. 모든 서비스 전환 후 runtime DB 계정을 root에서 최소 권한 계정으로 분리한다.
 
+### auth-service opt-in Flyway 파일럿
+
+`auth-service`에는 검증된 2026-09-29 MySQL no-data dump의 `admin_accounts` DDL을 기준으로 한 `V1__admin_accounts.sql`이 있다. 이는 **빈 스키마용 생성 마이그레이션**이며 관리자 데이터는 넣지 않는다. 기본 설정은 `spring.flyway.enabled=false`라서 기존 로컬·VPS 실행의 `schema.sql` 경로가 유지된다. 별도 `auth-flyway` 프로파일에서만 SQL 초기화를 끄고 Flyway를 켜며 JPA `validate`를 유지한다. 기존 DB나 VPS에서는 아직 이 프로파일을 사용하지 않는다.
+
+CI의 `인증 DB (Flyway · MySQL 8)` job은 임시 MySQL 8의 빈 `buildflow_auth_flyway_test` 스키마에 V1을 적용하고 history 1건, 실제 UNIQUE/CHECK/collation, 관리자 0건, Hibernate `validate`, 재실행 시 migration 0건을 확인한다. 테스트는 전용 플래그와 `127.0.0.1`의 `buildflow_auth_flyway_test` JDBC URL이 모두 일치할 때만 Spring 컨텍스트를 시작한다. 로컬 일반 `:auth-service:test`에서는 DB 테스트가 건너뛰어지므로 이 CI job의 성공을 별도로 확인한다.
+
+기존 데이터가 있는 스키마는 V1을 그대로 실행하거나 자동 baseline하지 않는다. Phase B의 관리자 로그인 검증과 원본/복원 DB의 실제 `SHOW CREATE TABLE` 대조가 끝난 뒤, **격리 복원 환경**에서 일회성 `baseline(version=1)`·`migrate`·로그인/로그아웃·행/제약 불변을 먼저 검증한다. 그 전에는 운영 프로파일 전환, `schema.sql` 제거 또는 VPS 배포를 하지 않는다. MySQL DDL 실패는 전체 트랜잭션 롤백으로 복구된다고 가정하지 않는다.
+
 ## 참고
 
 - [Flyway baselines](https://documentation.red-gate.com/fd/baselines-273973441.html)
