@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, Notification } from '../types'
+import type { ApiResponse, Notification } from '../types'
+
+export type NotificationWire = Omit<Notification, 'type'> & { eventType: string }
 
 export const NOTIFICATIONS_KEY = {
   all: ['notifications'] as const,
@@ -9,13 +11,13 @@ export const NOTIFICATIONS_KEY = {
 }
 
 const fetchNotifications = async () => {
-  const res = await axiosInstance.get<ApiResponse<Notification[]>>('/notifications')
-  return res.data.data
+  const res = await axiosInstance.get<ApiResponse<NotificationWire[]>>('/notifications')
+  return res.data.data.map(({ eventType, ...notification }) => ({ ...notification, type: eventType }))
 }
 
 const fetchUnreadCount = async () => {
-  const res = await axiosInstance.get<ApiResponse<number>>('/notifications/unread-count')
-  return res.data.data
+  const res = await axiosInstance.get<ApiResponse<{ count: number }>>('/notifications/unread-count')
+  return res.data.data.count
 }
 
 const markAsRead = async (id: number) => {

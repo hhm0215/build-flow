@@ -77,13 +77,6 @@
 - **예상 규모**: L (원본 카탈로그 → 관계 검토 → Assistant 연동으로 분할)
 - **상태**: TODO
 
-### API 명세를 실제 계약과 동기화
-- **배경**: `docs/API_SPEC.md`에 존재하지 않는 `/api/v1/specifications/**`, `/tax-invoices/**`, `/payments/**`, `/chat/sessions/**` 등이 기재되어 있고 실제 `/estimates/parse`, `/dashboard/stats`, `/chat/stream` 등은 빠져 있다. 오류 래퍼 형태도 구현과 다르다.
-- **산출물**: 컨트롤러/Gateway/프론트 호출 기준 엔드포인트·요청/응답·인증 표 갱신, 미구현 제안 API는 계획으로 명확히 분리
-- **관련 파일**: `docs/API_SPEC.md`, `docs/ARCHITECTURE.md`, `gateway-server`, 각 서비스 컨트롤러
-- **예상 규모**: M
-- **상태**: TODO
-
 ### 로컬 서버 배포 보안 하드닝
 - **배경**: 개발 Compose는 loopback 전용으로 제한했지만 향후 LAN 공개 시 프론트 리버스 프록시만 노출하고 Gateway·8081~8087·MySQL·Redis·Kafka 직접 접근을 차단해야 함
 - **산출물**: 로컬 서버용 Compose override, 외부 노출 포트 정책, Redis/DB 보안, 백업·복구 및 방화벽 런북
