@@ -60,6 +60,20 @@ jobs:
         run: chmod +x ./gradlew
       - name: Verify opt-in auth migration against fresh MySQL
         run: ./gradlew :auth-service:test --tests com.buildflow.auth.AuthFlywayIntegrationTest --no-daemon
+      - name: Assert MySQL integration test actually ran
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          result = Path('auth-service/build/test-results/test/TEST-com.buildflow.auth.AuthFlywayIntegrationTest.xml')
+          suite = ElementTree.parse(result).getroot()
+          assert suite.attrib['tests'] == '1', suite.attrib
+          assert suite.attrib['skipped'] == '0', suite.attrib
+          assert suite.attrib['failures'] == '0', suite.attrib
+          assert suite.attrib['errors'] == '0', suite.attrib
+          print('Auth Flyway MySQL integration test executed and passed.')
+          PY
 
   frontend:
     name: 프론트 (lint · test · build)
