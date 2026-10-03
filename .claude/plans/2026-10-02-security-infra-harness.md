@@ -31,4 +31,4 @@
 
 ## 결과
 
-독립 보안·인프라 리뷰를 수렴해 체크리스트·역할 지침을 반영했다. 로그아웃 UI 수정과 Compose 검증기 강화에 대해 로컬 프론트 lint/34파일 118테스트/프로덕션 빌드, Python 11테스트, 4파일 Compose 병합 검증, `git diff --check`를 통과했다. Codex 앱에 매일 보안/인프라 점검 heartbeat 두 건을 등록했다. CI·PR/`main` 병합과 VPS 반영, 공개 경로 실측은 이어서 진행한다. SSH 하드닝·커널 패치·외부 백업/복원은 별도 게이트로 남긴다.
+독립 보안·인프라 리뷰를 수렴해 체크리스트·역할 지침을 반영했다. 로그아웃 UI 수정과 Compose 검증기 강화에 대해 로컬 프론트 lint/34파일 118테스트/프로덕션 빌드, Python 11테스트, 4파일 Compose 병합 검증, `git diff --check`를 통과했다. Codex 앱에 매일 보안/인프라 점검 heartbeat 두 건을 등록했다. PR #69의 CI 8개와 SHA 검증 후 main merge `5a372f2`, develop fast-forward를 마쳤다. VPS도 해당 SHA로 고정해 frontend만 재빌드·기동했으며 private 15개/200/401/SSH 22만 확인했다. 실제 토큰 폐기 재사용·공인 TLS/429/CORS는 아직 미실측이다. SSH 하드닝은 안전 검토 거부로 승인을 요청했고, 커널 패치·외부 백업/복원은 별도 게이트로 남긴다.
