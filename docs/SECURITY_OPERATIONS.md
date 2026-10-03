@@ -1,6 +1,6 @@
 # BuildFlow 보안·인프라 점검 기준
 
-> 2026-10-02 기준. 이 문서는 점검 항목과 판정 기준의 단일 진실원이다. `AGENTS.md`의 보안 게이트가 이 문서를 호출한다. 공개 HTTPS는 **테스트 데이터 파일럿**이며 실데이터 운영 승격과 다르다. 실제 호스트명·IP·키·비밀값·덤프는 Git 추적 문서와 점검 결과에 적지 않는다.
+> 2026-10-03 기준. 이 문서는 점검 항목과 판정 기준의 단일 진실원이다. `AGENTS.md`의 보안 게이트가 이 문서를 호출한다. 공개 HTTPS는 **테스트 데이터 파일럿**이며 실데이터 운영 승격과 다르다. 실제 호스트명·IP·키·비밀값·덤프는 Git 추적 문서와 점검 결과에 적지 않는다.
 
 ## 판정과 기록
 
@@ -11,7 +11,7 @@
 
 ## 공개 HTTPS 파일럿 사전 게이트
 
-| ID | 점검 | 통과 근거 | 2026-10-02 상태 |
+| ID | 점검 | 통과 근거 | 현재 상태 |
 |---|---|---|---|
 | S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(private) — PR #69 merge SHA `5a372f2` 서버 고정, frontend 단일 재빌드 |
 | S02 | `.env`와 키 보호 | 서버 `.env` 소유/모드 `root:root 0600`, 값 비출력; 개인키 미복사 | PASS — 서버 메타데이터 확인 |
@@ -20,16 +20,18 @@
 | S05 | 로그아웃 토큰 폐기 | UI 로그아웃이 서버 API를 호출하고 **로그아웃 전 발급된 동일 토큰** 재사용이 401 | PASS(private) / PENDING(public 재확인) — 2026-10-03 터널 UI 로그아웃·보호 화면 재진입 차단, 대화형 API 스모크에서 동일 토큰 401 실측 |
 | S06 | TLS·호스트 | 공인 신뢰 인증서, 호스트명 일치, HTTP→HTTPS, 만료/갱신 경로; 잘못된 Host/SNI 거부 | PENDING — 80/443 미기동 |
 | S07 | 웹 남용·CORS | 실제 공개 경로의 로그인 429, 변형 경로/위조 XFF 우회 실패, 미허용 Origin 거부 | PENDING — 설정·CI만 통과 |
-| S08 | SSH 복구·하드닝 | 일반 계정 키·Web Console 복구 확인 후 root/password 정책과 `sshd -t`·별도 재접속 검증 | PENDING — 현재 root/password 허용; 무검증 변경 금지 |
+| S08 | SSH 복구·하드닝 | 일반 계정 키·Web Console 복구 확인 후 root/password/keyboard-interactive 정책과 `sshd -t`·별도 재접속 검증. 외부 22 차단 시 독립 배포·점검·알림·원격 재개방 실측 | PENDING — 현재 root/password 허용; 터널·점검은 SSH 의존; 무검증 변경 금지 |
 | S09 | OS·의존성 패치 | 보안 업데이트/커널 상태와 영향 평가, 재부팅 시 서비스 복귀 검증 | PENDING — 커널 업데이트 대기, 리부팅 미검증 |
 | S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(private 기본 health) / PENDING(public) |
 | S11 | 실패 복귀 | SSH 터널 200/401 보존, 공개 실패 시 Caddy 제거 후 private 복귀, named volume 유지 | PENDING — 런북만 작성 |
 
 **공개 결정:** S05는 비공개 경로에서 통과했지만 공개 경로 재확인이 필요하다. S06/S07 공인 경로, S08 SSH 정책, S09 패치·재부팅 검증이 끝나지 않아 80/443 개방을 보류한다. S06/S07의 실제 인증서·포트 검증은 나머지 사전 조건을 충족한 뒤 제한된 공개 검증 창에서 수행하고, 실패 시 즉시 비공개로 복귀한다. S08 변경은 복구 경로와 명시적 승인을 확인한 뒤에만 수행한다. 남은 위험을 승인 없이 `PASS`로 바꾸지 않는다.
 
+**SSH와 CI/CD:** CI만으로 VPS 배포 경로가 생기지 않는다. 현재 Web Console 접속 기록에는 내부 root 공개키 경로가 있어 `PermitRootLogin no`를 복구 검증 없이 적용하지 않는다. `PasswordAuthentication`뿐 아니라 `KbdInteractiveAuthentication`의 유효 설정도 확인한다. 외부 22 차단은 터널과 일일 SSH 점검을 끊는다. 운영 VPS에 일반 self-hosted Actions runner나 Docker/root 권한을 배포 우회책으로 추가하지 않는다(현재 GitHub 저장소는 PUBLIC). 온디맨드 22는 ADR-020의 대체 경로를 실측한 뒤 별도 승인·롤백 절차로 검토한다.
+
 ### 최근 게이트 증거 — 2026-10-03 03:51 UTC, private
 
-- 담당: 주 에이전트 UI·API 점검, `security-reviewer` 독립 코드 검토. 서버 코드 SHA `5a372f2`, 작업 트리 청결을 읽기 전용 SSH로 확인. 최신 `main` SHA `0c18b7e`와의 차이는 문서뿐이며, 다음 배포 전 정확한 SHA 재대조가 필요하다.
+- 담당: 주 에이전트 UI·API 점검, `security-reviewer` 독립 코드 검토. 서버 코드 SHA `5a372f2`, 작업 트리 청결을 읽기 전용 SSH로 확인. 당시 `main` SHA `0c18b7e`와의 차이는 문서뿐이었다. 이후 `main`이 변경됐으므로 다음 배포 전 정확한 SHA 재대조가 필요하다.
 - S05: SSH 터널에서 사용자 직접 로그인 후 UI 로그아웃이 로그인 화면으로 돌아왔고 `/dashboard` 재진입이 로그인 화면으로 리다이렉트됐다. 사용자 직접 대화형 `scripts/verify-admin.ps1 -BaseUrl http://127.0.0.1:13000` 실행 결과, 임시 현장 생성·조회·삭제 후 로그아웃 전의 동일 access token으로 `/api/v1/sites` 재요청이 401이었다. 스크립트는 비밀값과 토큰을 출력하지 않는다.
 - 프론트 200, 무인증 현장 API 401, 공개 가입 403, Gateway·8081~8087 health `UP`. 호스트 비loopback 리스닝은 SSH 22만 관측. Docker 컨테이너 재시작/OOM과 실제 외부망 포트는 이 비root 점검에서 `UNVERIFIED`다.
 

@@ -25,7 +25,7 @@
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
 - **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
-- **현재 진행**: Plain OS Ubuntu 24.04 LTS 변경·새 host key 확인, 비root 배포 계정 키 접속, Docker 공식 apt 설치, root 소유 코드 배치 완료. 서버 전용 비밀값(`0600`) 생성, 순차 빌드로 앱 이미지 11개 성공, 컨테이너 15개 기동. 8081~8087 health `UP`, 프론트 200·비인증 현장 API 401·초기 재시작/OOM 0·비loopback published port 0 확인. 사용자가 관리자 계정을 직접 생성했고, SSH 터널의 웹 로그인·UI 로그아웃, 임시 현장 생성/조회/삭제·동일 토큰 재사용 401까지 확인했다. 전체 업무 CRUD/PDF·재부팅 복구 및 DB+업로드 파일 외부 백업/격리 복원은 미완료. 로컬 Docker Engine은 꺼져 있다. AI 모델과 도메인 공개는 범위 밖.
+- **현재 진행**: Plain OS Ubuntu 24.04 LTS 변경·새 host key 확인, 비root 배포 계정 키 접속, Docker 공식 apt 설치, root 소유 코드 배치 완료. 서버 전용 비밀값(`0600`) 생성, 순차 빌드로 앱 이미지 11개 성공, 컨테이너 15개 기동. 8081~8087 health `UP`, 프론트 200·비인증 현장 API 401·초기 재시작/OOM 0·비loopback published port 0 확인. 사용자가 관리자 계정을 직접 생성했고, SSH 터널의 웹 로그인·UI 로그아웃, 임시 현장 생성/조회/삭제·동일 토큰 재사용 401까지 확인했다. 전체 업무 CRUD/PDF·재부팅 복구 및 DB+업로드 파일 외부 백업/격리 복원은 미완료. 로컬 Docker Engine은 2026-10-03 재기동해 격리 DB 복원 점검에 사용했다. AI 모델과 도메인 공개는 범위 밖.
 - **관련 파일**: `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `.claude/plans/2026-10-01-vps-private-pilot.md`
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
@@ -61,6 +61,7 @@
 - **배경**: ADR-018에 따라 로컬 `develop` 개발·GitHub CI와 VPS의 `main` 운영 릴리스를 분리한다. 현재 CI는 테스트·빌드를 검증하지만 VPS 자동 배포와 안전한 승격 경로는 없다.
 - **선행조건**: VPS 파일럿 CRUD/PDF·재부팅 회귀, 버전 관리형 DB 마이그레이션, DB+업로드 파일 외부 백업·격리 복원 및 최소 권한 DB 계정 완료. 그 전에는 운영 DB 대상 자동 배포를 켜지 않는다.
 - **산출물**: CI 성공·PR/SHA 검증 후 릴리스 고정, 배포 전 백업/복원 가능성·마이그레이션 점검, 순차 배포·헬스/스모크·실패 시 중단과 복귀 절차. GitHub에서 VPS로의 배포 인증은 최소 권한과 비밀값 관리 기준을 별도 설계한다. 사용자가 빌드·테스트 실패와 운영 배포 성공/실패를 실제 알림으로 받도록 구성한다. 1인 운영 기본안은 GitHub Actions 실패 메일 + Discord 전용 채널 웹훅이며 Slack은 보류한다. 웹훅 URL은 GitHub Environment secret에만 저장하고 알림에는 상태·커밋·실행 링크만 포함한다.
+- **접근 정책**: ADR-020. 현재는 SSH 터널·읽기 전용 점검에 22가 필요하다. 장래 외부 22를 평소 차단하려면 공개 사용자 접속, 독립 점검·알림, Web Console 복구·원격 재개방을 실측한다. outbound 릴리스 pull은 고정 SHA/image digest·출처/무결성·최소 실행 권한·승인/롤백을 검증할 **후보 설계**다. 현재 PUBLIC 저장소의 일반 self-hosted runner를 운영 VPS에 직접 두지 않는다. CI에는 병합된 `main` SHA 재검증과 read-only `GITHUB_TOKEN`만 먼저 적용한다.
 - **관련 파일**: `.github/workflows/`, `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `docs/DECISIONS.md`
 - **예상 규모**: M
 - **상태**: TODO
