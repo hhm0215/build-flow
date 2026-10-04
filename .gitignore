@@ -48,6 +48,9 @@ docker/volumes/
 # Database backups (contain real business data and credentials hashes)
 backups/
 
+# Local USB inventory manifests (contain source names and paths)
+usb-inventory/
+
 # 공개 저장소에 넣지 않는 VPS 실제 식별자·운영 기록
 docs/VPS_LOCAL_OPERATIONS.md
 docs/.vps_known_hosts

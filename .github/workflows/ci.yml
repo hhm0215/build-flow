@@ -149,6 +149,9 @@ jobs:
       - name: Validate database backup tools
         shell: powershell
         run: .\scripts\db\test-backup-tools.ps1
+      - name: Validate read-only USB inventory with synthetic files
+        shell: powershell
+        run: .\scripts\usb\test-inventory-estimates.ps1
       - name: Validate administrator smoke verifier
         shell: powershell
         run: .\scripts\test-verify-admin.ps1
