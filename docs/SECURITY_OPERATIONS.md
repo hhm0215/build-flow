@@ -40,7 +40,7 @@
 - 담당: 주 에이전트 배포·외부 실측, `security-reviewer`와 `infrastructure-reviewer` 독립 읽기 전용 검토. 기대/실제 `main` SHA `e6f3f477928c66ed7088a6fb85446dcd70dc692d`, PR #75의 CI 5개 성공, 서버 작업 트리 청결. Caddy 실제 호스트 설정 `validate` 통과.
 - 첫 공개의 잘못된 Host 200/임의 호스트로 308을 S06 `FAIL`로 판정해 볼륨 보존 private 롤백을 실행했다. private 프론트 200·보호 API 401·비loopback SSH 22만 재확인했다. 수정 후 재공개에서 정상 HTTP 308→고정 HTTPS, 공인 인증서 HTTPS 200, 잘못된 HTTP/HTTPS Host 모두 421, 무인증 보호 API 401을 외부망에서 실측했다. 인증서 자동 갱신은 아직 실측 전이다.
 - 사용자 직접 공인 HTTPS 로그인 후 대시보드를 확인했고 재배포 뒤 같은 세션의 새로고침으로 시현 현장 1건을 재조회했다. 비밀번호·토큰은 수집하지 않았다. 공개 경로에서 **로그아웃 전 동일 토큰의 로그아웃 후 401**은 여전히 `PENDING`이다.
-- 로그인 빈 테스트 요청 7건에서 위조 XFF 값을 바꿔도 6~7번째 429, `/api/v1/auth/login/` 403, 미허용 Origin 403을 확인했다. 비지원 GET 로그인에서 500이 관측돼 별도 예외 응답 결함으로 추적한다. 비loopback 리스닝은 22/80/443만, 외부 검사한 내부 포트는 차단됐다. 16개 컨테이너 모두 restart 0/OOM false, 디스크 약 14%·inode 약 2% 사용, RAM 가용 약 3.4 GiB.
+- 로그인 빈 테스트 요청 7건에서 위조 XFF 값을 바꿔도 6~7번째 429, `/api/v1/auth/login/` 403, 미허용 Origin 403을 확인했다. 비지원 GET 로그인에서 500이 관측됐고 auth-service 코드에서 405로 교정했다. 새 SHA의 VPS 배포 전까지 공개 경로 405는 `PENDING`이다. 비loopback 리스닝은 22/80/443만, 외부 검사한 내부 포트는 차단됐다. 16개 컨테이너 모두 restart 0/OOM false, 디스크 약 14%·inode 약 2% 사용, RAM 가용 약 3.4 GiB.
 
 ## 실데이터 운영 승격 게이트
 
