@@ -17,7 +17,7 @@ if (-not $AllowIncomplete -and ((Split-Path -Leaf $resolvedDirectory) -like ".pa
 $manifestPath = Join-Path $resolvedDirectory "manifest.json"
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "manifest.json is missing: $manifestPath" }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.formatVersion -ne 1) { throw "Unsupported manifest formatVersion: $($manifest.formatVersion)" }
+if ($manifest.formatVersion -notin @(1, 2)) { throw "Unsupported manifest formatVersion: $($manifest.formatVersion)" }
 if ($manifest.containsSensitiveData -ne $true) { throw "Manifest must mark the backup as sensitive data." }
 if ($manifest.dump.file -cne "buildflow.sql") { throw "Unexpected dump filename in manifest: $($manifest.dump.file)" }
 
@@ -113,6 +113,11 @@ if ([string]$manifest.administrator.digestAlgorithm -cne "SHA-256" -or
     throw "Administrator digest is missing or invalid."
 }
 
+if ($manifest.formatVersion -eq 2) {
+    throw "Integrated v2 verification requires restored-DB warranty reference validation, which is not implemented. Use verify-warranty-files.ps1 for file-only diagnostics."
+}
+
 Write-Host "[OK] Backup manifest, SHA-256, source identity, schemas, tables, administrator row presence, and digest metadata verified."
 Write-Host "[OK] $dumpPath"
+Write-Warning "This is a SQL-only backup. Warranty upload files and Kafka state are not included; it is not a complete operational recovery package."
 Write-Warning "Checksum verification detects accidental changes; it is not a cryptographic signature against coordinated dump and manifest tampering."

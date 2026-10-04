@@ -213,6 +213,9 @@ $backupPath = [System.IO.Path]::GetFullPath($BackupDirectory)
 if (-not (Test-Path -LiteralPath $backupPath -PathType Container)) { throw "Backup directory not found: $backupPath" }
 & $verifyScript -BackupDirectory $backupPath
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $backupPath "manifest.json") | ConvertFrom-Json
+if ($manifest.formatVersion -eq 2) {
+    throw "Integrated SQL+warranty isolated restore is not implemented. Refusing a DB-only restore test for a v2 package."
+}
 $dumpPath = Join-Path $backupPath ([string]$manifest.dump.file)
 
 $composeArgs = @("compose", "--project-name", $projectName, "-f", $composeFile)
@@ -283,6 +286,7 @@ try {
     Start-AuthValidation -TestLogin:$ValidateLogin
     Assert-RestoreInventory -Manifest $manifest
     Write-Host "[OK] Auth validation left the restored schema and data unchanged."
+    Write-Warning "This isolated restore covered SQL only. Warranty uploads and Kafka state were not restored."
 }
 finally {
     $cleanupError = $null

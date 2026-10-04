@@ -33,6 +33,8 @@ docker compose up -d mysql
 - `buildflow.sql`: 7개 스키마의 논리 덤프
 - `manifest.json`: 덤프 SHA-256, 원본 컨테이너·Compose project·named volume 신원, MySQL 버전, 스키마별 테이블/정확한 행 수, Flyway history 존재 여부, 관리자 계정 수와 비노출 digest
 
+현재 `backup.ps1`의 `formatVersion: 1`은 **SQL 전용**이다. 보증보험 PDF가 저장되는 `warranty_uploads` volume, Kafka broker 상태는 포함하지 않는다. 따라서 이 도구의 성공이나 아래 SQL 격리 복원 성공만으로 VPS 실데이터 운영/완전 복구 게이트를 통과했다고 판정하지 않는다. 업로드 volume은 앱의 `/app/uploads/warranties`에 연결되고 DB `defect_warranties.file_path`는 그 절대경로를 저장한다.
+
 스크립트는 컨테이너 내부 `MYSQL_ROOT_PASSWORD`를 자식 프로세스 환경으로만 전달하고 값을 명령행, manifest, 로그에 기록하지 않는다. `mysqldump`는 InnoDB 일관성 확보를 위한 `--single-transaction`, 큰 테이블 스트리밍을 위한 `--quick`, stored object 보존을 위한 `--routines --triggers --events`, 불필요한 tablespace 권한을 피하는 `--no-tablespaces`를 사용한다.
 
 백업 후 또는 다른 저장 장치로 복사한 뒤에는 Docker 없이 다음 검증을 실행한다.
@@ -42,6 +44,10 @@ docker compose up -d mysql
 ```
 
 성공 조건은 dump가 비어 있지 않고, manifest의 SHA-256과 일치하며, 7개 스키마·테이블 정의·단일 관리자 행·mysqldump 완료 footer가 manifest와 일치하는 것이다. 이 검증은 파일 손상 여부를 확인하지만 실제 복원 성공을 대신하지 않으며, dump와 manifest를 함께 바꾸는 공격을 막는 전자서명도 아니다.
+
+차기 통합 패키지를 위한 `verify-warranty-files.ps1`은 파일만 검사하는 준비 도구다. 고정 경로 `uploads/warranties` 아래 일반 파일의 바이트 수·SHA-256, manifest 내부의 참조 ID, SQL과 같은 Compose project의 별도 volume 신원을 확인한다. 파일 누락·추가·변조, 중복/위험 상대경로, 링크·하위 디렉터리, manifest에 적힌 파일이 없는 참조는 실패한다. **이 검사는 SQL의 실제 `defect_warranties.file_path`와 대조하지 못한다.** 그러므로 `verify-backup.ps1`과 `restore-test.ps1`은 `formatVersion: 2`를 명시적으로 거부한다. v2 백업 생성·DB/파일 통합 격리 복원·실제 DB 참조 검증을 구현하기 전에는 합성 파일 검사 통과를 운영 백업 성공으로 기록하지 않는다.
+
+통합 백업 구현 전 추가 중단 조건도 있다. 메모리 기반 비동기 OCR의 `PENDING` 행은 중지 후 자동 복구된다고 보장할 수 없다. Kafka outbox의 `SENT`는 broker 수락일 뿐 소비 완료가 아니므로 SQL+PDF만 복원하면 미소비 이벤트가 유실될 수 있다. OCR 대기 0건과 이벤트 drain/재조정 근거가 마련되기 전 전체 업무 복구 판정은 `PENDING`이다. 외부 물리 저장장치에 암호화된 복사본을 보관하고, 별도 빈 환경에서 DB와 파일을 같은 컨테이너 경로에 복원해 참조/해시/로그인을 확인해야 한다.
 
 ## 격리 복원 검증
 
