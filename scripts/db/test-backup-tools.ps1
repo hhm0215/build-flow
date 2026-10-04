@@ -17,6 +17,11 @@ $schemas = @(
 $encoding = New-Object System.Text.UTF8Encoding($false)
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("buildflow-db-backup-test-" + [Guid]::NewGuid().ToString("N"))
 
+function Invoke-WarrantyVerifier {
+    $package = Get-Content -LiteralPath (Join-Path $testRoot "manifest.json") -Raw | ConvertFrom-Json
+    & (Join-Path $PSScriptRoot "verify-warranty-files.ps1") -BackupDirectory $testRoot -Uploads $package.uploads -SqlSource $package.source
+}
+
 try {
     New-Item -ItemType Directory -Path $testRoot | Out-Null
     $dumpPath = Join-Path $testRoot "buildflow.sql"
@@ -95,6 +100,74 @@ try {
         throw "Corrupted backup was not rejected."
     }
 
+    [System.IO.File]::WriteAllText($dumpPath, ($dumpLines -join "`n") + "`n", $encoding)
+    $warrantyDirectory = Join-Path $testRoot "uploads\warranties"
+    New-Item -ItemType Directory -Path $warrantyDirectory -Force | Out-Null
+    $warrantyName = "0f86568e-8ac8-4226-b224-c0f9a7f72f3a.pdf"
+    $warrantyPath = Join-Path $warrantyDirectory $warrantyName
+    [System.IO.File]::WriteAllText($warrantyPath, "synthetic-warranty", $encoding)
+    $manifest.formatVersion = 2
+    $manifest.uploads = [ordered]@{
+        directory = "uploads/warranties"
+        mountPath = "/app/uploads/warranties"
+        source = [ordered]@{ composeProject = "test-project"; volumeName = "test_warranty_uploads"; volumeDriver = "local" }
+        files = @([ordered]@{
+            relativePath = $warrantyName
+            bytes = (Get-Item -LiteralPath $warrantyPath).Length
+            sha256 = (Get-FileHash -LiteralPath $warrantyPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        })
+        references = @([ordered]@{ warrantyId = 1; relativePath = $warrantyName })
+        referenceCount = 1
+    }
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+    $v2Rejected = $false
+    try { & (Join-Path $PSScriptRoot "verify-backup.ps1") -BackupDirectory $testRoot }
+    catch { $v2Rejected = $_.Exception.Message -match "restored-DB warranty reference validation" }
+    if (-not $v2Rejected) { throw "Unbound v2 package was incorrectly accepted as a complete backup." }
+    Invoke-WarrantyVerifier
+
+    [System.IO.File]::WriteAllText($warrantyPath, "synthetic-warrantx", $encoding)
+    $warrantyCorruptionRejected = $false
+    try { Invoke-WarrantyVerifier }
+    catch { $warrantyCorruptionRejected = $_.Exception.Message -match "SHA-256|size" }
+    if (-not $warrantyCorruptionRejected) { throw "Corrupted warranty file was not rejected." }
+    [System.IO.File]::WriteAllText($warrantyPath, "synthetic-warranty", $encoding)
+
+    $manifest.uploads.files[0].relativePath = "..\\outside.pdf"
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+    $traversalRejected = $false
+    try { Invoke-WarrantyVerifier }
+    catch { $traversalRejected = $_.Exception.Message -match "Unsafe warranty" }
+    if (-not $traversalRejected) { throw "Warranty path traversal was not rejected." }
+    $manifest.uploads.files[0].relativePath = $warrantyName
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+
+    $manifest.uploads.source.composeProject = "other-project"
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+    $wrongSourceRejected = $false
+    try { Invoke-WarrantyVerifier }
+    catch { $wrongSourceRejected = $_.Exception.Message -match "Warranty source" }
+    if (-not $wrongSourceRejected) { throw "Mismatched warranty source project was not rejected." }
+    $manifest.uploads.source.composeProject = "test-project"
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+
+    $manifest.uploads.references[0].relativePath = "missing.pdf"
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+    $missingReferenceRejected = $false
+    try { Invoke-WarrantyVerifier }
+    catch { $missingReferenceRejected = $_.Exception.Message -match "no packaged file" }
+    if (-not $missingReferenceRejected) { throw "Missing warranty reference was not rejected." }
+    $manifest.uploads.references[0].relativePath = $warrantyName
+    Write-JsonUtf8 -Path (Join-Path $testRoot "manifest.json") -Value $manifest
+
+    $extraPath = Join-Path $warrantyDirectory "orphan.pdf"
+    [System.IO.File]::WriteAllText($extraPath, "unlisted", $encoding)
+    $extraRejected = $false
+    try { Invoke-WarrantyVerifier }
+    catch { $extraRejected = $_.Exception.Message -match "count|Unlisted" }
+    if (-not $extraRejected) { throw "Unlisted warranty file was not rejected." }
+    Remove-Item -LiteralPath $extraPath
+
     $spaceDirectory = Join-Path $testRoot "path with space"
     New-Item -ItemType Directory -Path $spaceDirectory | Out-Null
     $echoScript = Join-Path $spaceDirectory "echo arguments.ps1"
@@ -124,7 +197,7 @@ try {
     }
     if (-not $stderrRejected) { throw "Non-empty stderr was not rejected." }
 
-    Write-Host "[OK] Backup verifier and Windows native argument quoting tests passed."
+    Write-Host "[OK] SQL verifier, warranty file-only diagnostics, v2 fail-closed gate, and Windows argument quoting tests passed."
 }
 finally {
     $resolvedTemp = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\') + '\'
