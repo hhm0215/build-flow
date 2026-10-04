@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 인증 API 비지원 메서드 405 (2026-10-04)
+
+- 공개 파일럿에서 관찰된 `GET /api/v1/auth/login` 500의 원인은 auth-service의 catch-all 예외 처리였다. `HttpRequestMethodNotSupportedException`을 405와 `Allow: POST` 및 기존 응답 형식으로 처리하고, 계정 정보·스택트레이스 대신 메서드명만 경고 로그에 남긴다.
+- standalone MVC 회귀에서 405/Allow/서비스 미호출을 검증했다. 코드 수정은 PR/CI/보안 리뷰 후 병합하며, VPS에 아직 배포하지 않았으므로 공개 경로 재실측은 PENDING이다.
+
 ## 현재 진행 중 — SQL+업로드 파일 복구 게이트 (2026-10-04)
 
 - 기존 SQL-only v1 백업/격리 복원의 성공 메시지에 업로드 파일·Kafka 미포함을 명시했다. 통합 v2 패키지는 실제 복원 DB의 `defect_warranties.file_path`와 파일을 대조하기 전까지 검증·복원을 거부한다.
