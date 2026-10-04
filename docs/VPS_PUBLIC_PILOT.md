@@ -48,7 +48,7 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose
 
 ## 외부 검증
 
-1. 외부망에서 `http://<VPS_HOST>`가 HTTPS로 전환되고, `https://<VPS_HOST>/login`의 인증서가 신뢰되는지 확인한다. 만료·이름 불일치·자체 서명 경고는 우회하지 않는다.
+1. 외부망에서 `http://<VPS_HOST>`가 HTTPS로 전환되고, `https://<VPS_HOST>/login`의 인증서가 신뢰되는지 확인한다. 만료·이름 불일치·자체 서명 경고는 우회하지 않는다. 정상 SNI에 잘못된 `Host` 헤더를 보낸 HTTPS 요청은 `421`, 공인 IP에 잘못된 `Host` 헤더를 보낸 HTTP 요청은 `421`이며 임의 도메인의 `Location`이 없어야 한다. 두 검사는 실제 호스트명/IP를 Git 문서에 기록하지 않고 수행한다.
 2. 로그인 전 `/api/v1/sites`는 401인지, 관리자 로그인 후 대시보드와 테스트 현장 API가 동작하는지 확인한다. 비밀번호는 채팅·로그에 입력하지 않고 사용자가 직접 웹 폼에 넣는다. UI 로그아웃은 서버 `/api/v1/auth/logout` 성공을 확인해야 하며 **로그아웃 전 발급된 동일 Bearer 토큰**으로 보호 API를 다시 호출했을 때 401인지 확인한다. 무토큰 401은 토큰 폐기 증거가 아니다. 토큰 값은 화면·로그·문서에 출력하지 않는다.
 3. 로그인 요청 제한(429), 허용하지 않은 Origin의 CORS 거부, 호스트의 비loopback 리스닝 포트가 SSH 22와 웹 80/443뿐인지 검사한다. 내부 서비스의 포트가 외부로 열렸다면 즉시 롤백한다.
 4. Caddy/프론트/Gateway 재시작 후 HTTPS·터널 접속을 재확인한다. 실제 리부팅 회귀와 DB+파일 복원 검증은 별도 선행 게이트로 남긴다.
