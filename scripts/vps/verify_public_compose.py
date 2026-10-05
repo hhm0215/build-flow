@@ -2,6 +2,7 @@
 
 import json
 import posixpath
+import re
 import sys
 
 
@@ -49,12 +50,23 @@ def verify(config: dict) -> None:
         raise ValueError(f"unexpected public ports: {sorted(public_ports)}")
 
     public_host = services["caddy"]["environment"].get("PUBLIC_HOST")
-    if not public_host:
-        raise ValueError("Caddy public hostname is missing")
+    if not isinstance(public_host, str) or len(public_host) > 253 or public_host != public_host.lower():
+        raise ValueError("Caddy public hostname must be one lowercase DNS name")
+    labels = public_host.split(".")
+    if len(labels) < 2 or labels[-1].isdigit() or any(
+        len(label) > 63 or re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label) is None
+        for label in labels
+    ):
+        raise ValueError("Caddy public hostname must be one lowercase DNS name")
 
     gateway_origins = services["gateway-server"]["environment"]["CORS_ALLOWED_ORIGINS"].split(",")
-    if f"https://{public_host}" not in gateway_origins:
-        raise ValueError("public HTTPS origin is missing from Gateway CORS")
+    expected_origins = {
+        f"https://{public_host}",
+        "http://localhost:13000",
+        "http://127.0.0.1:13000",
+    }
+    if set(gateway_origins) != expected_origins or len(gateway_origins) != len(expected_origins):
+        raise ValueError("Gateway CORS must contain only the public HTTPS and two loopback origins")
 
     mounts = {mount["target"] for mount in services["caddy"].get("volumes", [])}
     if not {"/etc/caddy/Caddyfile", "/data", "/config"}.issubset(mounts):
