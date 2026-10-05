@@ -1,6 +1,6 @@
 # BuildFlow 보안·인프라 점검 기준
 
-> 2026-10-04 기준. 이 문서는 점검 항목과 판정 기준의 단일 진실원이다. `AGENTS.md`의 보안 게이트가 이 문서를 호출한다. 공개 HTTPS는 **테스트 데이터 파일럿**이며 실데이터 운영 승격과 다르다. 실제 호스트명·IP·키·비밀값·덤프는 Git 추적 문서와 점검 결과에 적지 않는다.
+> 2026-10-05 기준. 이 문서는 점검 항목과 판정 기준의 단일 진실원이다. `AGENTS.md`의 보안 게이트가 이 문서를 호출한다. 공개 HTTPS는 **테스트 데이터 파일럿**이며 실데이터 운영 승격과 다르다. 실제 호스트명·IP·키·비밀값·덤프는 Git 추적 문서와 점검 결과에 적지 않는다.
 
 ## 판정과 기록
 
@@ -13,13 +13,13 @@
 
 | ID | 점검 | 통과 근거 | 현재 상태 |
 |---|---|---|---|
-| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(public) — PR #75 전체 CI 통과, merge SHA `e6f3f47` 서버 clean checkout |
+| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(public) — PR #80 전체 CI 통과, merge SHA `cd0f80a` 서버 clean checkout; 변경된 auth-service 이미지 재빌드·적용 |
 | S02 | `.env`와 키 보호 | 서버 `.env` 소유/모드 `root:root 0600`, 값 비출력; 개인키 미복사 | PASS — 서버 메타데이터 확인 |
 | S03 | 내부 서비스 포트 비공개 | Compose 검증 + 호스트 IPv4/IPv6 리스닝 + 외부망 접속 확인. public은 22/80/443만, private은 22만 | PASS(public) — 비loopback 22/80/443만, 내부 포트 외부 접근 불가 |
 | S04 | 관리자 인증 | 공개 회원가입 없음; 무인증 업무 API 401; 로그인 후 권한 경계 | PASS(public 기본 동선) — 사용자 직접 로그인·대시보드 재조회, 무인증 업무 API 401·가입 403 |
 | S05 | 로그아웃 토큰 폐기 | UI 로그아웃이 서버 API를 호출하고 **로그아웃 전 발급된 동일 토큰** 재사용이 401 | PASS(private) / PENDING(public 재확인) — 2026-10-03 터널 UI 로그아웃·보호 화면 재진입 차단, 대화형 API 스모크에서 동일 토큰 401 실측 |
-| S06 | TLS·호스트 | 공인 신뢰 인증서, 호스트명 일치, HTTP→HTTPS, 만료/갱신 경로; 잘못된 Host/SNI 거부 | PASS(현재 접속·Host) / PENDING(실제 자동 갱신) — 인증서 신뢰·정상 308/200, 잘못된 HTTP·HTTPS Host 421 |
-| S07 | 웹 남용·CORS | 실제 공개 경로의 로그인 429, 변형 경로/위조 XFF 우회 실패, 미허용 Origin 거부 | PASS(검사 표본) — 위조 XFF로 바꾼 빈 로그인 요청 429, `/api/v1/auth/login/` 403, 미허용 Origin 403; 비지원 GET의 500은 별도 결함 |
+| S06 | TLS·호스트 | 공인 신뢰 인증서, 호스트명 일치, HTTP→HTTPS, 만료/갱신 경로; 잘못된 Host/SNI 거부 | PASS(새 접속·Host) / PENDING(실제 자동 갱신) — 사용자 소유 도메인에서 TLS 신뢰·정상 308/200, 잘못된 HTTP·HTTPS Host 421 |
+| S07 | 웹 남용·CORS | 실제 공개 경로의 로그인 429, 변형 경로/위조 XFF 우회 실패, 미허용 Origin 거부 | PASS(검사 표본) — 기존 공개 경로에서 위조 XFF를 바꾼 빈 로그인 요청 429·변형 경로 403; 새 도메인에서 허용 Origin 200/정확한 ACAO, 미허용 Origin 403, 비지원 GET 로그인 405. 새 주소의 429 재검사는 PENDING |
 | S08 | SSH 복구·하드닝 | 일반 계정 키·Web Console 복구 확인 후 root/password/keyboard-interactive 정책과 `sshd -t`·별도 재접속 검증. 외부 22 차단 시 독립 배포·점검·알림·원격 재개방 실측 | PASS(현재 정책) — password/kbd-interactive no, 키·Web Console 복구; root 키·22는 유지. 장래 22 차단은 PENDING |
 | S09 | OS·의존성 패치 | 보안 업데이트/커널 상태와 영향 평가, 재부팅 시 서비스 복귀 검증 | PASS(커널·재부팅) / PENDING(잔여 업데이트 1건 영향 평가) — 6.8.0-146 재부팅 후 health 복귀 |
 | S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(public 기본 health) / PENDING(전 서비스 비밀값 로그 검토) — 16개 컨테이너 restart 0/OOM false, 대시보드·API·health 정상, 디스크·inode·RAM 여유 |
@@ -41,6 +41,14 @@
 - 첫 공개의 잘못된 Host 200/임의 호스트로 308을 S06 `FAIL`로 판정해 볼륨 보존 private 롤백을 실행했다. private 프론트 200·보호 API 401·비loopback SSH 22만 재확인했다. 수정 후 재공개에서 정상 HTTP 308→고정 HTTPS, 공인 인증서 HTTPS 200, 잘못된 HTTP/HTTPS Host 모두 421, 무인증 보호 API 401을 외부망에서 실측했다. 인증서 자동 갱신은 아직 실측 전이다.
 - 사용자 직접 공인 HTTPS 로그인 후 대시보드를 확인했고 재배포 뒤 같은 세션의 새로고침으로 시현 현장 1건을 재조회했다. 비밀번호·토큰은 수집하지 않았다. 공개 경로에서 **로그아웃 전 동일 토큰의 로그아웃 후 401**은 여전히 `PENDING`이다.
 - 로그인 빈 테스트 요청 7건에서 위조 XFF 값을 바꿔도 6~7번째 429, `/api/v1/auth/login/` 403, 미허용 Origin 403을 확인했다. 비지원 GET 로그인에서 500이 관측됐고 auth-service 코드에서 405로 교정했다. 새 SHA의 VPS 배포 전까지 공개 경로 405는 `PENDING`이다. 비loopback 리스닝은 22/80/443만, 외부 검사한 내부 포트는 차단됐다. 16개 컨테이너 모두 restart 0/OOM false, 디스크 약 14%·inode 약 2% 사용, RAM 가용 약 3.4 GiB.
+
+### 최근 게이트 증거 — 2026-10-05 04:41 UTC, 사용자 소유 도메인 공개 테스트 전용
+
+- 담당: 주 에이전트 배포·외부 실측, `security-reviewer`와 `infrastructure-reviewer` 독립 읽기 전용 재점검. 도메인은 hPanel에서 Active·소유자 이메일 인증 완료로 확인했다. A 레코드가 VPS IPv4를 가리키고 서버와 다른 기본 AAAA 레코드는 제거했다. 도메인 자동 갱신은 사용자 요청에 따라 껐으며 만료일은 2027-10-05이다. VPS 재부팅은 하지 않았다.
+- 전환 전 Hostinger 수동 스냅샷을 생성했고 hPanel 성공 표시와 다음 날 만료를 확인했다. 2026-10-04 주간 자동 백업도 존재한다. 이 둘은 DB+업로드 파일의 일관된 외부 백업·격리 복원을 대체하지 않는다.
+- 기대/실제 `main` SHA `cd0f80a710a449b2d61f64e695785fd6e83b0414`, PR #80 CI 5개 성공, 서버 작업 트리 청결. 유일한 앱 코드 변경인 auth-service 이미지를 빌드·재기동했고 health `UP`, 공개 경로의 비지원 GET 로그인 405를 확인했다. 새 `PUBLIC_HOST`의 4파일 Compose 구문 및 공개 포트·CORS·Caddy 지속성 정적 검사가 통과한 뒤 gateway-server와 caddy만 재생성했다. 기존 호스트명은 단일 호스트 설정에 따라 더 이상 공개 접속 주소가 아니다.
+- 외부 독립 실측: 새 HTTPS `/login` 200(시스템 TLS 신뢰 검증 통과), HTTP 308→정확한 HTTPS 주소, 무인증 현장 API 401, 잘못된 HTTP Host 및 정상 SNI+잘못된 HTTPS Host 421. 허용 Origin의 preflight 200·정확한 ACAO, 미허용 Origin 403. 호스트 IPv4/IPv6 비loopback 리스닝은 22/80/443뿐이며 8080–8087 health `UP`, loopback frontend 200·무인증 업무 API 401. 디스크 약 15%·inode 2%, 가용 RAM 약 2.8 GiB. 권한 있는 별도 확인에서 재기동한 auth/gateway/caddy는 모두 running·restart 0·OOM false였다. 외부 전 포트 스캔, 나머지 컨테이너의 재시작/OOM, 전체 비밀값 로그 점검은 `UNVERIFIED`/`PENDING`으로 유지한다.
+- 새 주소에서 관리자 직접 로그인과 로그아웃 전 동일 토큰의 로그아웃 후 401, 로그인 429 재검사, 인증서 자동 갱신 실측은 `PENDING`이다. 따라서 이 기록은 테스트 데이터 전용 공개 접속 확인이며 실데이터 운영 승격이 아니다.
 
 ## 실데이터 운영 승격 게이트
 
