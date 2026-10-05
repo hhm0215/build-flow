@@ -20,7 +20,7 @@ def valid_config():
             "mysql": {"ports": [{"published": "3306", "host_ip": "127.0.0.1"}]},
             "gateway-server": {
                 "ports": [{"published": "8080", "host_ip": "127.0.0.1"}],
-                "environment": {"CORS_ALLOWED_ORIGINS": "https://example.org,http://localhost:13000"},
+                "environment": {"CORS_ALLOWED_ORIGINS": "https://example.org,http://localhost:13000,http://127.0.0.1:13000"},
             },
         }
     }
@@ -105,16 +105,36 @@ class PublicComposeVerifierTest(unittest.TestCase):
     def test_rejects_missing_https_origin(self):
         config = copy.deepcopy(valid_config())
         config["services"]["gateway-server"]["environment"]["CORS_ALLOWED_ORIGINS"] = "http://localhost:13000"
-        with self.assertRaisesRegex(ValueError, "HTTPS origin"):
+        with self.assertRaisesRegex(ValueError, "Gateway CORS"):
             verify(config)
 
     def test_accepts_real_host_without_ci_literal(self):
         config = valid_config()
         config["services"]["caddy"]["environment"]["PUBLIC_HOST"] = "pilot.example.net"
         config["services"]["gateway-server"]["environment"]["CORS_ALLOWED_ORIGINS"] = (
-            "https://pilot.example.net,http://localhost:13000"
+            "https://pilot.example.net,http://localhost:13000,http://127.0.0.1:13000"
         )
         verify(config)
+
+    def test_rejects_invalid_public_hostnames(self):
+        for hostname in (
+            "https://example.org", "example.org/path", "example.org:443",
+            "example.org,attacker.test", "*.example.org", "Example.org", "localhost",
+            "example..org", "-example.org", "example.org.", "127.0.0.1",
+        ):
+            with self.subTest(hostname=hostname):
+                config = valid_config()
+                config["services"]["caddy"]["environment"]["PUBLIC_HOST"] = hostname
+                with self.assertRaisesRegex(ValueError, "public hostname"):
+                    verify(config)
+
+    def test_rejects_extra_cors_origin_and_duplicates(self):
+        for suffix in (",https://attacker.example", ",*", ",https://example.org"):
+            with self.subTest(suffix=suffix):
+                config = valid_config()
+                config["services"]["gateway-server"]["environment"]["CORS_ALLOWED_ORIGINS"] += suffix
+                with self.assertRaisesRegex(ValueError, "Gateway CORS"):
+                    verify(config)
 
 
 if __name__ == "__main__":
