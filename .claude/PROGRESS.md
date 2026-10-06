@@ -8,8 +8,9 @@
 ## 현재 진행 중 — 공개 파일럿 업무 QA·AI 가용성 (2026-10-06)
 
 - 사용자의 공개 사이트 CRUD·채팅 오류 보고를 `docs/PILOT_QA.md` 동선별 표와 BACKLOG P0로 등록했다. 기존 단위 테스트를 VPS 전체 CRUD/PDF 완료로 해석하지 않는다. 정확한 CRUD 실패 화면·작업·오류는 사용자 재현 정보 대기 중이며 기존 테스트 기록은 수정/삭제하지 않았다.
-- VPS의 Ollama 모델 미기동은 의도된 배포 구성이다. chat-service에 JWT 보호 `/api/v1/chat/availability`와 5초 탐침 캐시, 모델 부재 시 세션/질문 저장 전 거절을 추가했다. 프론트 채팅 패널은 모델 상태를 표시하고 미준비 시 전송을 막으며, 서버 스트림 오류는 내부 예외 대신 안전한 원인 메시지를 보여준다. 이 변경은 로컬 코드로, 공개 VPS에는 아직 반영되지 않았다.
-- 로컬 `:chat-service:test`, 프론트 lint·122개 테스트·build 통과. `security-reviewer`는 Critical/High 없음, 배포 후 무인증 401·모델 미기동 응답 실측 PENDING으로 판정했다. `infrastructure-reviewer`는 배포 전 자원·구 이미지·SHA 확인과 두 이미지 순차 빌드를 권고했다. 기존 사용자의 `EstimateService.java` 로컬 수정은 보존하며 이번 변경에 포함하지 않는다.
+- VPS의 Ollama 모델 미기동은 의도된 배포 구성이다. chat-service에 JWT 보호 `/api/v1/chat/availability`와 5초 탐침 캐시, 모델 부재 시 세션/질문 저장 전 거절을 추가했다. 프론트 채팅 패널은 모델 상태를 표시하고 미준비 시 전송을 막으며, 서버 스트림 오류는 내부 예외 대신 안전한 원인 메시지를 보여준다. AI 답변 모델 자체는 아직 가동하지 않는다.
+- 로컬 `:chat-service:test`, 프론트 lint·122개 테스트·build 통과. `security-reviewer`는 Critical/High 없음, `infrastructure-reviewer`는 구 실행 이미지 보존·두 이미지 순차 배포를 권고했다. [PR #82](https://github.com/hhm0215/build-flow/pull/82)는 10개 CI와 병합 `main` CI 성공 후 SHA `df23c6d6c99fbfd27a8b73a30e319e3d25fec998`로 병합했고 `develop`도 동기화했다.
+- 공개 테스트 VPS를 clean `main` SHA에 고정하고 실제 실행 chat/frontend 이미지를 `pre-pr82`로 보존한 뒤 두 이미지만 순차 빌드·재생성했다. 외부 HTTPS 200·TLS 신뢰, 새 API/현장 API 무인증 401, 전체 서비스 health 200, 로그인된 채팅 패널의 모델 미준비 안내·입력 차단, 포트 22/80/443 외부 노출 제한, 새 컨테이너 restart 0/OOM false를 확인했다. 외부 백업·격리 복원·DB 마이그레이션/최소 권한·전체 CRUD/PDF는 여전히 PENDING이며 실데이터 입력은 금지한다. 기존 사용자의 `EstimateService.java` 로컬 수정은 보존하며 이번 PR·배포에 포함하지 않았다.
 
 ## 완료된 작업 — 인증 API 비지원 메서드 405 (2026-10-04)
 
