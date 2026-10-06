@@ -13,7 +13,7 @@ public enum ErrorCode {
     CHAT_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "채팅 세션을 찾을 수 없습니다."),
 
     // LLM
-    CHAT_LLM_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 응답 서비스에 연결할 수 없습니다. Ollama가 실행 중인지 확인해주세요.");
+    CHAT_LLM_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 모델이 현재 준비되지 않았습니다. 잠시 후 다시 확인해주세요.");
 
     private final HttpStatus status;
     private final String message;

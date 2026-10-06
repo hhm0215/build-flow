@@ -2,13 +2,16 @@ package com.buildflow.chat.domain.chat.controller;
 
 import com.buildflow.chat.domain.chat.dto.ChatRequest;
 import com.buildflow.chat.domain.chat.dto.ChatResponse;
+import com.buildflow.chat.domain.chat.dto.ChatAvailabilityResponse;
 import com.buildflow.chat.domain.chat.service.ChatService;
+import com.buildflow.chat.domain.chat.service.OllamaToolService;
 import com.buildflow.chat.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +23,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class ChatController {
 
     private final ChatService chatService;
+    private final OllamaToolService ollamaToolService;
+
+    @GetMapping("/availability")
+    public ResponseEntity<ApiResponse<ChatAvailabilityResponse>> availability() {
+        return ResponseEntity.ok(ApiResponse.success(
+                new ChatAvailabilityResponse(ollamaToolService.isAvailable())));
+    }
 
     @PostMapping
     public ResponseEntity<ApiResponse<ChatResponse>> chat(@Valid @RequestBody ChatRequest request) {

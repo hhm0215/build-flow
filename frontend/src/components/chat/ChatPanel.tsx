@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bot, MessageCircle, RotateCcw, Send, Square, X } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
-import { streamChat } from '../../api/chat.api'
+import { getChatAvailability, streamChat } from '../../api/chat.api'
 import type { ChatMessage, ChatStreamEvent } from '../../types/chat.types'
 
 const SESSION_KEY = 'buildflow-chat-session'
@@ -17,6 +18,14 @@ export default function ChatPanel() {
   const [streaming, setStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const availability = useQuery({
+    queryKey: ['chat', 'availability'],
+    queryFn: getChatAvailability,
+    enabled: open,
+    staleTime: 10_000,
+    retry: false,
+  })
+  const canSend = availability.isSuccess && availability.data
 
   // 스트리밍 중에는 토큰마다 실행되므로 smooth 애니메이션 재시작 비용을 피한다
   useEffect(
@@ -47,7 +56,7 @@ export default function ChatPanel() {
 
   const sendMessage = async () => {
     const text = input.trim()
-    if (!text || streaming) return
+    if (!text || streaming || !canSend) return
     const userId = genId()
     const assistantId = genId()
     const controller = new AbortController()
@@ -99,6 +108,14 @@ export default function ChatPanel() {
             </div>
           </header>
           <div className="chat-messages">
+            {!canSend && (
+              <div className="chat-availability" role="status">
+                {availability.isPending ? 'AI 모델 준비 상태를 확인하고 있습니다.'
+                  : availability.isError ? 'AI 서비스 상태를 확인할 수 없습니다.'
+                    : 'AI 모델이 현재 준비되지 않아 채팅을 사용할 수 없습니다.'}
+                {!availability.isPending && <button onClick={() => void availability.refetch()}>다시 확인</button>}
+              </div>
+            )}
             {!messages.length && <div className="chat-empty"><Bot size={28} /><p>현장 손익, 미수금, 진행 상태를 물어보세요.</p></div>}
             {messages.map((message) => (
               <div key={message.id} className={`chat-message ${message.role} ${message.status}`}>
@@ -122,11 +139,11 @@ export default function ChatPanel() {
               }}
               placeholder="질문 입력"
               rows={2}
-              disabled={streaming}
+              disabled={streaming || !canSend}
             />
             {streaming
               ? <button className="chat-send stop" onClick={() => abortRef.current?.abort()} aria-label="답변 중단"><Square size={16} fill="currentColor" /></button>
-              : <button className="chat-send" onClick={() => void sendMessage()} disabled={!input.trim()} aria-label="질문 보내기"><Send size={17} /></button>}
+              : <button className="chat-send" onClick={() => void sendMessage()} disabled={!input.trim() || !canSend} aria-label="질문 보내기"><Send size={17} /></button>}
           </div>
         </section>
       )}
