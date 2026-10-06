@@ -155,6 +155,7 @@
 |--------|------|------|------|
 | POST | /api/v1/chat | JSON `{sessionId?, message}` → JSON `ChatResponse` (`sessionId`, `answer`) | O |
 | POST | /api/v1/chat/stream | 같은 JSON → `text/event-stream` (`session`, `status`, `token`, `done`, `error`) | O |
+| GET | /api/v1/chat/availability | 설정된 AI 모델 준비 상태 → JSON `{available: boolean}`. 채팅 입력 전 확인용이며 Gateway JWT 보호 대상 | O |
 
 `message`는 비어 있을 수 없고 `sessionId`가 없거나 비어 있으면 새 세션을 만든다. SSE 이벤트의 `data`는 JSON이다: `session`/`done`은 `sessionId`, `status`는 `phase`, `token`은 `content`, `error`는 `code`와 `message`를 담는다. 현재 VPS 파일럿에는 Ollama 모델이 없으므로 채팅 성공은 보장되지 않는다. 세션/메시지는 내부에 저장하지만 조회·삭제 REST 경로는 아직 없다.
 

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
 export const chatHandlers = [
+  http.get('/api/v1/chat/availability', () => HttpResponse.json({ success: true, data: { available: true } })),
   http.post('/api/v1/chat/stream', async ({ request }) => {
     const body = await request.json() as { sessionId?: string; message?: string }
     const sessionId = body.sessionId || crypto.randomUUID()

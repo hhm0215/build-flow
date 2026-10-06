@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,6 +33,10 @@ import java.util.regex.Pattern;
 public class OllamaToolService {
 
     private static final int CHUNK_MIN_LENGTH = 16;
+    private static final long AVAILABILITY_CACHE_NANOS = TimeUnit.SECONDS.toNanos(5);
+
+    private long availabilityCheckedAtNanos;
+    private boolean cachedAvailability;
 
     private final WebClient ollamaWebClient;
     private final ObjectMapper objectMapper;
@@ -45,6 +50,40 @@ public class OllamaToolService {
 
     @Value("${chat.max-tool-rounds:4}")
     private int maxToolRounds;
+
+    /** 질문을 받기 전에 모델 서버와 설정된 모델이 모두 준비됐는지 짧게 확인한다. */
+    public synchronized boolean isAvailable() {
+        long now = System.nanoTime();
+        if (availabilityCheckedAtNanos != 0 && now - availabilityCheckedAtNanos < AVAILABILITY_CACHE_NANOS) {
+            return cachedAvailability;
+        }
+        cachedAvailability = probeAvailability();
+        availabilityCheckedAtNanos = System.nanoTime();
+        return cachedAvailability;
+    }
+
+    private boolean probeAvailability() {
+        try {
+            JsonNode response = ollamaWebClient.get()
+                    .uri("/api/tags")
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .timeout(Duration.ofSeconds(2))
+                    .block();
+            JsonNode models = response == null ? null : response.get("models");
+            if (models == null || !models.isArray()) {
+                return false;
+            }
+            for (JsonNode entry : models) {
+                if (model.equals(entry.path("name").asText())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("AI 모델 준비 상태 확인 실패: {}", e.getClass().getSimpleName());
+        }
+        return false;
+    }
 
     /** messages: system/history/user가 채워진 가변 리스트. 루프 중 도구 왕복이 추가된다. */
     public String run(List<Object> messages) {

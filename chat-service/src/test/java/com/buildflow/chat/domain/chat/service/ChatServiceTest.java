@@ -38,6 +38,7 @@ class ChatServiceTest {
         ReflectionTestUtils.setField(chatService, "sessionTtlMinutes", 30L);
         ReflectionTestUtils.setField(chatService, "streamTimeoutSeconds", 180L);
         when(messageRepository.findBySessionIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
+        when(ollamaToolService.isAvailable()).thenReturn(true);
     }
 
     @Test
@@ -70,6 +71,15 @@ class ChatServiceTest {
         ArgumentCaptor<ChatMessage> captor = ArgumentCaptor.forClass(ChatMessage.class);
         verify(messageRepository).save(captor.capture());
         assertThat(captor.getValue().getRole()).isEqualTo(ChatRole.USER);
+    }
+
+    @Test
+    void unavailableModelDoesNotCreateSessionOrPersistQuestion() {
+        when(ollamaToolService.isAvailable()).thenReturn(false);
+
+        chatService.stream(request("현장 마진 알려줘"));
+
+        verifyNoInteractions(sessionRepository, messageRepository);
     }
 
     private ChatRequest request(String message) {

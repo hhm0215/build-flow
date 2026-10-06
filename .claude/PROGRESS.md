@@ -5,6 +5,12 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — 공개 파일럿 업무 QA·AI 가용성 (2026-10-06)
+
+- 사용자의 공개 사이트 CRUD·채팅 오류 보고를 `docs/PILOT_QA.md` 동선별 표와 BACKLOG P0로 등록했다. 기존 단위 테스트를 VPS 전체 CRUD/PDF 완료로 해석하지 않는다. 정확한 CRUD 실패 화면·작업·오류는 사용자 재현 정보 대기 중이며 기존 테스트 기록은 수정/삭제하지 않았다.
+- VPS의 Ollama 모델 미기동은 의도된 배포 구성이다. chat-service에 JWT 보호 `/api/v1/chat/availability`와 5초 탐침 캐시, 모델 부재 시 세션/질문 저장 전 거절을 추가했다. 프론트 채팅 패널은 모델 상태를 표시하고 미준비 시 전송을 막으며, 서버 스트림 오류는 내부 예외 대신 안전한 원인 메시지를 보여준다. 이 변경은 로컬 코드로, 공개 VPS에는 아직 반영되지 않았다.
+- 로컬 `:chat-service:test`, 프론트 lint·122개 테스트·build 통과. `security-reviewer`는 Critical/High 없음, 배포 후 무인증 401·모델 미기동 응답 실측 PENDING으로 판정했다. `infrastructure-reviewer`는 배포 전 자원·구 이미지·SHA 확인과 두 이미지 순차 빌드를 권고했다. 기존 사용자의 `EstimateService.java` 로컬 수정은 보존하며 이번 변경에 포함하지 않는다.
+
 ## 완료된 작업 — 인증 API 비지원 메서드 405 (2026-10-04)
 
 - 공개 파일럿에서 관찰된 `GET /api/v1/auth/login` 500의 원인은 auth-service의 catch-all 예외 처리였다. `HttpRequestMethodNotSupportedException`을 405와 `Allow: POST` 및 기존 응답 형식으로 처리하고, 계정 정보·스택트레이스 대신 메서드명만 경고 로그에 남긴다.

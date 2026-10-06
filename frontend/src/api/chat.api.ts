@@ -1,7 +1,13 @@
 import { useAuthStore } from '../stores/authStore'
 import { handleSessionExpired } from './axiosInstance'
+import axiosInstance from './axiosInstance'
 import { CHAT_STREAM_EVENTS } from '../types/chat.types'
 import type { ChatStreamEvent } from '../types/chat.types'
+
+export async function getChatAvailability(): Promise<boolean> {
+  const response = await axiosInstance.get<{ success: boolean; data: { available: boolean } }>('/chat/availability')
+  return response.data.data.available
+}
 
 function parseFrame(frame: string): ChatStreamEvent | null {
   let event = 'message'

@@ -8,6 +8,7 @@ import com.buildflow.chat.domain.chat.entity.ChatSession;
 import com.buildflow.chat.domain.chat.repository.ChatMessageRepository;
 import com.buildflow.chat.domain.chat.repository.ChatSessionRepository;
 import com.buildflow.chat.global.exception.BusinessException;
+import com.buildflow.chat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,6 +59,7 @@ public class ChatService {
     private long streamTimeoutSeconds;
 
     public ChatResponse chat(ChatRequest request) {
+        requireModelReady();
         String sessionId = prepareSession(request);
 
         List<Object> messages = buildMessages(sessionId, request.getMessage());
@@ -88,6 +90,7 @@ public class ChatService {
 
     private void streamInternal(ChatRequest request, SseEmitter emitter, AtomicBoolean disconnected) {
         try {
+            requireModelReady();
             String sessionId = prepareSession(request);
             send(emitter, disconnected, "session", Map.of("sessionId", sessionId));
             List<Object> messages = buildMessages(sessionId, request.getMessage());
@@ -109,7 +112,16 @@ public class ChatService {
         } catch (Exception e) {
             log.warn("채팅 스트림 실패: {}", e.getMessage());
             String code = (e instanceof BusinessException be) ? be.getErrorCode().name() : "CHAT_STREAM_FAILED";
-            completeWithErrorEvent(emitter, code, "답변을 생성하지 못했습니다. 잠시 후 다시 시도해주세요.");
+            String message = (e instanceof BusinessException be)
+                    ? be.getErrorCode().getMessage()
+                    : "답변을 생성하지 못했습니다. 잠시 후 다시 시도해주세요.";
+            completeWithErrorEvent(emitter, code, message);
+        }
+    }
+
+    private void requireModelReady() {
+        if (!ollamaToolService.isAvailable()) {
+            throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
         }
     }
 
