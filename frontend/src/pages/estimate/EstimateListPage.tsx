@@ -162,7 +162,7 @@ export default function EstimateListPage() {
               }}
             >
               <Sparkles size={14} strokeWidth={2.5} />
-              엑셀로 작성
+              공내역서 AI 파싱
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.02 }}

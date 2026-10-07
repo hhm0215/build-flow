@@ -52,6 +52,13 @@ afterEach(() => {
 })
 
 describe('EstimateListPage', () => {
+  it('엑셀 버튼을 파일 보존이나 엑셀 편집으로 오해하지 않도록 AI 파싱으로 표시한다', () => {
+    render(<MemoryRouter><EstimateListPage /></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: '공내역서 AI 파싱' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '엑셀로 작성' })).not.toBeInTheDocument()
+  })
+
   it('작성 중인 견적에만 확정 버튼을 표시하고 해당 견적을 선택한다', () => {
     render(<MemoryRouter><EstimateListPage /></MemoryRouter>)
 
