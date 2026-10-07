@@ -34,7 +34,7 @@
 - 담당: 주 에이전트 배포·외부 실측, `security-reviewer`·`infrastructure-reviewer` 독립 사전 검토. [PR #84](https://github.com/hhm0215/build-flow/pull/84)의 10개 체크와 병합 `main` CI run `37573098778` 성공. 기대/실제 SHA `9b7ea8828ea722ab2ffcee02304d89020af024f9`, VPS 작업 트리 청결. 사용자 소유 로컬 `EstimateService.java` 변경은 PR·배포에서 제외했다.
 - S02/S03: `.env` 권한 메타데이터 `root:root 0600` 확인, 값 비출력. 4파일 Compose `config --quiet` 및 JSON 기반 공개 포트·CORS·Caddy 저장소 검증 PASS. 고정 host key·비root BatchMode SSH 사전 점검에서 비loopback 리스닝은 IPv4/IPv6 22/80/443만 관측했다.
 - 배포 직전 실제 실행 frontend image ID를 `buildflow-frontend:pre-pr84`로 태그하고 동일 ID임을 확인했다. 서버를 정확한 병합 SHA에 detached checkout한 뒤 frontend만 단독 빌드·`--no-deps --no-build` 재생성했다. 새 frontend image ID는 보존 이미지와 다르고 restart 0/OOM false, chat image는 이전 ID 그대로 restart 0/OOM false였다. DB·업로드·다른 서비스·Caddy·SSH·방화벽은 변경하지 않았다.
-- S04/S06/S10: 외부 HTTPS `/login` 200 및 TLS 검증 성공, `/api/v1/clients` 무인증 401. Gateway·8081~8087 health 200, loopback frontend 200, 루트 디스크 15%, 가용 RAM 약 2.5 GiB. 인증 세션이 만료되어 새 거래처 수정 UI의 실제 저장·재조회는 **PENDING**이며 테스트 데이터 수정은 하지 않았다. 이미지 되돌리기 실측, 새 도메인 동일 토큰 로그아웃 401, 인증서 자동 갱신, 전체 CRUD/PDF·외부 백업/격리 복원·DB 마이그레이션은 계속 PENDING이다.
+- S04/S06/S10: 외부 HTTPS `/login` 200 및 TLS 검증 성공, `/api/v1/clients` 무인증 401. Gateway·8081~8087 health 200, loopback frontend 200, 루트 디스크 15%, 가용 RAM 약 2.5 GiB. 이후 관리자 브라우저 세션에서 `[QA]` 합성 거래처→현장(ID 4) 생성·연결, 거래처 PUT 저장·새로고침 재조회 **PASS**(2026-10-07 05:00 UTC); 기존 레코드는 변경하지 않았다. 이미지 되돌리기 실측, 새 도메인 동일 토큰 로그아웃 401, 인증서 자동 갱신, 나머지 CRUD/PDF·외부 백업/격리 복원·DB 마이그레이션은 계속 PENDING이다.
 - 후속 문서 전용 병합으로 `main` SHA가 앞서면 서버의 배포 코드와 차이를 다음 릴리스 게이트에서 대조한다. 문서만 갱신된 SHA를 새 애플리케이션 배포로 표시하지 않는다.
 
 ### 최근 게이트 증거 — 2026-10-06 12:12 UTC, public 테스트 전용
