@@ -28,6 +28,7 @@ import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
 import { calculateDocumentProfit } from '../../utils/estimate'
 import SiteEditModal from './SiteEditModal'
+import ClientEditModal from './ClientEditModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   IN_PROGRESS: '시공 중',
@@ -263,6 +264,7 @@ export default function SiteDetailPage() {
 
   const [tab, setTab] = useState<string>('estimates')
   const [editOpen, setEditOpen] = useState(false)
+  const [clientEditOpen, setClientEditOpen] = useState(false)
 
   const handleStatusChange = (next: SiteStatus) => {
     if (!site || next === site.status) return
@@ -326,6 +328,7 @@ export default function SiteDetailPage() {
       <SiteHeaderHero
         site={site}
         onEdit={() => setEditOpen(true)}
+        onClientEdit={() => setClientEditOpen(true)}
         onStatusChange={handleStatusChange}
         statusChanging={updateStatus.isPending}
       />
@@ -653,6 +656,9 @@ export default function SiteDetailPage() {
         />
       </motion.section>
       {editOpen && <SiteEditModal site={site} onClose={() => setEditOpen(false)} />}
+      {clientEditOpen && site.client && (
+        <ClientEditModal client={site.client} onClose={() => setClientEditOpen(false)} />
+      )}
     </div>
   )
 }
@@ -660,11 +666,13 @@ export default function SiteDetailPage() {
 function SiteHeaderHero({
   site,
   onEdit,
+  onClientEdit,
   onStatusChange,
   statusChanging,
 }: {
   site: Site
   onEdit: () => void
+  onClientEdit: () => void
   onStatusChange: (status: SiteStatus) => void
   statusChanging: boolean
 }) {
@@ -765,6 +773,15 @@ function SiteHeaderHero({
           >
             현장 수정
           </Button>
+          {site.client && (
+            <Button
+              icon={<Pencil size={14} />}
+              onClick={onClientEdit}
+              style={{ width: '100%', marginTop: 8 }}
+            >
+              거래처 수정
+            </Button>
+          )}
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 12, marginBottom: 4 }}>
             등록일
           </div>

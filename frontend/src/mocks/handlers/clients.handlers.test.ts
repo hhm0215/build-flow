@@ -12,6 +12,42 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterAll(() => server.close())
 
 describe('거래처·현장 MSW 계약', () => {
+  it('거래처 수정은 연결된 현장 조회에도 반영하고 존재하지 않는 ID를 거부한다', async () => {
+    const created = await fetch(clientsUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyName: '수정 전 거래처' }),
+    })
+    const client = (await created.json() as ApiResponse<Client>).data
+    const siteCreated = await fetch(sitesUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteName: '연결 현장', clientId: client.id }),
+    })
+    const site = (await siteCreated.json() as ApiResponse<Site>).data
+    const updateBody = {
+      companyName: '수정 후 거래처', representative: null, businessNo: null,
+      phone: null, email: null, address: null, memo: null,
+    }
+    const updated = await fetch(new URL(`/api/v1/clients/${client.id}`, document.baseURI), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateBody),
+    })
+    expect(updated.status).toBe(200)
+    expect((await updated.json() as ApiResponse<Client>).data.companyName).toBe('수정 후 거래처')
+
+    const siteRead = await fetch(new URL(`/api/v1/sites/${site.id}`, document.baseURI))
+    expect((await siteRead.json() as ApiResponse<Site>).data.client?.companyName).toBe('수정 후 거래처')
+
+    const missing = await fetch(new URL('/api/v1/clients/999999', document.baseURI), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updateBody),
+    })
+    expect(missing.status).toBe(404)
+  })
+
   it('회사명 필수 검증 후 생성한 거래처를 목록·현장 생성에서 사용한다', async () => {
     const invalid = await fetch(clientsUrl, {
       method: 'POST',

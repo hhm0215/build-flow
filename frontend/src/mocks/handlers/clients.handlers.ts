@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { ApiResponse, Client, ClientCreateRequest } from '../../types'
+import type { ApiResponse, Client, ClientCreateRequest, ClientUpdateRequest } from '../../types'
 import { mockSites } from '../data/sites.data'
 
 let clients = mockSites.flatMap((site) => site.client ? [site.client] : [])
@@ -40,5 +40,27 @@ export const clientsHandlers = [
       { success: true, data: client, error: null },
       { status: 201 },
     )
+  }),
+  http.put<{ id: string }, ClientUpdateRequest>('/api/v1/clients/:id', async ({ params, request }) => {
+    const index = clients.findIndex((client) => client.id === Number(params.id))
+    if (index === -1) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '거래처를 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
+    const body = await request.json()
+    if (!body.companyName?.trim()) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '업체명은 필수입니다.' },
+        { status: 400 },
+      )
+    }
+    clients[index] = {
+      ...clients[index],
+      ...body,
+      updatedAt: new Date().toISOString(),
+    }
+    return HttpResponse.json<ApiResponse<Client>>({ success: true, data: clients[index], error: null })
   }),
 ]

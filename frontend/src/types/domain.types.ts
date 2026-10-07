@@ -34,6 +34,16 @@ export interface ClientCreateRequest {
   memo?: string
 }
 
+export interface ClientUpdateRequest {
+  companyName: string
+  representative: string | null
+  businessNo: string | null
+  phone: string | null
+  email: string | null
+  address: string | null
+  memo: string | null
+}
+
 // ── Site (현장) ───────────────────────────────
 export type SiteStatus = 'IN_PROGRESS' | 'SETTLING' | 'WARRANTY' | 'COMPLETED'
 

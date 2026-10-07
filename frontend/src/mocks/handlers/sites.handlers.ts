@@ -5,6 +5,10 @@ import { findMockClientById } from './clients.handlers'
 
 let sites = [...mockSites]
 
+function withCurrentClient(site: Site): Site {
+  return { ...site, client: site.client ? findMockClientById(site.client.id) : null }
+}
+
 export const sitesHandlers = [
   // 목록 조회 — GET /api/v1/sites
   http.get('/api/v1/sites', ({ request }) => {
@@ -14,7 +18,7 @@ export const sitesHandlers = [
 
     return HttpResponse.json<ApiResponse<Site[]>>({
       success: true,
-      data: filtered,
+      data: filtered.map(withCurrentClient),
       error: null,
     })
   }),
@@ -28,7 +32,7 @@ export const sitesHandlers = [
         { status: 404 },
       )
     }
-    return HttpResponse.json<ApiResponse<Site>>({ success: true, data: site, error: null })
+    return HttpResponse.json<ApiResponse<Site>>({ success: true, data: withCurrentClient(site), error: null })
   }),
 
   // 생성 — POST /api/v1/sites
