@@ -73,10 +73,10 @@ public class OllamaService {
         } catch (BusinessException e) {
             throw e;
         } catch (WebClientRequestException e) {
-            log.error("Ollama 연결 실패: {}", e.getMessage());
+            log.error("Ollama 연결 실패");
             throw new BusinessException(ErrorCode.OLLAMA_API_FAILED);
         } catch (Exception e) {
-            log.error("Ollama API 호출 실패", e);
+            log.error("Ollama API 호출 실패");
             throw new BusinessException(ErrorCode.OLLAMA_API_FAILED);
         }
     }
@@ -86,7 +86,7 @@ public class OllamaService {
         try {
             return objectMapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
-            log.error("Ollama 응답 JSON 파싱 실패: {}", text);
+            log.error("Ollama 응답 JSON 파싱 실패");
             throw new BusinessException(ErrorCode.OLLAMA_PARSE_FAILED);
         }
     }
@@ -95,7 +95,7 @@ public class OllamaService {
         int start = text.indexOf('[');
         int end = text.lastIndexOf(']');
         if (start == -1 || end == -1 || start > end) {
-            log.error("JSON 배열을 찾을 수 없음: {}", text);
+            log.error("Ollama 응답에서 JSON 배열을 찾을 수 없음");
             throw new BusinessException(ErrorCode.OLLAMA_PARSE_FAILED);
         }
         return text.substring(start, end + 1);
