@@ -32,10 +32,6 @@ const updateSite = async ({ id, ...body }: SiteUpdateRequest & { id: number }) =
   return res.data.data
 }
 
-const deleteSite = async (id: number) => {
-  await axiosInstance.delete(`/sites/${id}`)
-}
-
 const updateSiteStatus = async ({ id, status }: { id: number; status: string }) => {
   const res = await axiosInstance.patch<ApiResponse<Site>>(`/sites/${id}/status`, { status })
   return res.data.data
@@ -79,14 +75,6 @@ export function useUpdateSite() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateSite,
-    onSuccess: () => invalidateSiteDependents(queryClient),
-  })
-}
-
-export function useDeleteSite() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: deleteSite,
     onSuccess: () => invalidateSiteDependents(queryClient),
   })
 }

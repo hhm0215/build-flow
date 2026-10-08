@@ -63,7 +63,7 @@
 | GET | /api/v1/sites/{id} | `SiteResponse` (손익 별도) | O |
 | PUT | /api/v1/sites/{id} | JSON `SiteUpdateRequest` → `SiteResponse` | O |
 | PATCH | /api/v1/sites/{id}/status | JSON `{status}` → `SiteResponse` | O |
-| DELETE | /api/v1/sites/{id} | 현장 삭제 | O |
+| DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 보관·복원 도입 전까지 사용 금지 | O |
 | GET | /api/v1/sites/{id}/profit | `ProfitResponse` | O |
 
 생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다.

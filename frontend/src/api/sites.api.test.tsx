@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import axiosInstance from './axiosInstance'
-import { useCreateSite, useDeleteSite, useUpdateSite, useUpdateSiteStatus, SITES_KEY } from './sites.api'
+import { useCreateSite, useUpdateSite, useUpdateSiteStatus, SITES_KEY } from './sites.api'
 import { DASHBOARD_KEY } from './dashboard.api'
 
 afterEach(() => vi.restoreAllMocks())
@@ -58,12 +58,4 @@ describe('site mutations', () => {
     expectSiteAndDashboardInvalidated(queryClient)
   })
 
-  it('삭제 후 현장 목록과 대시보드 캐시를 stale 처리한다', async () => {
-    vi.spyOn(axiosInstance, 'delete').mockResolvedValue({})
-    const { result, queryClient } = setup(() => useDeleteSite())
-
-    await act(async () => { await result.current.mutateAsync(1) })
-
-    expectSiteAndDashboardInvalidated(queryClient)
-  })
 })

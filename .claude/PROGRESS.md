@@ -5,10 +5,16 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — 현장 삭제 fail-closed (2026-10-08)
+
+- 사용자가 연계 자료 보존 방식을 위임해 ADR-021에서 현장·거래처는 복원 가능한 보관을 우선하고 일반 하드 삭제를 금지하기로 했다. 무조건 `siteRepository.delete`하던 현장 DELETE는 기존 ID 409·없는 ID 404로 바꾸고, 프론트 MSW 계약과 실제 UI에서 사용하지 않는 삭제 mutation을 정리했다. 관리자 검증 스크립트는 더 이상 임시 현장을 만들거나 지우지 않고 로그인→인증 목록 조회→로그아웃 후 같은 토큰 401을 점검하도록 변경했다. 공개 서버 반영·실제 409·보관/복원은 아직 PENDING이다.
+- 독립 아키텍처 검토에서 삭제 차단은 타당하지만 네 업무 서비스의 임의 `siteId` 생성과 보관 경합이 남는다고 확인했다. 단순 Feign 조회→저장만으로 경합을 막을 수 없고, DB 마이그레이션·복원 및 서비스 간 쓰기 방벽을 마련한 뒤 보관 UI를 노출해야 한다.
+- 전체 `./gradlew test`와 `:site-service:test`에서 기존/없는 ID의 서비스 및 HTTP 409/404 회귀 PASS, 프론트 lint·40파일 133테스트·build PASS, 관리자 스모크 mock 회귀 PASS. 독립 보안 검토가 관리자 스모크의 인증정보 리다이렉트 위험과 mock 누락을 지적하여 BaseUrl을 HTTPS/loopback HTTP로 제한하고 모든 요청의 자동 리다이렉트 차단 및 인자 전달 검증을 추가했다. 현재 검증은 로컬이며 공개 VPS의 409 응답은 아직 미검증이다. 전체 Gradle 실행에는 기존 Gradle 9 비호환 deprecated feature 경고가 남는다.
+
 ## 현재 진행 중 — 파싱 입력·로그 안전성 (2026-10-08)
 
 - 공내역서 업로드 UI의 `.xls` 허용 표기가 실제 백엔드 `.xlsx` 전용 정책과 달라 일치시켰다. 파싱 시작/실패와 Ollama 오류에서 원본 파일명, 예외 상세, 모델 응답 원문을 서버 로그에 남기지 않도록 수정했다. 손상된 워크북의 POI 런타임 예외도 안전한 업무 오류로 변환한다.
-- 독립 `security-reviewer` 재검토에서 변경 코드의 직접 민감정보 로그 차단과 형식·크기 일치는 PASS, 전 서비스 로그/운영 컨테이너·실제 AI 파싱은 PENDING/UNVERIFIED로 구분했다. `:estimate-service:test`, 프론트 lint·40파일 133테스트·build는 로컬 PASS(기존 대형 번들·테스트 환경 경고). 공개 VPS는 아직 이 변경을 적용하지 않았다.
+- 독립 `security-reviewer` 재검토에서 변경 코드의 직접 민감정보 로그 차단과 형식·크기 일치는 PASS, 전 서비스 로그/운영 컨테이너·실제 AI 파싱은 PENDING/UNVERIFIED로 구분했다. `:estimate-service:test`, 프론트 lint·40파일 133테스트·build는 로컬 PASS(기존 대형 번들·테스트 환경 경고). [PR #88](https://github.com/hhm0215/build-flow/pull/88) 단일 커밋·10개 CI와 병합 `main` SHA `403014a`의 CI 5개 PASS 후 `develop`을 동기화했다. 독립 인프라 조건부 GO에 따라 VPS 기존 estimate/frontend 실행 이미지를 `pre-pr88`로 각각 보존하고 새 SHA clean checkout·4파일 Compose/노출 검증 뒤 두 이미지만 순차 빌드·재생성했다. 전체 16개 Up, 두 새 컨테이너 restart 0/OOM false, Gateway·8081~8087/frontend 200, 외부 TLS 검증 0·HTTP 308·무인증 현장/견적 401, 로그인된 UI의 `.xlsx` 안내를 확인했다. 상세 게이트는 `docs/SECURITY_OPERATIONS.md`. 실제 모델 파싱과 실데이터 운영 게이트는 PENDING이다.
 
 ## 현재 진행 중 — 공개 파일럿 업무 QA·AI 가용성 (2026-10-07)
 

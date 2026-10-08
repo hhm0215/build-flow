@@ -19,8 +19,13 @@ function Invoke-RestMethod {
         [hashtable]$Headers,
         [string]$ContentType,
         [byte[]]$Body,
-        [int]$TimeoutSec
+        [int]$TimeoutSec,
+        [int]$MaximumRedirection
     )
+
+    if (-not $PSBoundParameters.ContainsKey('MaximumRedirection') -or $MaximumRedirection -ne 0) {
+        throw 'Redirects must be disabled for credential and token requests.'
+    }
 
     if ($Uri -match '/auth/login$' -and $Method -eq 'Post') {
         return [pscustomobject]@{ success = $true; data = [pscustomobject]@{ accessToken = 'test-only-token' } }
@@ -34,19 +39,7 @@ function Invoke-RestMethod {
         }
         return [pscustomobject]@{ success = $true; data = @() }
     }
-    if ($Uri -match '/sites$' -and $Method -eq 'Post') {
-        $script:siteName = ([Text.Encoding]::UTF8.GetString($Body) | ConvertFrom-Json).siteName
-        return [pscustomobject]@{ success = $true; data = [pscustomobject]@{ id = 77 } }
-    }
-    if ($Uri -match '/sites/77$' -and $Method -eq 'Get') {
-        return [pscustomobject]@{ success = $true; data = [pscustomobject]@{ siteName = $script:siteName } }
-    }
-    if ($Uri -match '/sites/77$' -and $Method -eq 'Delete') {
-        $script:deleted = $true
-        return [pscustomobject]@{ success = $true }
-    }
     if ($Uri -match '/auth/logout$' -and $Method -eq 'Post') {
-        if (-not $script:deleted) { throw 'Logout preceded temporary site cleanup.' }
         $script:loggedOut = $true
         return [pscustomobject]@{ success = $true }
     }
@@ -58,8 +51,6 @@ function Invoke-Case {
 
     $script:reusedStatus = $ReusedStatus
     $script:loggedOut = $false
-    $script:deleted = $false
-    $script:siteName = $null
     $failed = $false
     try {
         . (Join-Path $PSScriptRoot 'verify-admin.ps1') -BaseUrl 'http://127.0.0.1:13000'
@@ -70,8 +61,27 @@ function Invoke-Case {
     }
 
     if ($failed -eq $ExpectSuccess) { throw "Unexpected verifier outcome for reused status $ReusedStatus." }
-    if (-not $script:deleted -or -not $script:loggedOut) {
-        throw "Cleanup or logout was skipped for reused status $ReusedStatus."
+    if (-not $script:loggedOut) {
+        throw "Logout was skipped for reused status $ReusedStatus."
+    }
+}
+
+function Assert-UnsafeBaseUrlRejected {
+    param([string]$BaseUrl)
+
+    $script:loggedOut = $false
+    $rejected = $false
+    try {
+        . (Join-Path $PSScriptRoot 'verify-admin.ps1') -BaseUrl $BaseUrl
+    }
+    catch {
+        if ($_.Exception.Message -match 'BaseUrl must be HTTPS or loopback HTTP') {
+            $rejected = $true
+        }
+        else { throw }
+    }
+    if (-not $rejected -or $script:loggedOut) {
+        throw "Unsafe BaseUrl was not rejected before authentication."
     }
 }
 
@@ -79,4 +89,7 @@ Invoke-Case -ReusedStatus 401 -ExpectSuccess $true
 Invoke-Case -ReusedStatus 200 -ExpectSuccess $false
 Invoke-Case -ReusedStatus 403 -ExpectSuccess $false
 Invoke-Case -ReusedStatus 500 -ExpectSuccess $false
+Assert-UnsafeBaseUrlRejected -BaseUrl 'http://example.com'
+Assert-UnsafeBaseUrlRejected -BaseUrl 'https://example.com/other-path'
+Assert-UnsafeBaseUrlRejected -BaseUrl 'https://user:password@example.com'
 Write-Host "Admin smoke verifier tests passed."

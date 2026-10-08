@@ -13,7 +13,7 @@
 
 | ID | 점검 | 통과 근거 | 현재 상태 |
 |---|---|---|---|
-| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(public) — PR #84 및 병합 `main` CI 통과, merge SHA `9b7ea88` 서버 clean checkout; frontend 이미지만 적용 |
+| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(public) — PR #88 및 병합 `main` CI 통과, merge SHA `403014a` 서버 clean checkout; estimate/frontend 이미지만 적용 |
 | S02 | `.env`와 키 보호 | 서버 `.env` 소유/모드 `root:root 0600`, 값 비출력; 개인키 미복사 | PASS — 서버 메타데이터 확인 |
 | S03 | 내부 서비스 포트 비공개 | Compose 검증 + 호스트 IPv4/IPv6 리스닝 + 외부망 접속 확인. public은 22/80/443만, private은 22만 | PASS(public) — 비loopback 22/80/443만, 내부 포트 외부 접근 불가 |
 | S04 | 관리자 인증 | 공개 회원가입 없음; 무인증 업무 API 401; 로그인 후 권한 경계 | PASS(public 기본 동선) — 사용자 직접 로그인·대시보드 재조회, 무인증 업무 API 401·가입 403 |
@@ -22,12 +22,19 @@
 | S07 | 웹 남용·CORS | 실제 공개 경로의 로그인 429, 변형 경로/위조 XFF 우회 실패, 미허용 Origin 거부 | PASS(검사 표본) — 기존 공개 경로에서 위조 XFF를 바꾼 빈 로그인 요청 429·변형 경로 403; 새 도메인에서 허용 Origin 200/정확한 ACAO, 미허용 Origin 403, 비지원 GET 로그인 405. 새 주소의 429 재검사는 PENDING |
 | S08 | SSH 복구·하드닝 | 일반 계정 키·Web Console 복구 확인 후 root/password/keyboard-interactive 정책과 `sshd -t`·별도 재접속 검증. 외부 22 차단 시 독립 배포·점검·알림·원격 재개방 실측 | PASS(현재 정책) — password/kbd-interactive no, 키·Web Console 복구; root 키·22는 유지. 장래 22 차단은 PENDING |
 | S09 | OS·의존성 패치 | 보안 업데이트/커널 상태와 영향 평가, 재부팅 시 서비스 복귀 검증 | PASS(커널·재부팅) / PENDING(잔여 업데이트 영향 평가·적용) — 6.8.0-146 재부팅 후 health 복귀; 2026-10-07 `libfreetype6` 보안 업데이트와 Compose plugin 업데이트 2건 대기 |
-| S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(public 기본 health) / PENDING(전 서비스 비밀값 로그 검토) — 2026-10-07 Gateway·8081~8087 health 200, frontend 200, 변경된 frontend·chat 컨테이너 restart 0/OOM false, 디스크·RAM 여유. 나머지 컨테이너의 최신 restart/OOM은 UNVERIFIED |
+| S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(public 기본 health) / PENDING(전 서비스 비밀값 로그 검토) — 2026-10-08 Gateway·8081~8087 health 200, frontend 200, 변경된 estimate·frontend 컨테이너 restart 0/OOM false, 디스크·RAM 여유. 나머지 컨테이너의 최신 restart/OOM은 UNVERIFIED |
 | S11 | 실패 복귀 | SSH 터널 200/401 보존, 공개 실패 시 Caddy 제거 후 private 복귀, named volume 유지 | PASS — Host 게이트 실패 시 볼륨 보존 `down`→private `up`, 200/401·22만 공개 확인 후 수정 재공개 |
 
 **공개 결정:** 사용자가 승인한 테스트 데이터 전용 80/443 파일럿을 운영 중이다. 첫 공개에서 S06 Host 실패를 발견해 볼륨 보존 롤백했고, PR #75의 5개 CI 통과·독립 리뷰·재배포 뒤 정상 호스트와 잘못된 Host의 외부 응답을 재검증했다. S05 공개 경로의 동일 토큰 로그아웃 401, 실제 인증서 갱신, 전 서비스 로그 검토는 미완료다. 이 상태를 실데이터 운영 승인으로 해석하지 않는다. 외부 백업·격리 복원과 DB 마이그레이션/최소 권한 전에는 업무 원본을 입력하지 않는다.
 
 **SSH와 CI/CD:** CI만으로 VPS 배포 경로가 생기지 않는다. 현재 Web Console 접속 기록에는 내부 root 공개키 경로가 있어 `PermitRootLogin no`를 복구 검증 없이 적용하지 않는다. `PasswordAuthentication`뿐 아니라 `KbdInteractiveAuthentication`의 유효 설정도 확인한다. 외부 22 차단은 터널과 일일 SSH 점검을 끊는다. 운영 VPS에 일반 self-hosted Actions runner나 Docker/root 권한을 배포 우회책으로 추가하지 않는다(현재 GitHub 저장소는 PUBLIC). 온디맨드 22는 ADR-020의 대체 경로를 실측한 뒤 별도 승인·롤백 절차로 검토한다.
+
+### 최근 게이트 증거 — 2026-10-08 00:43 UTC, public 테스트 전용
+
+- 담당: 주 에이전트 배포·외부/UI 실측, `security-reviewer` 파싱 로그 독립 검토, `infrastructure-reviewer` 배포 사전 점검. [PR #88](https://github.com/hhm0215/build-flow/pull/88)의 단일 커밋·10개 CI PASS 및 병합 `main` SHA `403014a5fd6f2c81c52598ebf07be0eaaece3a10`의 [CI 5개 PASS](https://github.com/hhm0215/build-flow/actions/runs/37708416765)를 확인했다. 변경은 estimate-service 파싱 경로와 frontend 업로드 표기·테스트·문서뿐이며 DB/DDL/Compose 변경은 없다.
+- S01/S02/S03: 배포 전 VPS clean SHA `9eb2bd0`과 `.env` 메타데이터 `root:root 0600`, 비loopback 22/80/443, 헬스·자원 여유를 독립 확인했다. Web Console에서 실제 실행 estimate/frontend 이미지 ID와 `latest` 일치를 확인하고 각각 `pre-pr88` 롤백 태그로 보존·ID 대조했다. VPS를 정확한 병합 SHA로 detached clean checkout하고 `PUBLIC_HOST`를 적용한 4파일 Compose 구문·공개 포트/CORS 검사 PASS 후 두 이미지만 순차 빌드·`--no-deps --no-build` 단독 재생성했다. DB·볼륨·다른 서비스·Caddy·SSH·방화벽은 변경하지 않았다.
+- S04/S06/S10: 새 estimate/frontend 이미지 ID가 이전과 다르고 두 컨테이너 running·restart 0·OOM false, 전체 16개 컨테이너 Up. Gateway와 8081~8087 health 및 frontend 200, 외부 HTTPS `/login` 200/TLS 검증 0, HTTP 308→정확한 HTTPS 주소, 무인증 현장·견적 API 401을 확인했다. 호스트의 비loopback 리스닝은 22/80/443뿐이며 loopback DNS 53은 별개다. 로그인된 새로고침 UI에서 업로드 지원 형식 `.xlsx`를 확인했다. Web Console은 점검 후 닫았다.
+- PENDING: 실제 모델 기동·파일 파싱 성공, 전체 서비스의 민감정보 로그 검토, 공개 경로 동일 토큰 로그아웃 401, 인증서 자동 갱신, 이번 릴리스 이미지 롤백 실행, 전체 CRUD/PDF, 외부 DB+업로드 동시 백업·격리 복원과 버전 관리형 마이그레이션. 따라서 실데이터 운영 승격은 여전히 금지한다.
 
 ### 최근 게이트 증거 — 2026-10-08 00:17 UTC, public 테스트 전용
 
