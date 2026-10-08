@@ -79,10 +79,9 @@ public class SiteService {
         return SiteResponse.from(site);
     }
 
-    @Transactional
     public void delete(Long id) {
-        Site site = getSite(id);
-        siteRepository.delete(site);
+        getSite(id);
+        throw new BusinessException(ErrorCode.SITE_DELETION_DISABLED);
     }
 
     private Site getSite(Long id) {

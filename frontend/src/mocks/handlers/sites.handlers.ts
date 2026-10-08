@@ -114,9 +114,17 @@ export const sitesHandlers = [
     return HttpResponse.json<ApiResponse<Site>>({ success: true, data: sites[index], error: null })
   }),
 
-  // 삭제 — DELETE /api/v1/sites/:id
+  // 보관/복원 전까지 하드 삭제 차단 — DELETE /api/v1/sites/:id
   http.delete<{ id: string }>('/api/v1/sites/:id', ({ params }) => {
-    sites = sites.filter((s) => s.id !== Number(params.id))
-    return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
+    if (!sites.some((s) => s.id === Number(params.id))) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '현장을 찾을 수 없습니다.' },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json<ApiResponse<null>>(
+      { success: false, data: null, error: '현장 삭제는 연결 자료 보존을 위해 지원하지 않습니다. 보관 기능을 준비 중입니다.' },
+      { status: 409 },
+    )
   }),
 ]

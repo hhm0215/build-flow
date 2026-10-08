@@ -372,7 +372,7 @@ estimate-service/src/main/java/com/buildflow/estimate/
 - **생성**: `POST /api/v1/sites` — 거래처(Client)와 연결
 - **조회**: `GET /api/v1/sites`, `GET /api/v1/sites/{id}`
 - **수정**: `PUT /api/v1/sites/{id}`
-- **삭제**: `DELETE /api/v1/sites/{id}`
+- **삭제**: `DELETE /api/v1/sites/{id}` — 연결 자료 보존을 위해 현재 차단(기존 ID 409, 없는 ID 404); 보관·복원 도입 예정
 - **상태 변경**: `PATCH /api/v1/sites/{id}/status`
 
 **현장 상태 흐름:**

@@ -120,4 +120,19 @@ describe('거래처·현장 MSW 계약', () => {
     })
     expect(unknownClient.status).toBe(404)
   })
+
+  it('현장 DELETE는 409로 차단하고 기존 현장을 보존한다', async () => {
+    const created = await fetch(sitesUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteName: '보존할 현장' }),
+    })
+    const site = (await created.json() as ApiResponse<Site>).data
+    const siteUrl = new URL(`/api/v1/sites/${site.id}`, document.baseURI)
+
+    const rejected = await fetch(siteUrl, { method: 'DELETE' })
+    expect(rejected.status).toBe(409)
+    expect((await fetch(siteUrl)).status).toBe(200)
+    expect((await fetch(new URL('/api/v1/sites/999999', document.baseURI), { method: 'DELETE' })).status).toBe(404)
+  })
 })

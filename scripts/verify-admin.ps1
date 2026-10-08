@@ -6,20 +6,28 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$parsedBaseUrl = $null
+if (-not [Uri]::TryCreate($BaseUrl, [UriKind]::Absolute, [ref]$parsedBaseUrl) -or
+    -not [string]::IsNullOrEmpty($parsedBaseUrl.UserInfo) -or
+    $parsedBaseUrl.AbsolutePath -ne '/' -or
+    -not [string]::IsNullOrEmpty($parsedBaseUrl.Query) -or
+    -not [string]::IsNullOrEmpty($parsedBaseUrl.Fragment) -or
+    -not ($parsedBaseUrl.Scheme -eq 'https' -or
+          ($parsedBaseUrl.Scheme -eq 'http' -and $parsedBaseUrl.IsLoopback))) {
+    throw "BaseUrl must be HTTPS or loopback HTTP, without credentials, path, query, or fragment."
+}
+
 $loginId = Read-Host "Admin login ID"
 $securePassword = Read-Host "Admin password" -AsSecureString
 $passwordPointer = [IntPtr]::Zero
 $plainPassword = $null
 $loginBody = $null
-$siteBody = $null
 $headers = $null
 $accessToken = $null
-$siteId = $null
-$cleanupFailed = $false
 $verified = $false
 $revocationVerified = $false
 $revocationFailed = $false
-$apiUrl = "$($BaseUrl.TrimEnd('/'))/api/v1"
+$apiUrl = "$($parsedBaseUrl.AbsoluteUri.TrimEnd('/'))/api/v1"
 
 try {
     if ($loginId -cnotmatch '^[A-Za-z0-9._-]{3,50}$') {
@@ -33,54 +41,31 @@ try {
         password = $plainPassword
     } | ConvertTo-Json -Compress))
 
-    $login = Invoke-RestMethod -Uri "$apiUrl/auth/login" -Method Post -ContentType "application/json; charset=utf-8" -Body $loginBody -TimeoutSec 15
+    $login = Invoke-RestMethod -Uri "$apiUrl/auth/login" -Method Post -ContentType "application/json; charset=utf-8" -Body $loginBody -TimeoutSec 15 -MaximumRedirection 0
     if (-not $login.success -or [string]::IsNullOrWhiteSpace($login.data.accessToken)) {
         throw "Admin login did not return an access token."
     }
 
     $accessToken = $login.data.accessToken
     $headers = @{ Authorization = "Bearer $accessToken" }
-    $sites = Invoke-RestMethod -Uri "$apiUrl/sites" -Method Get -Headers $headers -TimeoutSec 15
+    $sites = Invoke-RestMethod -Uri "$apiUrl/sites" -Method Get -Headers $headers -TimeoutSec 15 -MaximumRedirection 0
     if (-not $sites.success) {
         throw "Authenticated site list request failed."
-    }
-
-    $siteName = "BuildFlow smoke $([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
-    $siteBody = [Text.Encoding]::UTF8.GetBytes((@{ siteName = $siteName } | ConvertTo-Json -Compress))
-    $created = Invoke-RestMethod -Uri "$apiUrl/sites" -Method Post -Headers $headers -ContentType "application/json; charset=utf-8" -Body $siteBody -TimeoutSec 15
-    if (-not $created.success -or $null -eq $created.data.id) {
-        throw "Temporary site creation failed."
-    }
-    $siteId = [long]$created.data.id
-
-    $detail = Invoke-RestMethod -Uri "$apiUrl/sites/$siteId" -Method Get -Headers $headers -TimeoutSec 15
-    if (-not $detail.success -or $detail.data.siteName -ne $siteName) {
-        throw "Temporary site detail did not match."
     }
 
     $verified = $true
 }
 finally {
-    if ($null -ne $siteId) {
-        try {
-            Invoke-RestMethod -Uri "$apiUrl/sites/$siteId" -Method Delete -Headers $headers -TimeoutSec 15 | Out-Null
-        }
-        catch {
-            $cleanupFailed = $true
-            Write-Warning "Temporary test site $siteId could not be removed; please inspect it before further testing."
-        }
-    }
-
     if ($null -ne $headers) {
         try {
-            $logout = Invoke-RestMethod -Uri "$apiUrl/auth/logout" -Method Post -Headers $headers -TimeoutSec 15
+            $logout = Invoke-RestMethod -Uri "$apiUrl/auth/logout" -Method Post -Headers $headers -TimeoutSec 15 -MaximumRedirection 0
             if (-not $logout.success) {
                 throw "Admin logout was not confirmed."
             }
 
             $reusedTokenStatus = $null
             try {
-                Invoke-RestMethod -Uri "$apiUrl/sites" -Method Get -Headers $headers -TimeoutSec 15 | Out-Null
+                Invoke-RestMethod -Uri "$apiUrl/sites" -Method Get -Headers $headers -TimeoutSec 15 -MaximumRedirection 0 | Out-Null
                 $reusedTokenStatus = 200
             }
             catch {
@@ -99,7 +84,6 @@ finally {
     }
 
     if ($null -ne $loginBody) { [Array]::Clear($loginBody, 0, $loginBody.Length) }
-    if ($null -ne $siteBody) { [Array]::Clear($siteBody, 0, $siteBody.Length) }
     if ($passwordPointer -ne [IntPtr]::Zero) {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
     }
@@ -108,8 +92,7 @@ finally {
     $headers = $null
 }
 
-if ($cleanupFailed) { throw "Smoke test passed but temporary site cleanup failed." }
 if ($revocationFailed) { throw "Admin logout revocation smoke test failed." }
 if ($verified -and $revocationVerified) {
-    Write-Host "Admin login, site API, and old-token rejection smoke tests passed; temporary site was removed."
+    Write-Host "Admin login, authenticated site list, and old-token rejection smoke tests passed; no site was created."
 }
