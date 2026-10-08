@@ -7,9 +7,10 @@
 
 ## 현재 진행 중 — 현장 삭제 fail-closed (2026-10-08)
 
-- 사용자가 연계 자료 보존 방식을 위임해 ADR-021에서 현장·거래처는 복원 가능한 보관을 우선하고 일반 하드 삭제를 금지하기로 했다. 무조건 `siteRepository.delete`하던 현장 DELETE는 기존 ID 409·없는 ID 404로 바꾸고, 프론트 MSW 계약과 실제 UI에서 사용하지 않는 삭제 mutation을 정리했다. 관리자 검증 스크립트는 더 이상 임시 현장을 만들거나 지우지 않고 로그인→인증 목록 조회→로그아웃 후 같은 토큰 401을 점검하도록 변경했다. 공개 서버 반영·실제 409·보관/복원은 아직 PENDING이다.
+- 사용자가 연계 자료 보존 방식을 위임해 ADR-021에서 현장·거래처는 복원 가능한 보관을 우선하고 일반 하드 삭제를 금지하기로 했다. 무조건 `siteRepository.delete`하던 현장 DELETE는 기존 ID 409·없는 ID 404로 바꾸고, 프론트 MSW 계약과 실제 UI에서 사용하지 않는 삭제 mutation을 정리했다. 관리자 검증 스크립트는 더 이상 임시 현장을 만들거나 지우지 않고 로그인→인증 목록 조회→로그아웃 후 같은 토큰 401을 점검하도록 변경했다. PR #89를 병합해 공개 테스트 VPS의 site-service에 반영했지만, 인증된 실제 DELETE 409와 보관/복원은 아직 PENDING이다.
 - 독립 아키텍처 검토에서 삭제 차단은 타당하지만 네 업무 서비스의 임의 `siteId` 생성과 보관 경합이 남는다고 확인했다. 단순 Feign 조회→저장만으로 경합을 막을 수 없고, DB 마이그레이션·복원 및 서비스 간 쓰기 방벽을 마련한 뒤 보관 UI를 노출해야 한다.
 - 전체 `./gradlew test`와 `:site-service:test`에서 기존/없는 ID의 서비스 및 HTTP 409/404 회귀 PASS, 프론트 lint·40파일 133테스트·build PASS, 관리자 스모크 mock 회귀 PASS. 독립 보안 검토가 관리자 스모크의 인증정보 리다이렉트 위험과 mock 누락을 지적하여 BaseUrl을 HTTPS/loopback HTTP로 제한하고 모든 요청의 자동 리다이렉트 차단 및 인자 전달 검증을 추가했다. 현재 검증은 로컬이며 공개 VPS의 409 응답은 아직 미검증이다. 전체 Gradle 실행에는 기존 Gradle 9 비호환 deprecated feature 경고가 남는다.
+- [PR #89](https://github.com/hhm0215/build-flow/pull/89) 단일 커밋·10개 CI 및 병합 `main` SHA `9435ae98e037218fc145a980b24779dc9ae18bae`의 5개 CI PASS. 인프라 독립 점검 후 VPS 이전 site-service 실행 이미지와 `latest` 일치 확인, `pre-pr89` 태그 보존, clean checkout/4파일 Compose 검사 후 site-service만 빌드·재생성했다. 새 이미지로 running·restart 0·OOM false, 전체 16개 Up, Gateway·8081~8087/frontend 200, 내부/외부 무인증 현장 API 401, 외부 TLS 검증 0·HTTP 308 및 공개 포트 22/80/443을 확인했다. 상세 증거는 `docs/SECURITY_OPERATIONS.md`에 기록한다.
 
 ## 현재 진행 중 — 파싱 입력·로그 안전성 (2026-10-08)
 
