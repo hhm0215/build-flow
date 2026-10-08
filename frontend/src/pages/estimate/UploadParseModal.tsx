@@ -13,7 +13,7 @@ interface UploadParseModalProps {
   onConfirm: (items: ParsedItemResult[], fileName: string) => void
 }
 
-const ACCEPT = '.xlsx,.xls'
+const ACCEPT = '.xlsx'
 const MAX_BYTES = 10 * 1024 * 1024
 
 function formatKRW(n: number) {
@@ -26,8 +26,8 @@ export default function UploadParseModal({ open, onClose, onConfirm }: UploadPar
 
   const handleBeforeUpload = (file: RcFile) => {
     const lower = file.name.toLowerCase()
-    if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
-      message.error('엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.')
+    if (!lower.endsWith('.xlsx')) {
+      message.error('엑셀 파일(.xlsx)만 업로드 가능합니다.')
       return Upload.LIST_IGNORE
     }
     if (file.size > MAX_BYTES) {
@@ -124,7 +124,7 @@ export default function UploadParseModal({ open, onClose, onConfirm }: UploadPar
                   {parseMutation.isPending ? 'AI가 공내역서를 분석 중입니다…' : '공내역서 엑셀 파일을 드래그하거나 클릭하세요'}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.6 }}>
-                  지원 형식: .xlsx, .xls · 최대 10MB
+                  지원 형식: .xlsx · 최대 10MB
                   <br />
                   품목·수량·단가를 자동으로 추출합니다 (Ollama qwen2.5).
                 </div>

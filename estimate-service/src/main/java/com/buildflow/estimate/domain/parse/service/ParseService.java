@@ -18,7 +18,7 @@ public class ParseService {
     private final OllamaService ollamaService;
 
     public ParseResult parse(MultipartFile file) {
-        log.info("공내역서 파싱 시작: {}", file.getOriginalFilename());
+        log.info("공내역서 파싱 시작");
 
         String excelText = excelParserService.extractText(file);
         List<ParsedItemResult> items = ollamaService.parseItems(excelText);

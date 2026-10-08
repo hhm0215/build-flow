@@ -24,8 +24,8 @@ public class ExcelParserService {
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             return buildTableText(sheet);
-        } catch (IOException e) {
-            log.error("엑셀 파일 파싱 실패: {}", file.getOriginalFilename(), e);
+        } catch (IOException | RuntimeException e) {
+            log.error("엑셀 파일 파싱 실패");
             throw new BusinessException(ErrorCode.EXCEL_PARSE_FAILED);
         }
     }
