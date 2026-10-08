@@ -29,6 +29,13 @@
 
 **SSH와 CI/CD:** CI만으로 VPS 배포 경로가 생기지 않는다. 현재 Web Console 접속 기록에는 내부 root 공개키 경로가 있어 `PermitRootLogin no`를 복구 검증 없이 적용하지 않는다. `PasswordAuthentication`뿐 아니라 `KbdInteractiveAuthentication`의 유효 설정도 확인한다. 외부 22 차단은 터널과 일일 SSH 점검을 끊는다. 운영 VPS에 일반 self-hosted Actions runner나 Docker/root 권한을 배포 우회책으로 추가하지 않는다(현재 GitHub 저장소는 PUBLIC). 온디맨드 22는 ADR-020의 대체 경로를 실측한 뒤 별도 승인·롤백 절차로 검토한다.
 
+### 최근 게이트 증거 — 2026-10-08 00:17 UTC, public 테스트 전용
+
+- [PR #86](https://github.com/hhm0215/build-flow/pull/86)은 단일 커밋 `dfc8196`과 PR 10개 CI PASS, 병합 `main` SHA `9eb2bd0a6c5798b3cb65999736fb4c0fb2c28349`의 CI 5개 PASS를 확인했다. 변경된 앱 파일은 프론트 4개뿐이다. `infrastructure-reviewer` 독립 사전 점검에서 이전 VPS SHA의 clean 상태, `.env` `root:root 0600`, HTTPS·포트·health·자원 여유를 PASS로 판정했다.
+- 권한 있는 Web Console에서 **실제 실행** 프론트 이미지 ID와 `latest`가 같음을 확인한 뒤 `pre-pr86`으로 태그하고 ID 동일성을 재확인했다. 서버를 검증된 SHA에 detached checkout, 공개 4파일 Compose 구문과 포트·CORS 격리 검사 PASS 후 프론트 이미지만 빌드·`--no-deps --no-build`로 재생성했다. DB·볼륨·백엔드·Caddy·SSH·방화벽은 변경하지 않았다.
+- S03/S04/S06/S10: 새 프론트는 빌드 이미지 ID로 실행, restart 0/OOM false; 16개 컨테이너 Up. 외부 HTTPS `/login` 200/TLS 검증 0, 무인증 `/api/v1/sites` 401, HTTP→HTTPS 308, 비loopback 리스닝 IPv4/IPv6 22/80/443만 확인했다. 공개 HTML이 새 JS 번들을 가리키고 번들에 수정된 UI 문구가 포함된 것도 확인했다. VPS 작업 트리는 clean이다.
+- PENDING: 관리자 로그인 후 알림·견적 화면의 새 문구 육안 확인, 이번 릴리스 이미지 롤백 **실행** 검증, 공개 경로 동일 토큰 로그아웃 401, 실제 AI 모델/OCR, 전체 삭제 동선, 외부 DB+업로드 동시 백업/격리 복원과 버전 관리형 마이그레이션. 따라서 실데이터 운영 승격은 승인하지 않는다.
+
 ### 최근 게이트 증거 — 2026-10-07 04:52 UTC, public 테스트 전용
 
 - 담당: 주 에이전트 배포·외부 실측, `security-reviewer`·`infrastructure-reviewer` 독립 사전 검토. [PR #84](https://github.com/hhm0215/build-flow/pull/84)의 10개 체크와 병합 `main` CI run `37573098778` 성공. 기대/실제 SHA `9b7ea8828ea722ab2ffcee02304d89020af024f9`, VPS 작업 트리 청결. 사용자 소유 로컬 `EstimateService.java` 변경은 PR·배포에서 제외했다.
