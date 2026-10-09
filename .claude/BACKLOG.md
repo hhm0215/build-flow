@@ -59,7 +59,7 @@
 
 ### 보안·인프라 반복 점검 및 공개 전 하드닝
 - **배경**: 사용자가 공개 전 체크리스트와 역할별 반복 유지보수를 요청했다. UI 로그아웃 토큰 미폐기와 Compose 검증 우회는 수정·비공개 실측했다. SSH 비밀번호·keyboard-interactive를 차단하고 커널 패치/재부팅 복구를 검증했으며 root 키·외부 22는 터널·복구 경로 때문에 유지한다.
-- **산출물**: `AGENTS.md` 하네스·역할 지침·`docs/SECURITY_OPERATIONS.md`, 코드/CI 회귀, 읽기 전용 정기 점검 자동화와 변화 시 알림. SSH 정책 변경·패치/재부팅은 Web Console 및 별도 키 재접속 복구 확인 후 수행.
+- **산출물**: `AGENTS.md` 하네스·역할 지침·`docs/SECURITY_OPERATIONS.md`, 코드/CI 회귀, 사용자 프롬프트마다 마지막 단계의 읽기 전용 보안·인프라 점검과 변화 시 보고. 기존 일일 예약 heartbeat 2건은 2026-10-09 사용자 요청으로 삭제했다. SSH 정책 변경·패치/재부팅은 Web Console 및 별도 키 재접속 복구 확인 후 수행.
 - **경계**: 모니터가 서버 변경·백업 복원·포트 개방·운영 배포를 무인 실행하지 않는다. 이메일/Discord 연동은 수신 채널·secret 설정 후 별도 실측.
 - **관련 파일**: `AGENTS.md`, `.claude/agents/`, `frontend`, `scripts/vps/`, `docs/SECURITY_OPERATIONS.md`
 - **예상 규모**: M
