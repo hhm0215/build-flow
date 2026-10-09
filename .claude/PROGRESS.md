@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 예약 점검을 프롬프트 종료 점검으로 전환 (2026-10-09)
+
+- 사용자의 요청에 따라 Codex의 `BuildFlow 보안 점검`·`BuildFlow 인프라 점검` 일일 heartbeat 2건을 삭제했다. `AGENTS.md`·`CLAUDE.md`·보안 운영 문서·백로그에 BuildFlow 관련 요청마다 마지막 단계의 읽기 전용 보안/인프라 점검과 `PASS/FAIL/PENDING/UNVERIFIED` 구분을 명시했다. 프롬프트가 없을 때는 자동 감시가 돌지 않으며 사전 배포 게이트와 실데이터 운영 제한은 유지된다.
+
 ## 현재 진행 중 — 현장 삭제 fail-closed (2026-10-08)
 
 - 사용자가 연계 자료 보존 방식을 위임해 ADR-021에서 현장·거래처는 복원 가능한 보관을 우선하고 일반 하드 삭제를 금지하기로 했다. 무조건 `siteRepository.delete`하던 현장 DELETE는 기존 ID 409·없는 ID 404로 바꾸고, 프론트 MSW 계약과 실제 UI에서 사용하지 않는 삭제 mutation을 정리했다. 관리자 검증 스크립트는 더 이상 임시 현장을 만들거나 지우지 않고 로그인→인증 목록 조회→로그아웃 후 같은 토큰 401을 점검하도록 변경했다. PR #89를 병합해 공개 테스트 VPS의 site-service에 반영했지만, 인증된 실제 DELETE 409와 보관/복원은 아직 PENDING이다.
@@ -75,7 +79,7 @@
 
 - 공개 전 독립 보안·인프라 리뷰에서 UI 로그아웃이 서버 토큰을 폐기하지 않는 문제와 Compose 포트 검증의 host-network/권한 우회 가능성을 확인했다. `docs/SECURITY_OPERATIONS.md`에 `PASS/FAIL/PENDING/UNVERIFIED` 근거와 공개/실데이터 게이트를 분리하고, `AGENTS.md`·`CLAUDE.md`·`.claude/agents/`에 두 역할을 연결했다.
 - 프론트 로그아웃은 서버 성공 확인 후에만 로컬 상태를 삭제하도록 수정했고 실패 시 토큰을 유지해 재시도한다. Compose 검증기에 host networking·privileged·Docker socket 마운트 차단을 추가했다. 로컬 lint, 프론트 34파일 118테스트/빌드, Python 11테스트, 4파일 Compose 검증 통과. 테스트·빌드는 Windows 샌드박스 상위 경로 접근 제약으로 권한 확장 재실행해 성공했다.
-- Codex 앱의 일일 보안/인프라 읽기 전용 heartbeat 두 건을 등록했다(현지 09:00/09:15 의도). 정상/변화 없음은 조용히, 실패·노출 변화·복구·사용자 판단 필요 시 보고한다. 메일/Discord 수신 채널은 아직 연결되지 않았다.
+- 당시 Codex 앱의 일일 보안/인프라 읽기 전용 heartbeat 두 건을 등록했다(현지 09:00/09:15 의도). 이 두 예약은 2026-10-09 사용자 요청으로 삭제하고 프롬프트 종료 점검으로 바꿨다. 메일/Discord 수신 채널은 아직 연결되지 않았다.
 - **80/443 공개는 여전히 미기동.** 이후 2026-10-03 비공개 경로의 로그아웃 전 토큰 재사용 401을 실측했다. 공인 TLS/포트, SSH root/password, 커널 업데이트·재부팅과 실데이터 운영 게이트는 별도 미해결 항목이다.
 - [PR #69](https://github.com/hhm0215/build-flow/pull/69)은 8개 CI와 local/origin/PR head `0264eb8` 대조 후 merge commit `5a372f2`로 병합했고 `develop`도 fast-forward했다. VPS 서버는 clean checkout을 `5a372f2`에 고정하고 직전 **빌드된** frontend image(`buildflow-frontend:latest`)에 `pre-pr69` 태그를 남긴 뒤 frontend만 재빌드·재기동했다. 앞서 실행 중이던 더 오래된 image ID `542aedda26da`는 저장소에서 이미 제거되어 직접 태그할 수 없었으므로, 이 태그를 실제 직전 실행 이미지의 완전한 롤백 증거로 보지 않는다. private 15개 실행, frontend 200, 무인증 sites 401, 비loopback SSH 22만 확인했다. 공개 Caddy는 아직 기동하지 않았다.
 - SSH 정책 변경은 원격 잠금 위험으로 자동 안전 검토가 중단했다. 서버 설정 파일은 생성되지 않았고 정책도 그대로다. Web Console root 경로와 비root 키 재접속은 확인했으며, 사용자에게 설정 범위·복구 절차를 명시해 승인을 요청했다. 커널 패치/재부팅도 아직 수행하지 않았다.
@@ -612,23 +616,17 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-01 갱신)
+## 다음 세션 진입점 (2026-10-09 갱신)
 
-**Git 상태**: PR #49~#68 merge 완료. `origin/main`·로컬/원격 `develop`은 PR #68 merge commit `49f7274`로 동기화했다. 이 병합 기록은 후처리 문서 커밋으로 반영한다.
+**Git 상태**: 이번 문서 변경 전 `origin/main`·로컬/원격 `develop`은 PR #90 병합 SHA `106f63de3a00ad139aeeddba2c58f2525d23c818`로 동기화했다. `EstimateService.java`의 기존 로컬 미커밋 변경은 사용자 소유로 보존하고 이번 문서 변경에 포함하지 않는다. 다음 세션에는 원격 SHA를 다시 실측한다.
 
-**로컬 실행 상태**: 2026-09-29에는 새 로컬 환경의 15개 컨테이너와 Ollama가 정상임을 확인했으나, 2026-10-01 현재 Docker Desktop Engine은 실행되지 않는다. 현재 컨테이너/API 상태는 미검증이다. 기존 관리자 1명 외 업무 데이터 0행 기준이었으며 `.env`와 `backups/`는 Git에서 제외된다.
+**VPS 상태**: 최근 검증된 앱 배포 SHA는 PR #89의 `9435ae98e037218fc145a980b24779dc9ae18bae`이며 이후 PR #90은 문서 전용이다. 공개 HTTPS는 **테스트 데이터 전용**이다. 2026-10-08에는 16개 컨테이너 Up, frontend/Gateway·업무 서비스 health 200, 무인증 업무 API 401, TLS·HTTP 리다이렉트와 외부 리스닝 22/80/443을 확인했다. 이는 2026-10-09 실시간 재점검 결과가 아니다.
 
-**다음 작업**: VPS 비공개 스택과 웹 로그인·테스트 현장 생성/수정 확인까지 완료했다. PR #68 코드의 공개 HTTPS 적용은 사용자 확인 후 인증서·포트·로그인 검증이 필요하다. CRUD/PDF·재부팅 검증도 남았다. 실데이터 입력 전 DB Phase B의 격리 복원 관리자 대화형 로그인·로그아웃 검증과 Flyway·DB/업로드 파일 복구 체계를 완료한다. CI/CD의 운영 자동 배포는 그 이후 작업이다. 실제 MySQL DDL 확인 전에는 V1을 작성하지 않는다.
+**다음 작업**: `.claude/BACKLOG.md`의 공개 파일럿 CRUD/PDF·AI 검증과 실데이터 운영 게이트(외부 DB+파일 백업·격리 복원, 버전 마이그레이션, 최소 DB 권한)를 따른다. CD는 CI와 별개로 미구축이며, 운영 DB 대상 자동 배포를 아직 켜지 않는다.
 
-**검증 상태**: 2026-10-01 VPS private override Compose 15개 서비스 공개 포트 0, public override는 Caddy 80/443 외 비loopback 포트 0을 정적 검증했다. 독립 보안·배포 리뷰, 전체 Gradle 41 tasks(기존), 프론트 lint·33파일 112테스트·build, Python 5테스트, PR #68 CI 8개 성공. 새 VPS OS·별도 SSH 키 로그인·Docker daemon/Compose, 기본 런타임 health/401 및 웹 로그인·테스트 현장 생성/수정을 실측 성공했다. 공개 HTTPS, 업무 전체 CRUD/PDF·재부팅/복구 및 로컬 컨테이너 런타임 스모크는 미실시다. Config Client 중복 접속/프론트 번들 크기 경고는 P2 백로그다.
+**점검 방식**: 보안·인프라 일일 heartbeat 두 건은 2026-10-09 삭제했다. BuildFlow 관련 사용자 요청마다 마지막 단계에서 `docs/SECURITY_OPERATIONS.md`에 따른 읽기 전용 종료 점검을 수행한다. 프롬프트가 없는 시간의 상시 감시나 메일/Discord 알림은 없다.
 
-**자동화 가이드**: `docs/AUTOMATION_GUIDE.md` (8단계 + 5.5단계 자동 코드 리뷰). ADR-014 능동 발의 규칙은 상시 적용.
-
-**활성화된 워크플로우 자동화** (2026-06-13 갱신):
-- ✅ PR 생성 자동 (`gh pr create`)
-- ✅ PR 자동 머지 (`gh pr merge --merge`) — SHA 검증 안전망 통과 시
-- ✅ main 브랜치 보호 룰: force-push/delete 차단, PR 경로 강제
-- ⚠️ 활성 PR 동안 develop 추가 push 시 PR 본문 즉시 갱신 의무 (RETROSPECTIVE 회고)
+**Git 워크플로우**: `docs/AUTOMATION_GUIDE.md`와 ADR-011의 PR 생성·SHA 검증 후 merge 규칙을 유지한다. 이 문서의 SHA는 기록 당시 스냅샷으로, 후속 PR·배포 판단 때 다시 검증한다.
 
 ## 능동 발의 로그 (실험 종료 — 2026-07-04 확정, 아카이브)
 

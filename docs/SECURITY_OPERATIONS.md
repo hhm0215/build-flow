@@ -95,21 +95,20 @@
 - 세션 저장소/XSS 방어(CSP 등), PDF 형식·페이지·자원 제한, 의존성/이미지 취약점 및 보안 패치 평가.
 - 운영 알림 수신 채널과 실패 복구 절차 검증. GitHub CI 성공은 VPS 배포 성공의 증거가 아니다.
 
-## 반복 점검 — 보안 역할
+## 사용자 프롬프트 종료 점검 — 보안 역할
 
-- 매 변경/매일: Git diff의 인증·권한·입력·비밀값·로그 노출, 공개 경로·CORS·프록시 헤더, `scripts/vps/verify_public_compose.py`와 CI 결과. 새로운 Critical/High는 같은 변경에서 수정하거나 공개/배포 중단.
-- 공개 후 매일: 외부 HTTPS 인증서/리다이렉트·무인증 API 401·의도한 포트만 노출되는지 read-only 확인. 로그인 429는 운영 계정 잠금/서비스 남용을 피하도록 합의한 저빈도 시나리오에서만 실행.
-- 매주: OS/라이브러리/이미지 보안 권고를 공식 출처와 실제 버전으로 대조. CVE 이름만으로 적용성을 단정하지 않는다. SSH 로그인 이벤트는 IP를 공개 문서에 복제하지 않고 이상 징후만 보고.
+- BuildFlow 관련 사용자 요청을 처리할 때마다 마지막 단계에서 Git diff의 인증·권한·입력·비밀값·로그 노출, 공개 경로·CORS·프록시 헤더, 관련 Compose 검증과 CI 결과를 읽기 전용으로 확인한다. 새로운 Critical/High는 같은 변경에서 수정하거나 공개/배포 중단.
+- 공개 파일럿 상태라면 외부 HTTPS 인증서/리다이렉트·무인증 API 401·의도한 포트 노출을 접근 가능한 범위에서 확인한다. 로그인 429는 계정 잠금/서비스 남용을 피하도록 저빈도로만 실행한다. OS/라이브러리/이미지 보안 권고는 공식 출처와 실제 버전으로 대조하며 CVE 이름만으로 적용성을 단정하지 않는다. SSH 로그인 IP를 공개 문서에 복제하지 않는다.
 
-## 반복 점검 — 인프라 역할
+## 사용자 프롬프트 종료 점검 — 인프라 역할
 
-- 매일: 고정 host key·비root `BatchMode` SSH, Git SHA/작업 트리, `.env` 권한 메타데이터, host 리스닝, frontend 200, Gateway와 8081–8087 health, 무인증 업무 API 401, 메모리·디스크·inode. private/public 기대 포트·컨테이너 수를 구분.
+- 매 BuildFlow 관련 사용자 요청의 마지막 단계에서 고정 host key·비root `BatchMode` SSH로 가능한 범위의 Git SHA/작업 트리, `.env` 권한 메타데이터, host 리스닝, frontend 200, Gateway와 8081–8087 health, 무인증 업무 API 401, 메모리·디스크·inode를 확인한다. private/public 기대 포트·컨테이너 수를 구분한다. 연결·권한 부족은 `UNVERIFIED`로 남긴다.
 - 권한 있는 점검에서만 Compose 서비스 수·restart/OOM·image ID와 프록시 오류 로그 요약을 조회. 일반 배포 계정의 Docker 권한 부족은 `UNVERIFIED`로 남기며 sudo/docker 그룹을 자동 부여하지 않는다.
-- 매주: 백업 최신성·오프사이트 보존·격리 복원 증거, 패치/재부팅 계획, 롤백 이미지·커밋 매핑을 확인. 모니터가 복원·재부팅을 자동 실행하지 않는다.
+- 백업 최신성·오프사이트 보존·격리 복원 증거, 패치/재부팅 계획, 롤백 이미지·커밋 매핑의 새 증거와 미해결 게이트를 검토한다. 점검 과정에서 복원·재부팅을 자동 실행하지 않는다.
 - 정상·변화 없음은 조용히 유지하고 장애/복구/노출 변화/SHA 불일치/실패한 게이트만 보고한다. 발견 사항은 `.claude/BACKLOG.md`에 우선순위와 근거를 적고, 수정 PR은 기존 CI/SHA/리뷰 규칙을 따른다.
 
 ## 역할과 실행 경계
 
-`security-reviewer`는 독립 보안 검토, `infrastructure-reviewer`는 가용성·배포·복구 검토를 담당한다. 이들은 상주 프로세스가 아니다. 작업 시 주 에이전트가 독립 서브에이전트로 위임하고 결과를 통합한다. 정기 실행은 Codex heartbeat 자동화가 같은 체크리스트를 다시 평가하도록 별도로 등록한다. 이는 앱 스케줄러·이 PC·네트워크 가용성에 의존하는 주기 점검이지 24시간 서버 감시나 장애 대응 SLA가 아니다. 자동화 알림은 Codex 앱 내 보고이며 이메일·Discord 전송은 별도 수신 채널 설정/검증 전까지 완료로 표시하지 않는다.
+`security-reviewer`는 독립 보안 검토, `infrastructure-reviewer`는 가용성·배포·복구 검토를 담당한다. 이들은 상주 프로세스가 아니다. 작업 시 주 에이전트가 필요에 따라 독립 서브에이전트로 위임하고 결과를 통합한다. 2026-10-09 사용자 요청으로 두 Codex heartbeat 예약을 삭제했다. 대신 BuildFlow 관련 사용자 프롬프트마다 요청 작업을 처리한 **뒤**, 응답 직전 읽기 전용 종료 점검을 수행한다. 사용자가 프롬프트를 보내지 않으면 점검이 실행되지 않으며 24시간 서버 감시나 장애 대응 SLA가 아니다. 이메일·Discord 전송은 별도 수신 채널 설정/검증 전까지 완료로 표시하지 않는다.
 
 참고 기준: [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/), [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html), [Docker 포트 공개](https://docs.docker.com/engine/network/port-publishing/), [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https/).
