@@ -105,6 +105,8 @@ jobs:
       PUBLIC_HOST: example.org
     steps:
       - uses: actions/checkout@v7
+      - name: Test release evidence generator
+        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
       - name: Test exposure validator
         run: python3 -m unittest discover -s scripts/vps -p 'test_verify_public_compose.py'
       - name: Validate Compose exposure and CORS
@@ -158,3 +160,34 @@ jobs:
       - name: Validate Gradle Wrapper
         shell: powershell
         run: .\gradlew.bat --version
+
+  release-candidate:
+    name: 릴리스 후보 증거 (배포 아님)
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [backend, auth-flyway, frontend, public-compose, windows-readiness]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact CI commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test release evidence generator
+        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+      - name: Create non-deployable release evidence
+        env:
+          RESULT_BACKEND: ${{ needs.backend.result }}
+          RESULT_AUTH_FLYWAY: ${{ needs['auth-flyway'].result }}
+          RESULT_FRONTEND: ${{ needs.frontend.result }}
+          RESULT_PUBLIC_COMPOSE: ${{ needs['public-compose'].result }}
+          RESULT_WINDOWS_READINESS: ${{ needs['windows-readiness'].result }}
+        run: python3 scripts/ci/create_release_candidate.py --output "$RUNNER_TEMP/release-candidate.json"
+      - name: Store release evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/release-candidate.json
+          if-no-files-found: error
+          retention-days: 14

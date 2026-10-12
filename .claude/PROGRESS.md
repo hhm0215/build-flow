@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 현재 진행 중 — CD 릴리스 후보 증거 (2026-10-12)
+
+- 기존 5개 CI 검사에 의존하는 `main` push 전용 읽기 권한 job과 후보 JSON 생성기를 준비했다. 정확한 checkout SHA, job 결과, 추적된 배포 파일 SHA-256을 검증하며 `deploy_authorized=false`·`real_data_ready=false`를 고정한다. PR에서도 생성기 회귀를 실행하도록 CI에 연결했다. 보안·인프라 독립 검토의 신규 차단 결함은 없었고 로컬 단위 테스트를 통과했다. PR/병합 `main` artifact 확인은 아직 남았다. VPS 배포·이미지 게시·운영 DB 자동 배포는 하지 않았다.
+
 ## 완료된 작업 — 예약 점검을 프롬프트 종료 점검으로 전환 (2026-10-09)
 
 - 사용자의 요청에 따라 Codex의 `BuildFlow 보안 점검`·`BuildFlow 인프라 점검` 일일 heartbeat 2건을 삭제했다. `AGENTS.md`·`CLAUDE.md`·보안 운영 문서·백로그에 BuildFlow 관련 요청마다 마지막 단계의 읽기 전용 보안/인프라 점검과 `PASS/FAIL/PENDING/UNVERIFIED` 구분을 명시했다. 프롬프트가 없을 때는 자동 감시가 돌지 않으며 사전 배포 게이트와 실데이터 운영 제한은 유지된다.

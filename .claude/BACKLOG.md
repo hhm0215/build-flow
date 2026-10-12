@@ -70,9 +70,10 @@
 - **선행조건**: VPS 파일럿 CRUD/PDF·재부팅 회귀, 버전 관리형 DB 마이그레이션, DB+업로드 파일 외부 백업·격리 복원 및 최소 권한 DB 계정 완료. 그 전에는 운영 DB 대상 자동 배포를 켜지 않는다.
 - **산출물**: CI 성공·PR/SHA 검증 후 릴리스 고정, 배포 전 백업/복원 가능성·마이그레이션 점검, 순차 배포·헬스/스모크·실패 시 중단과 복귀 절차. GitHub에서 VPS로의 배포 인증은 최소 권한과 비밀값 관리 기준을 별도 설계한다. 사용자가 빌드·테스트 실패와 운영 배포 성공/실패를 실제 알림으로 받도록 구성한다. 1인 운영 기본안은 GitHub Actions 실패 메일 + Discord 전용 채널 웹훅이며 Slack은 보류한다. 웹훅 URL은 GitHub Environment secret에만 저장하고 알림에는 상태·커밋·실행 링크만 포함한다.
 - **접근 정책**: ADR-020. 현재는 SSH 터널·읽기 전용 점검에 22가 필요하다. 장래 외부 22를 평소 차단하려면 공개 사용자 접속, 독립 점검·알림, Web Console 복구·원격 재개방을 실측한다. outbound 릴리스 pull은 고정 SHA/image digest·출처/무결성·최소 실행 권한·승인/롤백을 검증할 **후보 설계**다. 현재 PUBLIC 저장소의 일반 self-hosted runner를 운영 VPS에 직접 두지 않는다. CI에는 병합된 `main` SHA 재검증과 read-only `GITHUB_TOKEN`만 먼저 적용한다.
+- **현재 진행**: 기존 CI 5개 성공에 의존하는 `main` push 전용 릴리스 후보 JSON artifact를 준비 중이다. 이는 이미지 게시·VPS 적용·실데이터 승격이 아니다. `main` 브랜치의 required status checks가 현재 비어 있어 변경 승인과 설정 검증이 별도 필요하다.
 - **관련 파일**: `.github/workflows/`, `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `docs/DECISIONS.md`
 - **예상 규모**: M
-- **상태**: TODO
+- **상태**: IN_PROGRESS
 
 ### 문서 코어 Stage 1 — 원본 보존·가져오기·관계 검토 기반
 - **배경**: USB 실제 자료는 폴더·파일명·날짜만으로 수정본, 추가공사, 다른 현장을 안전하게 구분할 수 없다. 실데이터 입력 전에 원본과 해석을 분리하고 사용자의 확정 판단을 축적할 기반이 필요하다. 장기 원칙은 `docs/PRODUCT_VISION.md`와 ADR-017을 따른다.

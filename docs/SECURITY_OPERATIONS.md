@@ -29,6 +29,8 @@
 
 **SSH와 CI/CD:** CI만으로 VPS 배포 경로가 생기지 않는다. 현재 Web Console 접속 기록에는 내부 root 공개키 경로가 있어 `PermitRootLogin no`를 복구 검증 없이 적용하지 않는다. `PasswordAuthentication`뿐 아니라 `KbdInteractiveAuthentication`의 유효 설정도 확인한다. 외부 22 차단은 터널과 일일 SSH 점검을 끊는다. 운영 VPS에 일반 self-hosted Actions runner나 Docker/root 권한을 배포 우회책으로 추가하지 않는다(현재 GitHub 저장소는 PUBLIC). 온디맨드 22는 ADR-020의 대체 경로를 실측한 뒤 별도 승인·롤백 절차로 검토한다.
 
+**릴리스 후보 증거:** `main`의 기존 5개 CI가 모두 성공한 경우에만 `docs/RELEASE_CANDIDATE.md`의 후보 JSON을 만든다. 후보는 `deploy_authorized=false`·`real_data_ready=false`이며 이미지/서버 SHA 검증, 백업·복원, 승격 승인 또는 배포를 수행하지 않는다. 실데이터 운영 게이트와 CD 활성화는 계속 `PENDING`이다.
+
 ### 최근 게이트 증거 — 2026-10-08 12:28 UTC, public 테스트 전용
 
 - 담당: 주 에이전트 배포·외부 실측, `security-reviewer`·독립 아키텍처 코드 검토 및 `infrastructure-reviewer` 사전 점검. [PR #89](https://github.com/hhm0215/build-flow/pull/89)의 단일 커밋·10개 CI PASS, 병합 `main` SHA `9435ae98e037218fc145a980b24779dc9ae18bae`의 [CI 5개 PASS](https://github.com/hhm0215/build-flow/actions/runs/37776220263)를 확인했다. 변경은 현장 삭제 차단·스모크 안전장치·문서이며 DB/DDL/Compose 변경은 없다.
