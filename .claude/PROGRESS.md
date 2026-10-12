@@ -5,9 +5,13 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — CD 릴리스 후보 증거 (2026-10-12)
+## 완료된 작업 — CD 릴리스 후보 증거 (2026-10-12)
 
-- 기존 5개 CI 검사에 의존하는 `main` push 전용 읽기 권한 job과 후보 JSON 생성기를 준비했다. 정확한 checkout SHA, job 결과, 추적된 배포 파일 SHA-256을 검증하며 `deploy_authorized=false`·`real_data_ready=false`를 고정한다. PR에서도 생성기 회귀를 실행하도록 CI에 연결했다. 보안·인프라 독립 검토의 신규 차단 결함은 없었고 로컬 단위 테스트를 통과했다. PR/병합 `main` artifact 확인은 아직 남았다. VPS 배포·이미지 게시·운영 DB 자동 배포는 하지 않았다.
+- 기존 5개 CI 검사에 의존하는 `main` push 전용 읽기 권한 job과 후보 JSON 생성기를 추가했다. 정확한 checkout SHA, job 결과, 추적된 배포 파일 SHA-256을 검증하며 `deploy_authorized=false`·`real_data_ready=false`를 고정한다. PR에서도 생성기 회귀를 실행한다. 보안·인프라 독립 검토의 신규 차단 결함은 없었다. [PR #92](https://github.com/hhm0215/build-flow/pull/92) 병합 SHA `80165ce38b3a9063ea0e4b675a6b35efb3e63209`, `main` CI run `38245986008`의 6개 job PASS, artifact의 SHA·7개 Git blob hash 일치 확인. Windows 작업 폴더의 CRLF 4파일은 원본 Git blob과 달라 직접 파일 해시가 불일치했으나 artifact 자체의 검증 실패가 아니었다. VPS 배포·이미지 게시·운영 DB 자동 배포는 하지 않았다.
+
+## 완료된 작업 — V1 납기·진행률 기준선 (2026-10-12)
+
+- `docs/DELIVERY_PLAN.md`에 첫 실데이터 현장 운영을 V1의 100% 완료선으로 정했다. 2026-10-12 기준 추정 40/100점, 목표일 2026-12-11, 체크포인트·검증 근거·지연 시 재산정 규칙을 기록했다. 장기 범용 플랫폼 비전과 구분하며 보안/복구 게이트를 일정으로 대체하지 않는다.
 
 ## 완료된 작업 — 예약 점검을 프롬프트 종료 점검으로 전환 (2026-10-09)
 
