@@ -54,13 +54,23 @@ describe('WarrantyListPage', () => {
   it('OCR 처리 중인 행은 수정하지 못하고 실패 행은 수동 보정을 연다', () => {
     render(<MemoryRouter><WarrantyListPage /></MemoryRouter>)
     expect(screen.getAllByRole('button', { name: /수정/ })).toHaveLength(1)
-    expect(screen.getAllByText('기간 미입력')).toHaveLength(2)
-    expect(screen.getAllByText('확인 필요')).toHaveLength(2)
+    expect(screen.getAllByText('확인 필요')).toHaveLength(4)
     fireEvent.click(screen.getByRole('button', { name: '서울보증보험 수정' }))
     expect(screen.getByTestId('edit-target')).toHaveTextContent('2')
   })
 
   it('종료일 없는 OCR 항목은 유효 필터에서 제외한다', () => {
+    render(<MemoryRouter initialEntries={['/warranties?status=VALID']}><WarrantyListPage /></MemoryRouter>)
+    expect(screen.getByText('필터 조건에 맞는 보증보험이 없습니다.')).toBeInTheDocument()
+  })
+
+  it('종료일이 추출돼도 사용자 확인 전에는 유효로 표시하거나 필터에 넣지 않는다', () => {
+    warranties.items = [{ ...warranty(3, 'SUCCESS', '2027-10-13'), startDate: '2026-10-13', daysUntilExpiry: 364 }]
+    const view = render(<MemoryRouter><WarrantyListPage /></MemoryRouter>)
+    expect(screen.getAllByText('확인 필요')).toHaveLength(2)
+    expect(screen.queryByText('유효')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '서울보증보험 확인' })).toBeInTheDocument()
+    view.unmount()
     render(<MemoryRouter initialEntries={['/warranties?status=VALID']}><WarrantyListPage /></MemoryRouter>)
     expect(screen.getByText('필터 조건에 맞는 보증보험이 없습니다.')).toBeInTheDocument()
   })

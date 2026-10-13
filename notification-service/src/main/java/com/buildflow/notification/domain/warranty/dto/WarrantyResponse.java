@@ -22,13 +22,18 @@ public class WarrantyResponse {
     private Long coverageAmount;
     private long daysUntilExpiry;
     private boolean expired;
+    private boolean expiryConfirmed;
     private String memo;
     private OcrStatus ocrStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public static WarrantyResponse from(DefectWarranty warranty) {
-        long daysUntil = warranty.getEndDate() != null
+        boolean expiryConfirmed = warranty.getOcrStatus() == OcrStatus.MANUAL
+                && warranty.getInsuranceCompany() != null && !warranty.getInsuranceCompany().isBlank()
+                && warranty.getStartDate() != null && warranty.getEndDate() != null
+                && !warranty.getStartDate().isAfter(warranty.getEndDate());
+        long daysUntil = expiryConfirmed
                 ? ChronoUnit.DAYS.between(LocalDate.now(), warranty.getEndDate())
                 : 0L;
         return WarrantyResponse.builder()
@@ -40,7 +45,8 @@ public class WarrantyResponse {
                 .endDate(warranty.getEndDate())
                 .coverageAmount(warranty.getCoverageAmount())
                 .daysUntilExpiry(Math.max(daysUntil, 0))
-                .expired(warranty.isExpired())
+                .expired(expiryConfirmed && warranty.isExpired())
+                .expiryConfirmed(expiryConfirmed)
                 .memo(warranty.getMemo())
                 .ocrStatus(warranty.getOcrStatus())
                 .createdAt(warranty.getCreatedAt())

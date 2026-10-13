@@ -584,15 +584,16 @@ export default function SiteDetailPage() {
               ) : sortedWarranties.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {sortedWarranties.map((w) => {
-                    const expiringColor = !w.endDate
+                    const expiryConfirmed = w.ocrStatus === 'MANUAL' && w.expiryConfirmed !== false
+                    const expiringColor = !expiryConfirmed || !w.endDate
                       ? '#94a3b8'
                       : w.expired
                       ? '#ef4444'
                       : w.daysUntilExpiry <= 30
                         ? '#f59e0b'
                         : '#22c55e'
-                    const expiringLabel = !w.endDate
-                      ? w.ocrStatus === 'PENDING' ? '분석 중' : '정보 보정 필요'
+                    const expiringLabel = !expiryConfirmed || !w.endDate
+                      ? w.ocrStatus === 'PENDING' ? '분석 중' : '정보 확인 필요'
                       : w.expired
                       ? '만료됨'
                       : `D-${w.daysUntilExpiry}`

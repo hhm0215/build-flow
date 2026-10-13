@@ -122,8 +122,9 @@ public class DefectWarranty {
     }
 
     /**
-     * OCR 추출 결과 반영. 4 필드 중 1개 이상 추출됐을 때만 SUCCESS.
-     * 모두 null이면 FAILED로 마킹 — 사용자가 수동 입력으로 보완해야 함.
+     * OCR 추출 결과 반영. 화면에서 필수인 보험사·시작일·종료일이 모두 있고
+     * 기간이 유효할 때만 SUCCESS. 부분 추출값은 보존하되 FAILED로 표시하여
+     * 사용자가 원본을 확인하고 수동 보정할 수 있게 한다. 증권번호는 선택 사항이다.
      */
     public void applyOcrResult(String insuranceCompany, String policyNumber,
                                LocalDate startDate, LocalDate endDate) {
@@ -131,9 +132,9 @@ public class DefectWarranty {
         if (policyNumber != null) this.policyNumber = policyNumber;
         if (startDate != null) this.startDate = startDate;
         if (endDate != null) this.endDate = endDate;
-        boolean anyExtracted = insuranceCompany != null || policyNumber != null
-                || startDate != null || endDate != null;
-        this.ocrStatus = anyExtracted ? OcrStatus.SUCCESS : OcrStatus.FAILED;
+        boolean complete = insuranceCompany != null && !insuranceCompany.isBlank()
+                && startDate != null && endDate != null && !endDate.isBefore(startDate);
+        this.ocrStatus = complete ? OcrStatus.SUCCESS : OcrStatus.FAILED;
     }
 
     public void markOcrFailed() {

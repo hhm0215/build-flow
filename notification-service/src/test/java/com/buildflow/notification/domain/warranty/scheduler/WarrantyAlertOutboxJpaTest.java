@@ -1,6 +1,7 @@
 package com.buildflow.notification.domain.warranty.scheduler;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import com.buildflow.notification.global.config.JpaAuditingConfig;
 import com.buildflow.notification.global.kafka.KafkaProducerService;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -54,7 +56,8 @@ class WarrantyAlertOutboxJpaTest {
     void cooldownAndOutboxCommitTogetherWithoutDuplicate() {
         LocalDate today = LocalDate.of(2026, 9, 20);
         DefectWarranty warranty = warranties.save(DefectWarranty.builder()
-                .siteId(7L).endDate(today.plusDays(5)).insuranceCompany("보험사").build());
+                .siteId(7L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
 
         assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
                 today.plusDays(30), today.minusDays(7)));
@@ -75,7 +78,8 @@ class WarrantyAlertOutboxJpaTest {
     void leaseRecoveryUsesIdenticalEnvelopeAndRejectsStaleToken() {
         LocalDate today = LocalDate.of(2026, 9, 20);
         DefectWarranty warranty = warranties.save(DefectWarranty.builder()
-                .siteId(8L).endDate(today.plusDays(2)).build());
+                .siteId(8L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(2)).build());
         assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
                 today.plusDays(30), today.minusDays(7)));
 
@@ -91,7 +95,8 @@ class WarrantyAlertOutboxJpaTest {
     void prolongedBrokerOutageDoesNotCreateNewEventAfterCooldown() {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul")).minusDays(8);
         DefectWarranty warranty = warranties.save(DefectWarranty.builder()
-                .siteId(10L).endDate(today.plusDays(20)).build());
+                .siteId(10L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(20)).build());
         assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
                 today.plusDays(30), today.minusDays(7)));
 
@@ -113,7 +118,8 @@ class WarrantyAlertOutboxJpaTest {
     void simultaneousSchedulersEnqueueOnlyOnce() throws Exception {
         LocalDate today = LocalDate.of(2026, 9, 20);
         DefectWarranty warranty = warranties.save(DefectWarranty.builder()
-                .siteId(9L).endDate(today.plusDays(3)).build());
+                .siteId(9L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(3)).build());
         CountDownLatch start = new CountDownLatch(1);
         var pool = Executors.newFixedThreadPool(2);
         try {
@@ -134,6 +140,39 @@ class WarrantyAlertOutboxJpaTest {
             pool.shutdownNow();
         }
         assertEquals(1, outbox.count());
+    }
+
+    @Test
+    void 부분_OCR_실패_행은_만료_목록과_알림에서_제외된다() {
+        LocalDate today = LocalDate.of(2026, 10, 13);
+        DefectWarranty pending = DefectWarranty.createPending(11L, "synthetic.pdf");
+        pending.applyOcrResult("보험사", "POL-1", null, today.plusDays(5));
+        DefectWarranty warranty = warranties.save(pending);
+
+        List<OcrStatus> eligible = List.of(OcrStatus.MANUAL);
+        assertTrue(warranties.findExpiringSoon(today, today.plusDays(30), eligible).isEmpty());
+        assertTrue(warranties.findExpiringNotYetAlerted(
+                today, today.plusDays(30), today.minusDays(7), eligible).isEmpty());
+        assertFalse(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(0, outbox.count());
+    }
+
+    @Test
+    void 필드가_완전한_OCR도_사용자_확인_전에는_만료_목록과_알림에서_제외된다() {
+        LocalDate today = LocalDate.of(2026, 10, 13);
+        DefectWarranty extracted = DefectWarranty.createPending(12L, "synthetic.pdf");
+        extracted.applyOcrResult("보험사", "POL-2", today.minusDays(1), today.plusDays(5));
+        DefectWarranty warranty = warranties.save(extracted);
+
+        assertEquals(OcrStatus.SUCCESS, warranty.getOcrStatus());
+        List<OcrStatus> confirmed = List.of(OcrStatus.MANUAL);
+        assertTrue(warranties.findExpiringSoon(today, today.plusDays(30), confirmed).isEmpty());
+        assertTrue(warranties.findExpiringNotYetAlerted(
+                today, today.plusDays(30), today.minusDays(7), confirmed).isEmpty());
+        assertFalse(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(0, outbox.count());
     }
 
     @TestConfiguration

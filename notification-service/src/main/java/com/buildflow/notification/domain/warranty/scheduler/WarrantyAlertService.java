@@ -1,6 +1,7 @@
 package com.buildflow.notification.domain.warranty.scheduler;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.event.WarrantyExpiringPayload;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import com.buildflow.notification.global.kafka.KafkaProducerService;
@@ -27,7 +28,11 @@ public class WarrantyAlertService {
     public boolean enqueueIfEligible(Long warrantyId, LocalDate today, LocalDate threshold,
                                      LocalDate cooldownThreshold) {
         DefectWarranty warranty = warrantyRepository.findByIdForUpdate(warrantyId).orElse(null);
-        if (warranty == null || warranty.getEndDate() == null
+        if (warranty == null
+                || warranty.getOcrStatus() != OcrStatus.MANUAL
+                || warranty.getInsuranceCompany() == null || warranty.getInsuranceCompany().isBlank()
+                || warranty.getStartDate() == null || warranty.getEndDate() == null
+                || warranty.getStartDate().isAfter(warranty.getEndDate())
                 || warranty.getEndDate().isBefore(today) || warranty.getEndDate().isAfter(threshold)
                 || (warranty.getLastExpiringAlertSentAt() != null
                 && warranty.getLastExpiringAlertSentAt().isAfter(cooldownThreshold))) {

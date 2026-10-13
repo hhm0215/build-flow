@@ -131,7 +131,8 @@ public class DefectWarrantyService {
     public List<WarrantyResponse> findExpiringSoon(int days) {
         LocalDate now = LocalDate.now();
         LocalDate threshold = now.plusDays(days);
-        return warrantyRepository.findExpiringSoon(now, threshold).stream()
+        return warrantyRepository.findExpiringSoon(now, threshold,
+                        List.of(OcrStatus.MANUAL)).stream()
                 .map(WarrantyResponse::from)
                 .toList();
     }

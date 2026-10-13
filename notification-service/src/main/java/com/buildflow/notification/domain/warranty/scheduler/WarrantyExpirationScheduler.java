@@ -1,6 +1,7 @@
 package com.buildflow.notification.domain.warranty.scheduler;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +39,7 @@ public class WarrantyExpirationScheduler {
         LocalDate cooldownThreshold = today.minusDays(cooldownDays);
 
         List<DefectWarranty> targets = warrantyRepository.findExpiringNotYetAlerted(
-                today, threshold, cooldownThreshold);
+                today, threshold, cooldownThreshold, List.of(OcrStatus.MANUAL));
 
         if (targets.isEmpty()) {
             log.debug("만료 임박 보증보험 없음 (threshold={}일, cooldown={}일)", thresholdDays, cooldownDays);
