@@ -269,7 +269,6 @@ export interface Warranty {
   memo: string | null
   daysUntilExpiry: number
   expired: boolean
-  filePath?: string
   ocrStatus?: OcrStatus
   createdAt: string
   updatedAt: string

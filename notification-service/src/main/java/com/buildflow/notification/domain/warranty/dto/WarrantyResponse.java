@@ -22,7 +22,6 @@ public class WarrantyResponse {
     private Long coverageAmount;
     private long daysUntilExpiry;
     private boolean expired;
-    private String filePath;
     private String memo;
     private OcrStatus ocrStatus;
     private LocalDateTime createdAt;
@@ -42,7 +41,6 @@ public class WarrantyResponse {
                 .coverageAmount(warranty.getCoverageAmount())
                 .daysUntilExpiry(Math.max(daysUntil, 0))
                 .expired(warranty.isExpired())
-                .filePath(warranty.getFilePath())
                 .memo(warranty.getMemo())
                 .ocrStatus(warranty.getOcrStatus())
                 .createdAt(warranty.getCreatedAt())

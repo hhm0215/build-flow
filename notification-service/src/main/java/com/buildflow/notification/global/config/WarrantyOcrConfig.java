@@ -7,10 +7,27 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
 @EnableAsync
 public class WarrantyOcrConfig {
+
+    /** 640 MiB 파일럿 컨테이너에서 OCR을 직렬화하고 대기열 포화는 호출자에게 돌려준다. */
+    @Bean("warrantyOcrExecutor")
+    public Executor warrantyOcrExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(1);
+        executor.setQueueCapacity(2);
+        executor.setThreadNamePrefix("warranty-ocr-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.initialize();
+        return executor;
+    }
 
     @Value("${app.ocr.tessdata-path:/usr/share/tesseract-ocr/4.00/tessdata}")
     private String tessdataPath;

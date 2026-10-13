@@ -160,7 +160,6 @@ export const warrantiesHandlers = [
       memo: `업로드 파일: ${file.name}`,
       daysUntilExpiry: 0,
       expired: false,
-      filePath: `/uploads/warranties/${newId}-${file.name}`,
       ocrStatus: 'PENDING',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

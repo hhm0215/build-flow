@@ -134,7 +134,7 @@
 | DELETE | /api/v1/warranties/{id} | 삭제 | O |
 | GET | /api/v1/warranties/expiring?days=30 | 선택적 `days`(기본 30) → `WarrantyResponse[]` | O |
 
-직접 등록 본문은 필수 `siteId`, `insuranceCompany`, `startDate`, `endDate`와 선택적 `policyNumber`, `coverageAmount`(원 단위 정수), `memo`이다. 수정 본문은 필수 보험사·시작일·만료일과 선택적 `policyNumber`, `coverageAmount`, `memo`이다. 수정의 선택 필드는 **미전송=기존 유지, JSON null=지움, 값=변경**의 3상태다. 응답에는 `id`, `siteId`, 날짜·금액, `daysUntilExpiry`, `expired`, `filePath`, `ocrStatus`(`PENDING`/`SUCCESS`/`FAILED`/`MANUAL`), 생성·수정 시각이 포함된다. `filePath`는 파일 다운로드 API가 아니다.
+직접 등록 본문은 필수 `siteId`, `insuranceCompany`, `startDate`, `endDate`와 선택적 `policyNumber`, `coverageAmount`(원 단위 정수), `memo`이다. 수정 본문은 필수 보험사·시작일·만료일과 선택적 `policyNumber`, `coverageAmount`, `memo`이다. 수정의 선택 필드는 **미전송=기존 유지, JSON null=지움, 값=변경**의 3상태다. 응답에는 `id`, `siteId`, 날짜·금액, `daysUntilExpiry`, `expired`, `ocrStatus`(`PENDING`/`SUCCESS`/`FAILED`/`MANUAL`), 생성·수정 시각이 포함된다. 서버 내부 `filePath`는 응답하지 않으며 파일 다운로드 API도 아직 없다. PDF 업로드는 20 MiB, 10페이지, 300 DPI 기준 렌더링 1,200만 픽셀/변 5,000픽셀 한도로 거부될 수 있다. OCR 대기열 포화 시 수동 보정 가능한 `FAILED`, 접수 후 30분 초과 `PENDING`도 `FAILED`로 전환된다.
 
 ### 알림
 

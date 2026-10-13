@@ -8,19 +8,26 @@ import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import com.buildflow.notification.global.exception.BusinessException;
 import com.buildflow.notification.global.exception.ErrorCode;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -30,6 +37,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DefectWarrantyService {
+
+    static final long MAX_PDF_BYTES = 20L * 1024 * 1024;
+    static final int MAX_PDF_PAGES = 10;
 
     private final DefectWarrantyRepository warrantyRepository;
     private final WarrantyOcrService ocrService;
@@ -110,11 +120,11 @@ public class DefectWarrantyService {
         try {
             Path p = Paths.get(filePath);
             if (Files.deleteIfExists(p)) {
-                log.info("업로드 파일 삭제: {}", p);
+                log.info("보증보험 업로드 파일 삭제 완료");
             }
         } catch (IOException e) {
             // 파일이 이미 사라졌거나 권한 문제 — DB는 이미 정리됐으므로 로그만 남김 (orphan 파일은 별도 cleanup job 검토)
-            log.warn("업로드 파일 삭제 실패 (orphan 가능): path={} cause={}", filePath, e.getMessage());
+            log.warn("보증보험 업로드 파일 삭제 실패 (orphan 가능): causeType={}", e.getClass().getSimpleName());
         }
     }
 
@@ -130,20 +140,30 @@ public class DefectWarrantyService {
      * PDF 업로드 → 파일 저장 → PENDING 레코드 즉시 생성 → 비동기 OCR 트리거.
      * 컨트롤러는 즉시 PENDING WarrantyResponse를 반환 (HTTP 202).
      *
-     * <p>NOTE(@Transactional 의도적 미부착): processAsync가 outer tx 커밋 전에 실행되면
-     * 비동기 스레드의 findById가 PENDING row를 못 봐 영구 PENDING 사고가 발생함.
-     * `savePending`만 Spring Data JPA가 자체 짧은 tx로 commit한 후 `processAsync` 호출.
+     * 기존 readOnly 트랜잭션을 중단하고 repository.save 자체 트랜잭션이 커밋된 뒤 OCR을 예약한다.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public WarrantyResponse createFromOcr(Long siteId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.WARRANTY_FILE_EMPTY);
         }
         Path stored = storeFile(file);
-        DefectWarranty pending = warrantyRepository.save(
-                DefectWarranty.createPending(siteId, stored.toString()));
-        ocrService.processAsync(pending.getId(), stored);
-        log.info("warranty PENDING 생성 + OCR 비동기 트리거 id={} siteId={} path={}",
-                pending.getId(), siteId, stored);
+        DefectWarranty pending;
+        try {
+            pending = warrantyRepository.save(DefectWarranty.createPending(siteId, stored.toString()));
+        } catch (RuntimeException e) {
+            deleteFileQuietly(stored.toString());
+            throw e;
+        }
+        try {
+            ocrService.processAsync(pending.getId(), stored);
+        } catch (TaskRejectedException e) {
+            pending.markOcrFailed();
+            warrantyRepository.save(pending);
+            log.warn("OCR 작업 대기열 포화 warrantyId={}", pending.getId());
+        }
+        log.info("warranty 업로드 접수 id={} siteId={} status={}",
+                pending.getId(), siteId, pending.getOcrStatus());
         return WarrantyResponse.from(pending);
     }
 
@@ -151,13 +171,60 @@ public class DefectWarrantyService {
         try {
             Path dir = Paths.get(uploadDir).toAbsolutePath().normalize();
             Files.createDirectories(dir);
-            String original = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.pdf";
-            String ext = original.contains(".") ? original.substring(original.lastIndexOf('.')) : ".pdf";
-            Path target = dir.resolve(UUID.randomUUID() + ext);
-            file.transferTo(target);
-            return target;
+            if (file.getSize() > MAX_PDF_BYTES) {
+                throw new BusinessException(ErrorCode.WARRANTY_FILE_TOO_LARGE);
+            }
+            Path target = dir.resolve(UUID.randomUUID() + ".pdf");
+            try {
+                try (InputStream in = file.getInputStream();
+                     OutputStream out = Files.newOutputStream(target, StandardOpenOption.CREATE_NEW)) {
+                    byte[] buffer = new byte[8192];
+                    long count = 0;
+                    int n;
+                    while ((n = in.read(buffer)) != -1) {
+                        count += n;
+                        if (count > MAX_PDF_BYTES) {
+                            throw new BusinessException(ErrorCode.WARRANTY_FILE_TOO_LARGE);
+                        }
+                        out.write(buffer, 0, n);
+                    }
+                }
+                validatePdf(target);
+                return target;
+            } catch (IOException | RuntimeException e) {
+                deleteFileQuietly(target.toString());
+                throw e;
+            }
+        } catch (BusinessException e) {
+            throw e;
         } catch (IOException e) {
             throw new BusinessException(ErrorCode.WARRANTY_FILE_STORAGE_FAILED);
+        }
+    }
+
+    private void validatePdf(Path path) {
+        try (InputStream in = Files.newInputStream(path)) {
+            byte[] header = in.readNBytes(5);
+            if (header.length != 5 || header[0] != '%' || header[1] != 'P'
+                    || header[2] != 'D' || header[3] != 'F' || header[4] != '-') {
+                throw new BusinessException(ErrorCode.WARRANTY_INVALID_PDF);
+            }
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.WARRANTY_INVALID_PDF);
+        }
+        try (PDDocument document = Loader.loadPDF(path.toFile())) {
+            if (document.isEncrypted() || document.getNumberOfPages() < 1
+                    || document.getNumberOfPages() > MAX_PDF_PAGES) {
+                throw new BusinessException(ErrorCode.WARRANTY_INVALID_PDF);
+            }
+            for (int i = 0; i < document.getNumberOfPages(); i++) {
+                WarrantyOcrService.validateRenderSize(document.getPage(i).getCropBox(), 300);
+            }
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.WARRANTY_INVALID_PDF);
+        } catch (RuntimeException e) {
+            if (e instanceof BusinessException) throw e;
+            throw new BusinessException(ErrorCode.WARRANTY_INVALID_PDF);
         }
     }
 
