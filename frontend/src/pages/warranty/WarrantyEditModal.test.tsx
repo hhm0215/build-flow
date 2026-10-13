@@ -21,7 +21,6 @@ const warranty = {
   memo: '기존 메모',
   daysUntilExpiry: 300,
   expired: false,
-  filePath: '/uploads/7.pdf',
   ocrStatus: 'FAILED',
   createdAt: '2026-09-01T00:00:00',
   updatedAt: '2026-09-01T00:00:00',

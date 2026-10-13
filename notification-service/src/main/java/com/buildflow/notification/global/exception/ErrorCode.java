@@ -17,6 +17,8 @@ public enum ErrorCode {
     WARRANTY_INVALID_PERIOD(HttpStatus.BAD_REQUEST, "보증 종료일은 시작일보다 빠를 수 없습니다."),
     WARRANTY_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "보증금액은 0 이상이어야 합니다."),
     WARRANTY_FILE_EMPTY(HttpStatus.BAD_REQUEST, "업로드된 파일이 비어 있습니다."),
+    WARRANTY_INVALID_PDF(HttpStatus.BAD_REQUEST, "유효한 PDF 파일만 업로드할 수 있습니다."),
+    WARRANTY_FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "PDF 파일은 20 MiB 이하여야 합니다."),
     WARRANTY_FILE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다.");
 
     private final HttpStatus status;

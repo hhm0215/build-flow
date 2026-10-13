@@ -1,6 +1,7 @@
 package com.buildflow.notification.domain.warranty.repository;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -8,10 +9,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 public interface DefectWarrantyRepository extends JpaRepository<DefectWarranty, Long> {
+
+    List<DefectWarranty> findTop100ByOcrStatusAndCreatedAtBeforeOrderByCreatedAtAsc(
+            OcrStatus status, LocalDateTime createdBefore);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT w FROM DefectWarranty w WHERE w.id = :id")
