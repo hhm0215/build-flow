@@ -5,10 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
-## 현재 진행 중 — 보증보험 PDF/OCR 입력·상태 안전성 (2026-10-13)
+## 현재 진행 중 — 보증보험 PDF/OCR 공개 파일럿 검증 (2026-10-13)
 
 - 공개 파일럿 P0에서 PDF 업로드의 20 MiB/구조·암호화/10페이지/렌더 크기를 서버에서 검사하고 UUID `.pdf`만 저장한다. 실패한 복사·검증·DB 저장은 새 파일을 정리하고 응답의 내부 `filePath`를 제거했다. OCR은 단일 worker·2건 대기열과 추출 문자 한도를 적용하며 경로·보험사·원시 예외를 로그에 남기지 않는다.
-- 업로드 오케스트레이션의 클래스 read-only 트랜잭션 상속을 해제해 DB 커밋 후 OCR을 예약한다. OCR 결과는 별도의 짧은 잠금 트랜잭션에서 `PENDING` 행에만 반영하여 삭제 후 재삽입을 막는다. 재시작으로 유실된 30분 초과 `PENDING`은 최대 100건씩 `FAILED`로 바꿔 수동 보정을 허용한다. 합성 PDF/JPA 테스트, 전체 `./gradlew test`, 프론트 lint·40파일 133테스트·build가 로컬 PASS다. 독립 보안 재검토에서 새 Critical/High 정적 회귀는 발견되지 않았다. [PR #94](https://github.com/hhm0215/build-flow/pull/94)의 단일 커밋·10개 CI와 병합 `main` SHA `7b333322a41d46553329af29146d979c7c547941`의 [CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38328431685)가 통과했고 `develop`도 동기화했다. VPS는 아직 이전 앱 SHA `9435ae98e037218fc145a980b24779dc9ae18bae`이므로 실제 공개 PDF/OCR, native hard timeout/격리, DB+파일 복구는 PENDING이다. V1 점수는 현장 파일럿 게이트 미통과로 40/100 유지.
+- 업로드 오케스트레이션의 클래스 read-only 트랜잭션 상속을 해제해 DB 커밋 후 OCR을 예약한다. OCR 결과는 별도의 짧은 잠금 트랜잭션에서 `PENDING` 행에만 반영하여 삭제 후 재삽입을 막는다. 재시작으로 유실된 30분 초과 `PENDING`은 최대 100건씩 `FAILED`로 바꿔 수동 보정을 허용한다. 합성 PDF/JPA 테스트, 전체 `./gradlew test`, 프론트 lint·40파일 133테스트·build가 로컬 PASS다. 독립 보안 재검토에서 새 Critical/High 정적 회귀는 발견되지 않았다. [PR #94](https://github.com/hhm0215/build-flow/pull/94)의 단일 커밋·10개 CI와 병합 `main` SHA `7b333322a41d46553329af29146d979c7c547941`의 [CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38328431685)가 통과했다. 후속 기록 [PR #95](https://github.com/hhm0215/build-flow/pull/95) 병합 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`의 [CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38329227578)도 PASS다.
+- 2026-10-13 공개 **테스트 데이터 전용** VPS에 `4e565968db0b2600238f0e05add9891277d2f2fd`를 clean detached checkout으로 고정하고 notification-service 이미지만 빌드·재생성했다. 이전 실행 이미지와 `latest` ID 일치를 확인해 `pre-pr94-9435ae9` 태그로 보존했다. 재생성 후 새 이미지 실행, 기존 `warranty_uploads` named volume 유지, restart 0/OOM false, 16개 서비스 Up, 8080~8087/frontend 200, 무인증 보증 API 401, 외부 TLS 검증·HTTP 308, 비loopback 22/80/443만 확인했다. 실제 합성 PDF OCR 성공·실제 파일/DB 복구와 native hard timeout/격리는 PENDING이다. V1은 40/100 유지하며 실데이터 운영은 NO-GO다.
 
 ## 완료된 작업 — CD 릴리스 후보 증거 (2026-10-12)
 
@@ -631,9 +632,9 @@
 
 ## 다음 세션 진입점 (2026-10-13 갱신)
 
-**Git 상태**: PR #94 병합 후 `origin/main`·로컬/원격 `develop`은 SHA `7b333322a41d46553329af29146d979c7c547941`로 동기화했다. `EstimateService.java`의 기존 로컬 미커밋 변경은 사용자 소유로 보존하고 PR에 포함하지 않았다. 이 문서 후속 PR의 SHA는 병합 후 다시 실측한다.
+**Git 상태**: PR #95 병합 후 `origin/main`·로컬/원격 `develop`은 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 동기화했다. `EstimateService.java`의 기존 로컬 미커밋 변경은 사용자 소유로 보존하고 PR에 포함하지 않았다. 이 공개 파일럿 배포 기록 PR의 SHA는 병합 후 다시 실측한다.
 
-**VPS 상태**: 2026-10-13 비root 고정 host key SSH에서 clean 앱 SHA `9435ae98e037218fc145a980b24779dc9ae18bae`, `.env` 메타데이터 `root:root 0600`, 비loopback 리스닝 22/80/443, 디스크 17%·inode 3%·가용 RAM 약 2.2 GiB를 확인했다. PR #94의 notification-service는 아직 VPS에 배포하지 않았다. 공개 HTTPS는 **테스트 데이터 전용**이며 해당 시점의 서비스 health·401/TLS는 별도 재검증이 필요하다.
+**VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 
 **다음 작업**: `.claude/BACKLOG.md`의 공개 파일럿 CRUD/PDF·AI 검증과 실데이터 운영 게이트(외부 DB+파일 백업·격리 복원, 버전 마이그레이션, 최소 DB 권한)를 따른다. CD는 CI와 별개로 미구축이며, 운영 DB 대상 자동 배포를 아직 켜지 않는다.
 

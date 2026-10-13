@@ -13,7 +13,7 @@
 
 | ID | 점검 | 통과 근거 | 현재 상태 |
 |---|---|---|---|
-| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(public) — PR #89 및 병합 `main` CI 통과, merge SHA `9435ae9` 서버 clean checkout; site-service 이미지만 적용 |
+| S01 | CI 검증된 `main` SHA와 VPS checkout/빌드 대상 일치, 작업 트리 청결 | PR CI·SHA 대조 및 서버 `git status` | PASS(public) — 2026-10-13 병합 `main` CI 6개 통과, SHA `4e56596`의 서버 clean checkout에서 notification-service 이미지만 적용. 이후 문서 전용 main 커밋은 앱 배포 SHA와 분리 대조 |
 | S02 | `.env`와 키 보호 | 서버 `.env` 소유/모드 `root:root 0600`, 값 비출력; 개인키 미복사 | PASS — 서버 메타데이터 확인 |
 | S03 | 내부 서비스 포트 비공개 | Compose 검증 + 호스트 IPv4/IPv6 리스닝 + 외부망 접속 확인. public은 22/80/443만, private은 22만 | PASS(public) — 비loopback 22/80/443만, 내부 포트 외부 접근 불가 |
 | S04 | 관리자 인증 | 공개 회원가입 없음; 무인증 업무 API 401; 로그인 후 권한 경계 | PASS(public 기본 동선) — 사용자 직접 로그인·대시보드 재조회, 무인증 업무 API 401·가입 403 |
@@ -21,9 +21,9 @@
 | S06 | TLS·호스트 | 공인 신뢰 인증서, 호스트명 일치, HTTP→HTTPS, 만료/갱신 경로; 잘못된 Host/SNI 거부 | PASS(새 접속·Host) / PENDING(실제 자동 갱신) — 사용자 소유 도메인에서 TLS 신뢰·정상 308/200, 잘못된 HTTP·HTTPS Host 421 |
 | S07 | 웹 남용·CORS | 실제 공개 경로의 로그인 429, 변형 경로/위조 XFF 우회 실패, 미허용 Origin 거부 | PASS(검사 표본) — 기존 공개 경로에서 위조 XFF를 바꾼 빈 로그인 요청 429·변형 경로 403; 새 도메인에서 허용 Origin 200/정확한 ACAO, 미허용 Origin 403, 비지원 GET 로그인 405. 새 주소의 429 재검사는 PENDING |
 | S08 | SSH 복구·하드닝 | 일반 계정 키·Web Console 복구 확인 후 root/password/keyboard-interactive 정책과 `sshd -t`·별도 재접속 검증. 외부 22 차단 시 독립 배포·점검·알림·원격 재개방 실측 | PASS(현재 정책) — password/kbd-interactive no, 키·Web Console 복구; root 키·22는 유지. 장래 22 차단은 PENDING |
-| S09 | OS·의존성 패치 | 보안 업데이트/커널 상태와 영향 평가, 재부팅 시 서비스 복귀 검증 | PASS(커널·재부팅) / PENDING(잔여 업데이트 영향 평가·적용) — 6.8.0-146 재부팅 후 health 복귀; 2026-10-07 `libfreetype6` 보안 업데이트와 Compose plugin 업데이트 2건 대기 |
-| S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(public 기본 health) / PENDING(전 서비스 비밀값 로그 검토) — 2026-10-08 Gateway·8081~8087 health 200, frontend 200, 변경된 site-service 컨테이너 restart 0/OOM false, 디스크·RAM 여유. 나머지 컨테이너의 최신 restart/OOM은 UNVERIFIED |
-| S11 | 실패 복귀 | SSH 터널 200/401 보존, 공개 실패 시 Caddy 제거 후 private 복귀, named volume 유지 | PASS — Host 게이트 실패 시 볼륨 보존 `down`→private `up`, 200/401·22만 공개 확인 후 수정 재공개 |
+| S09 | OS·의존성 패치 | 보안 업데이트/커널 상태와 영향 평가, 재부팅 시 서비스 복귀 검증 | PASS(기존 커널·재부팅) / PENDING(잔여 업데이트 영향 평가·적용) — 6.8.0-146 재부팅 후 health 복귀; 2026-10-13 Web Console 배너의 업데이트 6건은 패키지/보안 영향 미분류 |
+| S10 | 리소스·로그 | 실제 서비스 health, frontend 200, 보호 API 401, OOM/restart, 디스크·메모리, 비밀값 로그 없음 | PASS(public 기본 health) / PENDING(전 서비스 비밀값 로그 검토) — 2026-10-13 Gateway·8081~8087/frontend 200, 변경된 notification 컨테이너 restart 0/OOM false, 디스크·RAM 여유. 나머지 컨테이너의 최신 restart/OOM은 UNVERIFIED |
+| S11 | 실패 복귀 | SSH 터널 200/401 보존, 공개 실패 시 Caddy 제거 후 private 복귀, named volume 유지 | PASS(과거 Host 실패 시 private 복귀) / PENDING(이번 notification 이미지 롤백 실측) — 이전 실행 이미지는 고유 태그로 보존했으나 복귀 명령은 실행하지 않음 |
 
 **공개 결정:** 사용자가 승인한 테스트 데이터 전용 80/443 파일럿을 운영 중이다. 첫 공개에서 S06 Host 실패를 발견해 볼륨 보존 롤백했고, PR #75의 5개 CI 통과·독립 리뷰·재배포 뒤 정상 호스트와 잘못된 Host의 외부 응답을 재검증했다. S05 공개 경로의 동일 토큰 로그아웃 401, 실제 인증서 갱신, 전 서비스 로그 검토는 미완료다. 이 상태를 실데이터 운영 승인으로 해석하지 않는다. 외부 백업·격리 복원과 DB 마이그레이션/최소 권한 전에는 업무 원본을 입력하지 않는다.
 
@@ -94,6 +94,13 @@
 - 코드: 단일 커밋 `307e4e9032be2e554f6339f4c1c1fea621736f27`, 병합 `main` SHA `7b333322a41d46553329af29146d979c7c547941`; [PR #94](https://github.com/hhm0215/build-flow/pull/94) 검사 10개와 [main CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38328431685) PASS. 독립 `security-reviewer`는 변경 코드의 신규 Critical/High 정적 결함을 발견하지 못했다. 이는 실제 PDFBox/Tess4J 격리 또는 VPS 동작 PASS가 아니다.
 - 인프라 독립 사전 점검: 고정 host key·비root BatchMode에서 VPS는 이전 앱 SHA `9435ae98e037218fc145a980b24779dc9ae18bae`의 clean checkout, `.env` 메타데이터 `root:root 0600`, 비loopback 22/80/443만 리스닝, frontend·Gateway·8081~8087 health 200, 무인증 업무 API 401, 디스크 17%·inode 3%·가용 RAM 약 2.2 GiB. 별도 공개 경로는 TLS 검증 0, `/login` 200, 무인증 보증 API 401, HTTP 308을 확인했다.
 - **PENDING/UNVERIFIED**: notification-service의 실제 실행 image ID·restart/OOM, 롤백 태그, 4파일 Compose 설정·업로드 volume 보존은 일반 점검 계정의 Docker 권한이 없어 확인하지 않았다. 권한 있는 Web Console에서 이 항목과 정확한 SHA를 검증하고 기존 이미지를 보존하기 전에는 배포하지 않는다. Hostinger 로그인 세션이 없어 서버 변경은 수행하지 않았다. PDFBox 파서 내부 비용과 Tesseract native hard timeout/격리, 실제 VPS 합성 PDF OCR·재시작 복구·외부 DB+파일 동시 백업/격리 복원은 남아 있으며 실데이터 운영은 **NO-GO**다.
+
+### 최근 게이트 증거 — PR #94 공개 테스트 파일럿 반영, 2026-10-13 01:14 UTC
+
+- **범위/출처 PASS**: 독립 `security-reviewer`·`infrastructure-reviewer`의 조건부 GO 후 [PR #95](https://github.com/hhm0215/build-flow/pull/95) 병합 `main` SHA `4e565968db0b2600238f0e05add9891277d2f2fd`와 [CI 6개 PASS](https://github.com/hhm0215/build-flow/actions/runs/38329227578)를 확인했다. 이전 VPS SHA `9435ae98e037218fc145a980b24779dc9ae18bae`의 clean checkout에서 정확한 대상 SHA로 detached 전환했고 전후 작업 트리는 clean이다. 런타임 변경은 notification-service에 한정되며 DB DDL·Compose·Dockerfile 변경은 없다.
+- **복귀/볼륨 PASS**: 실제 실행 notification 이미지가 기존 `latest`와 같은 ID `ecde7a8b6b4e`임을 확인하고 고유 태그 `pre-pr94-9435ae9`로 보존·ID 재대조했다. 실제 컨테이너의 `buildflow_warranty_uploads:/app/uploads/warranties`와 새 4파일 Compose의 `warranty_uploads` named volume 매핑 및 Compose 프로젝트 `buildflow`를 대조했다. `.env`는 `root:root 0600`; 값은 출력하지 않았다. `PUBLIC_HOST`를 기존 도메인으로 지정한 4파일 Compose 구문과 공개 포트/CORS 검증을 통과한 후 notification 이미지만 빌드·`--no-deps --no-build`로 재생성했다. 볼륨/DB·다른 서비스·Caddy·SSH·방화벽은 변경하지 않았다.
+- **가용성/노출 PASS**: 새 실행 이미지 ID `f2c7c68e3d6b`, restart 0/OOM false, `warranty_uploads` 동일 mount, notification 메모리 약 312/640 MiB, 최근 3분·최대 200줄의 오류 패턴 0건. 전체 16개 서비스 Up, Gateway·8081~8087와 frontend 200, 무인증 보증 API 401, 비loopback 22/80/443만 리스닝, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB. 별도 공개 요청에서 TLS 검증 0과 `/login` 200, 무인증 보증 API 401, HTTP 308→정확한 HTTPS를 확인했다.
+- **PENDING/NO-GO**: 새 스케줄러는 기동 후 30분 초과 `PENDING`을 `FAILED`로 바꿀 수 있다(원본 파일 삭제 없음). 실제 합성 PDF 업로드·OCR 결과/거부 회귀, 보존 이미지를 이용한 이번 릴리스 롤백 실행, PDFBox 내부 비용·Tesseract native hard timeout/격리, DB+업로드의 외부 백업·격리 복원, 스키마 마이그레이션·최소 권한은 아직 미검증/미완료다. 공개 경로의 로그아웃 전 동일 토큰 폐기 401도 별도 재검증이 필요하다. 공개 HTTPS는 계속 **테스트 데이터 전용**, 실데이터 운영은 **NO-GO**다.
 
 ## 실데이터 운영 승격 게이트
 
