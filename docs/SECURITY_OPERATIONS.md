@@ -89,6 +89,12 @@
 - 외부 독립 실측: 새 HTTPS `/login` 200(시스템 TLS 신뢰 검증 통과), HTTP 308→정확한 HTTPS 주소, 무인증 현장 API 401, 잘못된 HTTP Host 및 정상 SNI+잘못된 HTTPS Host 421. 허용 Origin의 preflight 200·정확한 ACAO, 미허용 Origin 403. 호스트 IPv4/IPv6 비loopback 리스닝은 22/80/443뿐이며 8080–8087 health `UP`, loopback frontend 200·무인증 업무 API 401. 디스크 약 15%·inode 2%, 가용 RAM 약 2.8 GiB. 권한 있는 별도 확인에서 재기동한 auth/gateway/caddy는 모두 running·restart 0·OOM false였다. 외부 전 포트 스캔, 나머지 컨테이너의 재시작/OOM, 전체 비밀값 로그 점검은 `UNVERIFIED`/`PENDING`으로 유지한다.
 - 새 주소에서 관리자 직접 로그인과 로그아웃 전 동일 토큰의 로그아웃 후 401, 로그인 429 재검사, 인증서 자동 갱신 실측은 `PENDING`이다. 따라서 이 기록은 테스트 데이터 전용 공개 접속 확인이며 실데이터 운영 승격이 아니다.
 
+### 최근 게이트 증거 — PR #94 보증보험 PDF/OCR, 2026-10-13 00:45 UTC, 배포 전
+
+- 코드: 단일 커밋 `307e4e9032be2e554f6339f4c1c1fea621736f27`, 병합 `main` SHA `7b333322a41d46553329af29146d979c7c547941`; [PR #94](https://github.com/hhm0215/build-flow/pull/94) 검사 10개와 [main CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38328431685) PASS. 독립 `security-reviewer`는 변경 코드의 신규 Critical/High 정적 결함을 발견하지 못했다. 이는 실제 PDFBox/Tess4J 격리 또는 VPS 동작 PASS가 아니다.
+- 인프라 독립 사전 점검: 고정 host key·비root BatchMode에서 VPS는 이전 앱 SHA `9435ae98e037218fc145a980b24779dc9ae18bae`의 clean checkout, `.env` 메타데이터 `root:root 0600`, 비loopback 22/80/443만 리스닝, frontend·Gateway·8081~8087 health 200, 무인증 업무 API 401, 디스크 17%·inode 3%·가용 RAM 약 2.2 GiB. 별도 공개 경로는 TLS 검증 0, `/login` 200, 무인증 보증 API 401, HTTP 308을 확인했다.
+- **PENDING/UNVERIFIED**: notification-service의 실제 실행 image ID·restart/OOM, 롤백 태그, 4파일 Compose 설정·업로드 volume 보존은 일반 점검 계정의 Docker 권한이 없어 확인하지 않았다. 권한 있는 Web Console에서 이 항목과 정확한 SHA를 검증하고 기존 이미지를 보존하기 전에는 배포하지 않는다. Hostinger 로그인 세션이 없어 서버 변경은 수행하지 않았다. PDFBox 파서 내부 비용과 Tesseract native hard timeout/격리, 실제 VPS 합성 PDF OCR·재시작 복구·외부 DB+파일 동시 백업/격리 복원은 남아 있으며 실데이터 운영은 **NO-GO**다.
+
 ## 실데이터 운영 승격 게이트
 
 - 7개 DB와 업로드 파일을 같은 쓰기 중지 시점으로 묶은 외부 백업, 체크섬/manifest, 빈 환경 격리 복원, 관리자 로그인·참조 무결성 검증.

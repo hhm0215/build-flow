@@ -8,7 +8,7 @@
 ## 현재 진행 중 — 보증보험 PDF/OCR 입력·상태 안전성 (2026-10-13)
 
 - 공개 파일럿 P0에서 PDF 업로드의 20 MiB/구조·암호화/10페이지/렌더 크기를 서버에서 검사하고 UUID `.pdf`만 저장한다. 실패한 복사·검증·DB 저장은 새 파일을 정리하고 응답의 내부 `filePath`를 제거했다. OCR은 단일 worker·2건 대기열과 추출 문자 한도를 적용하며 경로·보험사·원시 예외를 로그에 남기지 않는다.
-- 업로드 오케스트레이션의 클래스 read-only 트랜잭션 상속을 해제해 DB 커밋 후 OCR을 예약한다. OCR 결과는 별도의 짧은 잠금 트랜잭션에서 `PENDING` 행에만 반영하여 삭제 후 재삽입을 막는다. 재시작으로 유실된 30분 초과 `PENDING`은 최대 100건씩 `FAILED`로 바꿔 수동 보정을 허용한다. 합성 PDF/JPA 테스트, 전체 `./gradlew test`, 프론트 lint·40파일 133테스트·build가 로컬 PASS다. 독립 보안 재검토에서 새 Critical/High 정적 회귀는 발견되지 않았다. PR CI는 진행 중이며 실제 VPS PDF/OCR, native hard timeout/격리, DB+파일 복구는 PENDING이다. V1 점수는 현장 파일럿 게이트 미통과로 40/100 유지.
+- 업로드 오케스트레이션의 클래스 read-only 트랜잭션 상속을 해제해 DB 커밋 후 OCR을 예약한다. OCR 결과는 별도의 짧은 잠금 트랜잭션에서 `PENDING` 행에만 반영하여 삭제 후 재삽입을 막는다. 재시작으로 유실된 30분 초과 `PENDING`은 최대 100건씩 `FAILED`로 바꿔 수동 보정을 허용한다. 합성 PDF/JPA 테스트, 전체 `./gradlew test`, 프론트 lint·40파일 133테스트·build가 로컬 PASS다. 독립 보안 재검토에서 새 Critical/High 정적 회귀는 발견되지 않았다. [PR #94](https://github.com/hhm0215/build-flow/pull/94)의 단일 커밋·10개 CI와 병합 `main` SHA `7b333322a41d46553329af29146d979c7c547941`의 [CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38328431685)가 통과했고 `develop`도 동기화했다. VPS는 아직 이전 앱 SHA `9435ae98e037218fc145a980b24779dc9ae18bae`이므로 실제 공개 PDF/OCR, native hard timeout/격리, DB+파일 복구는 PENDING이다. V1 점수는 현장 파일럿 게이트 미통과로 40/100 유지.
 
 ## 완료된 작업 — CD 릴리스 후보 증거 (2026-10-12)
 
@@ -629,11 +629,11 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-09 갱신)
+## 다음 세션 진입점 (2026-10-13 갱신)
 
-**Git 상태**: 이번 문서 변경 전 `origin/main`·로컬/원격 `develop`은 PR #90 병합 SHA `106f63de3a00ad139aeeddba2c58f2525d23c818`로 동기화했다. `EstimateService.java`의 기존 로컬 미커밋 변경은 사용자 소유로 보존하고 이번 문서 변경에 포함하지 않는다. 다음 세션에는 원격 SHA를 다시 실측한다.
+**Git 상태**: PR #94 병합 후 `origin/main`·로컬/원격 `develop`은 SHA `7b333322a41d46553329af29146d979c7c547941`로 동기화했다. `EstimateService.java`의 기존 로컬 미커밋 변경은 사용자 소유로 보존하고 PR에 포함하지 않았다. 이 문서 후속 PR의 SHA는 병합 후 다시 실측한다.
 
-**VPS 상태**: 최근 검증된 앱 배포 SHA는 PR #89의 `9435ae98e037218fc145a980b24779dc9ae18bae`이며 이후 PR #90은 문서 전용이다. 공개 HTTPS는 **테스트 데이터 전용**이다. 2026-10-08에는 16개 컨테이너 Up, frontend/Gateway·업무 서비스 health 200, 무인증 업무 API 401, TLS·HTTP 리다이렉트와 외부 리스닝 22/80/443을 확인했다. 이는 2026-10-09 실시간 재점검 결과가 아니다.
+**VPS 상태**: 2026-10-13 비root 고정 host key SSH에서 clean 앱 SHA `9435ae98e037218fc145a980b24779dc9ae18bae`, `.env` 메타데이터 `root:root 0600`, 비loopback 리스닝 22/80/443, 디스크 17%·inode 3%·가용 RAM 약 2.2 GiB를 확인했다. PR #94의 notification-service는 아직 VPS에 배포하지 않았다. 공개 HTTPS는 **테스트 데이터 전용**이며 해당 시점의 서비스 health·401/TLS는 별도 재검증이 필요하다.
 
 **다음 작업**: `.claude/BACKLOG.md`의 공개 파일럿 CRUD/PDF·AI 검증과 실데이터 운영 게이트(외부 DB+파일 백업·격리 복원, 버전 마이그레이션, 최소 DB 권한)를 따른다. CD는 CI와 별개로 미구축이며, 운영 DB 대상 자동 배포를 아직 켜지 않는다.
 
