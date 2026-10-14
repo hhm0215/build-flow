@@ -82,7 +82,7 @@ public class DefectWarrantyService {
 
     @Transactional
     public WarrantyResponse update(Long id, WarrantyUpdateRequest request) {
-        DefectWarranty warranty = getWarranty(id);
+        DefectWarranty warranty = getWarrantyForUpdate(id);
         if (warranty.getOcrStatus() == OcrStatus.PENDING) {
             throw new BusinessException(ErrorCode.WARRANTY_OCR_PENDING);
         }
@@ -103,7 +103,7 @@ public class DefectWarrantyService {
 
     @Transactional
     public void delete(Long id) {
-        DefectWarranty warranty = getWarranty(id);
+        DefectWarranty warranty = getWarrantyForUpdate(id);
         String filePath = warranty.getFilePath();
         warrantyRepository.delete(warranty);
         // 트랜잭션 커밋 후에만 파일 삭제 — rollback 시 파일은 남고 다음 cleanup job 대상이 됨.
@@ -233,6 +233,11 @@ public class DefectWarrantyService {
 
     private DefectWarranty getWarranty(Long id) {
         return warrantyRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WARRANTY_NOT_FOUND));
+    }
+
+    private DefectWarranty getWarrantyForUpdate(Long id) {
+        return warrantyRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.WARRANTY_NOT_FOUND));
     }
 

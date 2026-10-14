@@ -7,6 +7,7 @@
 
 ## 현재 진행 중 — 보증보험 PDF/OCR 공개 파일럿 검증 (2026-10-13)
 
+- 2026-10-14 만료 Kafka 소비 경계의 1차 fail-closed 보완(로컬, 미배포): 현재 보증 행 잠금 후 MANUAL·필수 필드·KST 0~설정일 범위·이벤트의 현장/보험사/종료일 스냅샷을 재검증한다. 부적격/삭제 이벤트는 알림 없이 처리 영수증을 남겨 나중 재생으로 되살아나지 않게 하고, 적격 메시지의 남은 일수는 현재 행과 KST 날짜로 재계산한다. 수정·삭제도 같은 행 잠금을 사용한다. 관련 JPA/Kafka 테스트와 `notification-service:test` 전체·`gradlew test` PASS, 알림 쓰기 실패 시 영수증 롤백 회귀도 PASS. 독립 보안 리뷰에서 새 P0/P1 코드 결함은 없었다. 구 outbox 자체는 여전히 Kafka에 발행될 수 있고, 기존 OCR 행의 MANUAL 기본값은 실제 사용자 확인의 증거가 아니다. 구 큐 감사/종결·cooldown 재조정·MySQL 동시성/복구 게이트 전에는 공개 VPS에 반영하지 않는다. V1 40/100 유지.
 - 2026-10-14 KST 만료일 경계 정렬(로컬, 미배포): 목록/만료 임박 조회·응답·엔티티·알림 스케줄러·outbox ACK가 공통 업무일을 사용한다. 다건 목록은 요청당 날짜를 한 번 캡처한다. UTC 15:00→KST 자정과 만료 당일/다음날 회귀 추가, `notification-service:test`와 전체 백엔드 `gradlew test` PASS. 독립 코드 리뷰에서 P1 이상 없고 제안한 다건 목록 경계도 보완했다. CI·PR·VPS 반영은 PENDING이며 V1은 40/100 유지한다.
 - 회사 PC 작업 가시성을 위해 `docs/DELIVERY_PLAN.md`에 앱 `Scheduled`·현재 채팅, GitHub PR/Actions, BACKLOG/PROGRESS, VPS 반영 증거의 역할을 정리했다. 1시간 간격의 이 채팅 연속 개발 heartbeat는 앱에서 ACTIVE이며, 로컬 PC/앱이 켜져 있어야 한다. UX·업무 규칙 질문은 QA 문서에 모으고 독립 작업을 먼저 진행한다. 별도 Work Cloud 환경·회사 PC 원격 연결은 아직 구성하지 않았다.
 - OCR 추가 보완(로컬, 미배포): PDFBox가 길지만 파서가 보증 필드 0개를 찾는 경우에는 텍스트 결과를 성공으로 확정하지 않고 제한된 Tess4J 경로로 재시도한다. 회귀 5건과 전체 백엔드 테스트 PASS, `git diff --check` PASS. 독립 리뷰에서 혼합형 PDF의 부분 필드 누락과 native OCR 자원/timeout 위험을 지적했으며, 병합 정책·실제 VPS OCR·메모리 실측은 PENDING으로 백로그에 남겼다. 이번 코드를 공개 VPS에서 작동 중이라고 표시하지 않는다.

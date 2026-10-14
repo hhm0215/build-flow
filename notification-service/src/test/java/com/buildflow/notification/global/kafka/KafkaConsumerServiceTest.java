@@ -1,6 +1,7 @@
 package com.buildflow.notification.global.kafka;
 
 import com.buildflow.notification.domain.notification.service.NotificationService;
+import com.buildflow.notification.domain.warranty.service.WarrantyExpiryNotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +13,10 @@ class KafkaConsumerServiceTest {
     private static final String EVENT_ID = "11111111-1111-4111-8111-111111111111";
 
     private final NotificationService notificationService = mock(NotificationService.class);
-    private final KafkaConsumerService consumer = new KafkaConsumerService(notificationService, new ObjectMapper());
+    private final WarrantyExpiryNotificationService warrantyExpiryNotificationService =
+            mock(WarrantyExpiryNotificationService.class);
+    private final KafkaConsumerService consumer = new KafkaConsumerService(
+            notificationService, warrantyExpiryNotificationService, new ObjectMapper());
 
     @Test
     void validEventPassesEventIdToTransactionalService() {
@@ -58,6 +62,26 @@ class KafkaConsumerServiceTest {
         assertThatThrownBy(() -> consumer.consumePurchaseRegistered(
                 event("PURCHASE_REGISTERED", "\"siteId\":7,\"purchaseId\":2")))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void warrantyEventPassesSnapshotToTransactionalRecheck() {
+        consumer.consumeWarrantyExpiring(event("WARRANTY_EXPIRING",
+                "\"warrantyId\":5,\"siteId\":7,\"insuranceCompany\":\"보험사\","
+                        + "\"endDate\":\"2026-11-01\",\"daysUntilExpiry\":18"));
+
+        verify(warrantyExpiryNotificationService).consume(EVENT_ID, 5L, 7L,
+                "보험사", java.time.LocalDate.of(2026, 11, 1));
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void malformedWarrantySnapshotIsNotAcknowledged() {
+        assertThatThrownBy(() -> consumer.consumeWarrantyExpiring(event("WARRANTY_EXPIRING",
+                "\"warrantyId\":5,\"siteId\":7,\"insuranceCompany\":\"보험사\","
+                        + "\"endDate\":\"bad-date\",\"daysUntilExpiry\":18")))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(warrantyExpiryNotificationService);
     }
 
     private String event(String type, String payloadFields) {

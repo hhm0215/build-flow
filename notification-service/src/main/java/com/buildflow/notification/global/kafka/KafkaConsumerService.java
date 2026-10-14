@@ -1,6 +1,7 @@
 package com.buildflow.notification.global.kafka;
 
 import com.buildflow.notification.domain.notification.service.NotificationService;
+import com.buildflow.notification.domain.warranty.service.WarrantyExpiryNotificationService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 
 @Service
@@ -15,6 +18,7 @@ import java.util.UUID;
 public class KafkaConsumerService {
 
     private final NotificationService notificationService;
+    private final WarrantyExpiryNotificationService warrantyExpiryNotificationService;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = "estimate.parsed", groupId = "notification-service-group")
@@ -81,12 +85,12 @@ public class KafkaConsumerService {
     @KafkaListener(topics = "warranty.expiring", groupId = "notification-service-group")
     public void consumeWarrantyExpiring(String message) {
         Event event = parse(message, "WARRANTY_EXPIRING");
-        long daysUntilExpiry = requiredNonNegativeLong(event.payload(), "daysUntilExpiry");
-        String insurer = optionalText(event.payload(), "insuranceCompany");
-        notificationService.createNotification(event.eventId(), "WARRANTY_EXPIRING",
-                String.format("하자보증보험(ID: %d, %s) 만료까지 %d일 남았습니다.",
-                        requiredId(event.payload(), "warrantyId"), insurer, daysUntilExpiry),
-                requiredId(event.payload(), "siteId"));
+        requiredNonNegativeLong(event.payload(), "daysUntilExpiry");
+        warrantyExpiryNotificationService.consume(event.eventId(),
+                requiredId(event.payload(), "warrantyId"),
+                requiredId(event.payload(), "siteId"),
+                requiredText(event.payload(), "insuranceCompany"),
+                requiredDate(event.payload(), "endDate"));
     }
 
     private Event parse(String message, String expectedType) {
@@ -129,11 +133,6 @@ public class KafkaConsumerService {
         }
     }
 
-    private String optionalText(JsonNode node, String field) {
-        JsonNode value = node.get(field);
-        return value != null && value.isTextual() ? value.asText() : "";
-    }
-
     private Long requiredId(JsonNode node, String field) {
         long value = requiredLong(node, field);
         if (value <= 0) {
@@ -156,6 +155,14 @@ public class KafkaConsumerService {
             throw new IllegalArgumentException("Kafka 이벤트 정수 필드가 없습니다: " + field);
         }
         return value.longValue();
+    }
+
+    private LocalDate requiredDate(JsonNode node, String field) {
+        try {
+            return LocalDate.parse(requiredText(node, field));
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Kafka 이벤트 날짜 필드가 유효하지 않습니다: " + field, e);
+        }
     }
 
     private record Event(String eventId, JsonNode payload) {
