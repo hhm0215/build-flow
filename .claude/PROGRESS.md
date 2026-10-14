@@ -7,6 +7,12 @@
 
 ## 현재 진행 중 — 보증보험 PDF/OCR 공개 파일럿 검증 (2026-10-13)
 
+- 2026-10-14 확인 출처 fail-closed 후속(로컬, 미배포): nullable `expiry_confirmed_at`이 없는 기존 수기/OCR 행은 MANUAL 상태여도 미확정으로 조회·표시·알림 제외한다. 최초 확인 또는 보험사/시작일/종료일 변경 때만 새 확인 시각과 알림 세대를 만들며, 메모만 수정하면 기존 cooldown을 유지한다. 새 outbox 이벤트의 확인 기준이 현재 행과 일치해야 소비한다. 독립 보안 리뷰가 발견한 구 이벤트 ACK의 7일 false suppression을 확인 변경 시 marker 초기화와 지연 ACK의 생성시각 재검증으로 보완했고, 재검토에서 발견된 구 PENDING의 새 확인 차단도 만료 당일 회귀로 수리했다. 전체 `gradlew test`, frontend 40파일 135건·lint·build는 로컬 PASS(프론트는 앞선 변경 기준); CI·실제 MySQL ALTER/기존 NULL/롤백·VPS QA는 PENDING. 구 outbox 발행 자체와 확인자/원본 대조 감사는 미완료이고 실데이터 NO-GO·V1 40/100 유지. 사용자 소유 `EstimateService.java` 수정과 `output/`은 건드리지 않았다.
+- 2026-10-14 만료 Kafka 소비 경계의 1차 fail-closed 보완(로컬, 미배포): 현재 보증 행 잠금 후 MANUAL·필수 필드·KST 0~설정일 범위·이벤트의 현장/보험사/종료일 스냅샷을 재검증한다. 부적격/삭제 이벤트는 알림 없이 처리 영수증을 남겨 나중 재생으로 되살아나지 않게 하고, 적격 메시지의 남은 일수는 현재 행과 KST 날짜로 재계산한다. 수정·삭제도 같은 행 잠금을 사용한다. 관련 JPA/Kafka 테스트와 `notification-service:test` 전체·`gradlew test` PASS, 알림 쓰기 실패 시 영수증 롤백 회귀도 PASS. 독립 보안 리뷰에서 새 P0/P1 코드 결함은 없었다. 구 outbox 자체는 여전히 Kafka에 발행될 수 있고, 기존 OCR 행의 MANUAL 기본값은 실제 사용자 확인의 증거가 아니다. 구 큐 감사/종결·cooldown 재조정·MySQL 동시성/복구 게이트 전에는 공개 VPS에 반영하지 않는다. V1 40/100 유지.
+- 2026-10-14 KST 만료일 경계 정렬(로컬, 미배포): 목록/만료 임박 조회·응답·엔티티·알림 스케줄러·outbox ACK가 공통 업무일을 사용한다. 다건 목록은 요청당 날짜를 한 번 캡처한다. UTC 15:00→KST 자정과 만료 당일/다음날 회귀 추가, `notification-service:test`와 전체 백엔드 `gradlew test` PASS. 독립 코드 리뷰에서 P1 이상 없고 제안한 다건 목록 경계도 보완했다. CI·PR·VPS 반영은 PENDING이며 V1은 40/100 유지한다.
+- 회사 PC 작업 가시성을 위해 `docs/DELIVERY_PLAN.md`에 앱 `Scheduled`·현재 채팅, GitHub PR/Actions, BACKLOG/PROGRESS, VPS 반영 증거의 역할을 정리했다. 1시간 간격의 이 채팅 연속 개발 heartbeat는 앱에서 ACTIVE이며, 로컬 PC/앱이 켜져 있어야 한다. UX·업무 규칙 질문은 QA 문서에 모으고 독립 작업을 먼저 진행한다. 별도 Work Cloud 환경·회사 PC 원격 연결은 아직 구성하지 않았다.
+- OCR 추가 보완(로컬, 미배포): PDFBox가 길지만 파서가 보증 필드 0개를 찾는 경우에는 텍스트 결과를 성공으로 확정하지 않고 제한된 Tess4J 경로로 재시도한다. 회귀 5건과 전체 백엔드 테스트 PASS, `git diff --check` PASS. 독립 리뷰에서 혼합형 PDF의 부분 필드 누락과 native OCR 자원/timeout 위험을 지적했으며, 병합 정책·실제 VPS OCR·메모리 실측은 PENDING으로 백로그에 남겼다. 이번 코드를 공개 VPS에서 작동 중이라고 표시하지 않는다.
+- 2026-10-14 로컬 후속: 부분 OCR의 `SUCCESS` 오판을 막고 보험사·시작일·종료일/기간이 완전할 때만 추출 완료로 처리한다. 추출값은 보존하고, `SUCCESS`도 사용자 확인 전에는 만료 판단·알림에서 제외한다. 사용자가 원본 대조 후 수정/확인 저장한 `MANUAL` 행만 알림 후보로 삼고 발행 직전 잠금 후 재검증한다. 화면은 미확정 OCR에 유효/만료 대신 확인 필요를 표시한다. 전체 Gradle 테스트, 프론트 lint·40파일 134테스트·build 로컬 PASS. 공개 VPS 적용·합성 PDF 실측은 PENDING이며 V1 점수는 40/100 유지한다.
 - 공개 파일럿 P0에서 PDF 업로드의 20 MiB/구조·암호화/10페이지/렌더 크기를 서버에서 검사하고 UUID `.pdf`만 저장한다. 실패한 복사·검증·DB 저장은 새 파일을 정리하고 응답의 내부 `filePath`를 제거했다. OCR은 단일 worker·2건 대기열과 추출 문자 한도를 적용하며 경로·보험사·원시 예외를 로그에 남기지 않는다.
 - 업로드 오케스트레이션의 클래스 read-only 트랜잭션 상속을 해제해 DB 커밋 후 OCR을 예약한다. OCR 결과는 별도의 짧은 잠금 트랜잭션에서 `PENDING` 행에만 반영하여 삭제 후 재삽입을 막는다. 재시작으로 유실된 30분 초과 `PENDING`은 최대 100건씩 `FAILED`로 바꿔 수동 보정을 허용한다. 합성 PDF/JPA 테스트, 전체 `./gradlew test`, 프론트 lint·40파일 133테스트·build가 로컬 PASS다. 독립 보안 재검토에서 새 Critical/High 정적 회귀는 발견되지 않았다. [PR #94](https://github.com/hhm0215/build-flow/pull/94)의 단일 커밋·10개 CI와 병합 `main` SHA `7b333322a41d46553329af29146d979c7c547941`의 [CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38328431685)가 통과했다. 후속 기록 [PR #95](https://github.com/hhm0215/build-flow/pull/95) 병합 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`의 [CI 6개](https://github.com/hhm0215/build-flow/actions/runs/38329227578)도 PASS다.
 - 2026-10-13 공개 **테스트 데이터 전용** VPS에 `4e565968db0b2600238f0e05add9891277d2f2fd`를 clean detached checkout으로 고정하고 notification-service 이미지만 빌드·재생성했다. 이전 실행 이미지와 `latest` ID 일치를 확인해 `pre-pr94-9435ae9` 태그로 보존했다. 재생성 후 새 이미지 실행, 기존 `warranty_uploads` named volume 유지, restart 0/OOM false, 16개 서비스 Up, 8080~8087/frontend 200, 무인증 보증 API 401, 외부 TLS 검증·HTTP 308, 비loopback 22/80/443만 확인했다. 실제 합성 PDF OCR 성공·실제 파일/DB 복구와 native hard timeout/격리는 PENDING이다. V1은 40/100 유지하며 실데이터 운영은 NO-GO다.
@@ -632,13 +638,13 @@
 
 ## 다음 세션 진입점 (2026-10-13 갱신)
 
-**Git 상태**: PR #95 병합 후 `origin/main`·로컬/원격 `develop`은 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 동기화했다. `EstimateService.java`의 기존 로컬 미커밋 변경은 사용자 소유로 보존하고 PR에 포함하지 않았다. 이 공개 파일럿 배포 기록 PR의 SHA는 병합 후 다시 실측한다.
+**Git 상태**: PR #95 이후 `main`은 문서 후속 병합으로 진전됐고, 현재 `develop`에는 OCR 후속 로컬 커밋 두 건과 이번 KST 경계 변경이 있다. 이 변경의 PR/CI·병합·배포는 별도 확인 전까지 PENDING이다. `EstimateService.java`의 기존 로컬 미커밋 변경과 `output/`은 사용자 소유로 보존하며 PR에 포함하지 않는다.
 
 **VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 
 **다음 작업**: `.claude/BACKLOG.md`의 공개 파일럿 CRUD/PDF·AI 검증과 실데이터 운영 게이트(외부 DB+파일 백업·격리 복원, 버전 마이그레이션, 최소 DB 권한)를 따른다. CD는 CI와 별개로 미구축이며, 운영 DB 대상 자동 배포를 아직 켜지 않는다.
 
-**점검 방식**: 보안·인프라 일일 heartbeat 두 건은 2026-10-09 삭제했다. BuildFlow 관련 사용자 요청마다 마지막 단계에서 `docs/SECURITY_OPERATIONS.md`에 따른 읽기 전용 종료 점검을 수행한다. 프롬프트가 없는 시간의 상시 감시나 메일/Discord 알림은 없다.
+**점검 방식**: 보안·인프라 전용 일일 heartbeat 두 건은 2026-10-09 삭제했다. 2026-10-14 현재 별개의 BuildFlow 연속 개발 heartbeat가 1시간 간격으로 ACTIVE이며, 로컬 PC/앱이 실행 중일 때만 이 채팅을 이어받는다. 사용자 요청과 예약된 개발 실행 모두 마지막 단계에서 `docs/SECURITY_OPERATIONS.md`의 읽기 전용 종료 점검을 수행한다. 상시 서버 감시나 메일/Discord 알림으로 오인하지 않는다.
 
 **Git 워크플로우**: `docs/AUTOMATION_GUIDE.md`와 ADR-011의 PR 생성·SHA 검증 후 merge 규칙을 유지한다. 이 문서의 SHA는 기록 당시 스냅샷으로, 후속 PR·배포 판단 때 다시 검증한다.
 

@@ -1,13 +1,12 @@
 package com.buildflow.notification.global.outbox;
 
+import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,7 +14,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OutboxClaimService {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final OutboxEventRepository repository;
     private final DefectWarrantyRepository warrantyRepository;
 
@@ -40,7 +38,9 @@ public class OutboxClaimService {
                     if ("warranty.expiring".equals(event.getTopic())) {
                         Long warrantyId = Long.valueOf(event.getRecordKey());
                         warrantyRepository.findByIdForUpdate(warrantyId)
-                                .ifPresent(warranty -> warranty.markExpiringAlertSent(LocalDate.now(KST)));
+                                .filter(warranty -> warranty.getExpiryConfirmedAt() != null
+                                        && !event.getCreatedAt().isBefore(warranty.getExpiryConfirmedAt()))
+                                .ifPresent(warranty -> warranty.markExpiringAlertSent(WarrantyDatePolicy.today()));
                     }
                     return true;
                 })

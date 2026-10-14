@@ -24,7 +24,7 @@ class DefectWarrantyServiceTest {
         WarrantyOcrService ocrService = mock(WarrantyOcrService.class);
         DefectWarrantyService service = new DefectWarrantyService(repository, ocrService);
         DefectWarranty pending = DefectWarranty.createPending(1L, "warranty.pdf");
-        when(repository.findById(7L)).thenReturn(Optional.of(pending));
+        when(repository.findByIdForUpdate(7L)).thenReturn(Optional.of(pending));
 
         assertThatThrownBy(() -> service.update(7L, mock(WarrantyUpdateRequest.class)))
                 .isInstanceOf(BusinessException.class)
@@ -44,7 +44,7 @@ class DefectWarrantyServiceTest {
                 .endDate(LocalDate.of(2027, 1, 1))
                 .build();
         WarrantyUpdateRequest request = mock(WarrantyUpdateRequest.class);
-        when(repository.findById(7L)).thenReturn(Optional.of(warranty));
+        when(repository.findByIdForUpdate(7L)).thenReturn(Optional.of(warranty));
         when(request.getStartDate()).thenReturn(LocalDate.of(2027, 1, 1));
         when(request.getEndDate()).thenReturn(LocalDate.of(2026, 1, 1));
 
@@ -52,6 +52,6 @@ class DefectWarrantyServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> org.assertj.core.api.Assertions.assertThat(
                         ((BusinessException) error).getErrorCode()).isEqualTo(ErrorCode.WARRANTY_INVALID_PERIOD));
-        verify(repository).findById(7L);
+        verify(repository).findByIdForUpdate(7L);
     }
 }

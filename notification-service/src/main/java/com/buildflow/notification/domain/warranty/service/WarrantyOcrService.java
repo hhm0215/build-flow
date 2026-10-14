@@ -48,8 +48,7 @@ public class WarrantyOcrService {
     public void processAsync(Long warrantyId, Path pdfPath) {
         log.info("OCR 시작 warrantyId={}", warrantyId);
         try {
-            String text = extractText(pdfPath);
-            WarrantyOcrParser.Result result = WarrantyOcrParser.parse(text);
+            WarrantyOcrParser.Result result = extractResult(pdfPath);
 
             boolean applied = resultService.apply(warrantyId,
                     result.getInsuranceCompany(),
@@ -68,7 +67,7 @@ public class WarrantyOcrService {
         }
     }
 
-    private String extractText(Path pdfPath) throws Exception {
+    WarrantyOcrParser.Result extractResult(Path pdfPath) throws Exception {
         try (PDDocument doc = Loader.loadPDF(pdfPath.toFile())) {
             if (doc.getNumberOfPages() < 1 || doc.getNumberOfPages() > DefectWarrantyService.MAX_PDF_PAGES) {
                 throw new IOException("PDF page limit exceeded");
@@ -76,11 +75,12 @@ public class WarrantyOcrService {
             LimitedTextWriter writer = new LimitedTextWriter();
             new PDFTextStripper().writeText(doc, writer);
             String text = writer.text();
-            if (text != null && text.trim().length() >= minTextLength) {
+            WarrantyOcrParser.Result textResult = parseUsableTextLayer(text, minTextLength);
+            if (textResult != null) {
                 log.debug("PDFBox 텍스트 추출 성공 ({}자)", text.trim().length());
-                return text;
+                return textResult;
             }
-            log.debug("PDFBox 텍스트 부족 — Tess4J OCR fallback");
+            log.debug("PDFBox 텍스트 부족 또는 보증 필드 미추출 — Tess4J OCR fallback");
             PDFRenderer renderer = new PDFRenderer(doc);
             StringBuilder sb = new StringBuilder();
             // prototype scope — 이 호출 단위로 전용 인스턴스 (thread-safe 회피)
@@ -98,8 +98,14 @@ public class WarrantyOcrService {
                     img.flush();
                 }
             }
-            return sb.toString();
+            return WarrantyOcrParser.parse(sb.toString());
         }
+    }
+
+    static WarrantyOcrParser.Result parseUsableTextLayer(String text, int minTextLength) {
+        if (text == null || text.trim().length() < minTextLength) return null;
+        WarrantyOcrParser.Result result = WarrantyOcrParser.parse(text);
+        return result.extractedFieldCount() > 0 ? result : null;
     }
 
     static void validateRenderSize(PDRectangle cropBox, int dpi) throws IOException {

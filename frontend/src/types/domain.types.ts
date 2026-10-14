@@ -269,6 +269,9 @@ export interface Warranty {
   memo: string | null
   daysUntilExpiry: number
   expired: boolean
+  /** 만료 판단은 사용자 확인/수기 저장 이후에만 확정한다. */
+  expiryConfirmed?: boolean
+  expiryConfirmedAt?: string | null
   ocrStatus?: OcrStatus
   createdAt: string
   updatedAt: string

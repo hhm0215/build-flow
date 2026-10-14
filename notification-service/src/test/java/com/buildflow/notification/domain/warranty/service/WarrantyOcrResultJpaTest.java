@@ -40,13 +40,28 @@ class WarrantyOcrResultJpaTest {
     void OCR_결과는_PENDING_행에만_커밋된다() {
         DefectWarranty pending = repository.save(DefectWarranty.createPending(1L, "synthetic.pdf"));
         LocalDate end = LocalDate.of(2027, 1, 1);
-        assertThat(results.apply(pending.getId(), "보험사", "POL-1", null, end)).isTrue();
+        LocalDate start = LocalDate.of(2026, 1, 1);
+        assertThat(results.apply(pending.getId(), "보험사", "POL-1", start, end)).isTrue();
         DefectWarranty saved = repository.findById(pending.getId()).orElseThrow();
         assertThat(saved.getOcrStatus()).isEqualTo(OcrStatus.SUCCESS);
         assertThat(saved.getInsuranceCompany()).isEqualTo("보험사");
+        assertThat(saved.getStartDate()).isEqualTo(start);
         assertThat(saved.getEndDate()).isEqualTo(end);
         assertThat(results.apply(pending.getId(), "다른 값", null, null, null)).isFalse();
         assertThat(repository.findById(pending.getId()).orElseThrow().getInsuranceCompany()).isEqualTo("보험사");
+    }
+
+    @Test
+    void 부분_OCR_결과는_값을_보존하고_보정_필요로_표시한다() {
+        DefectWarranty pending = repository.save(DefectWarranty.createPending(1L, "synthetic.pdf"));
+        assertThat(results.apply(pending.getId(), "보험사", "POL-1", null, LocalDate.of(2027, 1, 1))).isTrue();
+
+        DefectWarranty saved = repository.findById(pending.getId()).orElseThrow();
+        assertThat(saved.getOcrStatus()).isEqualTo(OcrStatus.FAILED);
+        assertThat(saved.getInsuranceCompany()).isEqualTo("보험사");
+        assertThat(saved.getPolicyNumber()).isEqualTo("POL-1");
+        assertThat(saved.getStartDate()).isNull();
+        assertThat(saved.getEndDate()).isEqualTo(LocalDate.of(2027, 1, 1));
     }
 
     @Test

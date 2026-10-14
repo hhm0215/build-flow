@@ -41,6 +41,12 @@ public class NotificationService {
         log.info("알림 생성: eventType={}, siteId={}", eventType, siteId);
     }
 
+    @Transactional
+    public void recordIgnoredEvent(String eventId) {
+        if (processedEventRepository.existsById(eventId)) return;
+        processedEventRepository.saveAndFlush(new ProcessedNotificationEvent(eventId));
+    }
+
     public List<NotificationResponse> findAll(Boolean unreadOnly) {
         List<Notification> notifications = (unreadOnly != null && unreadOnly)
                 ? notificationRepository.findByIsReadFalseOrderByCreatedAtDesc()

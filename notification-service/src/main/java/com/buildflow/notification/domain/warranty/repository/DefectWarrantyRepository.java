@@ -26,17 +26,33 @@ public interface DefectWarrantyRepository extends JpaRepository<DefectWarranty, 
 
     List<DefectWarranty> findAllByOrderByEndDateAsc();
 
-    @Query("SELECT w FROM DefectWarranty w WHERE w.endDate BETWEEN :now AND :threshold ORDER BY w.endDate ASC")
-    List<DefectWarranty> findExpiringSoon(@Param("now") LocalDate now, @Param("threshold") LocalDate threshold);
+    @Query("""
+            SELECT w FROM DefectWarranty w
+            WHERE w.endDate BETWEEN :now AND :threshold
+              AND w.ocrStatus IN :eligibleStatuses
+              AND w.expiryConfirmedAt IS NOT NULL
+              AND w.insuranceCompany IS NOT NULL AND w.insuranceCompany <> ''
+              AND w.startDate IS NOT NULL AND w.startDate <= w.endDate
+            ORDER BY w.endDate ASC
+            """)
+    List<DefectWarranty> findExpiringSoon(
+            @Param("now") LocalDate now,
+            @Param("threshold") LocalDate threshold,
+            @Param("eligibleStatuses") List<OcrStatus> eligibleStatuses);
 
     @Query("""
             SELECT w FROM DefectWarranty w
             WHERE w.endDate BETWEEN :today AND :threshold
+              AND w.ocrStatus IN :eligibleStatuses
+              AND w.expiryConfirmedAt IS NOT NULL
+              AND w.insuranceCompany IS NOT NULL AND w.insuranceCompany <> ''
+              AND w.startDate IS NOT NULL AND w.startDate <= w.endDate
               AND (w.lastExpiringAlertSentAt IS NULL OR w.lastExpiringAlertSentAt <= :cooldownThreshold)
             ORDER BY w.endDate ASC
             """)
     List<DefectWarranty> findExpiringNotYetAlerted(
             @Param("today") LocalDate today,
             @Param("threshold") LocalDate threshold,
-            @Param("cooldownThreshold") LocalDate cooldownThreshold);
+            @Param("cooldownThreshold") LocalDate cooldownThreshold,
+            @Param("eligibleStatuses") List<OcrStatus> eligibleStatuses);
 }

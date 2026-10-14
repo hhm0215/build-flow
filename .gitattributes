@@ -10,6 +10,7 @@ docker-compose.public.yml text eol=lf
 frontend/nginx.conf text eol=lf
 frontend/src/api/sites.api.ts text eol=lf
 frontend/src/api/sites.api.test.tsx text eol=lf
+frontend/src/pages/site/SiteDetailPage.tsx text eol=lf
 deploy/caddy/Caddyfile text eol=lf
 estimate-service/src/main/resources/application.yml text eol=lf
 notification-service/src/main/resources/application.yml text eol=lf

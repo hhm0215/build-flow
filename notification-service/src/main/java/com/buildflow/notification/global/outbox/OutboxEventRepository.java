@@ -8,11 +8,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String> {
 
-    boolean existsByTopicAndRecordKeyAndStatusIn(
+    List<OutboxEvent> findByTopicAndRecordKeyAndStatusIn(
             String topic, String recordKey, Collection<OutboxStatus> statuses);
 
     @Query(value = """

@@ -19,6 +19,7 @@ public class WarrantyExpiringPayload {
     private String insuranceCompany;
     private LocalDate endDate;
     private long daysUntilExpiry;
+    private String expiryConfirmationRef;
 
     public static WarrantyExpiringPayload of(DefectWarranty warranty, long daysUntilExpiry) {
         return WarrantyExpiringPayload.builder()
@@ -27,6 +28,7 @@ public class WarrantyExpiringPayload {
                 .insuranceCompany(warranty.getInsuranceCompany())
                 .endDate(warranty.getEndDate())
                 .daysUntilExpiry(daysUntilExpiry)
+                .expiryConfirmationRef(warranty.getExpiryConfirmedAt().toString())
                 .build();
     }
 }

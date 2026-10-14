@@ -63,11 +63,11 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
 
   return (
     <Modal
-      title={warranty.ocrStatus === 'FAILED' ? 'AI 실패 정보 수동 보정' : '하자보증보험 수정'}
+      title={warranty.ocrStatus === 'FAILED' ? 'AI 실패 정보 수동 보정' : warranty.ocrStatus === 'SUCCESS' ? 'AI 추출 정보 확인' : '하자보증보험 수정'}
       open
       onOk={submit}
       onCancel={close}
-      okText="저장"
+      okText={warranty.ocrStatus === 'SUCCESS' ? '확인하고 저장' : '저장'}
       cancelText="취소"
       okButtonProps={{ disabled: warranty.ocrStatus === 'PENDING' || updateWarranty.isPending }}
       confirmLoading={updateWarranty.isPending}
@@ -91,6 +91,7 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
       >
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
         {warranty.ocrStatus === 'FAILED' && <Alert type="info" message="AI가 읽지 못한 필수 정보를 입력하면 수기 보정으로 저장됩니다." showIcon style={{ marginBottom: 16 }} />}
+        {warranty.ocrStatus === 'SUCCESS' && <Alert type="warning" message="AI 추출값은 아직 확정 정보가 아닙니다. 원본 PDF와 보험사·기간을 대조한 뒤 저장하면 만료 알림 대상이 됩니다." showIcon style={{ marginBottom: 16 }} />}
         <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, whitespace: true, message: '보험사를 입력하세요' }]}>
           <Input placeholder="보험사명" maxLength={200} />
         </Form.Item>

@@ -59,8 +59,9 @@ export default function WarrantyListPage() {
       filterFn: (w, f: Partial<WarrantyFilters>, rawQ) => {
         const q = rawQ.trim().toLowerCase()
         if (q && !`${w.insuranceCompany} ${w.policyNumber}`.toLowerCase().includes(q)) return false
-        if (f.status === 'VALID' && (!w.endDate || w.expired)) return false
-        if (f.status === 'EXPIRED' && (!w.endDate || !w.expired)) return false
+        const confirmed = w.ocrStatus === 'MANUAL' && w.expiryConfirmed === true
+        if (f.status === 'VALID' && (!confirmed || !w.endDate || w.expired)) return false
+        if (f.status === 'EXPIRED' && (!confirmed || !w.endDate || !w.expired)) return false
         const dateKey = w.endDate?.slice(0, 10) ?? ''
         if ((f.expiryFrom || f.expiryTo) && !dateKey) return false
         if (f.expiryFrom && dateKey < f.expiryFrom) return false
@@ -266,20 +267,22 @@ export default function WarrantyListPage() {
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 12, fontWeight: 700,
-                      color: getExpiryColor(w.daysUntilExpiry, w.expired, !!w.endDate),
+                      color: getExpiryColor(w.daysUntilExpiry, w.expired, !!w.endDate && w.ocrStatus === 'MANUAL' && w.expiryConfirmed === true),
                     }}>
-                      {getExpiryLabel(w.daysUntilExpiry, w.expired, !!w.endDate)}
+                      {w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true
+                        ? '확인 필요'
+                        : getExpiryLabel(w.daysUntilExpiry, w.expired, !!w.endDate)}
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '3px 8px',
                       borderRadius: 20,
-                      background: !w.endDate ? 'rgba(148,163,184,0.1)' : w.expired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                      color: !w.endDate ? '#94a3b8' : w.expired ? '#ef4444' : '#22c55e',
-                      border: `1px solid ${!w.endDate ? 'rgba(148,163,184,0.2)' : w.expired ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
+                      background: w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? 'rgba(148,163,184,0.1)' : w.expired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                      color: w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? '#94a3b8' : w.expired ? '#ef4444' : '#22c55e',
+                      border: `1px solid ${w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? 'rgba(148,163,184,0.2)' : w.expired ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
                     }}>
-                      {!w.endDate ? '확인 필요' : w.expired ? '만료' : '유효'}
+                      {w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? '확인 필요' : w.expired ? '만료' : '유효'}
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px' }}>
@@ -289,10 +292,10 @@ export default function WarrantyListPage() {
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setEditingWarranty(w)}
-                          aria-label={`${w.insuranceCompany || '보험사 미입력'} 수정`}
+                          aria-label={`${w.insuranceCompany || '보험사 미입력'} ${w.ocrStatus === 'SUCCESS' ? '확인' : '수정'}`}
                           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', cursor: 'pointer' }}
                         >
-                          <Pencil size={11} strokeWidth={2.5} /> 수정
+                          <Pencil size={11} strokeWidth={2.5} /> {w.ocrStatus === 'SUCCESS' ? '확인' : '수정'}
                         </motion.button>
                       )}
                       <motion.button

@@ -1,6 +1,8 @@
 package com.buildflow.notification.domain.warranty.scheduler;
 
+import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
+import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +11,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -17,7 +18,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WarrantyExpirationScheduler {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final DefectWarrantyRepository warrantyRepository;
     private final WarrantyAlertService warrantyAlertService;
 
@@ -33,12 +33,12 @@ public class WarrantyExpirationScheduler {
      */
     @Scheduled(cron = "${app.warranty.scheduler-cron:0 0 9 * * *}", zone = "Asia/Seoul")
     public void notifyExpiringWarranties() {
-        LocalDate today = LocalDate.now(KST);
+        LocalDate today = WarrantyDatePolicy.today();
         LocalDate threshold = today.plusDays(thresholdDays);
         LocalDate cooldownThreshold = today.minusDays(cooldownDays);
 
         List<DefectWarranty> targets = warrantyRepository.findExpiringNotYetAlerted(
-                today, threshold, cooldownThreshold);
+                today, threshold, cooldownThreshold, List.of(OcrStatus.MANUAL));
 
         if (targets.isEmpty()) {
             log.debug("만료 임박 보증보험 없음 (threshold={}일, cooldown={}일)", thresholdDays, cooldownDays);
