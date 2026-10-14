@@ -74,4 +74,14 @@ describe('WarrantyListPage', () => {
     render(<MemoryRouter initialEntries={['/warranties?status=VALID']}><WarrantyListPage /></MemoryRouter>)
     expect(screen.getByText('필터 조건에 맞는 보증보험이 없습니다.')).toBeInTheDocument()
   })
+
+  it('과거 MANUAL 행도 확인 증거가 없으면 유효로 표시하지 않는다', () => {
+    warranties.items = [{ ...warranty(4, 'MANUAL', '2027-10-13'), startDate: '2026-10-13', expiryConfirmed: false }]
+    const view = render(<MemoryRouter><WarrantyListPage /></MemoryRouter>)
+    expect(screen.getAllByText('확인 필요')).toHaveLength(2)
+    expect(screen.queryByText('유효')).not.toBeInTheDocument()
+    view.unmount()
+    render(<MemoryRouter initialEntries={['/warranties?status=VALID']}><WarrantyListPage /></MemoryRouter>)
+    expect(screen.getByText('필터 조건에 맞는 보증보험이 없습니다.')).toBeInTheDocument()
+  })
 })

@@ -68,11 +68,22 @@ class KafkaConsumerServiceTest {
     void warrantyEventPassesSnapshotToTransactionalRecheck() {
         consumer.consumeWarrantyExpiring(event("WARRANTY_EXPIRING",
                 "\"warrantyId\":5,\"siteId\":7,\"insuranceCompany\":\"보험사\","
+                        + "\"endDate\":\"2026-11-01\",\"daysUntilExpiry\":18,"
+                        + "\"expiryConfirmationRef\":\"2026-10-14T00:00:00Z\""));
+
+        verify(warrantyExpiryNotificationService).consume(EVENT_ID, 5L, 7L,
+                "보험사", java.time.LocalDate.of(2026, 11, 1), "2026-10-14T00:00:00Z");
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void legacyWarrantyEventWithoutConfirmationRefIsPassedForIgnoredReceipt() {
+        consumer.consumeWarrantyExpiring(event("WARRANTY_EXPIRING",
+                "\"warrantyId\":5,\"siteId\":7,\"insuranceCompany\":\"보험사\","
                         + "\"endDate\":\"2026-11-01\",\"daysUntilExpiry\":18"));
 
         verify(warrantyExpiryNotificationService).consume(EVENT_ID, 5L, 7L,
-                "보험사", java.time.LocalDate.of(2026, 11, 1));
-        verifyNoInteractions(notificationService);
+                "보험사", java.time.LocalDate.of(2026, 11, 1), null);
     }
 
     @Test

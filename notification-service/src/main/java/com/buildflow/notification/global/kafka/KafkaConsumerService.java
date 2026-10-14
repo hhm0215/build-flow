@@ -90,7 +90,8 @@ public class KafkaConsumerService {
                 requiredId(event.payload(), "warrantyId"),
                 requiredId(event.payload(), "siteId"),
                 requiredText(event.payload(), "insuranceCompany"),
-                requiredDate(event.payload(), "endDate"));
+                requiredDate(event.payload(), "endDate"),
+                optionalText(event.payload(), "expiryConfirmationRef"));
     }
 
     private Event parse(String message, String expectedType) {
@@ -121,6 +122,15 @@ public class KafkaConsumerService {
         JsonNode value = node.get(field);
         if (value == null || !value.isTextual() || value.asText().isBlank()) {
             throw new IllegalArgumentException("Kafka 이벤트 필수 필드가 없습니다: " + field);
+        }
+        return value.asText();
+    }
+
+    private String optionalText(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return null; // legacy event: ignore with receipt
+        if (!value.isTextual() || value.asText().isBlank()) {
+            throw new IllegalArgumentException("Kafka 이벤트 필드가 유효하지 않습니다: " + field);
         }
         return value.asText();
     }

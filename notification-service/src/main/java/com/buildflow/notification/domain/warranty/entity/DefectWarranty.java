@@ -13,6 +13,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 @Entity
@@ -63,6 +65,10 @@ public class DefectWarranty {
     @ColumnDefault("'MANUAL'")
     private OcrStatus ocrStatus;
 
+    /** Null for legacy rows and unreviewed OCR; never backfill this from MANUAL alone. */
+    @Column(name = "expiry_confirmed_at")
+    private Instant expiryConfirmedAt;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -83,6 +89,7 @@ public class DefectWarranty {
         this.filePath = filePath;
         this.memo = memo;
         this.ocrStatus = OcrStatus.MANUAL;
+        this.expiryConfirmedAt = Instant.now();
     }
 
     /** OCR 흐름 진입점 — 최소 정보(siteId + filePath)만으로 PENDING 레코드 생성 */
@@ -113,6 +120,10 @@ public class DefectWarranty {
                        Optional<String> policyNumber,
                        Optional<Long> coverageAmount,
                        Optional<String> memo) {
+        boolean confirmationChanged = this.expiryConfirmedAt == null
+                || !Objects.equals(this.insuranceCompany, insuranceCompany)
+                || !Objects.equals(this.startDate, startDate)
+                || !Objects.equals(this.endDate, endDate);
         this.insuranceCompany = insuranceCompany;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -120,6 +131,11 @@ public class DefectWarranty {
         if (coverageAmount != null) this.coverageAmount = coverageAmount.orElse(null);
         if (memo != null) this.memo = memo.orElse(null);
         this.ocrStatus = OcrStatus.MANUAL;
+        if (confirmationChanged) {
+            this.expiryConfirmedAt = Instant.now();
+            // Old enqueues belong to a different review of the expiry facts.
+            this.lastExpiringAlertSentAt = null;
+        }
     }
 
     /**
@@ -136,10 +152,12 @@ public class DefectWarranty {
         boolean complete = insuranceCompany != null && !insuranceCompany.isBlank()
                 && startDate != null && endDate != null && !endDate.isBefore(startDate);
         this.ocrStatus = complete ? OcrStatus.SUCCESS : OcrStatus.FAILED;
+        this.expiryConfirmedAt = null;
     }
 
     public void markOcrFailed() {
         this.ocrStatus = OcrStatus.FAILED;
+        this.expiryConfirmedAt = null;
     }
 
     public void markExpiringAlertSent(LocalDate sentAt) {

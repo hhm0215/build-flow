@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ class WarrantyExpiryNotificationJpaTest {
     @Autowired private DefectWarrantyRepository warranties;
     @SpyBean private NotificationRepository notifications;
     @Autowired private ProcessedNotificationEventRepository receipts;
+    @Autowired private JdbcTemplate jdbc;
 
     @BeforeEach
     void clean() {
@@ -53,8 +55,10 @@ class WarrantyExpiryNotificationJpaTest {
                 .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
         String eventId = UUID.randomUUID().toString();
 
-        expiryNotifications.consume(eventId, warranty.getId(), 7L, "보험사", warranty.getEndDate());
-        expiryNotifications.consume(eventId, warranty.getId(), 7L, "보험사", warranty.getEndDate());
+        String confirmationRef = warranties.findById(warranty.getId()).orElseThrow()
+                .getExpiryConfirmedAt().toString();
+        expiryNotifications.consume(eventId, warranty.getId(), 7L, "보험사", warranty.getEndDate(), confirmationRef);
+        expiryNotifications.consume(eventId, warranty.getId(), 7L, "보험사", warranty.getEndDate(), confirmationRef);
 
         assertEquals(1, receipts.count());
         assertEquals(1, notifications.count());
@@ -68,10 +72,10 @@ class WarrantyExpiryNotificationJpaTest {
         String pendingEventId = UUID.randomUUID().toString();
 
         expiryNotifications.consume(pendingEventId, pending.getId(), 7L, "보험사",
-                WarrantyDatePolicy.today().plusDays(5));
+                WarrantyDatePolicy.today().plusDays(5), null);
         warranties.deleteById(pending.getId());
         expiryNotifications.consume(UUID.randomUUID().toString(), pending.getId(), 7L, "보험사",
-                WarrantyDatePolicy.today().plusDays(5));
+                WarrantyDatePolicy.today().plusDays(5), null);
 
         assertEquals(2, receipts.count());
         assertEquals(0, notifications.count());
@@ -85,8 +89,9 @@ class WarrantyExpiryNotificationJpaTest {
                 .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
         String eventId = UUID.randomUUID().toString();
 
-        expiryNotifications.consume(eventId, warranty.getId(), 7L, "옛 보험사", warranty.getEndDate());
-        expiryNotifications.consume(eventId, warranty.getId(), 7L, "새 보험사", warranty.getEndDate());
+        String confirmationRef = warranty.getExpiryConfirmedAt().toString();
+        expiryNotifications.consume(eventId, warranty.getId(), 7L, "옛 보험사", warranty.getEndDate(), confirmationRef);
+        expiryNotifications.consume(eventId, warranty.getId(), 7L, "새 보험사", warranty.getEndDate(), confirmationRef);
 
         assertEquals(1, receipts.count());
         assertEquals(0, notifications.count());
@@ -100,7 +105,7 @@ class WarrantyExpiryNotificationJpaTest {
                 .startDate(today.minusDays(30)).endDate(today.minusDays(1)).build());
 
         expiryNotifications.consume(UUID.randomUUID().toString(), warranty.getId(), 7L,
-                "보험사", warranty.getEndDate());
+                "보험사", warranty.getEndDate(), warranty.getExpiryConfirmedAt().toString());
 
         assertEquals(1, receipts.count());
         assertEquals(0, notifications.count());
@@ -117,9 +122,44 @@ class WarrantyExpiryNotificationJpaTest {
                 .when(notifications).save(any(Notification.class));
 
         assertThrows(IllegalStateException.class, () -> expiryNotifications.consume(
-                eventId, warranty.getId(), 7L, "보험사", warranty.getEndDate()));
+                eventId, warranty.getId(), 7L, "보험사", warranty.getEndDate(),
+                warranties.findById(warranty.getId()).orElseThrow().getExpiryConfirmedAt().toString()));
 
         assertFalse(receipts.existsById(eventId));
+        assertEquals(0, notifications.count());
+    }
+
+    @Test
+    void legacyManualDefaultWithoutReviewCannotConsumeOldEvent() {
+        LocalDate today = WarrantyDatePolicy.today();
+        DefectWarranty warranty = warranties.save(DefectWarranty.builder()
+                .siteId(7L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
+        jdbc.update("UPDATE defect_warranties SET expiry_confirmed_at = NULL WHERE id = ?", warranty.getId());
+
+        String eventId = UUID.randomUUID().toString();
+        expiryNotifications.consume(eventId, warranty.getId(), 7L,
+                "보험사", warranty.getEndDate(), null);
+
+        assertEquals(1, receipts.count());
+        assertEquals(0, notifications.count());
+    }
+
+    @Test
+    void oldEventStillCannotNotifyAfterLegacyRowIsReviewed() {
+        LocalDate today = WarrantyDatePolicy.today();
+        DefectWarranty warranty = warranties.save(DefectWarranty.builder()
+                .siteId(7L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
+        jdbc.update("UPDATE defect_warranties SET expiry_confirmed_at = NULL WHERE id = ?", warranty.getId());
+        DefectWarranty reviewed = warranties.findById(warranty.getId()).orElseThrow();
+        reviewed.update("보험사", today.minusDays(1), today.plusDays(5), null, null, null);
+        warranties.save(reviewed);
+
+        expiryNotifications.consume(UUID.randomUUID().toString(), warranty.getId(), 7L,
+                "보험사", warranty.getEndDate(), null);
+
+        assertEquals(1, receipts.count());
         assertEquals(0, notifications.count());
     }
 }

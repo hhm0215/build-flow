@@ -7,6 +7,8 @@ import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepos
 import com.buildflow.notification.global.kafka.KafkaProducerService;
 import com.buildflow.notification.global.outbox.OutboxEventRepository;
 import com.buildflow.notification.global.outbox.OutboxStatus;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class WarrantyAlertService {
     private final DefectWarrantyRepository warrantyRepository;
     private final KafkaProducerService kafkaProducerService;
     private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
     /** The cooldown marker and durable outbox event must commit together. */
     @Transactional
@@ -30,6 +33,7 @@ public class WarrantyAlertService {
         DefectWarranty warranty = warrantyRepository.findByIdForUpdate(warrantyId).orElse(null);
         if (warranty == null
                 || warranty.getOcrStatus() != OcrStatus.MANUAL
+                || warranty.getExpiryConfirmedAt() == null
                 || warranty.getInsuranceCompany() == null || warranty.getInsuranceCompany().isBlank()
                 || warranty.getStartDate() == null || warranty.getEndDate() == null
                 || warranty.getStartDate().isAfter(warranty.getEndDate())
@@ -41,9 +45,11 @@ public class WarrantyAlertService {
 
         // A broker outage can exceed the cooldown. The warranty row lock serializes
         // this check with enqueue, so a still-pending alert cannot gain a new eventId.
-        if (outboxEventRepository.existsByTopicAndRecordKeyAndStatusIn(
+        String confirmationRef = warranty.getExpiryConfirmedAt().toString();
+        if (outboxEventRepository.findByTopicAndRecordKeyAndStatusIn(
                 "warranty.expiring", warrantyId.toString(),
-                List.of(OutboxStatus.PENDING, OutboxStatus.CLAIMED))) {
+                List.of(OutboxStatus.PENDING, OutboxStatus.CLAIMED)).stream()
+                .anyMatch(event -> belongsToCurrentConfirmation(event.getPayloadJson(), confirmationRef))) {
             return false;
         }
 
@@ -51,5 +57,15 @@ public class WarrantyAlertService {
         kafkaProducerService.sendWarrantyExpiring(WarrantyExpiringPayload.of(warranty, daysUntilExpiry));
         warranty.markExpiringAlertSent(today);
         return true;
+    }
+
+    private boolean belongsToCurrentConfirmation(String payloadJson, String confirmationRef) {
+        try {
+            return confirmationRef.equals(objectMapper.readTree(payloadJson)
+                    .path("payload").path("expiryConfirmationRef").asText(null));
+        } catch (JsonProcessingException e) {
+            // Legacy or malformed records do not represent this confirmation.
+            return false;
+        }
     }
 }

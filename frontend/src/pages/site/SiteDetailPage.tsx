@@ -584,7 +584,7 @@ export default function SiteDetailPage() {
               ) : sortedWarranties.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {sortedWarranties.map((w) => {
-                    const expiryConfirmed = w.ocrStatus === 'MANUAL' && w.expiryConfirmed !== false
+                    const expiryConfirmed = w.ocrStatus === 'MANUAL' && w.expiryConfirmed === true
                     const expiringColor = !expiryConfirmed || !w.endDate
                       ? '#94a3b8'
                       : w.expired

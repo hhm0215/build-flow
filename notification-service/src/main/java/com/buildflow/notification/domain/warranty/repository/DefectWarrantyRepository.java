@@ -30,6 +30,7 @@ public interface DefectWarrantyRepository extends JpaRepository<DefectWarranty, 
             SELECT w FROM DefectWarranty w
             WHERE w.endDate BETWEEN :now AND :threshold
               AND w.ocrStatus IN :eligibleStatuses
+              AND w.expiryConfirmedAt IS NOT NULL
               AND w.insuranceCompany IS NOT NULL AND w.insuranceCompany <> ''
               AND w.startDate IS NOT NULL AND w.startDate <= w.endDate
             ORDER BY w.endDate ASC
@@ -43,6 +44,7 @@ public interface DefectWarrantyRepository extends JpaRepository<DefectWarranty, 
             SELECT w FROM DefectWarranty w
             WHERE w.endDate BETWEEN :today AND :threshold
               AND w.ocrStatus IN :eligibleStatuses
+              AND w.expiryConfirmedAt IS NOT NULL
               AND w.insuranceCompany IS NOT NULL AND w.insuranceCompany <> ''
               AND w.startDate IS NOT NULL AND w.startDate <= w.endDate
               AND (w.lastExpiringAlertSentAt IS NULL OR w.lastExpiringAlertSentAt <= :cooldownThreshold)

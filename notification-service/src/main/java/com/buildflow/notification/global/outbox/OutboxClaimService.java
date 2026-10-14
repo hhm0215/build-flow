@@ -38,6 +38,8 @@ public class OutboxClaimService {
                     if ("warranty.expiring".equals(event.getTopic())) {
                         Long warrantyId = Long.valueOf(event.getRecordKey());
                         warrantyRepository.findByIdForUpdate(warrantyId)
+                                .filter(warranty -> warranty.getExpiryConfirmedAt() != null
+                                        && !event.getCreatedAt().isBefore(warranty.getExpiryConfirmedAt()))
                                 .ifPresent(warranty -> warranty.markExpiringAlertSent(WarrantyDatePolicy.today()));
                     }
                     return true;

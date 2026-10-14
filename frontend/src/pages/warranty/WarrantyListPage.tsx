@@ -59,7 +59,7 @@ export default function WarrantyListPage() {
       filterFn: (w, f: Partial<WarrantyFilters>, rawQ) => {
         const q = rawQ.trim().toLowerCase()
         if (q && !`${w.insuranceCompany} ${w.policyNumber}`.toLowerCase().includes(q)) return false
-        const confirmed = w.ocrStatus === 'MANUAL' && w.expiryConfirmed !== false
+        const confirmed = w.ocrStatus === 'MANUAL' && w.expiryConfirmed === true
         if (f.status === 'VALID' && (!confirmed || !w.endDate || w.expired)) return false
         if (f.status === 'EXPIRED' && (!confirmed || !w.endDate || !w.expired)) return false
         const dateKey = w.endDate?.slice(0, 10) ?? ''
@@ -267,9 +267,9 @@ export default function WarrantyListPage() {
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 12, fontWeight: 700,
-                      color: getExpiryColor(w.daysUntilExpiry, w.expired, !!w.endDate && w.ocrStatus === 'MANUAL' && w.expiryConfirmed !== false),
+                      color: getExpiryColor(w.daysUntilExpiry, w.expired, !!w.endDate && w.ocrStatus === 'MANUAL' && w.expiryConfirmed === true),
                     }}>
-                      {w.ocrStatus !== 'MANUAL' || w.expiryConfirmed === false
+                      {w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true
                         ? '확인 필요'
                         : getExpiryLabel(w.daysUntilExpiry, w.expired, !!w.endDate)}
                     </span>
@@ -278,11 +278,11 @@ export default function WarrantyListPage() {
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '3px 8px',
                       borderRadius: 20,
-                      background: w.ocrStatus !== 'MANUAL' || w.expiryConfirmed === false || !w.endDate ? 'rgba(148,163,184,0.1)' : w.expired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                      color: w.ocrStatus !== 'MANUAL' || w.expiryConfirmed === false || !w.endDate ? '#94a3b8' : w.expired ? '#ef4444' : '#22c55e',
-                      border: `1px solid ${w.ocrStatus !== 'MANUAL' || w.expiryConfirmed === false || !w.endDate ? 'rgba(148,163,184,0.2)' : w.expired ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
+                      background: w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? 'rgba(148,163,184,0.1)' : w.expired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                      color: w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? '#94a3b8' : w.expired ? '#ef4444' : '#22c55e',
+                      border: `1px solid ${w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? 'rgba(148,163,184,0.2)' : w.expired ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
                     }}>
-                      {w.ocrStatus !== 'MANUAL' || w.expiryConfirmed === false || !w.endDate ? '확인 필요' : w.expired ? '만료' : '유효'}
+                      {w.ocrStatus !== 'MANUAL' || w.expiryConfirmed !== true || !w.endDate ? '확인 필요' : w.expired ? '만료' : '유효'}
                     </span>
                   </td>
                   <td style={{ padding: '14px 20px' }}>

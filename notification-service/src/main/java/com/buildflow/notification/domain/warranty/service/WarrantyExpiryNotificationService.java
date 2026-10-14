@@ -27,11 +27,13 @@ public class WarrantyExpiryNotificationService {
     /** Recheck a possibly old Kafka event and insert the receipt with the notification atomically. */
     @Transactional
     public void consume(String eventId, Long warrantyId, Long siteId,
-                        String insuranceCompany, LocalDate endDate) {
+                        String insuranceCompany, LocalDate endDate, String expiryConfirmationRef) {
         DefectWarranty warranty = warrantyRepository.findByIdForUpdate(warrantyId).orElse(null);
         LocalDate today = WarrantyDatePolicy.today();
         if (warranty == null
                 || warranty.getOcrStatus() != OcrStatus.MANUAL
+                || warranty.getExpiryConfirmedAt() == null
+                || !Objects.equals(expiryConfirmationRef, warranty.getExpiryConfirmedAt().toString())
                 || warranty.getInsuranceCompany() == null || warranty.getInsuranceCompany().isBlank()
                 || warranty.getStartDate() == null || warranty.getEndDate() == null
                 || warranty.getStartDate().isAfter(warranty.getEndDate())

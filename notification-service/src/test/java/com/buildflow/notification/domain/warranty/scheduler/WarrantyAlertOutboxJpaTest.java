@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.scheduler;
 
+import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +47,7 @@ class WarrantyAlertOutboxJpaTest {
     @Autowired private DefectWarrantyRepository warranties;
     @Autowired private OutboxEventRepository outbox;
     @Autowired private OutboxClaimService claims;
+    @Autowired private JdbcTemplate jdbc;
 
     @BeforeEach
     void clean() {
@@ -173,6 +176,97 @@ class WarrantyAlertOutboxJpaTest {
         assertFalse(alerts.enqueueIfEligible(warranty.getId(), today,
                 today.plusDays(30), today.minusDays(7)));
         assertEquals(0, outbox.count());
+    }
+
+    @Test
+    void legacyManualDefaultWithoutConfirmationIsNotEligibleUntilUserSaves() {
+        LocalDate today = LocalDate.of(2026, 10, 13);
+        DefectWarranty warranty = warranties.save(DefectWarranty.builder()
+                .siteId(13L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
+        jdbc.update("UPDATE defect_warranties SET expiry_confirmed_at = NULL WHERE id = ?", warranty.getId());
+
+        assertTrue(warranties.findExpiringSoon(today, today.plusDays(30),
+                List.of(OcrStatus.MANUAL)).isEmpty());
+        assertFalse(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(0, outbox.count());
+
+        DefectWarranty reviewed = warranties.findById(warranty.getId()).orElseThrow();
+        reviewed.update("보험사", today.minusDays(1), today.plusDays(5), null, null, null);
+        warranties.save(reviewed);
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(1, outbox.count());
+    }
+
+    @Test
+    void oldAckBeforeReviewDoesNotSuppressFirstConfirmedAlert() {
+        LocalDate today = WarrantyDatePolicy.today();
+        DefectWarranty warranty = warranties.save(DefectWarranty.builder()
+                .siteId(14L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        jdbc.update("UPDATE defect_warranties SET expiry_confirmed_at = NULL WHERE id = ?", warranty.getId());
+
+        var oldClaim = claims.claimNext().orElseThrow();
+        assertTrue(claims.markSent(oldClaim));
+        DefectWarranty reviewed = warranties.findById(warranty.getId()).orElseThrow();
+        reviewed.update("보험사", today.minusDays(1), today.plusDays(5), null, null, null);
+        warranties.save(reviewed);
+
+        assertEquals(null, warranties.findById(warranty.getId()).orElseThrow().getLastExpiringAlertSentAt());
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(2, outbox.count());
+    }
+
+    @Test
+    void lateAckAfterReviewCannotRestoreLegacyCooldown() {
+        LocalDate today = WarrantyDatePolicy.today();
+        DefectWarranty warranty = warranties.save(DefectWarranty.builder()
+                .siteId(15L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today.plusDays(5)).build());
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        jdbc.update("UPDATE defect_warranties SET expiry_confirmed_at = NULL WHERE id = ?", warranty.getId());
+
+        var oldClaim = claims.claimNext().orElseThrow();
+        DefectWarranty reviewed = warranties.findById(warranty.getId()).orElseThrow();
+        reviewed.update("보험사", today.minusDays(1), today.plusDays(5), null, null, null);
+        warranties.save(reviewed);
+
+        assertTrue(claims.markSent(oldClaim));
+        assertEquals(null, warranties.findById(warranty.getId()).orElseThrow().getLastExpiringAlertSentAt());
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(2, outbox.count());
+    }
+
+    @Test
+    void oldPendingEventDoesNotBlockNewConfirmationOnLastEligibleDay() {
+        LocalDate today = WarrantyDatePolicy.today();
+        DefectWarranty warranty = warranties.save(DefectWarranty.builder()
+                .siteId(16L).insuranceCompany("보험사")
+                .startDate(today.minusDays(1)).endDate(today).build());
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        jdbc.update("UPDATE defect_warranties SET expiry_confirmed_at = NULL WHERE id = ?", warranty.getId());
+        DefectWarranty reviewed = warranties.findById(warranty.getId()).orElseThrow();
+        reviewed.update("보험사", today.minusDays(1), today, null, null, null);
+        warranties.save(reviewed);
+
+        assertTrue(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertFalse(alerts.enqueueIfEligible(warranty.getId(), today,
+                today.plusDays(30), today.minusDays(7)));
+        assertEquals(2, outbox.count());
+
+        var oldClaim = claims.claimNext().orElseThrow();
+        assertTrue(claims.markSent(oldClaim));
+        assertEquals(today, warranties.findById(warranty.getId()).orElseThrow()
+                .getLastExpiringAlertSentAt());
     }
 
     @TestConfiguration

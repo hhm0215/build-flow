@@ -86,6 +86,7 @@ class DefectWarrantyUpdateTest {
                 Optional.of("HD-01"), Optional.empty(), Optional.empty());
 
         assertThat(w.getOcrStatus()).isEqualTo(OcrStatus.MANUAL);
+        assertThat(w.getExpiryConfirmedAt()).isNotNull();
         assertThat(w.getInsuranceCompany()).isEqualTo("현대해상");
         assertThat(w.getFilePath()).isEqualTo("warranty.pdf");
     }
@@ -97,7 +98,35 @@ class DefectWarrantyUpdateTest {
                 LocalDate.of(2026, 10, 13), LocalDate.of(2027, 10, 12));
 
         assertThat(w.getOcrStatus()).isEqualTo(OcrStatus.SUCCESS);
+        assertThat(w.getExpiryConfirmedAt()).isNull();
         assertThat(WarrantyResponse.from(w).isExpiryConfirmed()).isFalse();
+    }
+
+    @Test
+    void memoOnlyUpdateKeepsExpiryConfirmationAndCooldown() {
+        DefectWarranty w = seed();
+        var confirmedAt = w.getExpiryConfirmedAt();
+        var alertedAt = LocalDate.of(2026, 10, 14);
+        w.markExpiringAlertSent(alertedAt);
+
+        w.update("삼성화재", LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1),
+                null, null, Optional.of("새 메모"));
+
+        assertThat(w.getExpiryConfirmedAt()).isEqualTo(confirmedAt);
+        assertThat(w.getLastExpiringAlertSentAt()).isEqualTo(alertedAt);
+    }
+
+    @Test
+    void changedExpiryRequiresNewAlertGeneration() {
+        DefectWarranty w = seed();
+        var confirmedAt = w.getExpiryConfirmedAt();
+        w.markExpiringAlertSent(LocalDate.of(2026, 10, 14));
+
+        w.update("삼성화재", LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 2),
+                null, null, null);
+
+        assertThat(w.getExpiryConfirmedAt()).isAfterOrEqualTo(confirmedAt);
+        assertThat(w.getLastExpiringAlertSentAt()).isNull();
     }
 
     @Test

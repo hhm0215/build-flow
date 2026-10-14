@@ -8,6 +8,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 @Getter
@@ -24,6 +25,7 @@ public class WarrantyResponse {
     private long daysUntilExpiry;
     private boolean expired;
     private boolean expiryConfirmed;
+    private Instant expiryConfirmedAt;
     private String memo;
     private OcrStatus ocrStatus;
     private LocalDateTime createdAt;
@@ -35,6 +37,7 @@ public class WarrantyResponse {
 
     public static WarrantyResponse from(DefectWarranty warranty, LocalDate today) {
         boolean expiryConfirmed = warranty.getOcrStatus() == OcrStatus.MANUAL
+                && warranty.getExpiryConfirmedAt() != null
                 && warranty.getInsuranceCompany() != null && !warranty.getInsuranceCompany().isBlank()
                 && warranty.getStartDate() != null && warranty.getEndDate() != null
                 && !warranty.getStartDate().isAfter(warranty.getEndDate());
@@ -52,6 +55,7 @@ public class WarrantyResponse {
                 .daysUntilExpiry(Math.max(daysUntil, 0))
                 .expired(expiryConfirmed && warranty.isExpired(today))
                 .expiryConfirmed(expiryConfirmed)
+                .expiryConfirmedAt(warranty.getExpiryConfirmedAt())
                 .memo(warranty.getMemo())
                 .ocrStatus(warranty.getOcrStatus())
                 .createdAt(warranty.getCreatedAt())

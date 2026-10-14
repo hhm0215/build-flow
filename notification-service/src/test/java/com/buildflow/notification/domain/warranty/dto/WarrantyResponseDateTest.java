@@ -2,6 +2,7 @@ package com.buildflow.notification.domain.warranty.dto;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 
@@ -36,6 +37,18 @@ class WarrantyResponseDateTest {
 
         assertThat(WarrantyResponse.from(first, businessDay).isExpired()).isFalse();
         assertThat(WarrantyResponse.from(second, businessDay).getDaysUntilExpiry()).isEqualTo(1);
+    }
+
+    @Test
+    void legacyManualStatusAloneIsNotConfirmationEvidence() {
+        DefectWarranty warranty = warrantyEndingOn(LocalDate.of(2026, 10, 14));
+        ReflectionTestUtils.setField(warranty, "expiryConfirmedAt", null);
+
+        WarrantyResponse response = WarrantyResponse.from(warranty, LocalDate.of(2026, 10, 13));
+
+        assertThat(response.isExpiryConfirmed()).isFalse();
+        assertThat(response.getDaysUntilExpiry()).isZero();
+        assertThat(response.getExpiryConfirmedAt()).isNull();
     }
 
     private DefectWarranty warrantyEndingOn(LocalDate endDate) {
