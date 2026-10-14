@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 보증보험 OCR·만료 알림 GitHub 통합 (2026-10-14)
+
+- [PR #97](https://github.com/hhm0215/build-flow/pull/97)의 6개 커밋과 원격 `develop` SHA 일치, PR 전용 CI 5개 성공, 독립 리뷰 후 merge commit `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`로 병합했다. 병합 `main` [CI run 38569829938](https://github.com/hhm0215/build-flow/actions/runs/38569829938)의 5개 검사와 릴리스 후보 증거 job이 성공했고 `develop`도 같은 SHA로 fast-forward했다. 릴리스 후보는 배포가 아니다.
+- 공개 테스트 VPS는 이전 코드 SHA `4e565968db0b2600238f0e05add9891277d2f2fd` 그대로다. 새 nullable 컬럼의 실제 MySQL 마이그레이션·기존 행 NULL/롤백, 구 outbox 감사·종결, 합성 PDF OCR·복구 검증 전에는 배포하지 않는다. 실데이터는 계속 NO-GO이며 V1은 40/100이다. 사용자 소유 `EstimateService.java` 수정과 `output/`은 보존했다.
+
 ## 현재 진행 중 — 보증보험 PDF/OCR 공개 파일럿 검증 (2026-10-13)
 
 - 2026-10-14 확인 출처 fail-closed 후속(로컬, 미배포): nullable `expiry_confirmed_at`이 없는 기존 수기/OCR 행은 MANUAL 상태여도 미확정으로 조회·표시·알림 제외한다. 최초 확인 또는 보험사/시작일/종료일 변경 때만 새 확인 시각과 알림 세대를 만들며, 메모만 수정하면 기존 cooldown을 유지한다. 새 outbox 이벤트의 확인 기준이 현재 행과 일치해야 소비한다. 독립 보안 리뷰가 발견한 구 이벤트 ACK의 7일 false suppression을 확인 변경 시 marker 초기화와 지연 ACK의 생성시각 재검증으로 보완했고, 재검토에서 발견된 구 PENDING의 새 확인 차단도 만료 당일 회귀로 수리했다. 전체 `gradlew test`, frontend 40파일 135건·lint·build는 로컬 PASS(프론트는 앞선 변경 기준); CI·실제 MySQL ALTER/기존 NULL/롤백·VPS QA는 PENDING. 구 outbox 발행 자체와 확인자/원본 대조 감사는 미완료이고 실데이터 NO-GO·V1 40/100 유지. 사용자 소유 `EstimateService.java` 수정과 `output/`은 건드리지 않았다.
@@ -636,9 +641,9 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-13 갱신)
+## 다음 세션 진입점 (2026-10-14 갱신)
 
-**Git 상태**: PR #95 이후 `main`은 문서 후속 병합으로 진전됐고, 현재 `develop`에는 OCR 후속 로컬 커밋 두 건과 이번 KST 경계 변경이 있다. 이 변경의 PR/CI·병합·배포는 별도 확인 전까지 PENDING이다. `EstimateService.java`의 기존 로컬 미커밋 변경과 `output/`은 사용자 소유로 보존하며 PR에 포함하지 않는다.
+**Git 상태**: PR #97 병합 후 `main`·`develop`은 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`로 동기화됐다. PR CI와 병합 `main` CI는 PASS지만 VPS 배포는 PENDING이다. `EstimateService.java`의 기존 로컬 미커밋 변경과 `output/`은 사용자 소유로 보존하며 PR에 포함하지 않는다.
 
 **VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 
