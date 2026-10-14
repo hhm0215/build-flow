@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.entity;
 
+import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -147,6 +148,10 @@ public class DefectWarranty {
 
     /** 만료: endDate < today (만료 당일은 아직 expired=false, 다음 날부터 true). */
     public boolean isExpired() {
-        return endDate != null && endDate.isBefore(LocalDate.now());
+        return isExpired(WarrantyDatePolicy.today());
+    }
+
+    public boolean isExpired(LocalDate today) {
+        return endDate != null && endDate.isBefore(today);
     }
 }

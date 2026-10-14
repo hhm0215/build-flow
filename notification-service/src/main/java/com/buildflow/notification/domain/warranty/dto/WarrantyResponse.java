@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.dto;
 
+import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import lombok.Builder;
@@ -29,12 +30,16 @@ public class WarrantyResponse {
     private LocalDateTime updatedAt;
 
     public static WarrantyResponse from(DefectWarranty warranty) {
+        return from(warranty, WarrantyDatePolicy.today());
+    }
+
+    public static WarrantyResponse from(DefectWarranty warranty, LocalDate today) {
         boolean expiryConfirmed = warranty.getOcrStatus() == OcrStatus.MANUAL
                 && warranty.getInsuranceCompany() != null && !warranty.getInsuranceCompany().isBlank()
                 && warranty.getStartDate() != null && warranty.getEndDate() != null
                 && !warranty.getStartDate().isAfter(warranty.getEndDate());
         long daysUntil = expiryConfirmed
-                ? ChronoUnit.DAYS.between(LocalDate.now(), warranty.getEndDate())
+                ? ChronoUnit.DAYS.between(today, warranty.getEndDate())
                 : 0L;
         return WarrantyResponse.builder()
                 .id(warranty.getId())
@@ -45,7 +50,7 @@ public class WarrantyResponse {
                 .endDate(warranty.getEndDate())
                 .coverageAmount(warranty.getCoverageAmount())
                 .daysUntilExpiry(Math.max(daysUntil, 0))
-                .expired(expiryConfirmed && warranty.isExpired())
+                .expired(expiryConfirmed && warranty.isExpired(today))
                 .expiryConfirmed(expiryConfirmed)
                 .memo(warranty.getMemo())
                 .ocrStatus(warranty.getOcrStatus())

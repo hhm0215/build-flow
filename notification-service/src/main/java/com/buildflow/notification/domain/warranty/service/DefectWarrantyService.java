@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.service;
 
+import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
 import com.buildflow.notification.domain.warranty.dto.WarrantyResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
@@ -68,9 +69,10 @@ public class DefectWarrantyService {
         List<DefectWarranty> warranties = (siteId != null)
                 ? warrantyRepository.findBySiteIdOrderByEndDateAsc(siteId)
                 : warrantyRepository.findAllByOrderByEndDateAsc();
+        LocalDate today = WarrantyDatePolicy.today();
 
         return warranties.stream()
-                .map(WarrantyResponse::from)
+                .map(warranty -> WarrantyResponse.from(warranty, today))
                 .toList();
     }
 
@@ -129,11 +131,11 @@ public class DefectWarrantyService {
     }
 
     public List<WarrantyResponse> findExpiringSoon(int days) {
-        LocalDate now = LocalDate.now();
+        LocalDate now = WarrantyDatePolicy.today();
         LocalDate threshold = now.plusDays(days);
         return warrantyRepository.findExpiringSoon(now, threshold,
                         List.of(OcrStatus.MANUAL)).stream()
-                .map(WarrantyResponse::from)
+                .map(warranty -> WarrantyResponse.from(warranty, now))
                 .toList();
     }
 
