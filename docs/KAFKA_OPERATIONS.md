@@ -8,15 +8,35 @@
 
 ## 점검
 
-견적·매입·세금계산서·보증보험 발행 서비스는 업무 변경과 동일한 DB 트랜잭션에 `outbox_events`를 기록한다. 각 서비스 DB에서 `status`, `attempts`, `next_attempt_at`, `lease_until`, `last_error`를 확인한다. `PENDING`은 전송 대기/재시도, `CLAIMED`는 최대 60초의 발행 lease, `SENT`는 Kafka broker 수락을 뜻하며 **소비 완료를 뜻하지 않는다**. 발행기는 1초마다 최대 100건을 확인하고 Kafka `send()`의 메타데이터/버퍼 대기 및 ACK 대기를 각각 최대 5초로 제한한다. 실패는 1초부터 최대 5분까지 백오프한다.
+견적·매입·세금계산서·보증보험 발행 서비스는 업무 변경과 동일한 DB 트랜잭션에 `outbox_events`를 기록한다. 각 서비스 DB에서 `status`, `attempts`, `next_attempt_at`, `lease_until`, `last_error`를 확인한다. `PENDING`은 전송 대기/재시도, `CLAIMED`는 최대 60초의 발행 lease, `SENT`는 Kafka broker 수락을 뜻하며 **소비 완료를 뜻하지 않는다**. 보증보험 알림의 `SUPPRESSED`는 발행 직전 현재 확인본과 일치하지 않아 **이후 재전송을 금지**한 보존 상태다. 이전 lease 소유자가 이미 broker로 보냈을 수 있으므로 `SUPPRESSED`가 전송 이력 부재를 증명하지는 않으며, 소비자의 현재 행 재검증을 유지한다. 발행기는 1초마다 최대 100건을 확인하고 Kafka `send()`의 메타데이터/버퍼 대기 및 ACK 대기를 각각 최대 5초로 제한한다. 실패는 1초부터 최대 5분까지 백오프한다.
 
 ```sql
 SELECT status, COUNT(*) FROM outbox_events GROUP BY status;
 SELECT event_id, topic, record_key, attempts, next_attempt_at, lease_until, last_error
-FROM outbox_events WHERE status <> 'SENT' ORDER BY created_at LIMIT 50;
+FROM outbox_events WHERE status IN ('PENDING', 'CLAIMED') ORDER BY created_at LIMIT 50;
+SELECT last_error AS reason_code, COUNT(*) FROM outbox_events
+WHERE topic = 'warranty.expiring' AND status = 'SUPPRESSED' GROUP BY last_error;
 ```
 
 broker 장애 때는 업무 트랜잭션이 성공해도 `PENDING` 행이 남으며, 복구 후 동일 `eventId`·원본 JSON으로 재전송한다. ACK 직후 `SENT` 기록에 실패해 같은 이벤트가 재전송될 수 있으므로 소비자 처리 기록을 임의로 제거하지 않는다. 장시간 `CLAIMED` 상태인 행은 먼저 발행기·DB 로그 및 실제 lease 만료 여부를 확인한다. 상태를 수동으로 `SENT` 처리하거나 outbox 행을 삭제하면 유실될 수 있다.
+
+### 보증보험 구 outbox의 배포 선행 게이트
+
+`SUPPRESSED`와 nullable `suppressed_at`을 쓰는 코드는 운영 MySQL의 현재 `outbox_events.status` 컬럼 타입/허용 enum 값과 실제 대기·만료 lease 행을 확인하기 전까지 VPS에 배포하지 않는다. `@Enumerated(STRING)`의 H2 `create-drop` 결과나 Hibernate `ddl-auto:update`에 MySQL enum 확장·롤백을 맡기지 않는다. 아래 조회는 **값/원문을 출력하지 않는 읽기 전용 사전 감사**이며, 컬럼이 아직 없다면 해당 컬럼 참조 쿼리는 실행하지 않는다.
+
+```sql
+SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME IN ('outbox_events', 'defect_warranties')
+  AND COLUMN_NAME IN ('status', 'suppressed_at', 'expiry_confirmed_at');
+SELECT status, COUNT(*) FROM outbox_events
+WHERE topic = 'warranty.expiring' GROUP BY status;
+SELECT COUNT(*) AS expired_leases FROM outbox_events
+WHERE topic = 'warranty.expiring' AND status = 'CLAIMED' AND lease_until <= UTC_TIMESTAMP(6);
+```
+
+실제 DDL을 기준으로 명시적 확장 마이그레이션을 작성해 격리 MySQL 8 복제에서 적용·재실행·기존 행 보존을 검증한다. 기존 수기/OCR 행의 `expiry_confirmed_at`을 MANUAL 상태만 보고 채우지 않는다. DB+업로드 파일의 일관된 외부 백업·격리 복원, 구 큐/소비 lag·DLT 감사, 중단·복귀 이미지/SHA·구 버전의 새 enum 읽기 호환성을 확인하기 전 배포는 **NO-GO**다. 새 상태를 기록한 뒤 구 앱 이미지로 단순 롤백하면 읽기 또는 스키마 자동 변경이 실패할 수 있으므로, 호환 롤백 이미지나 publisher 정지·스키마/행 복구 절차를 먼저 리허설한다. 부적격 행은 원본 JSON과 `eventId`를 바꾸거나 삭제하지 않으며 `last_error`에는 민감값 대신 고정 사유 코드만 남긴다.
 
 로컬 Docker Kafka에서 DLT 토픽 목록을 확인한다.
 

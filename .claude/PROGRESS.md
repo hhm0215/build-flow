@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — 보증 만료 구 outbox 발행 전 차단 (2026-10-15)
+
+- `warranty.expiring`을 claim하기 직전에 원본 envelope·현장/보험사/종료일·확인 세대·현재 MANUAL·KST 알림 기간을 DB 행 잠금 아래 재검증한다. 부적격 행은 JSON/eventId를 바꾸지 않고 `SUPPRESSED`·사유 코드·시각으로 보존하며, 한 행씩 짧은 트랜잭션을 마친 뒤 다음 행으로 진행한다. lease 만료 후 이미 broker가 수락한 메시지는 consumer 재검증이 막으며 `SUPPRESSED`는 이후 재전송 금지의 의미다.
+- notification-service 전체 테스트와 전체 백엔드 `gradlew test` 로컬 PASS, 독립 보안 리뷰에서 새 코드 P1 결함 없음. 실제 MySQL의 ENUM/nullable 컬럼·기존 큐·명시적 migration/구 이미지 롤백은 `UNVERIFIED`; 공개 VPS는 이전 코드 그대로이며 배포·실데이터 승격 **NO-GO**. 사용자 소유 `EstimateService.java`와 `output/`은 그대로 보존한다.
+
 ## 완료된 작업 — 보증보험 OCR·만료 알림 GitHub 통합 (2026-10-14)
 
 - [PR #97](https://github.com/hhm0215/build-flow/pull/97)의 6개 커밋과 원격 `develop` SHA 일치, PR 전용 CI 5개 성공, 독립 리뷰 후 merge commit `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`로 병합했다. 병합 `main` [CI run 38569829938](https://github.com/hhm0215/build-flow/actions/runs/38569829938)의 5개 검사와 릴리스 후보 증거 job이 성공했고 `develop`도 같은 SHA로 fast-forward했다. 릴리스 후보는 배포가 아니다.
