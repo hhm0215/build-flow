@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — 보증보험 PDF 원본 확인 경로 (2026-10-16, 작업 분기)
+
+- 보증보험 업로드 사본을 파일명·경로 비노출로 내려받는 API와 확인 화면 버튼을 구현했다. 내부 notification 포트의 Gateway 우회를 막도록 서비스에서 JWT 서명·access/ADMIN/authVersion 2·Redis 로그아웃 블랙리스트를 다시 검사한다. PDF는 크기·매직·UUID 경로·symlink를 검사하고 2개 동시 스트림으로 제한한다. 없는 파일/수동 등록은 404, 무인증은 401이다.
+- notification-service 테스트, 전체 백엔드 테스트, 프론트 40파일 136건·lint·build는 로컬 PASS. 독립 보안/코드 리뷰가 찾은 401→500 매핑과 응답 중 메모리 보유 문제를 수정하고 재검토에서 신규 P0~P2 차단 결함이 없었다. 새 변경의 CI·실제 VPS 다운로드/401·복원은 **PENDING**이며 `main`/VPS 미반영이다. 확인자 감사·보존 정책·실데이터 백업/격리 복원도 PENDING, V1 40/100·실데이터 NO-GO 유지.
+
 ## 진행 중 — 보증 만료 구 outbox 발행 전 차단 (2026-10-15)
 
 - `warranty.expiring`을 claim하기 직전에 원본 envelope·현장/보험사/종료일·확인 세대·현재 MANUAL·KST 알림 기간을 DB 행 잠금 아래 재검증한다. 부적격 행은 JSON/eventId를 바꾸지 않고 `SUPPRESSED`·사유 코드·시각으로 보존하며, 한 행씩 짧은 트랜잭션을 마친 뒤 다음 행으로 진행한다. lease 만료 후 이미 broker가 수락한 메시지는 consumer 재검증이 막으며 `SUPPRESSED`는 이후 재전송 금지의 의미다.

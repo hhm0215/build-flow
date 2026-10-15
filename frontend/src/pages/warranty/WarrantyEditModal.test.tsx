@@ -5,9 +5,11 @@ import type { Warranty } from '../../types'
 import WarrantyEditModal, { toWarrantyUpdateRequest } from './WarrantyEditModal'
 
 const mutateAsync = vi.hoisted(() => vi.fn())
+const downloadWarrantyPdf = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/warranties.api', () => ({
   useUpdateWarranty: () => ({ mutateAsync, isPending: false }),
+  downloadWarrantyPdf,
 }))
 
 const warranty = {
@@ -28,6 +30,7 @@ const warranty = {
 
 beforeEach(() => {
   mutateAsync.mockReset()
+  downloadWarrantyPdf.mockReset()
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: false,
     media: query,
@@ -46,6 +49,17 @@ afterEach(() => {
 })
 
 describe('WarrantyEditModal', () => {
+  it('업로드 PDF가 연결된 경우에만 원본 다운로드를 제공한다', async () => {
+    downloadWarrantyPdf.mockResolvedValue(undefined)
+    const { rerender } = render(<WarrantyEditModal warranty={warranty} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: '업로드 PDF 다운로드' })).not.toBeInTheDocument()
+
+    rerender(<WarrantyEditModal warranty={{ ...warranty, hasUploadedPdf: true }} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '업로드 PDF 다운로드' }))
+    await waitFor(() => expect(downloadWarrantyPdf).toHaveBeenCalledWith(7))
+    expect(mutateAsync).not.toHaveBeenCalled()
+  })
+
   it('선택 필드를 비우면 서버 3-state 계약의 null로 보낸다', () => {
     expect(toWarrantyUpdateRequest({
       insuranceCompany: ' 현대해상 ',

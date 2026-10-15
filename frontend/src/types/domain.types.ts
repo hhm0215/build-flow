@@ -273,6 +273,8 @@ export interface Warranty {
   expiryConfirmed?: boolean
   expiryConfirmedAt?: string | null
   ocrStatus?: OcrStatus
+  /** 업로드 사본의 DB 연결 여부. 실제 파일이 없으면 다운로드는 404로 거부된다. */
+  hasUploadedPdf?: boolean
   createdAt: string
   updatedAt: string
 }

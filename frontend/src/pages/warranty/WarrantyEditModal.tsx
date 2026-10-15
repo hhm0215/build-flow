@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
-import { Alert, DatePicker, Form, Input, InputNumber, Modal } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal } from 'antd'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useUpdateWarranty } from '../../api/warranties.api'
+import { downloadWarrantyPdf, useUpdateWarranty } from '../../api/warranties.api'
 import type { Warranty, WarrantyUpdateRequest } from '../../types'
 
 interface FormValues {
@@ -34,7 +34,24 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
   const [form] = Form.useForm<FormValues>()
   const updateWarranty = useUpdateWarranty()
   const [error, setError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const inFlight = useRef(false)
+  const downloadInFlight = useRef(false)
+
+  const downloadOriginal = async () => {
+    if (downloadInFlight.current) return
+    downloadInFlight.current = true
+    setDownloading(true)
+    setError(null)
+    try {
+      await downloadWarrantyPdf(warranty.id)
+    } catch {
+      setError('업로드 PDF를 다운로드하지 못했습니다. 파일 상태를 확인해 주세요.')
+    } finally {
+      downloadInFlight.current = false
+      setDownloading(false)
+    }
+  }
 
   const close = () => {
     if (!inFlight.current && !updateWarranty.isPending) onClose()
@@ -92,6 +109,7 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
         {warranty.ocrStatus === 'FAILED' && <Alert type="warning" message="AI가 일부 정보를 읽지 못했거나 서로 다른 값을 찾았습니다. 원본 PDF와 보험사·증권번호·보증기간을 모두 대조하고 저장해 주세요. 저장하면 만료 알림 대상이 될 수 있습니다." showIcon style={{ marginBottom: 16 }} />}
         {warranty.ocrStatus === 'SUCCESS' && <Alert type="warning" message="AI 추출값은 아직 확정 정보가 아닙니다. 원본 PDF와 보험사·기간을 대조한 뒤 저장하면 만료 알림 대상이 됩니다." showIcon style={{ marginBottom: 16 }} />}
+        {warranty.hasUploadedPdf && <Button onClick={downloadOriginal} loading={downloading} style={{ marginBottom: 16 }}>업로드 PDF 다운로드</Button>}
         <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, whitespace: true, message: '보험사를 입력하세요' }]}>
           <Input placeholder="보험사명" maxLength={200} />
         </Form.Item>
