@@ -132,6 +132,12 @@ public final class WarrantyOcrParser {
         private final String policyNumber;
         private final LocalDate startDate;
         private final LocalDate endDate;
+        /** 텍스트 레이어와 이미지 OCR이 서로 다른 값을 제시하면 사용자 확인이 필요하다. */
+        private final boolean conflicting;
+
+        public Result(String insuranceCompany, String policyNumber, LocalDate startDate, LocalDate endDate) {
+            this(insuranceCompany, policyNumber, startDate, endDate, false);
+        }
 
         public static Result empty() {
             return new Result(null, null, null, null);

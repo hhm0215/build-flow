@@ -90,7 +90,7 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
         }}
       >
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
-        {warranty.ocrStatus === 'FAILED' && <Alert type="info" message="AI가 읽지 못한 필수 정보를 입력하면 수기 보정으로 저장됩니다." showIcon style={{ marginBottom: 16 }} />}
+        {warranty.ocrStatus === 'FAILED' && <Alert type="warning" message="AI가 일부 정보를 읽지 못했거나 서로 다른 값을 찾았습니다. 원본 PDF와 보험사·증권번호·보증기간을 모두 대조하고 저장해 주세요. 저장하면 만료 알림 대상이 될 수 있습니다." showIcon style={{ marginBottom: 16 }} />}
         {warranty.ocrStatus === 'SUCCESS' && <Alert type="warning" message="AI 추출값은 아직 확정 정보가 아닙니다. 원본 PDF와 보험사·기간을 대조한 뒤 저장하면 만료 알림 대상이 됩니다." showIcon style={{ marginBottom: 16 }} />}
         <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, whitespace: true, message: '보험사를 입력하세요' }]}>
           <Input placeholder="보험사명" maxLength={200} />

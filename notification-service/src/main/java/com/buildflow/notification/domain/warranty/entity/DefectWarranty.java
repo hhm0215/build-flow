@@ -145,13 +145,18 @@ public class DefectWarranty {
      */
     public void applyOcrResult(String insuranceCompany, String policyNumber,
                                LocalDate startDate, LocalDate endDate) {
+        applyOcrResult(insuranceCompany, policyNumber, startDate, endDate, false);
+    }
+
+    public void applyOcrResult(String insuranceCompany, String policyNumber,
+                               LocalDate startDate, LocalDate endDate, boolean conflicting) {
         if (insuranceCompany != null) this.insuranceCompany = insuranceCompany;
         if (policyNumber != null) this.policyNumber = policyNumber;
         if (startDate != null) this.startDate = startDate;
         if (endDate != null) this.endDate = endDate;
         boolean complete = insuranceCompany != null && !insuranceCompany.isBlank()
                 && startDate != null && endDate != null && !endDate.isBefore(startDate);
-        this.ocrStatus = complete ? OcrStatus.SUCCESS : OcrStatus.FAILED;
+        this.ocrStatus = complete && !conflicting ? OcrStatus.SUCCESS : OcrStatus.FAILED;
         this.expiryConfirmedAt = null;
     }
 

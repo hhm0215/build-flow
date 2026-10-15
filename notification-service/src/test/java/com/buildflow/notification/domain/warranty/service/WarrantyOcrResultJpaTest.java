@@ -65,6 +65,19 @@ class WarrantyOcrResultJpaTest {
     }
 
     @Test
+    void 상충하는_OCR_결과는_잠긴_PENDING_행에_보존하되_확정하지_않는다() {
+        DefectWarranty pending = repository.save(DefectWarranty.createPending(1L, "synthetic.pdf"));
+        assertThat(results.apply(pending.getId(), "서울보증보험", "QA-20261013-0001",
+                LocalDate.of(2026, 10, 13), LocalDate.of(2027, 10, 12), true)).isTrue();
+
+        DefectWarranty saved = repository.findById(pending.getId()).orElseThrow();
+        assertThat(saved.getOcrStatus()).isEqualTo(OcrStatus.FAILED);
+        assertThat(saved.getPolicyNumber()).isEqualTo("QA-20261013-0001");
+        assertThat(saved.getExpiryConfirmedAt()).isNull();
+        assertThat(results.apply(pending.getId(), "다른 값", null, null, null, false)).isFalse();
+    }
+
+    @Test
     void 삭제된_보증서는_OCR_콜백으로_다시_생성되지_않는다() {
         DefectWarranty pending = repository.save(DefectWarranty.createPending(1L, "synthetic.pdf"));
         Long id = pending.getId();
