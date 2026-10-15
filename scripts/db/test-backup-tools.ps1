@@ -22,6 +22,13 @@ function Invoke-WarrantyVerifier {
     & (Join-Path $PSScriptRoot "verify-warranty-files.ps1") -BackupDirectory $testRoot -Uploads $package.uploads -SqlSource $package.source
 }
 
+function Invoke-WarrantyReferenceVerifier {
+    param([Parameter(Mandatory = $true)][object[]]$Rows)
+    $rowsPath = Join-Path $testRoot "restored-warranty-rows.json"
+    [System.IO.File]::WriteAllText($rowsPath, (ConvertTo-Json -InputObject @($Rows) -Depth 10), $encoding)
+    & (Join-Path $PSScriptRoot "verify-warranty-references.ps1") -BackupDirectory $testRoot -RestoredDbRowsPath $rowsPath
+}
+
 try {
     New-Item -ItemType Directory -Path $testRoot | Out-Null
     $dumpPath = Join-Path $testRoot "buildflow.sql"
@@ -33,6 +40,9 @@ try {
             $dumpLines += "CREATE TABLE ``admin_accounts`` (``id`` bigint NOT NULL);"
             $dumpLines += "INSERT INTO ``admin_accounts`` VALUES (1);"
         }
+        if ($schema -eq "buildflow_notification") {
+            $dumpLines += "CREATE TABLE ``defect_warranties`` (``id`` bigint NOT NULL);"
+        }
     }
     $dumpLines += "-- Dump completed on 2026-09-29 00:00:00"
     [System.IO.File]::WriteAllText($dumpPath, ($dumpLines -join "`n") + "`n", $encoding)
@@ -43,7 +53,9 @@ try {
         containsSensitiveData = $true
         mysqlServerVersion = "test"
         schemas = @($schemas | ForEach-Object {
-            $tables = if ($_ -eq "buildflow_auth") { @([ordered]@{ name = "admin_accounts"; rowCount = 1 }) } else { @() }
+            $tables = if ($_ -eq "buildflow_auth") { @([ordered]@{ name = "admin_accounts"; rowCount = 1 }) }
+                elseif ($_ -eq "buildflow_notification") { @([ordered]@{ name = "defect_warranties"; rowCount = 2 }) }
+                else { @() }
             [ordered]@{ name = $_; tables = $tables; flywayHistoryPresent = $false }
         })
         source = [ordered]@{
@@ -125,6 +137,45 @@ try {
     catch { $v2Rejected = $_.Exception.Message -match "restored-DB warranty reference validation" }
     if (-not $v2Rejected) { throw "Unbound v2 package was incorrectly accepted as a complete backup." }
     Invoke-WarrantyVerifier
+    $matchingRow = [pscustomobject]@{ warrantyId = 1; filePath = "/app/uploads/warranties/$warrantyName" }
+    Invoke-WarrantyReferenceVerifier -Rows @($matchingRow, [pscustomobject]@{ warrantyId = 2; filePath = $null })
+    $missingManualRowRejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @($matchingRow) }
+    catch { $missingManualRowRejected = $_.Exception.Message -match "row count differs" }
+    if (-not $missingManualRowRejected) { throw "Missing manual warranty row was not rejected." }
+    $wrongPathRejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @([pscustomobject]@{ warrantyId = 1; filePath = "/app/uploads/warranties/wrong.pdf" }) }
+    catch { $wrongPathRejected = $_.Exception.Message -match "differs from manifest" }
+    if (-not $wrongPathRejected) { throw "Mismatched restored warranty path was not rejected." }
+    $missingDbRowRejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @([pscustomobject]@{ warrantyId = 2; filePath = $null }) }
+    catch { $missingDbRowRejected = $_.Exception.Message -match "missing from the restored DB" }
+    if (-not $missingDbRowRejected) { throw "Missing restored warranty reference was not rejected." }
+    $extraDbRowRejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @($matchingRow, [pscustomobject]@{ warrantyId = 2; filePath = "/app/uploads/warranties/$warrantyName" }) }
+    catch { $extraDbRowRejected = $_.Exception.Message -match "differs from manifest" }
+    if (-not $extraDbRowRejected) { throw "Extra restored warranty reference was not rejected." }
+    $duplicateDbRowRejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @($matchingRow, $matchingRow) }
+    catch { $duplicateDbRowRejected = $_.Exception.Message -match "duplicate restored warranty ID" }
+    if (-not $duplicateDbRowRejected) { throw "Duplicate restored warranty ID was not rejected." }
+    $missingFilePathRejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @([pscustomobject]@{ warrantyId = 1 }) }
+    catch { $missingFilePathRejected = $_.Exception.Message -match "include warrantyId and filePath" }
+    if (-not $missingFilePathRejected) { throw "Malformed restored warranty row was not rejected." }
+    foreach ($badId in @(1.1, $true, "1")) {
+        $badIdRejected = $false
+        try { Invoke-WarrantyReferenceVerifier -Rows @([pscustomobject]@{ warrantyId = $badId; filePath = "/app/uploads/warranties/$warrantyName" }) }
+        catch { $badIdRejected = $_.Exception.Message -match "must be an integer" }
+        if (-not $badIdRejected) { throw "Non-integer restored warranty ID was not rejected." }
+    }
+    $incompleteV2 = Join-Path $testRoot "INCOMPLETE"
+    [System.IO.File]::WriteAllText($incompleteV2, "test", $encoding)
+    $incompleteV2Rejected = $false
+    try { Invoke-WarrantyReferenceVerifier -Rows @($matchingRow, [pscustomobject]@{ warrantyId = 2; filePath = $null }) }
+    catch { $incompleteV2Rejected = $_.Exception.Message -match "Incomplete backup" }
+    if (-not $incompleteV2Rejected) { throw "Incomplete v2 package was not rejected." }
+    Remove-Item -LiteralPath $incompleteV2
 
     [System.IO.File]::WriteAllText($warrantyPath, "synthetic-warrantx", $encoding)
     $warrantyCorruptionRejected = $false
