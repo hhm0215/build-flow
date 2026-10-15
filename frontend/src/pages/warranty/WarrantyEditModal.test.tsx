@@ -69,6 +69,7 @@ describe('WarrantyEditModal', () => {
     const onClose = vi.fn()
     render(<WarrantyEditModal warranty={warranty} onClose={onClose} />)
     expect(screen.getByText('AI 실패 정보 수동 보정')).toBeInTheDocument()
+    expect(screen.getByText(/원본 PDF와 보험사·증권번호·보증기간을 모두 대조/)).toBeInTheDocument()
     expect(screen.getByPlaceholderText('보험사명')).toHaveValue('기존 보험사')
     fireEvent.change(screen.getByPlaceholderText('보험사명'), { target: { value: '현대해상' } })
     fireEvent.click(screen.getByRole('button', { name: '저장' }))

@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -46,7 +47,6 @@ class WarrantyOcrServiceTest {
         when(tesseract.doOCR(any(BufferedImage.class))).thenReturn(
                 "서울보증보험 증권번호 QA-20261013-0001 보증기간 2026-10-13 ~ 2027-10-12");
         WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), provider);
-        ReflectionTestUtils.setField(service, "minTextLength", 50);
         ReflectionTestUtils.setField(service, "scanDpi", 72);
 
         WarrantyOcrParser.Result result = service.extractResult(pdf);
@@ -64,17 +64,76 @@ class WarrantyOcrServiceTest {
         String text = "[QA] 합성 증권입니다. 보험회사 서울보증보험, 증권번호 QA-20261013-0001, "
                 + "보증기간 2026-10-13 ~ 2027-10-12. 실제 계약의 효력은 없습니다.";
 
-        WarrantyOcrParser.Result result = WarrantyOcrService.parseUsableTextLayer(text, 50);
+        WarrantyOcrParser.Result result = WarrantyOcrService.parseUsableTextLayer(text);
 
         assertThat(result).isNotNull();
         assertThat(result.extractedFieldCount()).isEqualTo(4);
+        assertThat(WarrantyOcrService.hasRequiredFields(result)).isTrue();
+    }
+
+    @Test
+    void 텍스트의_일부_필드와_이미지의_누락_필드를_병합한다() {
+        WarrantyOcrParser.Result text = WarrantyOcrService.parseUsableTextLayer(
+                "[QA] 합성 증권번호 QA-20261013-0001. 그 밖의 보증기간과 보험사는 이미지에 있습니다.");
+        WarrantyOcrParser.Result image = WarrantyOcrParser.parse(
+                "서울보증보험 보증기간 2026-10-13 ~ 2027-10-12");
+
+        assertThat(WarrantyOcrService.hasRequiredFields(text)).isFalse();
+        WarrantyOcrParser.Result merged = WarrantyOcrService.mergeResults(text, image);
+        assertThat(merged.getPolicyNumber()).isEqualTo("QA-20261013-0001");
+        assertThat(merged.getInsuranceCompany()).isEqualTo("서울보증보험");
+        assertThat(merged.getStartDate()).isEqualTo(LocalDate.of(2026, 10, 13));
+        assertThat(merged.getEndDate()).isEqualTo(LocalDate.of(2027, 10, 12));
+        assertThat(merged.isConflicting()).isFalse();
+    }
+
+    @Test
+    void 상충하는_두_추출값은_텍스트값을_보존하고_수동_확인으로_넘긴다() {
+        WarrantyOcrParser.Result text = WarrantyOcrParser.Result.builder()
+                .policyNumber("QA-20261013-0001")
+                .startDate(LocalDate.of(2026, 10, 13))
+                .build();
+        WarrantyOcrParser.Result image = WarrantyOcrParser.Result.builder()
+                .insuranceCompany("서울보증보험")
+                .policyNumber("QA-20261013-0002")
+                .startDate(LocalDate.of(2026, 10, 14))
+                .endDate(LocalDate.of(2027, 10, 12))
+                .build();
+
+        WarrantyOcrParser.Result merged = WarrantyOcrService.mergeResults(text, image);
+
+        assertThat(merged.isConflicting()).isTrue();
+        assertThat(merged.getPolicyNumber()).isEqualTo("QA-20261013-0001");
+        assertThat(merged.getStartDate()).isEqualTo(LocalDate.of(2026, 10, 13));
+        assertThat(merged.getEndDate()).isEqualTo(LocalDate.of(2027, 10, 12));
+    }
+
+    @Test
+    void 이미지_OCR_실패_시_기존_부분_텍스트는_보정용으로_남긴다() throws Exception {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<Tesseract> provider = mock(ObjectProvider.class);
+        Tesseract tesseract = mock(Tesseract.class);
+        when(provider.getObject()).thenReturn(tesseract);
+        when(tesseract.doOCR(any(BufferedImage.class))).thenThrow(new IllegalStateException("synthetic failure"));
+        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), provider);
+        ReflectionTestUtils.setField(service, "scanDpi", 72);
+        WarrantyOcrParser.Result partial = WarrantyOcrParser.parse("증권번호 QA-20261013-0001");
+
+        try (PDDocument document = new PDDocument()) {
+            document.addPage(new PDPage());
+            assertThat(service.extractWithFallback(document, partial)).isSameAs(partial);
+            assertThatThrownBy(() -> service.extractWithFallback(document, null))
+                    .isInstanceOf(IllegalStateException.class);
+        }
     }
 
     @Test
     void 짧거나_깨진_텍스트는_텍스트_결과로_확정하지_않는다() {
-        assertThat(WarrantyOcrService.parseUsableTextLayer("짧음", 50)).isNull();
+        assertThat(WarrantyOcrService.parseUsableTextLayer("짧음")).isNull();
         assertThat(WarrantyOcrService.parseUsableTextLayer(
-                "This is a long but unreadable or unrelated page that has no recognized fields.", 50)).isNull();
+                "This is a long but unreadable or unrelated page that has no recognized fields.")).isNull();
+        assertThat(WarrantyOcrService.parseUsableTextLayer("증권번호 QA-12345678").getPolicyNumber())
+                .isEqualTo("QA-12345678");
     }
 
     @Test
@@ -90,7 +149,6 @@ class WarrantyOcrServiceTest {
         when(provider.getObject()).thenReturn(tesseract);
         when(tesseract.doOCR(any(BufferedImage.class))).thenReturn("recognized but unrelated text");
         WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), provider);
-        ReflectionTestUtils.setField(service, "minTextLength", 50);
         ReflectionTestUtils.setField(service, "scanDpi", 72);
 
         assertThat(service.extractResult(pdf).extractedFieldCount()).isZero();

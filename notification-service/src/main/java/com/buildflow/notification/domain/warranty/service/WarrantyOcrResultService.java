@@ -18,9 +18,15 @@ public class WarrantyOcrResultService {
 
     @Transactional
     public boolean apply(Long id, String insurer, String policyNumber, LocalDate startDate, LocalDate endDate) {
+        return apply(id, insurer, policyNumber, startDate, endDate, false);
+    }
+
+    @Transactional
+    public boolean apply(Long id, String insurer, String policyNumber, LocalDate startDate, LocalDate endDate,
+                         boolean conflicting) {
         DefectWarranty warranty = repository.findByIdForUpdate(id).orElse(null);
         if (warranty == null || warranty.getOcrStatus() != OcrStatus.PENDING) return false;
-        warranty.applyOcrResult(insurer, policyNumber, startDate, endDate);
+        warranty.applyOcrResult(insurer, policyNumber, startDate, endDate, conflicting);
         return true;
     }
 
