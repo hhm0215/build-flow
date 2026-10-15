@@ -3,6 +3,7 @@ import { mockWarranties } from '../data/warranties.data'
 import { ApiResponse, Warranty, WarrantyUpdateRequest } from '../../types'
 
 let warranties: Warranty[] = [...mockWarranties]
+const uploadedPdfs = new Map<number, File>()
 
 // OCR 시뮬용 가짜 보험사·증권번호 풀
 const FAKE_INSURERS = ['서울보증보험', '한화손해보험', '삼성화재', 'DB손해보험', 'KB손해보험']
@@ -132,6 +133,7 @@ export const warrantiesHandlers = [
 
   // 삭제 — DELETE /api/v1/warranties/:id
   http.delete<{ id: string }>('/api/v1/warranties/:id', ({ params }) => {
+    uploadedPdfs.delete(Number(params.id))
     warranties = warranties.filter((w) => w.id !== Number(params.id))
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
   }),
@@ -161,10 +163,12 @@ export const warrantiesHandlers = [
       daysUntilExpiry: 0,
       expired: false,
       ocrStatus: 'PENDING',
+      hasUploadedPdf: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
     warranties = [pending, ...warranties]
+    uploadedPdfs.set(newId, file)
 
     // 10초 후 자동 SUCCESS — 폴링이 잡아냄
     setTimeout(() => {
@@ -190,5 +194,19 @@ export const warrantiesHandlers = [
       { success: true, data: pending, error: null },
       { status: 202 },
     )
+  }),
+
+  http.get<{ id: string }>('/api/v1/warranties/:id/file', async ({ params }) => {
+    const file = uploadedPdfs.get(Number(params.id))
+    if (!file) return new HttpResponse(null, { status: 404 })
+    return new HttpResponse(await file.arrayBuffer(), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="warranty-${params.id}.pdf"`,
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
   }),
 ]

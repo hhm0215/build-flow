@@ -4,13 +4,22 @@ import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
 import com.buildflow.notification.domain.warranty.dto.WarrantyResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
 import com.buildflow.notification.domain.warranty.service.DefectWarrantyService;
+import com.buildflow.notification.domain.warranty.service.WarrantyOriginalFileService;
+import com.buildflow.notification.domain.warranty.service.WarrantyOriginalFileService.OpenedPdf;
+import com.buildflow.notification.domain.warranty.service.WarrantyFileAuthorizationService;
 import com.buildflow.notification.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.List;
 
@@ -20,6 +29,8 @@ import java.util.List;
 public class DefectWarrantyController {
 
     private final DefectWarrantyService warrantyService;
+    private final WarrantyOriginalFileService originalFileService;
+    private final WarrantyFileAuthorizationService fileAuthorizationService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<WarrantyResponse>> create(
@@ -38,6 +49,21 @@ public class DefectWarrantyController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<WarrantyResponse>> findById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(warrantyService.findById(id)));
+    }
+
+    @GetMapping(value = "/{id}/file", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<InputStreamResource> downloadOriginal(@PathVariable Long id,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        fileAuthorizationService.requireAdminAccess(authorization);
+        OpenedPdf pdf = originalFileService.open(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.size())
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename("warranty-" + id + ".pdf").build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(pdf.resource());
     }
 
     @PutMapping("/{id}")

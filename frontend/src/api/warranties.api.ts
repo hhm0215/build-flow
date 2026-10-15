@@ -42,6 +42,24 @@ const fetchExpiring = async (days: number) => {
   return res.data.data
 }
 
+export async function downloadWarrantyPdf(id: number): Promise<void> {
+  const response = await axiosInstance.get<Blob>(`/warranties/${id}/file`, {
+    responseType: 'blob',
+    timeout: 30_000,
+  })
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `warranty-${id}.pdf`
+  document.body.appendChild(link)
+  try {
+    link.click()
+  } finally {
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+}
+
 type RefetchIntervalOption =
   | number
   | false

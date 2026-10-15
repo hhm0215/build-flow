@@ -11,6 +11,11 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
   jpa:
     hibernate:
       ddl-auto: update
@@ -56,6 +61,7 @@ app:
     # 스케줄 cron — 매일 09:00
     scheduler-cron: "0 0 9 * * *"
   upload-dir: ${UPLOAD_DIR:./uploads/warranties}
+  warranty-file-jwt-secret: ${JWT_SECRET:}
   # multipart 업로드 제한 (Spring 기본 1MB / 10MB로 줄여진 것을 PDF 사이즈에 맞춰 확장)
   ocr:
     # PDFBox 텍스트의 필수 보증 필드가 부족하면 Tess4J OCR fallback
