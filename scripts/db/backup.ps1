@@ -1,11 +1,17 @@
 [CmdletBinding()]
-param([string]$OutputRoot)
+param([string]$OutputRoot, [switch]$IncludeWarrantyUploads)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
+. (Join-Path $PSScriptRoot 'restored-warranty-rows.ps1')
+. (Join-Path $PSScriptRoot 'warranty-snapshot.ps1')
+. (Join-Path $PSScriptRoot 'warranty-volume-copy.ps1')
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+if ($IncludeWarrantyUploads -and [string]::IsNullOrWhiteSpace($OutputRoot)) {
+    throw 'Integrated snapshot requires an explicit existing private OutputRoot.'
+}
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $repoRoot "backups\db" }
 $schemas = @("buildflow_auth", "buildflow_estimate", "buildflow_site", "buildflow_purchase", "buildflow_tax", "buildflow_notification", "buildflow_chat")
 $composeArgs = @("compose", "-f", (Join-Path $repoRoot "docker-compose.yml"), "-f", (Join-Path $repoRoot "docker-compose.app.yml"))
@@ -65,6 +71,19 @@ function Assert-NoActiveBuildFlowClients {
     if ($activeCount -ne 0) {
         throw "Detected $activeCount active BuildFlow database connection(s). Stop local bootRun and all external writers before backup."
     }
+}
+
+function Get-WarrantySourceRows {
+    param([Parameter(Mandatory = $true)][object[]]$Inventory)
+
+    $notification = @($Inventory | Where-Object { $_.name -ceq 'buildflow_notification' })
+    $warranty = @($notification | ForEach-Object { $_.tables } | Where-Object { $_.name -ceq 'defect_warranties' })
+    if ($notification.Count -ne 1 -or $warranty.Count -ne 1) {
+        throw 'Warranty table inventory is missing or duplicated.'
+    }
+    $query = "SELECT id, IF(file_path IS NULL, 'N', CONCAT('H', HEX(CONVERT(file_path USING utf8mb4)))) FROM buildflow_notification.defect_warranties ORDER BY id;"
+    $encoded = @(Invoke-MySqlQuery -Query $query)
+    return @(ConvertFrom-RestoredWarrantyLines -Lines $encoded -ExpectedCount ([long]$warranty[0].rowCount))
 }
 
 function Get-LabelValue {
@@ -136,6 +155,9 @@ function Test-BroadReadAcl {
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required. Install and start Docker Desktop." }
+if ($IncludeWarrantyUploads -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+    throw 'Integrated snapshot private-ACL verification currently requires Windows.'
+}
 
 Push-Location $repoRoot
 try {
@@ -162,15 +184,29 @@ try {
     Assert-NoActiveBuildFlowClients
     $inventoryBefore = @(Get-DatabaseInventory)
     $administratorBefore = Get-AdministratorFingerprint
+    $warrantyBefore = @()
+    $warrantyVolumeBefore = $null
+    if ($IncludeWarrantyUploads) {
+        $warrantyBefore = @(Get-WarrantySourceRows -Inventory $inventoryBefore)
+        $warrantyVolumeBefore = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') -PassThru
+    }
 
     $outputRootFull = [System.IO.Path]::GetFullPath($OutputRoot)
-    if (-not (Test-Path -LiteralPath $outputRootFull)) { New-Item -ItemType Directory -Path $outputRootFull | Out-Null }
+    if ($IncludeWarrantyUploads) {
+        if (-not (Test-Path -LiteralPath $outputRootFull -PathType Container)) {
+            throw 'Integrated snapshot OutputRoot must already exist.'
+        }
+        Assert-NoReparseAncestor -Path $outputRootFull
+        Assert-PrivateWarrantyDirectory -Path $outputRootFull
+    }
+    elseif (-not (Test-Path -LiteralPath $outputRootFull)) { New-Item -ItemType Directory -Path $outputRootFull | Out-Null }
     $timestamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ")
     $finalDirectory = Join-Path $outputRootFull $timestamp
     $partialDirectory = Join-Path $outputRootFull (".partial-$timestamp-" + [Guid]::NewGuid().ToString("N"))
     if (Test-Path -LiteralPath $finalDirectory) { throw "Backup directory already exists: $finalDirectory" }
     New-Item -ItemType Directory -Path $partialDirectory | Out-Null
     $backupDirectory = $partialDirectory
+    if ($IncludeWarrantyUploads) { Assert-PrivateWarrantyDirectory -Path $partialDirectory }
     $incompleteMarker = Join-Path $partialDirectory "INCOMPLETE"
     [System.IO.File]::WriteAllText($incompleteMarker, "Backup has not completed verification.`n")
     $broadReadAcl = Test-BroadReadAcl -Path $partialDirectory
@@ -208,10 +244,40 @@ try {
         throw "Database inventory changed while the backup was running. The dump is not accepted."
     }
 
+    $uploads = $null
+    if ($IncludeWarrantyUploads) {
+        $uploadsDirectory = Join-Path $partialDirectory 'uploads\warranties'
+        New-Item -ItemType Directory -Path $uploadsDirectory -Force | Out-Null
+        Assert-PrivateWarrantyDirectory -Path $uploadsDirectory
+        $copiedFiles = @(Copy-WarrantyVolumeSnapshot -VolumeName ([string]$warrantyVolumeBefore.volumeName) -DestinationDirectory $uploadsDirectory -WorkingDirectory $repoRoot)
+        Assert-NoActiveBuildFlowClients
+        $warrantyVolumeAfter = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') -PassThru
+        if (($warrantyVolumeBefore | ConvertTo-Json -Compress) -cne ($warrantyVolumeAfter | ConvertTo-Json -Compress)) {
+            throw 'Warranty upload volume identity changed during snapshot.'
+        }
+        $inventoryFinal = @(Get-DatabaseInventory)
+        $administratorFinal = Get-AdministratorFingerprint
+        if (($inventoryBefore | ConvertTo-Json -Depth 8 -Compress) -cne ($inventoryFinal | ConvertTo-Json -Depth 8 -Compress) -or
+            ($administratorBefore | ConvertTo-Json -Compress) -cne ($administratorFinal | ConvertTo-Json -Compress)) {
+            throw 'Database inventory changed while the warranty files were copied.'
+        }
+        $warrantyAfter = @(Get-WarrantySourceRows -Inventory $inventoryFinal)
+        if ((ConvertTo-Json -InputObject $warrantyBefore -Depth 4 -Compress) -cne
+            (ConvertTo-Json -InputObject $warrantyAfter -Depth 4 -Compress)) {
+            throw 'Warranty DB references changed during snapshot.'
+        }
+        $uploads = ConvertTo-WarrantyUploadManifest -Rows $warrantyBefore -Files $copiedFiles -ExpectedRowCount $warrantyBefore.Count -Source $warrantyVolumeBefore
+        Assert-PrivateWarrantyDirectory -Path $uploadsDirectory
+        foreach ($copiedFile in $copiedFiles) {
+            Assert-PrivateWarrantyDirectory -Path (Join-Path $uploadsDirectory ([string]$copiedFile.relativePath))
+        }
+        Assert-PrivateWarrantyDirectory -Path $dumpPath
+    }
+
     $hash = (Get-FileHash -LiteralPath $dumpPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $serverVersion = (Invoke-MySqlQuery -Query "SELECT VERSION();" | Select-Object -First 1).Trim()
     $manifest = [ordered]@{
-        formatVersion = 1
+        formatVersion = $(if ($IncludeWarrantyUploads) { 2 } else { 1 })
         createdAtUtc = [DateTime]::UtcNow.ToString("o")
         containsSensitiveData = $true
         mysqlServerVersion = $serverVersion
@@ -221,9 +287,21 @@ try {
         administrator = $administratorBefore
         security = [ordered]@{ plaintext = $true; broadReadAclWarning = $broadReadAcl }
     }
+    if ($IncludeWarrantyUploads) {
+        $manifest.uploads = $uploads
+        $manifest.recoveryStatus = 'source-snapshot-only; isolated DB+volume restore pending'
+    }
     Write-JsonUtf8 -Path (Join-Path $partialDirectory "manifest.json") -Value $manifest
+    if ($IncludeWarrantyUploads) {
+        Assert-PrivateWarrantyDirectory -Path (Join-Path $partialDirectory 'manifest.json')
+        Assert-PrivateWarrantyDirectory -Path $incompleteMarker
+    }
 
-    & (Join-Path $PSScriptRoot "verify-backup.ps1") -BackupDirectory $partialDirectory -AllowIncomplete
+    & (Join-Path $PSScriptRoot "verify-backup.ps1") -BackupDirectory $partialDirectory -AllowIncomplete -AllowUnrestoredV2:$IncludeWarrantyUploads
+    if ($IncludeWarrantyUploads) {
+        Write-Warning "SQL and warranty files were captured in an INCOMPLETE diagnostic snapshot: $partialDirectory. Isolated restore is still required; do not use for operational recovery or real data."
+        return
+    }
     Remove-Item -LiteralPath $incompleteMarker
     Move-Item -LiteralPath $partialDirectory -Destination $finalDirectory
     $backupDirectory = $finalDirectory

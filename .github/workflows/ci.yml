@@ -154,6 +154,7 @@ jobs:
           .\scripts\db\test-backup-tools.ps1
           .\scripts\db\test-restored-warranty-rows.ps1
           .\scripts\db\test-warranty-volume-preflight.ps1
+          .\scripts\db\test-warranty-snapshot.ps1
       - name: Validate read-only USB inventory with synthetic files
         shell: powershell
         run: .\scripts\usb\test-inventory-estimates.ps1
