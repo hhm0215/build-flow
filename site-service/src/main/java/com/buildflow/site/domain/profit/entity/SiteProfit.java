@@ -19,6 +19,10 @@ import java.time.LocalDateTime;
 @EntityListeners(AuditingEntityListener.class)
 public class SiteProfit {
 
+    // margin_rate는 DECIMAL(5,2). 매입이 견적의 10배를 넘는 손실 현장은 이 범위를 벗어나 저장이 실패하므로
+    // 마진 금액은 정확히 두고 표시용 마진율만 하한으로 제한한다(컬럼 확장은 마이그레이션 게이트 대상).
+    static final BigDecimal MIN_MARGIN_RATE = new BigDecimal("-999.99");
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -74,7 +78,8 @@ public class SiteProfit {
         if (this.totalEstimateAmount.compareTo(BigDecimal.ZERO) > 0) {
             this.marginRate = this.margin
                     .multiply(BigDecimal.valueOf(100))
-                    .divide(this.totalEstimateAmount, 2, java.math.RoundingMode.HALF_UP);
+                    .divide(this.totalEstimateAmount, 2, java.math.RoundingMode.HALF_UP)
+                    .max(MIN_MARGIN_RATE);
         } else {
             this.marginRate = BigDecimal.ZERO;
         }

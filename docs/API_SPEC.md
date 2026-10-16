@@ -68,7 +68,7 @@
 | DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 정리는 보관을 사용 | O |
 | GET | /api/v1/sites/{id}/profit | `ProfitResponse` | O |
 
-생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다. `SiteResponse.archivedAt`은 보관 시각(KST, 미보관 null)이며 업무 단계 `status`와 별개다. 보관된 현장은 수정·상태 변경이 409이고, 매입·견적·세금계산서·보증 생성은 해당 서비스에서 400으로 거부된다. 보관해도 기존 자료·손익 조회는 유지된다(ADR-021).
+생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. `marginRate`는 소수 2자리 %이며 저장 범위(DECIMAL(5,2)) 때문에 −999.99에서 하한 처리된다(매입이 견적의 약 11배 이상인 손실 현장). 정확한 손실은 `margin` 금액으로 본다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다. `SiteResponse.archivedAt`은 보관 시각(KST, 미보관 null)이며 업무 단계 `status`와 별개다. 보관된 현장은 수정·상태 변경이 409이고, 매입·견적·세금계산서·보증 생성은 해당 서비스에서 400으로 거부된다. 보관해도 기존 자료·손익 조회는 유지된다(ADR-021).
 
 ### 거래처 (clients)
 
