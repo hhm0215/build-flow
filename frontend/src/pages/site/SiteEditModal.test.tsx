@@ -22,6 +22,7 @@ const site = {
   startDate: '2026-09-01',
   endDate: '2026-09-30',
   memo: '기존 메모',
+  archivedAt: null,
   createdAt: '2026-09-01T00:00:00',
   updatedAt: '2026-09-01T00:00:00',
 } satisfies Site

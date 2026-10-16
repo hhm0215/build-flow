@@ -17,11 +17,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 04:15 KST |
-| 브랜치 | `claude/agent-handoff` → 다음 `claude/site-archive` |
-| PR | (생성 예정) |
-| 현재 단계 | 인계 체계 도입 PR → 현장 보관(archive) 구현 착수 |
-| 다음 첫 행동 | `origin/develop`에서 `claude/site-archive` 브랜치를 만들고 `.claude/plans/2026-10-17-site-archive.md` 계획대로 site-service `archived_at` 구현 |
+| 갱신 | 2026-10-17 04:35 KST |
+| 브랜치 | `claude/site-archive` |
+| PR | 현장 보관 PR (develop 대상, 생성 중) |
+| 현재 단계 | 현장 보관 1차 구현·테스트·Docker 실측 완료 → PR·CI·병합 |
+| 다음 첫 행동 | 현장 보관 PR CI 확인 후 병합 → BACKLOG P0 남은 항목(보관 현장 소속 기존 문서 수정 경계 등) 선택 |
 
 ## 공통 사용자 지시
 

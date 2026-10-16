@@ -15,12 +15,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SiteService {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final SiteRepository siteRepository;
     private final ClientRepository clientRepository;
@@ -41,12 +46,14 @@ public class SiteService {
         return SiteResponse.from(siteRepository.save(site));
     }
 
-    public List<SiteResponse> findAll(SiteStatus status) {
+    /** archived가 null이면 보관 여부와 무관하게 전체를 반환한다(기존 계약). */
+    public List<SiteResponse> findAll(SiteStatus status, Boolean archived) {
         List<Site> sites = (status != null)
                 ? siteRepository.findByStatusOrderByCreatedAtDesc(status)
                 : siteRepository.findAllByOrderByCreatedAtDesc();
 
         return sites.stream()
+                .filter(site -> archived == null || site.isArchived() == archived)
                 .map(SiteResponse::from)
                 .toList();
     }
@@ -57,7 +64,8 @@ public class SiteService {
 
     @Transactional
     public SiteResponse update(Long id, SiteUpdateRequest request) {
-        Site site = getSite(id);
+        Site site = getSiteForUpdate(id);
+        requireNotArchived(site);
         Client client = resolveClient(request.getClientId());
 
         site.update(
@@ -74,8 +82,24 @@ public class SiteService {
 
     @Transactional
     public SiteResponse changeStatus(Long id, SiteStatusUpdateRequest request) {
-        Site site = getSite(id);
+        Site site = getSiteForUpdate(id);
+        requireNotArchived(site);
         site.changeStatus(request.getStatus());
+        return SiteResponse.from(site);
+    }
+
+    @Transactional
+    public SiteResponse archive(Long id) {
+        Site site = getSiteForUpdate(id);
+        // 응답과 DB 재조회 값이 정밀도 차이로 달라지지 않도록 초 단위로 저장
+        site.archive(LocalDateTime.now(BUSINESS_ZONE).truncatedTo(ChronoUnit.SECONDS));
+        return SiteResponse.from(site);
+    }
+
+    @Transactional
+    public SiteResponse restore(Long id) {
+        Site site = getSiteForUpdate(id);
+        site.restore();
         return SiteResponse.from(site);
     }
 
@@ -87,6 +111,17 @@ public class SiteService {
     private Site getSite(Long id) {
         return siteRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SITE_NOT_FOUND));
+    }
+
+    private Site getSiteForUpdate(Long id) {
+        return siteRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SITE_NOT_FOUND));
+    }
+
+    private void requireNotArchived(Site site) {
+        if (site.isArchived()) {
+            throw new BusinessException(ErrorCode.SITE_ARCHIVED);
+        }
     }
 
     private Client resolveClient(Long clientId) {

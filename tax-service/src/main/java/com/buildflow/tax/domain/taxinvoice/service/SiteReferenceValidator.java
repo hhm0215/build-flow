@@ -32,5 +32,8 @@ public class SiteReferenceValidator {
                 || !siteId.equals(response.data().id())) {
             throw new BusinessException(ErrorCode.SITE_REFERENCE_UNAVAILABLE);
         }
+        if (response.data().archived()) {
+            throw new BusinessException(ErrorCode.SITE_ARCHIVED);
+        }
     }
 }

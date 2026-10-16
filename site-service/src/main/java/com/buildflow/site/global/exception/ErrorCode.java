@@ -11,7 +11,8 @@ public enum ErrorCode {
     // Site
     SITE_NOT_FOUND(HttpStatus.NOT_FOUND, "현장을 찾을 수 없습니다."),
     SITE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 완료된 현장입니다."),
-    SITE_DELETION_DISABLED(HttpStatus.CONFLICT, "현장 삭제는 연결 자료 보존을 위해 지원하지 않습니다. 보관 기능을 준비 중입니다."),
+    SITE_DELETION_DISABLED(HttpStatus.CONFLICT, "현장 삭제는 연결 자료 보존을 위해 지원하지 않습니다. 보관 기능을 사용해 주세요."),
+    SITE_ARCHIVED(HttpStatus.CONFLICT, "보관된 현장은 복원한 뒤 수정할 수 있습니다."),
 
     // Client
     CLIENT_NOT_FOUND(HttpStatus.NOT_FOUND, "거래처를 찾을 수 없습니다."),

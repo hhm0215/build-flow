@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 현장 보관·복원 1차 (2026-10-17)
+
+- ADR-021 추천안대로 site-service `archived_at`·보관/복원 API, 보관 현장 수정 409와 네 생성 서비스 신규 등록 400, 프론트 목록 보관 필터(기본 보관 제외)·상세 보관/복원 버튼·등록 폼 현장 선택에서 보관 제외를 구현했다. 테스트·로컬 풀 Docker 실측 PASS(`.claude/plans/2026-10-17-site-archive.md`). 운영 DB·VPS 반영은 마이그레이션 게이트 이후, V1 **40/100**·실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — Codex↔Claude 인계 체계 (2026-10-17)
 
 - 두 도구가 모두 읽는 `.claude/HANDOFF.md`(작업 잠금·공통 사용자 지시)와 끊긴 세션 요약 `scripts/agents/last_session.py`(읽기 전용, 출력 비커밋)를 추가하고 AGENTS.md·CLAUDE.md에 확인 규칙을 넣었다. Codex 자체 메모리 DB는 비어 있어 저장소 문서가 실질적인 공유 기억이다. 별도 `memory-bus` 프로젝트는 설계 단계라 현재 인계 수단으로 쓰지 않는다. Codex `buildflow` heartbeat는 ACTIVE 상태 그대로이며 잠금 규칙으로 충돌을 피한다.
