@@ -35,6 +35,8 @@ docker compose up -d mysql
 
 현재 `backup.ps1`의 `formatVersion: 1`은 **SQL 전용**이다. 보증보험 PDF가 저장되는 `warranty_uploads` volume, Kafka broker 상태는 포함하지 않는다. 따라서 이 도구의 성공이나 아래 SQL 격리 복원 성공만으로 VPS 실데이터 운영/완전 복구 게이트를 통과했다고 판정하지 않는다. 업로드 volume은 앱의 `/app/uploads/warranties`에 연결되고 DB `defect_warranties.file_path`는 그 절대경로를 저장한다.
 
+`-IncludeWarrantyUploads -OutputRoot <이미 존재하는 비공개 디렉터리>`는 SQL과 보증 파일을 함께 읽는 **진단용 v2 snapshot**이다. Linux 실행 경로는 현재 사용자 소유의 `0700` 출력 디렉터리, 시작 시점의 `umask 0077`(새 PowerShell 프로세스를 띄우기 전에 설정), 생성 파일 `0600`, 링크·교체 가능한 공유 쓰기 조상이 없는 경로를 요구한다. Docker 복사 helper도 호스트 실행 UID/GID로 동작하므로 원본 volume을 그 계정으로 읽을 수 없으면 중단한다. 출력은 언제나 `INCOMPLETE`이며 일반 검증·운영 복원으로 승격되지 않는다. 실제 Ubuntu 호스트의 UID/ACL·Docker volume 접근, 외부 writer 차단, 격리 복원과 관리자 로그인은 별도 실측 전까지 `PENDING/UNVERIFIED`다. 이 경로를 사용해도 USB 원본이나 운영 volume을 정리하지 않는다.
+
 스크립트는 컨테이너 내부 `MYSQL_ROOT_PASSWORD`를 자식 프로세스 환경으로만 전달하고 값을 명령행, manifest, 로그에 기록하지 않는다. `mysqldump`는 InnoDB 일관성 확보를 위한 `--single-transaction`, 큰 테이블 스트리밍을 위한 `--quick`, stored object 보존을 위한 `--routines --triggers --events`, 불필요한 tablespace 권한을 피하는 `--no-tablespaces`를 사용한다.
 
 백업 후 또는 다른 저장 장치로 복사한 뒤에는 Docker 없이 다음 검증을 실행한다.

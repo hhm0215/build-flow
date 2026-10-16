@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — Ubuntu 진단용 백업 비공개 경로 게이트 (2026-10-17)
+
+- Windows 전용 ACL 때문에 Ubuntu에서 즉시 거부되던 SQL+보증 PDF v2 진단 snapshot에 Unix UID·mode·`umask 0077` 검사와 링크/공유 쓰기 조상 차단을 추가했다. Docker 파일 복사는 호스트 실행 UID/GID·컨테이너 `umask 077`로 제한하고, 권한 불일치는 중단한다. Windows 합성 정책/백업 도구 회귀는 로컬 PASS, Linux CI와 실제 Docker volume 소유권·VPS snapshot은 PENDING이다. v2는 계속 `INCOMPLETE`이며 운영 복구 증거가 아니다. 외부 writer 차단·빈 환경 복원·관리자 로그인·암호화 오프사이트 사본은 미완료, 실데이터 NO-GO·V1 **40/100** 유지.
+
 ## 진행 중 — 합성 Docker 원본 snapshot→격리 복원 (2026-10-16)
 
 - 실제 개발·운영 Compose의 고정 컨테이너명·공유 네트워크·기존 볼륨을 사용하지 않는 별도 합성 Compose와 무작위 프로젝트/nonce 경로를 마련했다. 합성 DB 7개·관리자 1행·보증 참조/NULL 행과 PDF 2개를 새 볼륨에 넣고 `backup.ps1 -IncludeWarrantyUploads`의 실제 Docker 경로로 `INCOMPLETE` v2 패키지를 생성했다. 이후 별도 새 DB·볼륨에 복원해 행/파일 해시·참조·auth 스키마를 확인했다. 격리 프로젝트의 컨테이너·볼륨·네트워크 정리도 확인했다.

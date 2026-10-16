@@ -109,6 +109,10 @@ jobs:
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
       - name: Test exposure validator
         run: python3 -m unittest discover -s scripts/vps -p 'test_verify_public_compose.py'
+      - name: Validate Unix backup privacy gate
+        run: |
+          pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1
+          sh -c 'umask 077; exec pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1 -CheckActiveUmask'
       - name: Validate Compose exposure and CORS
         run: |
           docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml config --format json \
@@ -152,6 +156,7 @@ jobs:
         shell: powershell
         run: |
           .\scripts\db\test-backup-tools.ps1
+          .\scripts\db\test-private-backup-path.ps1
           .\scripts\db\test-restored-warranty-rows.ps1
           .\scripts\db\test-warranty-volume-preflight.ps1
           .\scripts\db\test-warranty-snapshot.ps1
