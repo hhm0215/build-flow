@@ -13,7 +13,8 @@ spring:
   application:
     name: estimate-service
   config:
-    import: optional:configserver:http://localhost:8888
+    # Docker는 CONFIG_SERVER_URL=http://config-server:8888, 로컬 기본은 localhost (import는 이 한 곳에서만 선언)
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:3306/buildflow_estimate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:root}

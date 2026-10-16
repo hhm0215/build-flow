@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — Config Server import 단일화 (2026-10-17)
+
+- 7개 서비스의 Config import를 `application.yml`의 `${CONFIG_SERVER_URL:http://localhost:8888}` 한 곳으로 통합하고 Docker 프로필 중복 선언을 제거, compose는 `CONFIG_SERVER_URL`을 전달한다. 로컬 풀 Docker 재기동에서 7개 서비스 `localhost:8888` 시도 0건·Config Server 조회·8개 health UP. 현장 보관 뒤 기존 문서 수정/입금 확인 규칙은 `docs/PILOT_QA.md` 사용자 판단 대기로 기록.
+
 ## 완료된 작업 — 현장 보관·복원 1차 (2026-10-17)
 
 - ADR-021 추천안대로 site-service `archived_at`·보관/복원 API, 보관 현장 수정 409와 네 생성 서비스 신규 등록 400, 프론트 목록 보관 필터(기본 보관 제외)·상세 보관/복원 버튼·등록 폼 현장 선택에서 보관 제외를 구현했다. 테스트·로컬 풀 Docker 실측 PASS(`.claude/plans/2026-10-17-site-archive.md`). 운영 DB·VPS 반영은 마이그레이션 게이트 이후, V1 **40/100**·실데이터 **NO-GO** 유지.
@@ -719,7 +723,7 @@
 
 ## 다음 세션 진입점 (2026-10-17 갱신)
 
-**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#112를 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
+**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#116을 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
 
 **VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 
