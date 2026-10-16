@@ -51,6 +51,8 @@ docker compose up -d mysql
 
 `verify-backup.ps1`과 `restore-test.ps1`은 `formatVersion: 2`를 계속 명시적으로 거부한다. 일관된 v2 백업 생성·격리 복원·실제 DB 추출을 연결하고 관리자 로그인과 이벤트/OCR 재조정까지 검증하기 전에는 운영 백업 성공으로 기록하지 않는다.
 
+SQL 전용 v1 백업의 격리 복원에서는 `-WarrantyRowsExportPath`에 **절대 경로**를 지정하면 복원된 `defect_warranties`의 ID·파일 경로를 JSON 배열로 추출할 수 있다. 경로의 부모 디렉터리는 미리 만들어 두고 현재 사용자만 읽을 수 있도록 제한해야 한다. 원본 백업 디렉터리나 Git 추적 폴더에는 쓰지 않으며 기존 파일은 덮어쓰지 않는다. `<경로>.evidence.json`에는 덤프·manifest·행 JSON SHA-256과 격리 복원 컨테이너/volume/nonce를 기록한다. 실제 경로 값은 콘솔에 출력하지 않는다. 이 메타데이터는 전자서명이 아니며 v1의 업로드 파일이 복원되지 않았으므로 **부분 진단 증거**일 뿐이다. v2 통합 복원 거부와 실데이터 NO-GO는 그대로 유지된다.
+
 통합 백업 구현 전 추가 중단 조건도 있다. 메모리 기반 비동기 OCR의 `PENDING` 행은 중지 후 자동 복구된다고 보장할 수 없다. Kafka outbox의 `SENT`는 broker 수락일 뿐 소비 완료가 아니므로 SQL+PDF만 복원하면 미소비 이벤트가 유실될 수 있다. OCR 대기 0건과 이벤트 drain/재조정 근거가 마련되기 전 전체 업무 복구 판정은 `PENDING`이다. 외부 물리 저장장치에 암호화된 복사본을 보관하고, 별도 빈 환경에서 DB와 파일을 같은 컨테이너 경로에 복원해 참조/해시/로그인을 확인해야 한다.
 
 ## 격리 복원 검증
@@ -73,6 +75,12 @@ docker compose up -d mysql
 
 ```powershell
 .\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp> -ValidateLogin
+```
+
+필요할 때만 보호된 로컬 경로로 복원 DB 참조를 추출한다. 기존 행 JSON·증거 파일은 보존하고 새 경로를 사용한다.
+
+```powershell
+.\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp> -ValidateLogin -WarrantyRowsExportPath C:\protected\restore-evidence\warranty-rows.json
 ```
 
 ### 복원 검증 원칙

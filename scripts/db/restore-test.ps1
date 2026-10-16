@@ -2,12 +2,14 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$BackupDirectory,
-    [switch]$ValidateLogin
+    [switch]$ValidateLogin,
+    [string]$WarrantyRowsExportPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
+. (Join-Path $PSScriptRoot "restored-warranty-rows.ps1")
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $composeFile = Join-Path $PSScriptRoot "restore-test.compose.yml"
@@ -211,6 +213,21 @@ function Start-AuthValidation {
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required." }
 $backupPath = [System.IO.Path]::GetFullPath($BackupDirectory)
 if (-not (Test-Path -LiteralPath $backupPath -PathType Container)) { throw "Backup directory not found: $backupPath" }
+if ($PSBoundParameters.ContainsKey('WarrantyRowsExportPath')) {
+    if ([string]::IsNullOrWhiteSpace($WarrantyRowsExportPath)) { throw "Warranty rows export path cannot be blank." }
+    if (-not [IO.Path]::IsPathRooted($WarrantyRowsExportPath)) { throw "Warranty rows export path must be absolute." }
+    $exportFullPath = [IO.Path]::GetFullPath($WarrantyRowsExportPath)
+    $backupPrefix = $backupPath.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if ($exportFullPath.StartsWith($backupPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Warranty rows export must not modify the original backup directory."
+    }
+    $repoPrefix = [IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    $ignoredBackupPrefix = (Join-Path $repoRoot 'backups').TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if ($exportFullPath.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCase) -and
+        -not $exportFullPath.StartsWith($ignoredBackupPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Warranty rows export inside the repository must be in the ignored backups directory."
+    }
+}
 & $verifyScript -BackupDirectory $backupPath
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $backupPath "manifest.json") | ConvertFrom-Json
 if ($manifest.formatVersion -eq 2) {
@@ -286,6 +303,37 @@ try {
     Start-AuthValidation -TestLogin:$ValidateLogin
     Assert-RestoreInventory -Manifest $manifest
     Write-Host "[OK] Auth validation left the restored schema and data unchanged."
+    if ($PSBoundParameters.ContainsKey('WarrantyRowsExportPath')) {
+        Assert-NoReparseAncestor -Path $backupPath
+        $notification = @($manifest.schemas | Where-Object { $_.name -ceq 'buildflow_notification' })
+        $warranty = @($notification | ForEach-Object { $_.tables } | Where-Object { $_.name -ceq 'defect_warranties' })
+        if ($notification.Count -ne 1 -or $warranty.Count -ne 1) {
+            throw "Backup manifest does not contain exactly one warranty table."
+        }
+        $query = "SELECT id, IF(file_path IS NULL, 'N', CONCAT('H', HEX(CONVERT(file_path USING utf8mb4)))) FROM buildflow_notification.defect_warranties ORDER BY id;"
+        $encoded = @(Invoke-RestoreQuery -Query $query)
+        $rows = @(ConvertFrom-RestoredWarrantyLines -Lines $encoded -ExpectedCount ([long]$warranty[0].rowCount))
+        $dumpSha = (Get-FileHash -LiteralPath $dumpPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($dumpSha -cne ([string]$manifest.dump.sha256).ToLowerInvariant()) {
+            throw "Backup dump changed during isolated restore validation."
+        }
+        $evidence = [ordered]@{
+            kind = 'restored-v1-sql-warranty-rows'
+            generatedAtUtc = [DateTime]::UtcNow.ToString('o')
+            backupManifestSha256 = (Get-FileHash -LiteralPath (Join-Path $backupPath 'manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+            backupDumpSha256 = $dumpSha
+            sourceContainerId = [string]$manifest.source.containerId
+            isolatedComposeProject = $projectName
+            isolatedContainerId = $containerId
+            isolatedVolumeName = $volumeName
+            isolatedNonce = $nonce
+            rowCount = $rows.Count
+            rowsSha256 = $null
+            limitation = 'SQL-only v1 diagnostic. No uploads restored; metadata is not signed proof.'
+        }
+        Write-RestoredWarrantyRows -Path $WarrantyRowsExportPath -Rows $rows -Evidence $evidence
+        Write-Host "[OK] Restored warranty DB rows exported with diagnostic provenance: count=$($rows.Count). Upload recovery is NOT verified."
+    }
     Write-Warning "This isolated restore covered SQL only. Warranty uploads and Kafka state were not restored."
 }
 finally {
