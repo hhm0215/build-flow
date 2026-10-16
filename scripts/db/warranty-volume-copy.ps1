@@ -16,6 +16,7 @@ done
 '@
 $script:warrantyCopyShell = @'
 set -eu
+umask 077
 for path in /source/* /source/.[!.]* /source/..?*; do
   if [ ! -e "$path" ] && [ ! -L "$path" ]; then continue; fi
   if [ ! -f "$path" ] || [ -L "$path" ]; then exit 41; fi
@@ -83,6 +84,17 @@ function Invoke-WarrantyVolumeHelper {
     if ($ImageId -cnotmatch '^sha256:[a-f0-9]{64}$') { throw 'Warranty helper requires a pinned source image ID.' }
     $arguments = @('run', '--rm', '--pull=never', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges', '--mount', "type=volume,source=$VolumeName,target=/source,readonly")
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        $uid = @(& id -u)
+        if ($LASTEXITCODE -ne 0 -or $uid.Count -ne 1 -or $uid[0] -cnotmatch '^(0|[1-9][0-9]*)$') {
+            throw 'Cannot verify Unix user identity for warranty volume copy.'
+        }
+        $gid = @(& id -g)
+        if ($LASTEXITCODE -ne 0 -or $gid.Count -ne 1 -or $gid[0] -cnotmatch '^(0|[1-9][0-9]*)$') {
+            throw 'Cannot verify Unix group identity for warranty volume copy.'
+        }
+        $arguments += @('--user', "$($uid[0]):$($gid[0])")
+    }
     if (-not [string]::IsNullOrWhiteSpace($DestinationDirectory)) {
         $arguments += @('--mount', "type=bind,source=$DestinationDirectory,target=/target")
     }

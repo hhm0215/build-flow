@@ -167,6 +167,13 @@ function Test-BroadReadAcl {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     try {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            $item = Get-Item -LiteralPath $Path -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $true }
+            $metadata = Get-UnixPrivacyMetadata -Path $Path
+            return -not (Test-PrivateUnixMetadata -OwnerUid $metadata.OwnerUid -CurrentUid $metadata.CurrentUid `
+                -OctalMode $metadata.OctalMode -IsDirectory $item.PSIsContainer)
+        }
         $broadIdentities = @("Everyone", "BUILTIN\Users", "NT AUTHORITY\Authenticated Users")
         $readRights = [System.Security.AccessControl.FileSystemRights]::Read -bor [System.Security.AccessControl.FileSystemRights]::ReadAndExecute -bor [System.Security.AccessControl.FileSystemRights]::ReadData
         foreach ($rule in (Get-Acl -LiteralPath $Path).Access) {
@@ -183,10 +190,8 @@ function Test-BroadReadAcl {
     return $false
 }
 
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required. Install and start Docker Desktop." }
-if ($IncludeWarrantyUploads -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-    throw 'Integrated snapshot private-ACL verification currently requires Windows.'
-}
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required and must be running." }
+if ($IncludeWarrantyUploads) { Assert-PrivateUnixUmask }
 
 Push-Location $repoRoot
 try {
@@ -246,6 +251,7 @@ try {
     [System.IO.File]::WriteAllText($incompleteMarker, "Backup has not completed verification.`n")
     $broadReadAcl = Test-BroadReadAcl -Path $partialDirectory
     if ($broadReadAcl) {
+        if ($IncludeWarrantyUploads) { throw 'Integrated snapshot directory privacy changed after creation.' }
         Write-Warning "Backup directory may be readable by a broad Windows group. Store the completed backup on an encrypted, access-controlled device."
     }
 
