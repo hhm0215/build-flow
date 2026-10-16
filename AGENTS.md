@@ -14,9 +14,9 @@ AI 대시보드로 마진·손익을 요약. 1인 개발 + 가족이 단일 관�
 - Java 17, Spring Boot 3.3.4, Spring Cloud 2023.0.3
 - Gradle (Groovy), 멀티프로젝트 모노레포
 - JPA/Hibernate, MySQL 8.0 (서비스별 스키마 분리)
-- Redis 7.2 (JWT 블랙리스트, 캐시)
+- Redis 7.2 (JWT refresh·블랙리스트, chat 보조 캐시 — 조회 캐시·분산락 미구현, ADR-003 v2)
 - Kafka (KRaft 모드) — 비동기 이벤트
-- OpenFeign — 서비스 간 동기 통신
+- OpenFeign — 서비스 간 동기 통신 (chat→site/tax, 생성 시 site 현장 참조 검증)
 - Zipkin — 분산 트레이싱
 
 ### Frontend
@@ -151,7 +151,7 @@ eventId 기반 멱등성 필수.
 
 ### Redis 키 컨벤션
 - `{service}:{domain}:{id}`
-- 기본 TTL 5분, 분산락 TTL 30초
+- 도입 시 기본 TTL 5분, 분산락 TTL 30초 (현재 분산락·조회 캐시 미구현 — DB 비관적 잠금 + outbox 멱등, ADR-003 v2)
 
 ### React / TypeScript
 - 함수형 컴포넌트 + Hooks만 사용

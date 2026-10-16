@@ -68,7 +68,7 @@ bun run preview         # 빌드 결과 미리보기
 
 - Java 17, Spring Boot 3.3.4, Spring Cloud 2023.0.3, Gradle (Groovy)
 - React 18 + TypeScript + Vite + Ant Design (dark theme) + Zustand + TanStack Query
-- 서비스 간 통신: 동기 = OpenFeign, 비동기 = Kafka (KRaft)
+- 서비스 간 통신: 동기 = OpenFeign(chat→site/tax 조회, 매입·견적·세금계산서·보증 생성 시 site 현장 참조 검증), 비동기 = Kafka (KRaft)
 - Database per Service — MySQL 1인스턴스, 서비스별 스키마 분리
 
 ### 서비스 포트 & DB 스키마
@@ -158,7 +158,8 @@ bun run preview         # 빌드 결과 미리보기
 ### Redis
 
 - 키: `{service}:{domain}:{id}`
-- TTL 기본 5분, 분산락 TTL 30초
+- 현재 용도는 인증 토큰 상태(refresh·블랙리스트)와 chat 보조 캐시뿐. 조회 캐시·분산락은 미구현(ADR-003 v2) — 동시성은 DB 비관적 잠금 + outbox 멱등으로 처리
+- 도입 시 TTL 기본 5분, 분산락 TTL 30초
 
 ### React / TypeScript
 

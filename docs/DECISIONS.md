@@ -63,7 +63,9 @@ Apache Kafka (KRaft mode)
 
 ## ADR-003: Redis 사용 범위
 
-### 결정
+> **v2 정정 (2026-10-17)**: 아래 v1의 "캐시 + 분산락"은 구현되지 않았다. 현재 사실은 이 절 끝의 "v2 — 실제 구현 기준"을 따른다. v1 본문과 면접 답변은 당시 계획 기록으로만 남긴다.
+
+### 결정 (v1, 2026-04 계획)
 
 캐시 + JWT 블랙리스트 + 분산락 (3가지 용도)
 
@@ -84,6 +86,16 @@ Apache Kafka (KRaft mode)
 Cache Aside 패턴으로 조회 성능 최적화, JWT 블랙리스트로 로그아웃 구현,
 Redisson 분산락으로 동시 수정 방지입니다.
 특히 분산락은 MSA에서 같은 견적서를 동시에 수정하는 것을 방지하기 위해 사용했습니다."
+
+> 위 면접 답변은 v1 계획이며 현재 구현과 다르다. 그대로 사용하지 않는다.
+
+### v2 — 실제 구현 기준 (2026-10-17 실측)
+
+- **사용 중**: 인증 토큰 상태만 Redis에 둔다. auth-service가 refresh 토큰(`auth:refresh:{userId}`)과 로그아웃한 access 토큰 블랙리스트(`auth:blacklist:{token}`)를 쓰고, gateway-server와 notification-service(보증 PDF 원본 직접 다운로드)가 블랙리스트를 조회한다. chat-service는 대화 세션 보조 캐시로 쓰되 장애 시 무시하고 MySQL을 진실원으로 둔다.
+- **미구현**: 조회 Cache Aside(`@Cacheable`/`CacheManager`)와 Redisson 분산락은 사용처 0건이다. estimate·purchase·site·tax는 Redis 의존성만 있고 사용하지 않는다.
+- **동시성 제어의 실제 방식**: 같은 서비스 DB 안의 행은 JPA 비관적 잠금(`findByIdForUpdate`, `PESSIMISTIC_WRITE`)으로 직렬화하고, 서비스 간 정합성은 transactional outbox·eventId 멱등 소비로 맞춘다. 단일 MySQL 인스턴스·서비스당 단일 인스턴스 운영이라 분산락이 필요한 경합 지점이 아직 확인되지 않았다.
+- **재도입 조건**: 조회 지연이 실측으로 확인되거나 서비스를 다중 인스턴스로 늘려 DB 행 잠금으로 막을 수 없는 경합이 생기면, 그때 대상·TTL·무효화 규칙을 정해 ADR을 개정하고 구현한다.
+- **면접 설명 기준**: "Redis는 Stateless JWT의 로그아웃·토큰 갱신 상태 저장에 쓰고, 동시 수정은 DB 비관적 잠금과 outbox 멱등 처리로 해결했다. 캐시·분산락은 필요가 실측되기 전까지 넣지 않았다."
 
 ---
 
@@ -690,6 +702,7 @@ GitHub-hosted runner에서 SSH로 VPS에 밀어 넣는 배포는 22가 닫히면
 | v2.2 | 2026-10-01 | ADR-019 — 실데이터 게이트 이전 공개 HTTPS는 테스트 데이터 전용 시현으로 한정 |
 | v2.3 | 2026-10-03 | ADR-020 — CI 검증과 배포·SSH 접근 분리, 온디맨드 SSH 선행조건 명시 |
 | v2.4 | 2026-10-08 | ADR-021 — 현장·거래처는 복원 가능한 보관 우선, 일반 하드 삭제 금지 |
+| v2.5 | 2026-10-17 | ADR-003 v2 정정 — Redis는 인증 토큰 상태 전용, 캐시·분산락 미구현 명시. ADR-021 1차 이행 메모 |
 
 ---
 

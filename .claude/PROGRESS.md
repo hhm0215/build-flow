@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — ADR-003 v2 문서 정정 (2026-10-17)
+
+- Redis 실사용(인증 refresh·블랙리스트, chat 보조 캐시)과 미구현(조회 캐시·Redisson 분산락 0건)을 실측해 ADR-003에 v2 정정을 추가하고 v1 면접 답변을 계획 기록으로 표시했다. 실제 동시성 제어(DB 비관적 잠금 + outbox 멱등)와 재도입 조건을 명시하고 CLAUDE.md·AGENTS.md의 Redis·OpenFeign 표기를 맞췄다. 선택지 (b) 캐시·분산락 구현은 필요가 실측될 때 재검토.
+
 ## 완료된 작업 — 프론트 번들 분할 (2026-10-17)
 
 - 로그인 외 8개 페이지를 `React.lazy`로 분리하고 react·antd·markdown을 vendor 청크로 나눴다. 단일 1.42 MB(gzip 443 KB) → 앱 250 KB + vendor(react 162·antd 761·markdown 117 KB) + 페이지별 10~22 KB. antd는 단일 라이브러리라 임계값을 800 KB로 문서화했다. catch-all vendor는 개발 전용 msw를 첫 화면으로 끌어와 제외했고, 프로덕션 preview에서 페이지 청크 지연 로드·msw 미로드를 확인했다.
