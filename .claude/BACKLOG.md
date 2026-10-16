@@ -111,13 +111,6 @@
 
 ## P2 — 인프라/툴링
 
-### 현장 참조 Feign 호출 시간 한도·깨진 JSON 응답 코드
-- **배경**: 2026-10-17 로컬 Docker 실측에서 site-service 중지 시 견적 생성 첫 503이 약 20초 걸렸다. 매입·견적·세금계산서는 DB 트랜잭션 안에서 Feign을 호출하므로 기본 timeout 동안 커넥션을 점유한다. 또 깨진 UTF-8 JSON 본문이 견적 서비스에서 400이 아니라 500으로 응답했다.
-- **산출물**: `site-service` 참조 클라이언트의 connect/read timeout 명시(트랜잭션 밖 검증 이동 여부 포함), `HttpMessageNotReadableException` 400 매핑과 회귀 테스트
-- **관련 파일**: 각 서비스 `SiteReferenceValidator`·`application.yml`, `GlobalExceptionHandler`
-- **예상 규모**: S
-- **상태**: TODO
-
 ### chat-service Phase 3 (Phase 1·2 완료, 견고화/확장)
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
 - **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화, buildMessages 이력 tail 쿼리(LIMIT)
