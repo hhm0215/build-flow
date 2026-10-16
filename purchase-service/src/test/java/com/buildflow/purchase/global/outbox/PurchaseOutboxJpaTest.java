@@ -4,6 +4,7 @@ import com.buildflow.purchase.domain.purchase.dto.PurchaseCreateRequest;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseUpdateRequest;
 import com.buildflow.purchase.domain.purchase.repository.PurchaseRepository;
 import com.buildflow.purchase.domain.purchase.service.PurchaseService;
+import com.buildflow.purchase.domain.purchase.service.SiteReferenceValidator;
 import com.buildflow.purchase.global.config.JpaAuditingConfig;
 import com.buildflow.purchase.global.exception.BusinessException;
 import com.buildflow.purchase.global.exception.ErrorCode;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -55,6 +57,7 @@ class PurchaseOutboxJpaTest {
     }
 
     @Autowired private PurchaseService purchaseService;
+    @MockBean private SiteReferenceValidator siteReferenceValidator;
     @Autowired private PurchaseRepository purchaseRepository;
     @SpyBean private OutboxEventRepository outboxRepository;
     @Autowired private OutboxClaimService claimService;
@@ -84,6 +87,19 @@ class PurchaseOutboxJpaTest {
         assertEquals(1L, json.get("payload").get("revision").asLong());
         assertEquals(0, new BigDecimal(json.get("payload").get("totalAmount").asText())
                 .compareTo(created.getTotalAmount()));
+    }
+
+    @Test
+    void invalidSiteCannotPersistPurchaseOrOutboxEvent() {
+        doThrow(new BusinessException(ErrorCode.INVALID_SITE_REFERENCE))
+                .when(siteReferenceValidator).requireExistingSite(7L);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> purchaseService.create(request()));
+
+        assertEquals(ErrorCode.INVALID_SITE_REFERENCE, error.getErrorCode());
+        assertEquals(0, purchaseRepository.count());
+        assertEquals(0, outboxRepository.count());
     }
 
     @Test
