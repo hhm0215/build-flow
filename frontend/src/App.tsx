@@ -1,15 +1,31 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { Spin } from 'antd'
 import MainLayout from './layouts/MainLayout'
 import LoginPage from './pages/auth/LoginPage'
-import DashboardPage from './pages/dashboard/DashboardPage'
-import SiteListPage from './pages/site/SiteListPage'
-import SiteDetailPage from './pages/site/SiteDetailPage'
-import EstimateListPage from './pages/estimate/EstimateListPage'
-import PurchaseListPage from './pages/purchase/PurchaseListPage'
-import TaxListPage from './pages/tax/TaxListPage'
-import NotificationListPage from './pages/notification/NotificationListPage'
-import WarrantyListPage from './pages/warranty/WarrantyListPage'
 import { useAuthStore } from './stores/authStore'
+
+// 로그인·레이아웃은 첫 화면이라 즉시 로드하고, 업무 페이지는 이동할 때 청크를 받는다
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
+const SiteListPage = lazy(() => import('./pages/site/SiteListPage'))
+const SiteDetailPage = lazy(() => import('./pages/site/SiteDetailPage'))
+const EstimateListPage = lazy(() => import('./pages/estimate/EstimateListPage'))
+const PurchaseListPage = lazy(() => import('./pages/purchase/PurchaseListPage'))
+const TaxListPage = lazy(() => import('./pages/tax/TaxListPage'))
+const NotificationListPage = lazy(() => import('./pages/notification/NotificationListPage'))
+const WarrantyListPage = lazy(() => import('./pages/warranty/WarrantyListPage'))
+
+function PageFallback() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+      <Spin />
+    </div>
+  )
+}
+
+function Page({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageFallback />}>{children}</Suspense>
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -29,14 +45,14 @@ export default function App() {
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="sites" element={<SiteListPage />} />
-        <Route path="sites/:id" element={<SiteDetailPage />} />
-        <Route path="estimates" element={<EstimateListPage />} />
-        <Route path="purchases" element={<PurchaseListPage />} />
-        <Route path="taxes" element={<TaxListPage />} />
-        <Route path="notifications" element={<NotificationListPage />} />
-        <Route path="warranties" element={<WarrantyListPage />} />
+        <Route path="dashboard" element={<Page><DashboardPage /></Page>} />
+        <Route path="sites" element={<Page><SiteListPage /></Page>} />
+        <Route path="sites/:id" element={<Page><SiteDetailPage /></Page>} />
+        <Route path="estimates" element={<Page><EstimateListPage /></Page>} />
+        <Route path="purchases" element={<Page><PurchaseListPage /></Page>} />
+        <Route path="taxes" element={<Page><TaxListPage /></Page>} />
+        <Route path="notifications" element={<Page><NotificationListPage /></Page>} />
+        <Route path="warranties" element={<Page><WarrantyListPage /></Page>} />
       </Route>
     </Routes>
   )

@@ -124,13 +124,6 @@
 - **예상 규모**: S(문서 정정) / M(구현)
 - **상태**: TODO
 
-### 프론트 프로덕션 번들 분할
-- **배경**: `bun run build` 결과 메인 JS chunk가 약 1.36MB(gzip 약 430KB)로 Vite 500KB 경고 발생
-- **산출물**: 페이지 lazy loading 또는 `manualChunks` 적용, 기존 라우팅·SSE 동작 회귀 없이 경고 해소/합리적 임계값 문서화
-- **관련 파일**: `frontend/src/App.tsx`, `frontend/vite.config.ts`
-- **예상 규모**: S~M
-- **상태**: TODO
-
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
 - 후보: ProfitService 마진계산, estimate OllamaService JSON추출, tax 미수금 계산, 프론트 다른 훅
