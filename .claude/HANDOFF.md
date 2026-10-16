@@ -17,11 +17,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 05:30 KST |
-| 브랜치 | `claude/money-tests` |
-| PR | 손익·미수금 테스트 PR (develop 대상) — 직전 #119 병합 |
-| 현재 단계 | 마진율 저장 결함 수정·테스트 추가 → PR·CI·병합 |
-| 다음 첫 행동 | 병합 후 BACKLOG P2 "테스트 커버리지 확장"(ProfitService 마진·tax 미수금 계산 등 순수 로직) |
+| 갱신 | 2026-10-17 05:40 KST |
+| 브랜치 | `claude/retro-derived-decimal` |
+| PR | 회고·규칙 PR (develop 대상) — 직전 #120 병합 |
+| 현재 단계 | 마진율 결함 회고·재발 방지 규칙 반영 → PR·CI·병합 |
+| 다음 첫 행동 | 병합 후 테스트 커버리지 남은 후보(estimate Ollama JSON 추출) 또는 사용자 답변 대기 항목(`docs/PILOT_QA.md` 보관 현장 기존 문서 규칙) 반영 |
 
 ## 공통 사용자 지시
 

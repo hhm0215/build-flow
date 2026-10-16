@@ -337,7 +337,7 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: 기동 순서 Eureka → Config → Gateway → 나머지
 - **IMPORTANT**: 새 백엔드 서비스는 Docker 편입 3종(`docker-compose.app.yml` 서비스 블록, `application-docker.yml`, 루트 Dockerfile build.gradle COPY)을 함께 반영
 - **IMPORTANT**: 프론트↔백엔드 API 계약 변경 시 백엔드 DTO를 원본으로 프론트 타입·요청 코드·MSW 핸들러를 같은 작업에서 동기화
-- **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다
+- **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다. 저장되는 파생 값(비율·합계·차액)도 입력 극단 조합의 최소·최대를 컬럼 precision과 대조하고 극단값 저장 테스트를 둔다(2026-10-17 마진율 저장 실패 회고)
 - **IMPORTANT**: 비동기 처리·부분 추출 API 응답은 PENDING/FAILED의 null 필드를 타입·목록·정렬·필터·MSW에 함께 반영하고, 수동 보정의 상태 전환·경합 방지·기간 검증을 서버에서 보장한다
 - **IMPORTANT**: 파일럿/실사용 검증은 풀 Docker 실서비스 모드로 수행. `bootRun`과 MSW 검증은 각각 서비스 단위·목업 검증으로만 기록
 - **IMPORTANT**: VPS 배포 런북은 새 파일·이미지 사용 전에 서버 작업 트리 청결, CI 검증된 `origin/main` SHA, 실제 서버 `HEAD` 일치를 확인한다. 단일 브랜치 clone은 `main`을 명시적 refspec으로 fetch한다. `fetch`만 하고 이전 checkout에서 빌드하지 않는다.
