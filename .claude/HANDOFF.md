@@ -17,11 +17,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 04:35 KST |
-| 브랜치 | `claude/site-archive` |
-| PR | 현장 보관 PR (develop 대상, 생성 중) |
-| 현재 단계 | 현장 보관 1차 구현·테스트·Docker 실측 완료 → PR·CI·병합 |
-| 다음 첫 행동 | 현장 보관 PR CI 확인 후 병합 → BACKLOG P0 남은 항목(보관 현장 소속 기존 문서 수정 경계 등) 선택 |
+| 갱신 | 2026-10-17 04:45 KST |
+| 브랜치 | `claude/next` (Config import 단일화) |
+| PR | Config import PR (develop 대상) — 직전 #116 현장 보관 병합 |
+| 현재 단계 | Config import 단일화 구현·Docker 실측 완료 → PR·CI·병합 |
+| 다음 첫 행동 | 병합 후 BACKLOG P2 "프론트 프로덕션 번들 분할" 착수. 보관 현장 기존 문서 규칙은 `docs/PILOT_QA.md` 사용자 답변 대기 |
 
 ## 공통 사용자 지시
 
