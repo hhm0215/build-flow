@@ -37,7 +37,7 @@
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
 - **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
 - **현재 진행**: Plain OS Ubuntu 24.04 LTS, 고정 host key·비root 키 접속, Docker/Compose, 서버 전용 비밀값(`0600`)과 앱 기동 완료. SSH 터널에서 관리자 로그인·UI 로그아웃, 임시 현장 생성/조회/삭제·동일 토큰 재사용 401을 확인했다. 커널 패치 후 재부팅·서비스 복귀를 검증했고 공개 HTTPS 테스트 파일럿은 별도 항목에서 관리한다. 전체 업무 CRUD/PDF와 DB+업로드 파일 외부 백업·격리 복원은 미완료다.
-- **복구 선행 작업**: SQL-only v1을 전체 복구로 오인하지 않도록 경고하고, 업로드 파일 전용 오프라인 검사·합성 회귀를 추가했다. v2 합성 패키지와 별도 DB 행 JSON의 ID·파일 경로를 대조하고 격리 복원 DB에서 행을 추출하는 준비 도구를 추가했다. `warranty_uploads`의 Compose 프로젝트·MySQL과의 볼륨 구분·실행 중 컨테이너/서비스를 거부하는 읽기 전용 preflight도 준비했다. 실제 Docker·격리 복원 실측은 미완료이며 v2 전체 검증/복원은 계속 명시적으로 거부한다. 다음은 외부 writer 차단·DB 연결 0 → 읽기 전용 파일 snapshot/DB 참조 일치 → SQL+파일 v2 생성 → 새 volume의 동일 경로 격리 복원 → 외부 암호화 사본 복원 실측이다. OCR `PENDING`과 Kafka 미소비 `SENT`의 복구/재조정 방안도 별도로 통과해야 한다.
+- **복구 선행 작업**: SQL-only v1을 전체 복구로 오인하지 않도록 경고하고, 업로드 파일 전용 오프라인 검사·합성 회귀를 추가했다. v2 합성 패키지와 격리 복원 DB 행의 ID·파일 경로 대조 준비 도구, `warranty_uploads` 읽기 전용 preflight를 마련했다. 이어 DB writer/연결 0 상태에서 SQL과 파일 볼륨을 함께 읽고 SHA·DB 참조를 대조하는 **진단용 v2 snapshot**을 준비했다. 출력은 `INCOMPLETE`로 유지하고 일반 검증·복원은 계속 거부한다. 실제 Docker 파일 복사·격리 DB+새 볼륨 복원·관리자 로그인·외부 암호화 사본 복원은 미실측이다. 다음은 실제 쓰기 중지/외부 writer 차단 확인 → Docker snapshot 실측 → 동일 경로 새 볼륨 격리 복원 → 외부 사본 복원이다. OCR `PENDING`과 Kafka 미소비 `SENT`의 복구/재조정도 별도로 통과해야 한다.
 - **관련 파일**: `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `.claude/plans/2026-10-01-vps-private-pilot.md`
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS

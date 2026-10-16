@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([switch]$PassThru)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -45,5 +45,10 @@ $warrantyVolume = Get-SingleDockerObject -Arguments @('volume', 'inspect', $warr
 $runningUsers = @(Invoke-DockerLines -Arguments @('ps', '-q', '--filter', "volume=$($warrantyVolume.Name)"))
 $runningServices = @(Invoke-DockerLines -Arguments ($composeArgs + @('ps', '--services', '--status', 'running')))
 $identity = Assert-WarrantyVolumePreflight -MySqlContainer $mysqlContainer -MySqlVolume $dbVolume -WarrantyVolume $warrantyVolume -ExpectedWorkingDirectory $repoRoot -NotificationVolumeMounts @($config.services.'notification-service'.volumes) -RunningComposeServices $runningServices -RunningWarrantyContainerIds $runningUsers
-Write-Host "[OK] Warranty volume identity and no currently running Compose writer or volume mount: $($identity.volumeName)"
-Write-Warning 'Preflight only: external writers are unverified; no upload files were copied, no DB references were checked, and no restorable v2 backup was produced.'
+if ($PassThru) {
+    Write-Output $identity
+}
+else {
+    Write-Host "[OK] Warranty volume identity and no currently running Compose writer or volume mount: $($identity.volumeName)"
+    Write-Warning 'Preflight only: external writers are unverified; no upload files were copied, no DB references were checked, and no restorable v2 backup was produced.'
+}

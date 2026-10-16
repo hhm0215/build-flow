@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$BackupDirectory,
-    [switch]$AllowIncomplete
+    [switch]$AllowIncomplete,
+    [switch]$AllowUnrestoredV2
 )
 
 Set-StrictMode -Version Latest
@@ -114,7 +115,12 @@ if ([string]$manifest.administrator.digestAlgorithm -cne "SHA-256" -or
 }
 
 if ($manifest.formatVersion -eq 2) {
-    throw "Integrated v2 verification requires restored-DB warranty reference validation, which is not implemented. Use verify-warranty-files.ps1 for file-only diagnostics."
+    if (-not $AllowUnrestoredV2 -or -not $AllowIncomplete) {
+        throw "Integrated v2 verification requires restored-DB warranty reference validation, which is not implemented. Use verify-warranty-files.ps1 for file-only diagnostics."
+    }
+    & (Join-Path $PSScriptRoot 'verify-warranty-files.ps1') -BackupDirectory $resolvedDirectory -Uploads $manifest.uploads -SqlSource $manifest.source
+    Write-Warning 'Diagnostic v2 source package only. Isolated DB+volume restore, external encrypted copy, and operational recovery remain UNVERIFIED.'
+    return
 }
 
 Write-Host "[OK] Backup manifest, SHA-256, source identity, schemas, tables, administrator row presence, and digest metadata verified."

@@ -136,6 +136,10 @@ try {
     try { & (Join-Path $PSScriptRoot "verify-backup.ps1") -BackupDirectory $testRoot }
     catch { $v2Rejected = $_.Exception.Message -match "restored-DB warranty reference validation" }
     if (-not $v2Rejected) { throw "Unbound v2 package was incorrectly accepted as a complete backup." }
+    $diagnosticMarker = Join-Path $testRoot 'INCOMPLETE'
+    [System.IO.File]::WriteAllText($diagnosticMarker, 'source snapshot is not restored', $encoding)
+    & (Join-Path $PSScriptRoot 'verify-backup.ps1') -BackupDirectory $testRoot -AllowIncomplete -AllowUnrestoredV2
+    Remove-Item -LiteralPath $diagnosticMarker
     Invoke-WarrantyVerifier
     $matchingRow = [pscustomobject]@{ warrantyId = 1; filePath = "/app/uploads/warranties/$warrantyName" }
     Invoke-WarrantyReferenceVerifier -Rows @($matchingRow, [pscustomobject]@{ warrantyId = 2; filePath = $null })

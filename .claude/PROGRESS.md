@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — SQL+보증 파일 진단용 v2 snapshot (2026-10-16)
+
+- `backup.ps1 -IncludeWarrantyUploads -OutputRoot <기존 비공개 폴더>` opt-in에서 DB writer·연결 중지, MySQL/업로드 볼륨 신원과 참조 행을 확인하고 SQL dump·읽기 전용 업로드 볼륨 사본의 파일 크기/SHA·참조를 대조하도록 준비했다. 출력은 `.partial-*`와 `INCOMPLETE`를 유지하고 일반 v2 검증·격리 복원은 계속 거부한다. 운영 복구 완료나 실데이터 승인으로 간주하지 않는다.
+- Windows PowerShell 5.1·7 합성 검증과 독립 보안·인프라 정적 리뷰에서 새 차단 보안 결함은 없었고, 누락 `OutputRoot`와 빈 보증 파일 집합의 경계 오류를 수정했다. 실제 Docker snapshot/ACL 상속·격리 복원·외부 사본과 VPS 실측은 PENDING/UNVERIFIED다. V1 40/100, `main`/VPS 미반영, 실데이터 NO-GO 유지.
+
 ## 완료된 작업 — 날짜 없는 V1 완료선·격리 복원 참조 증거 (2026-10-16, develop 통합)
 
 - [PR #103](https://github.com/hhm0215/build-flow/pull/103)의 필수 CI 5개 PASS와 정확한 단일 head SHA `f3675980b55ef9e60d92a41ea3ea48d31d415e1e` 대조 후 merge commit `c05d1beeb01d88a1d3da970df3690b91d684503d`로 `develop`에 병합했다. v1 SQL 격리 복원 DB의 보증 ID·파일 경로 opt-in 추출/해시·출처 기록은 Windows PowerShell 5.1·7 합성 테스트와 독립 인프라·보안 검토를 통과했다. 실제 Docker 격리 복원·SQL+업로드 통합 복원은 PENDING이며 `main`/VPS 미반영이다.
