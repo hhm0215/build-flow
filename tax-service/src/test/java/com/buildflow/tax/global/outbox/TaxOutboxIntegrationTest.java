@@ -6,6 +6,7 @@ import com.buildflow.tax.domain.taxinvoice.dto.TaxInvoiceUpdateRequest;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoice;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoiceType;
 import com.buildflow.tax.domain.taxinvoice.repository.TaxInvoiceRepository;
+import com.buildflow.tax.domain.taxinvoice.service.SiteReferenceValidator;
 import com.buildflow.tax.domain.taxinvoice.service.TaxInvoiceService;
 import com.buildflow.tax.global.config.JpaAuditingConfig;
 import com.buildflow.tax.global.exception.BusinessException;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -59,6 +62,8 @@ class TaxOutboxIntegrationTest {
     private final PlatformTransactionManager transactionManager;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
+
+    @MockBean private SiteReferenceValidator siteReferenceValidator;
 
     TaxOutboxIntegrationTest(TaxInvoiceService taxService, TaxInvoiceRepository taxRepository,
                              OutboxEventRepository outboxRepository, OutboxClaimService claimService,
@@ -119,6 +124,20 @@ class TaxOutboxIntegrationTest {
 
         assertThat(taxRepository.existsById(id)).isFalse();
         assertThat(outboxRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void unknownSiteDoesNotWriteInvoiceOrOutbox() {
+        doThrow(new BusinessException(ErrorCode.INVALID_SITE_REFERENCE))
+                .when(siteReferenceValidator).requireExistingSite(7L);
+
+        assertThatThrownBy(() -> taxService.create(createRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.INVALID_SITE_REFERENCE));
+
+        assertThat(taxRepository.count()).isZero();
+        assertThat(outboxRepository.count()).isZero();
     }
 
     @Test

@@ -5,9 +5,13 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — 견적·세금계산서 생성 현장 참조 검증 (2026-10-17)
+
+- PR #110의 매입 패턴을 `estimate-service`·`tax-service` 생성 경로에 적용했다. site-service Feign 조회로 없는 현장 400, 상류 오류·응답 불일치 503으로 실패-닫힘 처리하고 저장/outbox 이전에 검증한다. 두 서비스 테스트(견적 36·세금계산서 31건) 로컬 PASS. 실제 Feign/Eureka·Docker/VPS 실측과 `main`/VPS 배포는 PENDING. 보증 직접 등록·업로드 검증은 notification-service에 OpenFeign 도입이 필요해 다음 작업으로 분리했다. 첫 실데이터 현장 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
 ## 진행 중 — 매입 생성 현장 참조 검증 (2026-10-17)
 
-- `purchase-service` 생성 경로에 site-service Feign 조회를 추가해 없는 현장 400, 상류 오류·응답 불일치 503으로 실패-닫힘 처리하고 저장/outbox 이전에 검증한다. 매입 서비스 JPA·단위 회귀는 로컬 PASS, 독립 보안 리뷰에 신규 P0/P1 없음. 실제 Feign/Eureka·Docker/VPS 실측과 PR CI·`main`/VPS 배포는 PENDING이다. 첫 실데이터 현장 V1 **40/100**, 실데이터 **NO-GO** 유지.
+- `purchase-service` 생성 경로에 site-service Feign 조회를 추가해 없는 현장 400, 상류 오류·응답 불일치 503으로 실패-닫힘 처리하고 저장/outbox 이전에 검증한다. 매입 서비스 JPA·단위 회귀는 로컬 PASS, 독립 보안 리뷰에 신규 P0/P1 없음. PR #110 필수 CI 5개 PASS 후 `develop` 병합 `87381fc`. 실제 Feign/Eureka·Docker/VPS 실측과 `main`/VPS 배포는 PENDING이다. 첫 실데이터 현장 V1 **40/100**, 실데이터 **NO-GO** 유지.
 
 ## 진행 중 — Ubuntu 진단용 백업 비공개 경로 게이트 (2026-10-17)
 
@@ -693,9 +697,9 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-14 갱신)
+## 다음 세션 진입점 (2026-10-17 갱신)
 
-**Git 상태**: PR #97 병합 후 `main`·`develop`은 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`로 동기화됐다. PR CI와 병합 `main` CI는 PASS지만 VPS 배포는 PENDING이다. `EstimateService.java`의 기존 로컬 미커밋 변경과 `output/`은 사용자 소유로 보존하며 PR에 포함하지 않는다.
+**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#110을 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
 
 **VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 

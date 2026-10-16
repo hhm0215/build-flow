@@ -4,6 +4,7 @@ import com.buildflow.estimate.domain.estimate.dto.EstimateCreateRequest;
 import com.buildflow.estimate.domain.estimate.dto.EstimateItemRequest;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
 import com.buildflow.estimate.global.exception.BusinessException;
+import com.buildflow.estimate.global.exception.ErrorCode;
 import com.buildflow.estimate.global.kafka.KafkaProducerService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +20,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,6 +31,7 @@ class EstimateServiceAmountTest {
 
     @Mock EstimateRepository estimateRepository;
     @Mock KafkaProducerService kafkaProducerService;
+    @Mock SiteReferenceValidator siteReferenceValidator;
     @InjectMocks EstimateService estimateService;
 
     @ParameterizedTest
@@ -55,6 +58,19 @@ class EstimateServiceAmountTest {
 
         assertEquals(0, new BigDecimal("1250.00").compareTo(result.getTotalAmount()));
         verify(estimateRepository).save(any());
+    }
+
+    @Test
+    void unknownSiteIsRejectedBeforeEstimateIsSaved() {
+        EstimateCreateRequest request = request("1", "1000");
+        when(request.getSiteId()).thenReturn(7L);
+        doThrow(new BusinessException(ErrorCode.INVALID_SITE_REFERENCE))
+                .when(siteReferenceValidator).requireExistingSite(7L);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> estimateService.create(request));
+
+        assertEquals(ErrorCode.INVALID_SITE_REFERENCE, error.getErrorCode());
+        verify(estimateRepository, never()).save(any());
     }
 
     private EstimateCreateRequest request(String quantity, String price) {

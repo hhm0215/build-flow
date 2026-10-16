@@ -33,6 +33,7 @@ class EstimateServiceLockTest {
 
     @Mock EstimateRepository estimateRepository;
     @Mock KafkaProducerService kafkaProducerService;
+    @Mock SiteReferenceValidator siteReferenceValidator;
     @InjectMocks EstimateService estimateService;
 
     @Test
