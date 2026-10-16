@@ -47,6 +47,17 @@ class SiteReferenceValidatorTest {
     }
 
     @Test
+    void archivedSiteIsRejected() throws Exception {
+        String json = """
+                {"success":true,"data":{"id":7,"siteName":"합성 현장","archivedAt":"2026-10-17T09:30:00"},"error":null}
+                """;
+        when(client.findById(7L)).thenReturn(new ObjectMapper().readValue(json, SiteReferenceResponse.class));
+
+        assertEquals(ErrorCode.SITE_ARCHIVED,
+                assertThrows(BusinessException.class, () -> validator.requireExistingSite(7L)).getErrorCode());
+    }
+
+    @Test
     void missingAndInvalidSiteIdsAreRejected() {
         assertEquals(ErrorCode.INVALID_SITE_REFERENCE,
                 assertThrows(BusinessException.class, () -> validator.requireExistingSite(null)).getErrorCode());

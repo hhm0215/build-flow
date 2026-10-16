@@ -32,8 +32,9 @@ public class SiteController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<SiteResponse>>> findAll(
-            @RequestParam(required = false) SiteStatus status) {
-        return ResponseEntity.ok(ApiResponse.success(siteService.findAll(status)));
+            @RequestParam(required = false) SiteStatus status,
+            @RequestParam(required = false) Boolean archived) {
+        return ResponseEntity.ok(ApiResponse.success(siteService.findAll(status, archived)));
     }
 
     @GetMapping("/{id}")
@@ -53,6 +54,16 @@ public class SiteController {
             @PathVariable Long id,
             @Valid @RequestBody SiteStatusUpdateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(siteService.changeStatus(id, request)));
+    }
+
+    @PatchMapping("/{id}/archive")
+    public ResponseEntity<ApiResponse<SiteResponse>> archive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(siteService.archive(id)));
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<ApiResponse<SiteResponse>> restore(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(siteService.restore(id)));
     }
 
     @DeleteMapping("/{id}")

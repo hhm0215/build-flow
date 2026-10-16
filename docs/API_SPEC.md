@@ -59,14 +59,16 @@
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
 | POST | /api/v1/sites | JSON `SiteCreateRequest` → `SiteResponse` (201) | O |
-| GET | /api/v1/sites?status={status} | 선택적 상태 필터 → `SiteResponse[]`; 서버 검색·페이징 없음 | O |
+| GET | /api/v1/sites?status={status}&archived={true\|false} | 두 필터 모두 선택적 → `SiteResponse[]`; `archived` 미지정은 보관 여부와 무관한 전체(기존 계약); 서버 검색·페이징 없음 | O |
 | GET | /api/v1/sites/{id} | `SiteResponse` (손익 별도) | O |
 | PUT | /api/v1/sites/{id} | JSON `SiteUpdateRequest` → `SiteResponse` | O |
-| PATCH | /api/v1/sites/{id}/status | JSON `{status}` → `SiteResponse` | O |
-| DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 보관·복원 도입 전까지 사용 금지 | O |
+| PATCH | /api/v1/sites/{id}/status | JSON `{status}` → `SiteResponse`; 보관된 현장은 409 | O |
+| PATCH | /api/v1/sites/{id}/archive | 본문 없음 → `SiteResponse`; 보관(멱등, 최초 `archivedAt` 유지) | O |
+| PATCH | /api/v1/sites/{id}/restore | 본문 없음 → `SiteResponse`; 복원(`archivedAt=null`) | O |
+| DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 정리는 보관을 사용 | O |
 | GET | /api/v1/sites/{id}/profit | `ProfitResponse` | O |
 
-생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다.
+생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다. `SiteResponse.archivedAt`은 보관 시각(KST, 미보관 null)이며 업무 단계 `status`와 별개다. 보관된 현장은 수정·상태 변경이 409이고, 매입·견적·세금계산서·보증 생성은 해당 서비스에서 400으로 거부된다. 보관해도 기존 자료·손익 조회는 유지된다(ADR-021).
 
 ### 거래처 (clients)
 

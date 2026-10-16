@@ -56,6 +56,8 @@ export interface Site {
   startDate: string | null
   endDate: string | null
   memo: string | null
+  /** 보관 시각. null이면 미보관 (업무 단계 status와 별개) */
+  archivedAt: string | null
   createdAt: string
   updatedAt: string
 }

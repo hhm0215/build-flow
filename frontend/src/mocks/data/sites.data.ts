@@ -11,6 +11,7 @@ export const mockSites: Site[] = [
     endDate: '2026-06-30',
     memo: '',
     createdAt: '2026-01-10T09:00:00',
+    archivedAt: null,
     updatedAt: '2026-01-10T09:00:00',
   },
   {
@@ -23,6 +24,7 @@ export const mockSites: Site[] = [
     endDate: '2026-08-31',
     memo: '',
     createdAt: '2026-01-28T09:00:00',
+    archivedAt: null,
     updatedAt: '2026-01-28T09:00:00',
   },
   {
@@ -35,6 +37,7 @@ export const mockSites: Site[] = [
     endDate: '2026-04-15',
     memo: '',
     createdAt: '2025-09-20T09:00:00',
+    archivedAt: null,
     updatedAt: '2026-04-15T09:00:00',
   },
   {
@@ -47,6 +50,7 @@ export const mockSites: Site[] = [
     endDate: '2026-12-31',
     memo: '대규모 철골 공사',
     createdAt: '2026-03-15T09:00:00',
+    archivedAt: null,
     updatedAt: '2026-03-15T09:00:00',
   },
   {
@@ -59,6 +63,7 @@ export const mockSites: Site[] = [
     endDate: '2025-12-20',
     memo: '',
     createdAt: '2025-04-15T09:00:00',
+    archivedAt: null,
     updatedAt: '2025-12-20T09:00:00',
   },
 ]
