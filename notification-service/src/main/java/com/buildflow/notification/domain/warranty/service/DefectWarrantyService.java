@@ -44,6 +44,7 @@ public class DefectWarrantyService {
 
     private final DefectWarrantyRepository warrantyRepository;
     private final WarrantyOcrService ocrService;
+    private final SiteReferenceValidator siteReferenceValidator;
 
     @Value("${app.upload-dir:./uploads/warranties}")
     private String uploadDir;
@@ -52,6 +53,7 @@ public class DefectWarrantyService {
     public WarrantyResponse create(WarrantyCreateRequest request) {
         validatePeriod(request.getStartDate(), request.getEndDate());
         validateAmount(request.getCoverageAmount());
+        siteReferenceValidator.requireExistingSite(request.getSiteId());
         DefectWarranty warranty = DefectWarranty.builder()
                 .siteId(request.getSiteId())
                 .insuranceCompany(request.getInsuranceCompany())
@@ -150,6 +152,7 @@ public class DefectWarrantyService {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.WARRANTY_FILE_EMPTY);
         }
+        siteReferenceValidator.requireExistingSite(siteId);
         Path stored = storeFile(file);
         DefectWarranty pending;
         try {

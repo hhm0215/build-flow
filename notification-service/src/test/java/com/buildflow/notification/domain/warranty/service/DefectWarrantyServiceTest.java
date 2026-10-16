@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.service;
 
+import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
 import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
@@ -22,7 +24,7 @@ class DefectWarrantyServiceTest {
     void OCR_처리중에는_수동_수정을_거부한다() {
         DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
         WarrantyOcrService ocrService = mock(WarrantyOcrService.class);
-        DefectWarrantyService service = new DefectWarrantyService(repository, ocrService);
+        DefectWarrantyService service = new DefectWarrantyService(repository, ocrService, mock(SiteReferenceValidator.class));
         DefectWarranty pending = DefectWarranty.createPending(1L, "warranty.pdf");
         when(repository.findByIdForUpdate(7L)).thenReturn(Optional.of(pending));
 
@@ -36,7 +38,7 @@ class DefectWarrantyServiceTest {
     @Test
     void 역전된_기간은_저장하지_않는다() {
         DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
-        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class));
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(SiteReferenceValidator.class));
         DefectWarranty warranty = DefectWarranty.builder()
                 .siteId(1L)
                 .insuranceCompany("기존 보험사")
@@ -53,5 +55,24 @@ class DefectWarrantyServiceTest {
                 .satisfies(error -> org.assertj.core.api.Assertions.assertThat(
                         ((BusinessException) error).getErrorCode()).isEqualTo(ErrorCode.WARRANTY_INVALID_PERIOD));
         verify(repository).findByIdForUpdate(7L);
+    }
+
+    @Test
+    void 없는_현장의_직접_등록은_저장하지_않는다() {
+        DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
+        SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), siteReferenceValidator);
+        WarrantyCreateRequest request = mock(WarrantyCreateRequest.class);
+        when(request.getSiteId()).thenReturn(99L);
+        when(request.getStartDate()).thenReturn(LocalDate.of(2026, 1, 1));
+        when(request.getEndDate()).thenReturn(LocalDate.of(2027, 1, 1));
+        doThrow(new BusinessException(ErrorCode.INVALID_SITE_REFERENCE))
+                .when(siteReferenceValidator).requireExistingSite(99L);
+
+        assertThatThrownBy(() -> service.create(request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> org.assertj.core.api.Assertions.assertThat(
+                        ((BusinessException) error).getErrorCode()).isEqualTo(ErrorCode.INVALID_SITE_REFERENCE));
+        verifyNoInteractions(repository);
     }
 }
