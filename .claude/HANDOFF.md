@@ -17,11 +17,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 04:45 KST |
-| 브랜치 | `claude/next` (Config import 단일화) |
-| PR | Config import PR (develop 대상) — 직전 #116 현장 보관 병합 |
-| 현재 단계 | Config import 단일화 구현·Docker 실측 완료 → PR·CI·병합 |
-| 다음 첫 행동 | 병합 후 BACKLOG P2 "프론트 프로덕션 번들 분할" 착수. 보관 현장 기존 문서 규칙은 `docs/PILOT_QA.md` 사용자 답변 대기 |
+| 갱신 | 2026-10-17 05:05 KST |
+| 브랜치 | `claude/frontend-chunks` |
+| PR | 프론트 번들 분할 PR (develop 대상) — 직전 #117 병합 |
+| 현재 단계 | 번들 분할 구현·preview 확인 완료 → PR·CI·병합 |
+| 다음 첫 행동 | 병합 후 BACKLOG P2 "ADR-003 / 아키텍처 문서 drift 정정"(문서 정정안 a) 또는 테스트 커버리지 확장. 보관 현장 기존 문서 규칙은 `docs/PILOT_QA.md` 답변 대기 |
 
 ## 공통 사용자 지시
 

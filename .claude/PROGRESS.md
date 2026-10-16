@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 프론트 번들 분할 (2026-10-17)
+
+- 로그인 외 8개 페이지를 `React.lazy`로 분리하고 react·antd·markdown을 vendor 청크로 나눴다. 단일 1.42 MB(gzip 443 KB) → 앱 250 KB + vendor(react 162·antd 761·markdown 117 KB) + 페이지별 10~22 KB. antd는 단일 라이브러리라 임계값을 800 KB로 문서화했다. catch-all vendor는 개발 전용 msw를 첫 화면으로 끌어와 제외했고, 프로덕션 preview에서 페이지 청크 지연 로드·msw 미로드를 확인했다.
+
 ## 완료된 작업 — Config Server import 단일화 (2026-10-17)
 
 - 7개 서비스의 Config import를 `application.yml`의 `${CONFIG_SERVER_URL:http://localhost:8888}` 한 곳으로 통합하고 Docker 프로필 중복 선언을 제거, compose는 `CONFIG_SERVER_URL`을 전달한다. 로컬 풀 Docker 재기동에서 7개 서비스 `localhost:8888` 시도 0건·Config Server 조회·8개 health UP. 현장 보관 뒤 기존 문서 수정/입금 확인 규칙은 `docs/PILOT_QA.md` 사용자 판단 대기로 기록.
