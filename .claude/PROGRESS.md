@@ -5,6 +5,15 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 날짜 없는 V1 완료선·격리 복원 참조 증거 (2026-10-16, develop 통합)
+
+- [PR #103](https://github.com/hhm0215/build-flow/pull/103)의 필수 CI 5개 PASS와 정확한 단일 head SHA `f3675980b55ef9e60d92a41ea3ea48d31d415e1e` 대조 후 merge commit `c05d1beeb01d88a1d3da970df3690b91d684503d`로 `develop`에 병합했다. v1 SQL 격리 복원 DB의 보증 ID·파일 경로 opt-in 추출/해시·출처 기록은 Windows PowerShell 5.1·7 합성 테스트와 독립 인프라·보안 검토를 통과했다. 실제 Docker 격리 복원·SQL+업로드 통합 복원은 PENDING이며 `main`/VPS 미반영이다.
+- [PR #104](https://github.com/hhm0215/build-flow/pull/104)의 필수 CI 5개 PASS와 단일 head SHA `39a025ed94a4962c8d64f786656fe1327099ff91` 대조 후 merge commit `d99f6e94eb37fb16f6eca148dbb6c7ea415030bd`로 `develop`에 병합했다. 사용자와 합의하지 않은 사용 목표일은 폐기하고 첫 현장 수동 입력의 안전한 운영을 V1 100%로 맞췄다. USB 가져오기는 후속 작업으로 남는다. V1 40/100과 실데이터 NO-GO는 유지한다.
+
+## 진행 중 — 보증 파일 볼륨 읽기 전용 사전 검사 (2026-10-16)
+
+- SQL-only v1과 실제 파일을 혼동하지 않도록 별도 `check-warranty-volume.ps1`을 추가했다. MySQL Compose 프로젝트·작업 디렉터리·DB 볼륨, 같은 프로젝트의 `warranty_uploads` local volume, 실행 중 파일 볼륨 사용자와 7개 DB writer 서비스를 검사해 불일치·활성 사용을 거부한다. 합성 PowerShell 5.1 회귀 PASS. 아직 파일 복사·DB 참조 추출·v2 백업 생성·격리 복원은 하지 않았고 외부 writer도 미검증이다. 실제 Docker 엔진이 없어 동작 실측은 PENDING; V1 40/100, 실데이터 NO-GO, `main`/VPS 미반영이다.
+
 ## 진행 중 — 날짜 없는 즉시 운영 게이트·격리 복원 행 출처 (2026-10-16)
 
 - 사용자가 합의하지 않은 V1 사용 목표일을 폐기하고 `docs/DELIVERY_PLAN.md`를 통과 증거 순서로 바꿨다. 날짜를 기다리지 않고 첫 실데이터 현장에 필요한 복구·스키마·업무 동선·복귀를 병렬로 진행한다.
