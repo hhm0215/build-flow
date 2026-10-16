@@ -17,10 +17,10 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 05:40 KST |
-| 브랜치 | `claude/retro-derived-decimal` |
-| PR | 회고·규칙 PR (develop 대상) — 직전 #120 병합 |
-| 현재 단계 | 마진율 결함 회고·재발 방지 규칙 반영 → PR·CI·병합 |
+| 갱신 | 2026-10-17 05:55 KST |
+| 브랜치 | `claude/parse-json-tests` |
+| PR | AI 응답 JSON 추출 PR (develop 대상) — 직전 #121 병합 |
+| 현재 단계 | Ollama JSON 추출 결함 수정·테스트 → PR·CI·병합 |
 | 다음 첫 행동 | 병합 후 테스트 커버리지 남은 후보(estimate Ollama JSON 추출) 또는 사용자 답변 대기 항목(`docs/PILOT_QA.md` 보관 현장 기존 문서 규칙) 반영 |
 
 ## 공통 사용자 지시
