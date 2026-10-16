@@ -15,13 +15,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 05:55 KST |
-| 브랜치 | `claude/parse-json-tests` |
-| PR | AI 응답 JSON 추출 PR (develop 대상) — 직전 #121 병합 |
-| 현재 단계 | Ollama JSON 추출 결함 수정·테스트 → PR·CI·병합 |
-| 다음 첫 행동 | 병합 후 테스트 커버리지 남은 후보(estimate Ollama JSON 추출) 또는 사용자 답변 대기 항목(`docs/PILOT_QA.md` 보관 현장 기존 문서 규칙) 반영 |
+| 갱신 | 2026-10-17 06:05 KST |
+| 브랜치 | 없음 (`develop` = PR #122 병합 뒤, 열린 기능 브랜치 없음) |
+| PR | #99 develop→main **draft 유지**(운영 DDL·복구·실제 혼합 PDF 검증 전 main 병합 금지) |
+| 현재 단계 | Claude 세션 종료. 2026-10-17에 PR #111~#122 병합(현장 참조 검증·Feign timeout·보관/복원·인계 체계·Config import·번들 분할·ADR-003 v2·마진율/AI 파싱 결함) |
+| 다음 첫 행동 | ① `docs/PILOT_QA.md` "현장 보관 후 기존 문서" 사용자 답변 반영 ② P1 운영 DB 마이그레이션·DB+파일 외부 백업/격리 복원(VPS 권한 필요) ③ 테스트 커버리지 프론트 훅. 이어받는 도구는 잠금을 자기 것으로 바꾼 뒤 착수 |
 
 ## 공통 사용자 지시
 
