@@ -17,11 +17,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 05:05 KST |
-| 브랜치 | `claude/frontend-chunks` |
-| PR | 프론트 번들 분할 PR (develop 대상) — 직전 #117 병합 |
-| 현재 단계 | 번들 분할 구현·preview 확인 완료 → PR·CI·병합 |
-| 다음 첫 행동 | 병합 후 BACKLOG P2 "ADR-003 / 아키텍처 문서 drift 정정"(문서 정정안 a) 또는 테스트 커버리지 확장. 보관 현장 기존 문서 규칙은 `docs/PILOT_QA.md` 답변 대기 |
+| 갱신 | 2026-10-17 05:15 KST |
+| 브랜치 | `claude/adr003-drift` |
+| PR | ADR-003 정정 PR (develop 대상) — 직전 #118 병합 |
+| 현재 단계 | ADR-003 v2 문서 정정 → PR·CI·병합 |
+| 다음 첫 행동 | 병합 후 BACKLOG P2 "테스트 커버리지 확장"(ProfitService 마진·tax 미수금 계산 등 순수 로직) |
 
 ## 공통 사용자 지시
 

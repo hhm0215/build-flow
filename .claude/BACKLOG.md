@@ -116,14 +116,6 @@
 - **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화, buildMessages 이력 tail 쿼리(LIMIT)
 - 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
 
-### ADR-003 / 아키텍처 문서 ↔ 실구현 drift 정정
-- **배경**: 2026-07-22 실측 — `docs/DECISIONS.md` ADR-003이 "Redis 3용도(캐시 + JWT 블랙리스트 + Redisson 분산락)"로 기록하고 면접 답변 스크립트까지 포함하나, `Redisson`/`RLock`/`@Cacheable`/`CacheManager` 사용처 **0건**. 실사용은 JWT 블랙리스트 + refresh 토큰 + chat 세션뿐. 같은 계열로 CLAUDE.md/AGENTS.md의 "서비스 간 동기 통신 = OpenFeign"도 실제로는 chat-service 2곳(SiteClient/TaxClient)만
-- **선택지**: (a) 문서를 현재 구현에 맞게 정정 (b) ADR대로 Cache Aside·분산락을 실제 구현 후 문서 유지
-- **산출물**: ADR-003 v2(정정 또는 구현 반영) + CLAUDE.md/AGENTS.md 통신 방식 표기 정렬
-- **관련 파일**: `docs/DECISIONS.md`, `CLAUDE.md`, `AGENTS.md`, `auth-service/.../RedisConfig.java`
-- **예상 규모**: S(문서 정정) / M(구현)
-- **상태**: TODO
-
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
 - 후보: ProfitService 마진계산, estimate OllamaService JSON추출, tax 미수금 계산, 프론트 다른 훅
