@@ -23,9 +23,11 @@ public class TaxInvoiceService {
 
     private final TaxInvoiceRepository taxInvoiceRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final SiteReferenceValidator siteReferenceValidator;
 
     @Transactional
     public TaxInvoiceResponse create(TaxInvoiceCreateRequest request) {
+        siteReferenceValidator.requireExistingSite(request.getSiteId());
         TaxInvoice taxInvoice = TaxInvoice.builder()
                 .siteId(request.getSiteId())
                 .type(request.getType())

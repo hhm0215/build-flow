@@ -48,7 +48,7 @@
 | PATCH | /api/v1/estimates/{id}/confirm | 본문 없음 → `EstimateResponse`; 확정 후 집계 이벤트 발행 | O |
 | DELETE | /api/v1/estimates/{id} | DRAFT만 삭제; CONFIRMED는 충돌 오류 | O |
 
-생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`이다. 수정은 `siteId`를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`), `estimateDate`, `totalAmount`, `memo`, `items[]`, 생성·수정 시각이 포함된다. 금액은 서버가 항목으로 계산한다. 파일을 업로드하거나 다운로드하는 견적 CRUD 경로는 없다.
+생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`이다. 수정은 `siteId`를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`), `estimateDate`, `totalAmount`, `memo`, `items[]`, 생성·수정 시각이 포함된다. 금액은 서버가 항목으로 계산한다. 견적 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 견적을 저장하지 않는다. 파일을 업로드하거나 다운로드하는 견적 CRUD 경로는 없다.
 
 ---
 
@@ -116,7 +116,7 @@
 | DELETE | /api/v1/taxes/{id} | 삭제; 입금 확인 건 불가 | O |
 | GET | /api/v1/taxes/outstanding?siteId={id} | 필수 `siteId` → `OutstandingResponse` | O |
 
-생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`, `paymentDate`, 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`, `outstandingAmount`, `unpaidCount`, `unpaidInvoices[]`이다. 입금 확인 불가 상태는 충돌 오류다.
+생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`, `paymentDate`, 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`, `outstandingAmount`, `unpaidCount`, `unpaidInvoices[]`이다. 입금 확인 불가 상태는 충돌 오류다. 세금계산서 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 세금계산서/outbox를 저장하지 않는다.
 
 ---
 

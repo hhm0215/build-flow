@@ -27,10 +27,12 @@ public class EstimateService {
 
     private final EstimateRepository estimateRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final SiteReferenceValidator siteReferenceValidator;
 
     @Transactional
     public EstimateResponse create(EstimateCreateRequest request) {
         BigDecimal totalAmount = calculateTotal(request.getItems());
+        siteReferenceValidator.requireExistingSite(request.getSiteId());
 
         Estimate estimate = Estimate.builder()
                 .siteId(request.getSiteId())
