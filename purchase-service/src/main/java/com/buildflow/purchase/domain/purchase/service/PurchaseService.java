@@ -25,9 +25,11 @@ public class PurchaseService {
 
     private final PurchaseRepository purchaseRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final SiteReferenceValidator siteReferenceValidator;
 
     @Transactional
     public PurchaseResponse create(PurchaseCreateRequest request) {
+        siteReferenceValidator.requireExistingSite(request.getSiteId());
         Purchase purchase = Purchase.builder()
                 .siteId(request.getSiteId())
                 .itemName(request.getItemName())

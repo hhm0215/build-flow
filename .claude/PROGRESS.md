@@ -5,9 +5,13 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — 매입 생성 현장 참조 검증 (2026-10-17)
+
+- `purchase-service` 생성 경로에 site-service Feign 조회를 추가해 없는 현장 400, 상류 오류·응답 불일치 503으로 실패-닫힘 처리하고 저장/outbox 이전에 검증한다. 매입 서비스 JPA·단위 회귀는 로컬 PASS, 독립 보안 리뷰에 신규 P0/P1 없음. 실제 Feign/Eureka·Docker/VPS 실측과 PR CI·`main`/VPS 배포는 PENDING이다. 첫 실데이터 현장 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
 ## 진행 중 — Ubuntu 진단용 백업 비공개 경로 게이트 (2026-10-17)
 
-- Windows 전용 ACL 때문에 Ubuntu에서 즉시 거부되던 SQL+보증 PDF v2 진단 snapshot에 Unix UID·mode·`umask 0077` 검사와 링크/공유 쓰기 조상 차단을 추가했다. Docker 파일 복사는 호스트 실행 UID/GID·컨테이너 `umask 077`로 제한하고, 권한 불일치는 중단한다. Windows 합성 정책/백업 도구 회귀는 로컬 PASS, Linux CI와 실제 Docker volume 소유권·VPS snapshot은 PENDING이다. v2는 계속 `INCOMPLETE`이며 운영 복구 증거가 아니다. 외부 writer 차단·빈 환경 복원·관리자 로그인·암호화 오프사이트 사본은 미완료, 실데이터 NO-GO·V1 **40/100** 유지.
+- Windows 전용 ACL 때문에 Ubuntu에서 즉시 거부되던 SQL+보증 PDF v2 진단 snapshot에 Unix UID·mode·`umask 0077` 검사와 링크/공유 쓰기 조상 차단을 추가했다. Docker 파일 복사는 호스트 실행 UID/GID·컨테이너 `umask 077`로 제한하고, 권한 불일치는 중단한다. PR #109의 Linux/Windows 포함 필수 CI 5개 PASS 후 `develop` 병합 `50de5c6`; 실제 Docker volume 소유권·VPS snapshot은 PENDING이다. v2는 계속 `INCOMPLETE`이며 운영 복구 증거가 아니다. 외부 writer 차단·빈 환경 복원·관리자 로그인·암호화 오프사이트 사본은 미완료, 실데이터 NO-GO·V1 **40/100** 유지.
 
 ## 진행 중 — 합성 Docker 원본 snapshot→격리 복원 (2026-10-16)
 
