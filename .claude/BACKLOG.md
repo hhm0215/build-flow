@@ -118,7 +118,8 @@
 
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
-- 후보: ProfitService 마진계산, estimate OllamaService JSON추출, tax 미수금 계산, 프론트 다른 훅
+- 2026-10-17: 현장 마진·마진율과 tax 미수금 계산 테스트 추가(마진율 DECIMAL(5,2) 초과 저장 실패 결함 발견·수정)
+- 남은 후보: estimate OllamaService JSON추출, 프론트 다른 훅
 - **예상 규모**: S~M (점진적)
 
 ---

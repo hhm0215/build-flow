@@ -17,10 +17,10 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 05:15 KST |
-| 브랜치 | `claude/adr003-drift` |
-| PR | ADR-003 정정 PR (develop 대상) — 직전 #118 병합 |
-| 현재 단계 | ADR-003 v2 문서 정정 → PR·CI·병합 |
+| 갱신 | 2026-10-17 05:30 KST |
+| 브랜치 | `claude/money-tests` |
+| PR | 손익·미수금 테스트 PR (develop 대상) — 직전 #119 병합 |
+| 현재 단계 | 마진율 저장 결함 수정·테스트 추가 → PR·CI·병합 |
 | 다음 첫 행동 | 병합 후 BACKLOG P2 "테스트 커버리지 확장"(ProfitService 마진·tax 미수금 계산 등 순수 로직) |
 
 ## 공통 사용자 지시
