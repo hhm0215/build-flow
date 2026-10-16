@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — Codex↔Claude 인계 체계 (2026-10-17)
+
+- 두 도구가 모두 읽는 `.claude/HANDOFF.md`(작업 잠금·공통 사용자 지시)와 끊긴 세션 요약 `scripts/agents/last_session.py`(읽기 전용, 출력 비커밋)를 추가하고 AGENTS.md·CLAUDE.md에 확인 규칙을 넣었다. Codex 자체 메모리 DB는 비어 있어 저장소 문서가 실질적인 공유 기억이다. 별도 `memory-bus` 프로젝트는 설계 단계라 현재 인계 수단으로 쓰지 않는다. Codex `buildflow` heartbeat는 ACTIVE 상태 그대로이며 잠금 규칙으로 충돌을 피한다.
+
 ## 완료된 작업 — 현장 참조 Feign 시간 한도·깨진 본문 400 (2026-10-17)
 
 - 매입·견적·세금계산서·보증의 현장 참조 Feign 클라이언트에 connect 2s/read 3s를 명시하고, 현장·견적·보증 서비스에 깨진 요청 본문 400 처리(본문 비기록)를 추가했다. 5개 서비스 테스트 PASS, 로컬 풀 Docker 재실측에서 503 약 4초·깨진 JSON 400·거부 시 행 미생성 확인. 공개 VPS 반영 PENDING.
