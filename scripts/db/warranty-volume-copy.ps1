@@ -74,17 +74,19 @@ function Invoke-WarrantyVolumeHelper {
     param(
         [Parameter(Mandatory = $true)][string]$VolumeName,
         [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string]$ImageId,
         [Parameter(Mandatory = $true)][string]$Shell,
         [string]$DestinationDirectory
     )
 
     if ($VolumeName -cnotmatch '^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$') { throw 'Unsafe warranty volume name.' }
+    if ($ImageId -cnotmatch '^sha256:[a-f0-9]{64}$') { throw 'Warranty helper requires a pinned source image ID.' }
     $arguments = @('run', '--rm', '--pull=never', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges', '--mount', "type=volume,source=$VolumeName,target=/source,readonly")
     if (-not [string]::IsNullOrWhiteSpace($DestinationDirectory)) {
         $arguments += @('--mount', "type=bind,source=$DestinationDirectory,target=/target")
     }
-    $arguments += @('--entrypoint', 'sh', 'mysql:8.0', '-c', $Shell)
+    $arguments += @('--entrypoint', 'sh', $ImageId, '-c', $Shell)
     return (Invoke-NativeProcess -FileName 'docker' -Arguments $arguments -WorkingDirectory $WorkingDirectory -RejectStandardError).StandardOutput
 }
 
@@ -92,7 +94,8 @@ function Copy-WarrantyVolumeSnapshot {
     param(
         [Parameter(Mandatory = $true)][string]$VolumeName,
         [Parameter(Mandatory = $true)][string]$DestinationDirectory,
-        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string]$ImageId
     )
 
     $destination = [IO.Path]::GetFullPath($DestinationDirectory)
@@ -104,9 +107,9 @@ function Copy-WarrantyVolumeSnapshot {
     if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
         throw 'Warranty snapshot destination cannot be a linked directory.'
     }
-    $before = @(ConvertFrom-WarrantyVolumeListing -Text (Invoke-WarrantyVolumeHelper -VolumeName $VolumeName -WorkingDirectory $WorkingDirectory -Shell $script:warrantyScanShell))
-    [void](Invoke-WarrantyVolumeHelper -VolumeName $VolumeName -WorkingDirectory $WorkingDirectory -Shell $script:warrantyCopyShell -DestinationDirectory $destination)
-    $after = @(ConvertFrom-WarrantyVolumeListing -Text (Invoke-WarrantyVolumeHelper -VolumeName $VolumeName -WorkingDirectory $WorkingDirectory -Shell $script:warrantyScanShell))
+    $before = @(ConvertFrom-WarrantyVolumeListing -Text (Invoke-WarrantyVolumeHelper -VolumeName $VolumeName -WorkingDirectory $WorkingDirectory -ImageId $ImageId -Shell $script:warrantyScanShell))
+    [void](Invoke-WarrantyVolumeHelper -VolumeName $VolumeName -WorkingDirectory $WorkingDirectory -ImageId $ImageId -Shell $script:warrantyCopyShell -DestinationDirectory $destination)
+    $after = @(ConvertFrom-WarrantyVolumeListing -Text (Invoke-WarrantyVolumeHelper -VolumeName $VolumeName -WorkingDirectory $WorkingDirectory -ImageId $ImageId -Shell $script:warrantyScanShell))
     if ((ConvertTo-Json -InputObject $before -Depth 3 -Compress) -cne (ConvertTo-Json -InputObject $after -Depth 3 -Compress)) {
         throw 'Warranty source volume changed during snapshot; retain the incomplete copy for inspection.'
     }

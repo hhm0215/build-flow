@@ -1,0 +1,39 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${SNAPSHOT_TEST_DB_PASSWORD:?Synthetic password required}
+    labels:
+      com.buildflow.snapshot-test: ${SNAPSHOT_TEST_NONCE:?Synthetic nonce required}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysql --user=root --host=127.0.0.1 --protocol=TCP --batch --skip-column-names --execute='SELECT 1' | grep -qx 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  notification-service:
+    image: mysql:8.0
+    entrypoint: ["sh", "-c", "exit 0"]
+    network_mode: none
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    labels:
+      com.buildflow.snapshot-test: ${SNAPSHOT_TEST_NONCE:?Synthetic nonce required}
+    volumes:
+      - warranty_uploads:/app/uploads/warranties
+
+volumes:
+  mysql_data:
+    labels:
+      com.buildflow.snapshot-test: ${SNAPSHOT_TEST_NONCE:?Synthetic nonce required}
+  warranty_uploads:
+    labels:
+      com.buildflow.snapshot-test: ${SNAPSHOT_TEST_NONCE:?Synthetic nonce required}
+
+networks:
+  default:
+    labels:
+      com.buildflow.snapshot-test: ${SNAPSHOT_TEST_NONCE:?Synthetic nonce required}

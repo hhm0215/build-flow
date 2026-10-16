@@ -46,6 +46,7 @@ Assert-Rejected { ConvertTo-WarrantyUploadManifest $rows @([pscustomobject]@{ re
 $source.volumeDriver = 'remote'
 Assert-Rejected { ConvertTo-WarrantyUploadManifest $rows $files 2 $source } 'local driver'
 $source.volumeDriver = 'local'
+Assert-Rejected { Invoke-WarrantyVolumeHelper -VolumeName 'synthetic_uploads' -WorkingDirectory $PSScriptRoot -ImageId 'mysql:8.0' -Shell 'true' } 'pinned source image ID'
 
 $copyRoot = Join-Path ([IO.Path]::GetTempPath()) ('buildflow-warranty-snapshot-test-' + [Guid]::NewGuid().ToString('N'))
 try {

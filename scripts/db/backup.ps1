@@ -1,5 +1,11 @@
 [CmdletBinding()]
-param([string]$OutputRoot, [switch]$IncludeWarrantyUploads)
+param(
+    [string]$OutputRoot,
+    [switch]$IncludeWarrantyUploads,
+    [switch]$SyntheticTestSource,
+    [string]$SyntheticProject,
+    [string]$SyntheticNonce
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -9,12 +15,24 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'warranty-volume-copy.ps1')
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+if ($SyntheticTestSource) {
+    if (-not $IncludeWarrantyUploads -or $SyntheticProject -cnotmatch '^buildflowsnap[a-f0-9]{12}$' -or
+        $SyntheticNonce -cnotmatch '^[a-f0-9]{32}$' -or $env:SNAPSHOT_TEST_NONCE -cne $SyntheticNonce) {
+        throw 'Synthetic source requires v2, a random test project, and matching nonce.'
+    }
+} elseif ($PSBoundParameters.ContainsKey('SyntheticProject') -or $PSBoundParameters.ContainsKey('SyntheticNonce')) {
+    throw 'Synthetic project and nonce require -SyntheticTestSource.'
+}
 if ($IncludeWarrantyUploads -and [string]::IsNullOrWhiteSpace($OutputRoot)) {
     throw 'Integrated snapshot requires an explicit existing private OutputRoot.'
 }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $repoRoot "backups\db" }
 $schemas = @("buildflow_auth", "buildflow_estimate", "buildflow_site", "buildflow_purchase", "buildflow_tax", "buildflow_notification", "buildflow_chat")
-$composeArgs = @("compose", "-f", (Join-Path $repoRoot "docker-compose.yml"), "-f", (Join-Path $repoRoot "docker-compose.app.yml"))
+$composeArgs = if ($SyntheticTestSource) {
+    @('compose', '--project-directory', $repoRoot, '--project-name', $SyntheticProject, '-f', (Join-Path $PSScriptRoot 'snapshot-test.compose.yml'))
+} else {
+    @("compose", "-f", (Join-Path $repoRoot "docker-compose.yml"), "-f", (Join-Path $repoRoot "docker-compose.app.yml"))
+}
 $mysqlShell = 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --batch --skip-column-names --raw --execute="$1"'
 $writeCapableServices = @("auth-service", "estimate-service", "site-service", "purchase-service", "tax-service", "notification-service", "chat-service")
 $backupDirectory = $null
@@ -103,6 +121,10 @@ function Get-SourceIdentity {
         throw "Resolved container is not the Compose mysql service."
     }
     $project = Get-LabelValue -Labels $container.Config.Labels -Name "com.docker.compose.project"
+    if ($SyntheticTestSource -and ($project -cne $SyntheticProject -or
+        (Get-LabelValue -Labels $container.Config.Labels -Name 'com.buildflow.snapshot-test') -cne $SyntheticNonce)) {
+        throw 'Synthetic MySQL project or nonce identity mismatch.'
+    }
     $workingDirectory = Get-LabelValue -Labels $container.Config.Labels -Name "com.docker.compose.project.working_dir"
     $expectedWorkingDirectory = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/')
     $actualWorkingDirectory = [System.IO.Path]::GetFullPath($workingDirectory).TrimEnd('\', '/')
@@ -111,6 +133,9 @@ function Get-SourceIdentity {
     }
     if ([string]$container.Config.Image -cne "mysql:8.0") {
         throw "Unexpected MySQL image reference: $($container.Config.Image)"
+    }
+    if ([string]$container.Image -cnotmatch '^sha256:[a-f0-9]{64}$') {
+        throw 'MySQL source image ID is not a pinned SHA-256 digest.'
     }
 
     $dataMounts = @($container.Mounts | Where-Object { $_.Destination -eq "/var/lib/mysql" })
@@ -122,6 +147,10 @@ function Get-SourceIdentity {
     if ((Get-LabelValue -Labels $volume.Labels -Name "com.docker.compose.project") -cne $project -or
         (Get-LabelValue -Labels $volume.Labels -Name "com.docker.compose.volume") -cne "mysql_data") {
         throw "MySQL data volume labels do not match this Compose project and mysql_data."
+    }
+    if ($SyntheticTestSource -and
+        (Get-LabelValue -Labels $volume.Labels -Name 'com.buildflow.snapshot-test') -cne $SyntheticNonce) {
+        throw 'Synthetic MySQL volume nonce identity mismatch.'
     }
     return [ordered]@{
         containerId = [string]$container.Id
@@ -187,8 +216,14 @@ try {
     $warrantyBefore = @()
     $warrantyVolumeBefore = $null
     if ($IncludeWarrantyUploads) {
+        $warrantyPreflightArguments = @{ PassThru = $true }
+        if ($SyntheticTestSource) {
+            $warrantyPreflightArguments.SyntheticTestSource = $true
+            $warrantyPreflightArguments.SyntheticProject = $SyntheticProject
+            $warrantyPreflightArguments.SyntheticNonce = $SyntheticNonce
+        }
         $warrantyBefore = @(Get-WarrantySourceRows -Inventory $inventoryBefore)
-        $warrantyVolumeBefore = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') -PassThru
+        $warrantyVolumeBefore = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') @warrantyPreflightArguments
     }
 
     $outputRootFull = [System.IO.Path]::GetFullPath($OutputRoot)
@@ -249,9 +284,9 @@ try {
         $uploadsDirectory = Join-Path $partialDirectory 'uploads\warranties'
         New-Item -ItemType Directory -Path $uploadsDirectory -Force | Out-Null
         Assert-PrivateWarrantyDirectory -Path $uploadsDirectory
-        $copiedFiles = @(Copy-WarrantyVolumeSnapshot -VolumeName ([string]$warrantyVolumeBefore.volumeName) -DestinationDirectory $uploadsDirectory -WorkingDirectory $repoRoot)
+        $copiedFiles = @(Copy-WarrantyVolumeSnapshot -VolumeName ([string]$warrantyVolumeBefore.volumeName) -DestinationDirectory $uploadsDirectory -WorkingDirectory $repoRoot -ImageId ([string]$sourceIdentity.imageId))
         Assert-NoActiveBuildFlowClients
-        $warrantyVolumeAfter = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') -PassThru
+        $warrantyVolumeAfter = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') @warrantyPreflightArguments
         if (($warrantyVolumeBefore | ConvertTo-Json -Compress) -cne ($warrantyVolumeAfter | ConvertTo-Json -Compress)) {
             throw 'Warranty upload volume identity changed during snapshot.'
         }
