@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BackupDirectory,
     [switch]$ValidateLogin,
+    [switch]$TestIncompleteV2,
     [string]$WarrantyRowsExportPath
 )
 
@@ -10,6 +11,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
 . (Join-Path $PSScriptRoot "restored-warranty-rows.ps1")
+. (Join-Path $PSScriptRoot "warranty-snapshot.ps1")
+. (Join-Path $PSScriptRoot "warranty-restore-volume.ps1")
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $composeFile = Join-Path $PSScriptRoot "restore-test.compose.yml"
@@ -21,6 +24,7 @@ $cleanupAuthorized = $false
 $projectStarted = $false
 $containerId = $null
 $volumeName = $null
+$warrantyVolumeName = $null
 $previousEnvironment = @{}
 $environmentNames = @("RESTORE_TEST_DB_PASSWORD", "RESTORE_TEST_JWT_SECRET", "RESTORE_TEST_NONCE")
 
@@ -102,12 +106,12 @@ function Assert-RestoreInventory {
     foreach ($schema in $Manifest.schemas) {
         Assert-MySqlIdentifier -Value ([string]$schema.name)
         $actualTables = @(Invoke-RestoreQuery -Query "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '$($schema.name)' AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME;")
-        $expectedTables = @($schema.tables | ForEach-Object { [string]$_.name } | Sort-Object)
+        $expectedTables = @($schema.tables | Where-Object { $null -ne $_ -and $null -ne $_.PSObject.Properties['name'] } | ForEach-Object { [string]$_.name } | Sort-Object)
         if (($actualTables -join "`n") -cne ($expectedTables -join "`n")) {
             throw "Restored table list does not match the manifest for $($schema.name)."
         }
 
-        foreach ($table in $schema.tables) {
+        foreach ($table in @($schema.tables | Where-Object { $null -ne $_ -and $null -ne $_.PSObject.Properties['name'] })) {
             Assert-MySqlIdentifier -Value ([string]$table.name)
             $rowCount = [long]((Invoke-RestoreQuery -Query "SELECT COUNT(*) FROM ``$($schema.name)``.``$($table.name)``;") | Select-Object -First 1)
             if ($rowCount -ne [long]$table.rowCount) {
@@ -131,6 +135,66 @@ function Assert-RestoreInventory {
     if ($fingerprintParts.Count -ne 2 -or [int]$fingerprintParts[0] -ne [int]$Manifest.administrator.count -or
         $fingerprintParts[1].Trim().ToLowerInvariant() -cne ([string]$Manifest.administrator.digest).ToLowerInvariant()) {
         throw "Restored administrator count or digest does not match the manifest."
+    }
+}
+
+function Get-RestoredWarrantyRows {
+    param([Parameter(Mandatory = $true)][object]$Manifest)
+
+    $notification = @($Manifest.schemas | Where-Object { $_.name -ceq 'buildflow_notification' })
+    $warranty = @($notification | ForEach-Object { $_.tables } | Where-Object { $_.name -ceq 'defect_warranties' })
+    if ($notification.Count -ne 1 -or $warranty.Count -ne 1) {
+        throw 'Backup manifest does not contain exactly one warranty table.'
+    }
+    $query = "SELECT id, IF(file_path IS NULL, 'N', CONCAT('H', HEX(CONVERT(file_path USING utf8mb4)))) FROM buildflow_notification.defect_warranties ORDER BY id;"
+    $encoded = @(Invoke-RestoreQuery -Query $query)
+    return @(ConvertFrom-RestoredWarrantyLines -Lines $encoded -ExpectedCount ([long]$warranty[0].rowCount))
+}
+
+function Assert-IsolatedCleanupIdentity {
+    param([switch]$IncludeWarranty)
+
+    $sourceVolumeNames = @([string]$manifest.source.volumeName)
+    $allowedServices = @('mysql', 'redis', 'auth-service')
+    $allowedVolumes = @('restore_mysql_data')
+    if ($IncludeWarranty) {
+        $sourceVolumeNames += [string]$manifest.uploads.source.volumeName
+        $allowedServices += 'warranty-store'
+        $allowedVolumes += 'restore_warranty_uploads'
+    }
+    $seenServices = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    foreach ($id in @(Get-OutputLines -Text (Invoke-DockerText -Arguments @('ps', '-aq', '--filter', "label=com.docker.compose.project=$projectName")))) {
+        $item = @((Invoke-DockerText -Arguments @('inspect', $id) | ConvertFrom-Json)) | Select-Object -First 1
+        $service = Get-LabelValue -Labels $item.Config.Labels -Name 'com.docker.compose.service'
+        if ((Get-LabelValue -Labels $item.Config.Labels -Name 'com.docker.compose.project') -cne $projectName -or
+            (Get-LabelValue -Labels $item.Config.Labels -Name 'com.buildflow.restore-test') -cne $nonce -or
+            $service -notin $allowedServices -or -not $seenServices.Add($service) -or
+            [string]$item.Id -ceq [string]$manifest.source.containerId) {
+            throw 'Isolated cleanup found an unexpected or unowned container.'
+        }
+        foreach ($mount in @($item.Mounts)) {
+            if ([string]$mount.Name -in $sourceVolumeNames) {
+                throw 'Isolated container mounts a source volume; refusing cleanup.'
+            }
+        }
+    }
+    if (-not $seenServices.Contains('mysql') -or ($IncludeWarranty -and -not $seenServices.Contains('warranty-store'))) {
+        throw 'Isolated cleanup is missing an expected witness container.'
+    }
+    $seenVolumes = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    foreach ($name in @(Get-OutputLines -Text (Invoke-DockerText -Arguments @('volume', 'ls', '-q', '--filter', "label=com.docker.compose.project=$projectName")))) {
+        $item = @((Invoke-DockerText -Arguments @('volume', 'inspect', $name) | ConvertFrom-Json)) | Select-Object -First 1
+        $role = Get-LabelValue -Labels $item.Labels -Name 'com.docker.compose.volume'
+        if ((Get-LabelValue -Labels $item.Labels -Name 'com.docker.compose.project') -cne $projectName -or
+            (Get-LabelValue -Labels $item.Labels -Name 'com.buildflow.restore-test') -cne $nonce -or
+            $role -notin $allowedVolumes -or -not $seenVolumes.Add($role) -or
+            [string]$item.Name -in $sourceVolumeNames) {
+            throw 'Isolated cleanup found an unexpected or unowned named volume.'
+        }
+    }
+    if (-not $seenVolumes.Contains('restore_mysql_data') -or
+        ($IncludeWarranty -and -not $seenVolumes.Contains('restore_warranty_uploads'))) {
+        throw 'Isolated cleanup is missing an expected named volume.'
     }
 }
 
@@ -213,6 +277,7 @@ function Start-AuthValidation {
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required." }
 $backupPath = [System.IO.Path]::GetFullPath($BackupDirectory)
 if (-not (Test-Path -LiteralPath $backupPath -PathType Container)) { throw "Backup directory not found: $backupPath" }
+Assert-NoReparseAncestor -Path $backupPath
 if ($PSBoundParameters.ContainsKey('WarrantyRowsExportPath')) {
     if ([string]::IsNullOrWhiteSpace($WarrantyRowsExportPath)) { throw "Warranty rows export path cannot be blank." }
     if (-not [IO.Path]::IsPathRooted($WarrantyRowsExportPath)) { throw "Warranty rows export path must be absolute." }
@@ -228,10 +293,19 @@ if ($PSBoundParameters.ContainsKey('WarrantyRowsExportPath')) {
         throw "Warranty rows export inside the repository must be in the ignored backups directory."
     }
 }
-& $verifyScript -BackupDirectory $backupPath
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $backupPath "manifest.json") | ConvertFrom-Json
 if ($manifest.formatVersion -eq 2) {
-    throw "Integrated SQL+warranty isolated restore is not implemented. Refusing a DB-only restore test for a v2 package."
+    if (-not $TestIncompleteV2 -or (Split-Path -Leaf $backupPath) -notlike '.partial-*' -or
+        -not (Test-Path -LiteralPath (Join-Path $backupPath 'INCOMPLETE') -PathType Leaf)) {
+        throw 'V2 diagnostic restore requires -TestIncompleteV2 and the original .partial/INCOMPLETE package. Operational recovery remains prohibited.'
+    }
+    if ($PSBoundParameters.ContainsKey('WarrantyRowsExportPath')) {
+        throw 'V2 diagnostic restore checks DB references directly; external row export is only supported for v1.'
+    }
+    & $verifyScript -BackupDirectory $backupPath -AllowIncomplete -AllowUnrestoredV2
+} else {
+    if ($TestIncompleteV2) { throw '-TestIncompleteV2 requires a v2 diagnostic package.' }
+    & $verifyScript -BackupDirectory $backupPath
 }
 $dumpPath = Join-Path $backupPath ([string]$manifest.dump.file)
 
@@ -253,8 +327,8 @@ try {
         throw "Random restore-test project name unexpectedly already has Docker resources."
     }
 
-    [void](Invoke-DockerText -Arguments ($composeArgs + @("up", "-d", "mysql")) -AllowStandardError)
     $projectStarted = $true
+    [void](Invoke-DockerText -Arguments ($composeArgs + @("up", "-d", "mysql")) -AllowStandardError)
     $containerId = (Invoke-DockerText -Arguments ($composeArgs + @("ps", "-q", "mysql"))).Trim()
     if ([string]::IsNullOrWhiteSpace($containerId)) { throw "Could not resolve the isolated MySQL container." }
     $container = @((Invoke-DockerText -Arguments @("inspect", $containerId) | ConvertFrom-Json)) | Select-Object -First 1
@@ -294,25 +368,73 @@ try {
         (Get-LabelValue -Labels $volume.Labels -Name "com.buildflow.restore-test") -cne $nonce) {
         throw "Isolated restore volume identity validation failed."
     }
+    if ($manifest.formatVersion -eq 2) {
+        if ([string]$manifest.uploads.source.volumeName -ceq [string]$manifest.source.volumeName -or
+            [string]$manifest.uploads.source.composeProject -cne [string]$manifest.source.composeProject) {
+            throw 'V2 SQL and warranty source identities are inconsistent.'
+        }
+        [void](Invoke-DockerText -Arguments ($composeArgs + @('--profile', 'warranty-restore', 'up', '-d', 'warranty-store')) -AllowStandardError)
+        $warrantyStoreId = (Invoke-DockerText -Arguments ($composeArgs + @('--profile', 'warranty-restore', 'ps', '-a', '-q', 'warranty-store'))).Trim()
+        if ([string]::IsNullOrWhiteSpace($warrantyStoreId)) { throw 'Could not resolve isolated warranty witness container.' }
+        $warrantyStore = @((Invoke-DockerText -Arguments @('inspect', $warrantyStoreId) | ConvertFrom-Json)) | Select-Object -First 1
+        if ((Get-LabelValue -Labels $warrantyStore.Config.Labels -Name 'com.docker.compose.project') -cne $projectName -or
+            (Get-LabelValue -Labels $warrantyStore.Config.Labels -Name 'com.docker.compose.service') -cne 'warranty-store' -or
+            (Get-LabelValue -Labels $warrantyStore.Config.Labels -Name 'com.buildflow.restore-test') -cne $nonce -or
+            [string]$warrantyStore.Config.Image -cne 'mysql:8.0' -or
+            [string]$warrantyStore.Image -cnotmatch '^sha256:[a-f0-9]{64}$' -or
+            [string]$warrantyStore.Id -ceq [string]$manifest.source.containerId) {
+            throw 'Isolated warranty witness container identity validation failed.'
+        }
+        $warrantyMounts = @($warrantyStore.Mounts | Where-Object { $_.Destination -ceq '/isolated-warranties' })
+        if ($warrantyMounts.Count -ne 1 -or $warrantyMounts[0].Type -cne 'volume') {
+            throw 'Isolated warranty witness must have exactly one named target mount.'
+        }
+        $warrantyVolumeName = [string]$warrantyMounts[0].Name
+        if ([string]::IsNullOrWhiteSpace($warrantyVolumeName) -or
+            $warrantyVolumeName -cne ($projectName + '_restore_warranty_uploads') -or
+            $warrantyVolumeName -in @($volumeName, [string]$manifest.source.volumeName, [string]$manifest.uploads.source.volumeName)) {
+            throw 'Isolated warranty volume could refer to the source or DB volume.'
+        }
+        foreach ($mount in @($warrantyStore.Mounts)) {
+            if ([string]$mount.Name -in @([string]$manifest.source.volumeName, [string]$manifest.uploads.source.volumeName)) {
+                throw 'Isolated warranty witness mounts a source volume.'
+            }
+        }
+        $warrantyVolume = @((Invoke-DockerText -Arguments @('volume', 'inspect', $warrantyVolumeName) | ConvertFrom-Json)) | Select-Object -First 1
+        if ([string]$warrantyVolume.Name -cne $warrantyVolumeName -or [string]$warrantyVolume.Driver -cne 'local' -or
+            ($null -ne $warrantyVolume.Options -and @($warrantyVolume.Options.PSObject.Properties).Count -ne 0) -or
+            (Get-LabelValue -Labels $warrantyVolume.Labels -Name 'com.docker.compose.project') -cne $projectName -or
+            (Get-LabelValue -Labels $warrantyVolume.Labels -Name 'com.docker.compose.volume') -cne 'restore_warranty_uploads' -or
+            (Get-LabelValue -Labels $warrantyVolume.Labels -Name 'com.buildflow.restore-test') -cne $nonce) {
+            throw 'Isolated warranty volume identity validation failed.'
+        }
+    }
     $cleanupAuthorized = $true
 
     Wait-ForContainerHealth -Id $containerId
     Import-DatabaseDump -DumpPath $dumpPath
     Assert-RestoreInventory -Manifest $manifest
     Write-Host "[OK] Restore manifest, exact row counts, administrator digest, and CHECK TABLE results match."
+    if ($manifest.formatVersion -eq 2) {
+        $uploadDirectory = Join-Path $backupPath 'uploads\warranties'
+        $expectedFiles = @($manifest.uploads.files | Where-Object { $null -ne $_ -and @($_.PSObject.Properties).Count -gt 0 })
+        [void](Invoke-WarrantyVolumeRestore -UploadsDirectory $uploadDirectory -VolumeName $warrantyVolumeName -WorkingDirectory $repoRoot -ProjectName $projectName -Nonce $nonce -ImageId ([string]$warrantyStore.Image) -ExpectedFiles $expectedFiles)
+        $rows = @(Get-RestoredWarrantyRows -Manifest $manifest)
+        $warrantyTable = @($manifest.schemas | Where-Object { $_.name -ceq 'buildflow_notification' } | ForEach-Object { $_.tables } | Where-Object { $_.name -ceq 'defect_warranties' })
+        Assert-RestoredWarrantyReferences -Uploads $manifest.uploads -Rows $rows -ExpectedRowCount ([long]$warrantyTable[0].rowCount)
+        Write-Host '[OK] Isolated warranty volume hashes and restored DB references match the diagnostic source package.'
+    }
     Start-AuthValidation -TestLogin:$ValidateLogin
     Assert-RestoreInventory -Manifest $manifest
     Write-Host "[OK] Auth validation left the restored schema and data unchanged."
+    if ($manifest.formatVersion -eq 2) {
+        $rowsAfter = @(Get-RestoredWarrantyRows -Manifest $manifest)
+        Assert-RestoredWarrantyReferences -Uploads $manifest.uploads -Rows $rowsAfter -ExpectedRowCount ([long]$warrantyTable[0].rowCount)
+        & $verifyScript -BackupDirectory $backupPath -AllowIncomplete -AllowUnrestoredV2
+    }
     if ($PSBoundParameters.ContainsKey('WarrantyRowsExportPath')) {
         Assert-NoReparseAncestor -Path $backupPath
-        $notification = @($manifest.schemas | Where-Object { $_.name -ceq 'buildflow_notification' })
-        $warranty = @($notification | ForEach-Object { $_.tables } | Where-Object { $_.name -ceq 'defect_warranties' })
-        if ($notification.Count -ne 1 -or $warranty.Count -ne 1) {
-            throw "Backup manifest does not contain exactly one warranty table."
-        }
-        $query = "SELECT id, IF(file_path IS NULL, 'N', CONCAT('H', HEX(CONVERT(file_path USING utf8mb4)))) FROM buildflow_notification.defect_warranties ORDER BY id;"
-        $encoded = @(Invoke-RestoreQuery -Query $query)
-        $rows = @(ConvertFrom-RestoredWarrantyLines -Lines $encoded -ExpectedCount ([long]$warranty[0].rowCount))
+        $rows = @(Get-RestoredWarrantyRows -Manifest $manifest)
         $dumpSha = (Get-FileHash -LiteralPath $dumpPath -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($dumpSha -cne ([string]$manifest.dump.sha256).ToLowerInvariant()) {
             throw "Backup dump changed during isolated restore validation."
@@ -334,13 +456,18 @@ try {
         Write-RestoredWarrantyRows -Path $WarrantyRowsExportPath -Rows $rows -Evidence $evidence
         Write-Host "[OK] Restored warranty DB rows exported with diagnostic provenance: count=$($rows.Count). Upload recovery is NOT verified."
     }
-    Write-Warning "This isolated restore covered SQL only. Warranty uploads and Kafka state were not restored."
+    if ($manifest.formatVersion -eq 2) {
+        Write-Warning 'This was an isolated diagnostic restore of an INCOMPLETE v2 source package. External encrypted recovery, Kafka/OCR reconciliation, and operational readiness remain UNVERIFIED.'
+    } else {
+        Write-Warning "This isolated restore covered SQL only. Warranty uploads and Kafka state were not restored."
+    }
 }
 finally {
     $cleanupError = $null
     if ($cleanupAuthorized) {
         try {
-            [void](Invoke-DockerText -Arguments ($composeArgs + @("--profile", "auth-validation", "down", "--volumes", "--remove-orphans")) -AllowStandardError)
+            Assert-IsolatedCleanupIdentity -IncludeWarranty:($manifest.formatVersion -eq 2)
+            [void](Invoke-DockerText -Arguments ($composeArgs + @('--profile', 'auth-validation', '--profile', 'warranty-restore', 'down', '--volumes')) -AllowStandardError)
             $remainingContainers = @(Get-OutputLines -Text (Invoke-DockerText -Arguments @("ps", "-aq", "--filter", "label=com.docker.compose.project=$projectName")))
             $remainingVolumes = @(Get-OutputLines -Text (Invoke-DockerText -Arguments @("volume", "ls", "-q", "--filter", "label=com.docker.compose.project=$projectName")))
             $remainingNetworks = @(Get-OutputLines -Text (Invoke-DockerText -Arguments @("network", "ls", "-q", "--filter", "label=com.docker.compose.project=$projectName")))
