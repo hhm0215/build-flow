@@ -2,6 +2,14 @@ server:
   port: 8085
 
 spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          # 현장 참조 검증은 DB 트랜잭션 안에서 호출되므로 기본 10s/60s 대신 짧게 제한하고 실패 시 503
+          taxSiteReferenceClient:
+            connect-timeout: 2000
+            read-timeout: 3000
   application:
     name: tax-service
   jackson:
