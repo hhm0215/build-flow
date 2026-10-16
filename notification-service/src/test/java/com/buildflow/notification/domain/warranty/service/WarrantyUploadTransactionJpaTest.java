@@ -34,6 +34,7 @@ class WarrantyUploadTransactionJpaTest {
     @Autowired private DefectWarrantyService service;
     @Autowired private DefectWarrantyRepository repository;
     @MockBean private WarrantyOcrService ocr;
+    @MockBean private SiteReferenceValidator siteReferenceValidator;
     @TempDir Path tempDir;
 
     @Test

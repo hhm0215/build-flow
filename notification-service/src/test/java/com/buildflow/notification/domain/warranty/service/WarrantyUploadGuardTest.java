@@ -36,9 +36,10 @@ class WarrantyUploadGuardTest {
 
     private DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
     private WarrantyOcrService ocr = mock(WarrantyOcrService.class);
+    private SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
 
     private DefectWarrantyService service() {
-        DefectWarrantyService service = new DefectWarrantyService(repository, ocr);
+        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, siteReferenceValidator);
         ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
         return service;
     }
@@ -74,6 +75,32 @@ class WarrantyUploadGuardTest {
         assertThat(files()).hasSize(1)
                 .allSatisfy(path -> assertThat(path.getFileName().toString()).endsWith(".pdf").doesNotContain("untrusted"));
         verify(ocr).processAsync(eq(42L), any(Path.class));
+    }
+
+    @Test
+    void 없는_현장_업로드는_파일과_DB와_OCR을_남기지_않는다() throws Exception {
+        doThrow(new BusinessException(ErrorCode.INVALID_SITE_REFERENCE))
+                .when(siteReferenceValidator).requireExistingSite(99L);
+
+        assertThatThrownBy(() -> service().createFromOcr(99L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_SITE_REFERENCE));
+        assertThat(files()).isEmpty();
+        verifyNoInteractions(repository, ocr);
+    }
+
+    @Test
+    void 현장_확인_장애는_업로드를_저장_전에_실패_닫힘으로_거부한다() throws Exception {
+        doThrow(new BusinessException(ErrorCode.SITE_REFERENCE_UNAVAILABLE))
+                .when(siteReferenceValidator).requireExistingSite(1L);
+
+        assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode())
+                        .isEqualTo(ErrorCode.SITE_REFERENCE_UNAVAILABLE));
+        assertThat(files()).isEmpty();
+        verifyNoInteractions(repository, ocr);
     }
 
     @Test
