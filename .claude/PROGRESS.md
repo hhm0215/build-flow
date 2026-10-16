@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 진행 중 — 진단용 v2 SQL+보증 파일 격리 복원 회귀 (2026-10-16)
+
+- `INCOMPLETE` v2는 기본 복원에서 거부하고 명시적 진단 옵션에서만 새 무작위 Docker 프로젝트·빈 보증 볼륨으로 복사한다. 원본은 읽기 전용이며 복사 전후 해시, 복원 파일의 해시·크기, 복원 DB의 보증 ID·경로·NULL을 대조한다. 복사 helper는 witness 컨테이너의 실제 이미지 ID로 고정하고 네트워크·추가 권한을 차단한다.
+- 합성 v2의 7개 DB·보증 파일 2개(참조 1개, 미참조 1개) 격리 복원과 기존 v1 SQL-only 회귀를 로컬 Docker에서 통과했다. 두 격리 프로젝트·임시 볼륨 정리를 확인했다. Windows PowerShell 5.1/7 도구 회귀와 독립 보안·인프라 정적 검토에서 신규 P0~P2 결함은 없었다. 실제 관리자 자격 증명 로그인, 실제 원본 snapshot, 외부 암호화 사본의 빈 환경 복원, OCR/Kafka 재조정 및 VPS 적용은 PENDING/UNVERIFIED다. V1 **40/100**, 실데이터 **NO-GO** 유지.
+
 ## 진행 중 — SQL+보증 파일 진단용 v2 snapshot (2026-10-16)
 
 - `backup.ps1 -IncludeWarrantyUploads -OutputRoot <기존 비공개 폴더>` opt-in에서 DB writer·연결 중지, MySQL/업로드 볼륨 신원과 참조 행을 확인하고 SQL dump·읽기 전용 업로드 볼륨 사본의 파일 크기/SHA·참조를 대조하도록 준비했다. 출력은 `.partial-*`와 `INCOMPLETE`를 유지하고 일반 v2 검증·격리 복원은 계속 거부한다. 운영 복구 완료나 실데이터 승인으로 간주하지 않는다.

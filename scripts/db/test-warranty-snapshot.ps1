@@ -32,6 +32,10 @@ $manifest = ConvertTo-WarrantyUploadManifest -Rows $rows -Files $files -Expected
 if ($manifest.referenceCount -ne 1 -or $manifest.unreferencedFileCount -ne 1 -or @($manifest.files).Count -ne 2) {
     throw 'Warranty snapshot did not preserve referenced and orphan files.'
 }
+Assert-RestoredWarrantyReferences -Uploads $manifest -Rows $rows -ExpectedRowCount 2
+Assert-RestoredWarrantyReferences -Uploads $emptyManifest -Rows @() -ExpectedRowCount 0
+Assert-Rejected { Assert-RestoredWarrantyReferences -Uploads $manifest -Rows @([pscustomobject]@{ warrantyId = 1L; filePath = $null }, $rows[1]) -ExpectedRowCount 2 } 'differs'
+Assert-Rejected { Assert-RestoredWarrantyReferences -Uploads $manifest -Rows @($rows[0]) -ExpectedRowCount 2 } 'row count'
 Assert-Rejected { ConvertTo-WarrantyUploadManifest $rows $files 1 $source } 'row count'
 Assert-Rejected { ConvertTo-WarrantyUploadManifest @($rows[0], $rows[0]) $files 2 $source } 'duplicate warranty DB ID'
 Assert-Rejected { ConvertTo-WarrantyUploadManifest @([pscustomobject]@{ warrantyId = 1L; filePath = '/other/file.pdf' }) $files 1 $source } 'outside'

@@ -87,3 +87,30 @@ function ConvertTo-WarrantyUploadManifest {
         unreferencedFileCount = $fileNames.Count - $referencedNames.Count
     }
 }
+
+function Assert-RestoredWarrantyReferences {
+    param(
+        [Parameter(Mandatory = $true)][object]$Uploads,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][object[]]$Rows,
+        [Parameter(Mandatory = $true)][long]$ExpectedRowCount
+    )
+
+    $files = @($Uploads.files | Where-Object { $null -ne $_ -and @($_.PSObject.Properties).Count -gt 0 })
+    $actual = ConvertTo-WarrantyUploadManifest -Rows $Rows -Files $files -ExpectedRowCount $ExpectedRowCount -Source $Uploads.source
+    if ([string]$Uploads.mountPath -cne [string]$actual.mountPath -or
+        [string]$Uploads.directory -cne [string]$actual.directory -or
+        [int]$Uploads.referenceCount -ne $actual.referenceCount -or
+        [int]$Uploads.unreferencedFileCount -ne $actual.unreferencedFileCount) {
+        throw 'Restored warranty reference metadata differs from the source manifest.'
+    }
+    $expected = @($Uploads.references | Where-Object { $null -ne $_ -and @($_.PSObject.Properties).Count -gt 0 } | Sort-Object warrantyId)
+    $observed = @($actual.references | Sort-Object warrantyId)
+    if ($expected.Count -ne $observed.Count) { throw 'Restored warranty reference count differs from the source manifest.' }
+    for ($i = 0; $i -lt $expected.Count; $i++) {
+        if (($expected[$i].warrantyId -isnot [int] -and $expected[$i].warrantyId -isnot [long]) -or
+            [long]$expected[$i].warrantyId -ne [long]$observed[$i].warrantyId -or
+            [string]$expected[$i].relativePath -cne [string]$observed[$i].relativePath) {
+            throw 'Restored warranty DB file reference differs from the source manifest.'
+        }
+    }
+}
