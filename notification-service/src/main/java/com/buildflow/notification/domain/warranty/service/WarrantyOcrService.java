@@ -2,14 +2,12 @@ package com.buildflow.notification.domain.warranty.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.sourceforge.tess4j.Tesseract;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -25,16 +23,13 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class WarrantyOcrService {
 
-    static final int MAX_TEXT_CHARS = 200_000;
+    public static final int MAX_TEXT_CHARS = 200_000;
     static final double MAX_RENDER_PIXELS = 12_000_000;
     static final double MAX_RENDER_SIDE = 5_000;
 
     private final WarrantyOcrResultService resultService;
-    /**
-     * Tesseract는 thread-safe하지 않아 prototype scope로 등록됨 (WarrantyOcrConfig).
-     * @Async 동시 호출 시 ObjectProvider로 호출마다 새 인스턴스를 가져옴.
-     */
-    private final ObjectProvider<Tesseract> tesseractProvider;
+    /** 페이지별 OCR. 운영은 시간 제한이 있는 별도 Tesseract 프로세스(WarrantyOcrConfig). */
+    private final OcrEngine ocrEngine;
 
     @Value("${app.ocr.scan-dpi:300}")
     private int scanDpi;
@@ -99,15 +94,13 @@ public class WarrantyOcrService {
     private WarrantyOcrParser.Result extractImageResult(PDDocument doc) throws Exception {
         PDFRenderer renderer = new PDFRenderer(doc);
         StringBuilder sb = new StringBuilder();
-        // prototype scope — 이 호출 단위로 전용 인스턴스 (thread-safe 회피)
-        Tesseract tesseract = tesseractProvider.getObject();
         for (int i = 0; i < doc.getNumberOfPages(); i++) {
             validateRenderSize(doc.getPage(i).getCropBox(), scanDpi);
             // Tesseract는 내부에서 흑백으로 변환하므로 처음부터 GRAY로 렌더링해 픽셀당 4바이트→1바이트로 줄인다
             // (640 MiB 컨테이너에서 10페이지 스캔 PDF가 한도에 닿던 문제, 2026-10-17 실측)
             BufferedImage img = renderer.renderImageWithDPI(i, scanDpi, ImageType.GRAY);
             try {
-                String pageText = tesseract.doOCR(img);
+                String pageText = ocrEngine.recognize(img);
                 if ((long) sb.length() + pageText.length() + 1 > MAX_TEXT_CHARS) {
                     throw new IOException("OCR text limit exceeded");
                 }

@@ -18,10 +18,10 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 14:50 KST |
-| 브랜치 | `claude/mixed-ocr` |
-| PR | 혼합 PDF OCR 충돌 판정 PR (develop 대상), #99 draft 유지 |
-| 현재 단계 | 혼합 PDF 실측·충돌 판정 결함 수정 → PR·CI·병합 |
+| 갱신 | 2026-10-17 15:30 KST |
+| 브랜치 | `claude/ocr-subprocess` |
+| PR | OCR 별도 프로세스 PR (develop 대상), #99 draft 유지 |
+| 현재 단계 | OCR 별도 프로세스·강제 타임아웃 구현과 로컬 실측 완료 → PR·CI·병합 |
 | 다음 첫 행동 | 병합 후 BACKLOG P0 독립 안전 항목 계속 |
 
 ## 공통 사용자 지시

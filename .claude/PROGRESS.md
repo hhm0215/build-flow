@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — OCR 별도 프로세스·강제 타임아웃 (2026-10-17)
+
+- Tess4J(JNA) 대신 Tesseract CLI를 페이지마다 별도 프로세스로 실행하고 페이지 시간 제한(`app.ocr.page-timeout-seconds`, 기본 60)·강제 종료·임시 파일 정리를 넣었다. CLI 전환 중 생긴 인식률 회귀(기본 PSM이 빽빽한 페이지 누락)를 컨테이너 비교로 찾아 `--psm 6`으로 바로잡았다. 로컬 Docker에서 스캔·혼합 6종 기대 결과, 최대 742 MiB(896m 한도 내), 1초 제한 시 2초 내 종료·잔여 프로세스 0을 실측. Tess4J 의존성과 `libtesseract-dev` 제거.
+
 ## 완료된 작업 — 혼합 PDF OCR 충돌 판정 수정 (2026-10-17)
 
 - 합성 혼합 PDF 실측에서 두 결함을 고쳤다: 페이지 전체 OCR이 텍스트 층 증권번호를 다르게 읽어(`QA`→`04`) 정상 문서가 FAILED로 떨어지던 문제(혼동 글자 정규화 비교), OCR이 텍스트 층·이미지 보험사를 함께 읽어 실제 충돌이 SUCCESS로 가려지던 문제(서로 다른 보험사 2개 이상이면 모호 처리). 회귀 테스트 추가, 로컬 Docker에서 보완형 SUCCESS·충돌형 FAILED·스캔 1/10페이지 SUCCESS 재확인. native timeout/격리·VPS 실측은 PENDING.
