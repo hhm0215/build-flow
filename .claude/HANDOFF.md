@@ -20,9 +20,9 @@
 | 도구 | Codex |
 | 갱신 | 2026-10-17 12:32 KST |
 | 브랜치 | `codex/handoff-trace-validation` (현재 `develop` SHA는 `git rev-parse origin/develop`로 확인) |
-| PR | 준비 중; #99 develop→main **draft 유지** |
-| 현재 단계 | 세션 추출기의 주입된 AGENTS 오인·브라우저 맥락 뒤 사용자 요청 누락 수정, 합성 회귀·CI 연결 및 공통 지침의 목표일 문구 정합화 |
-| 다음 첫 행동 | 로컬 테스트·독립 검토 후 브랜치를 푸시하고 PR/CI를 대조한다. `main`/VPS/실데이터는 이 작업에서 변경하지 않는다 |
+| PR | [#131](https://github.com/hhm0215/build-flow/pull/131) `develop` 대상 **draft**, #99 develop→main **draft 유지** |
+| 현재 단계 | 세션 추출 오인·누락 수정과 기본 비공개 출력, 합성 회귀 5건 로컬 PASS·독립 보안 재검토 차단 결함 없음. #131 원격 CI 진행 중 |
+| 다음 첫 행동 | #131 head SHA·필수 CI 5개를 대조하고 통과 시 `develop` 병합·잠금 해제. `main`/VPS/실데이터는 이 작업에서 변경하지 않는다 |
 
 ## 공통 사용자 지시
 
