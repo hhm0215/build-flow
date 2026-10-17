@@ -121,7 +121,8 @@ jobs:
         env:
           LAN_BIND_ADDRESS: 192.168.0.20
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.lan.yml config --format json \n            | python3 scripts/vps/verify_lan_compose.py
+          docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.lan.yml config --format json \
+            | python3 scripts/vps/verify_lan_compose.py
       - name: Validate Caddyfile syntax
         run: |
           docker run --rm --entrypoint caddy -e PUBLIC_HOST=example.org \
