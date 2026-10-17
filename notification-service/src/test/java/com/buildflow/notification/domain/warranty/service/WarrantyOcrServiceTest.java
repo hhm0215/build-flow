@@ -88,6 +88,27 @@ class WarrantyOcrServiceTest {
     }
 
     @Test
+    void OCR이_텍스트층_증권번호를_혼동_글자로_다시_읽어도_충돌이_아니다() {
+        WarrantyOcrParser.Result text = WarrantyOcrParser.Result.builder()
+                .insuranceCompany("서울보증보험")
+                .policyNumber("QA-2026-2001")
+                .build();
+        WarrantyOcrParser.Result image = WarrantyOcrParser.Result.builder()
+                .policyNumber("04-2026-2001") // 실측: Tess4J가 Q→0, A→4로 읽음
+                .startDate(LocalDate.of(2026, 10, 17))
+                .endDate(LocalDate.of(2028, 10, 16))
+                .build();
+
+        WarrantyOcrParser.Result merged = WarrantyOcrService.mergeResults(text, image);
+
+        assertThat(merged.isConflicting()).isFalse();
+        assertThat(merged.getPolicyNumber()).isEqualTo("QA-2026-2001");
+        assertThat(WarrantyOcrService.policyNumbersConflict("QA-2026-2001", "QA-2026-2002")).isTrue();
+        assertThat(WarrantyOcrService.policyNumbersConflict("QA-2O26-2OO1", "QA-2026-2001")).isFalse();
+        assertThat(WarrantyOcrService.policyNumbersConflict("AB-1I0O", "48 110 0")).isFalse();
+    }
+
+    @Test
     void 상충하는_두_추출값은_텍스트값을_보존하고_수동_확인으로_넘긴다() {
         WarrantyOcrParser.Result text = WarrantyOcrParser.Result.builder()
                 .policyNumber("QA-20261013-0001")

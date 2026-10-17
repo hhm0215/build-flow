@@ -112,4 +112,24 @@ class WarrantyOcrParserTest {
         assertThat(r.getStartDate()).isEqualTo(LocalDate.of(2026, 5, 1));
         assertThat(r.getEndDate()).isEqualTo(LocalDate.of(2027, 4, 30));
     }
+
+    @Test
+    void 서로_다른_보험사가_둘_이상이면_모호로_표시한다() {
+        WarrantyOcrParser.Result single = WarrantyOcrParser.parse("보험회사: 서울보증보험 보험기간: 2026-10-17 ~ 2028-10-16");
+        WarrantyOcrParser.Result mixed = WarrantyOcrParser.parse(
+                "보험회사: 서울보증보험 (텍스트 층)" + System.lineSeparator() + "보험회사: 삼성화재 (스캔 이미지)");
+
+        assertThat(single.isConflicting()).isFalse();
+        assertThat(mixed.isConflicting()).isTrue();
+        assertThat(mixed.getInsuranceCompany()).isNotNull();
+    }
+
+    @Test
+    void 텍스트층_보험사와_이미지_보험사가_섞인_혼합_결과는_충돌로_병합된다() {
+        WarrantyOcrParser.Result text = WarrantyOcrParser.parse("보험회사: 서울보증보험");
+        WarrantyOcrParser.Result image = WarrantyOcrParser.parse(
+                "보험회사: 서울보증보험 보험회사: 삼성화재 보험기간: 2026년 11월 01일 ~ 2028년 10월 31일");
+
+        assertThat(WarrantyOcrService.mergeResults(text, image).isConflicting()).isTrue();
+    }
 }

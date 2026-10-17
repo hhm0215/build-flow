@@ -129,8 +129,9 @@ public class WarrantyOcrService {
     static WarrantyOcrParser.Result mergeResults(WarrantyOcrParser.Result text,
                                                   WarrantyOcrParser.Result image) {
         if (text == null) return image;
-        boolean conflicting = conflicts(text.getInsuranceCompany(), image.getInsuranceCompany())
-                || conflicts(text.getPolicyNumber(), image.getPolicyNumber())
+        boolean conflicting = text.isConflicting() || image.isConflicting()
+                || conflicts(text.getInsuranceCompany(), image.getInsuranceCompany())
+                || policyNumbersConflict(text.getPolicyNumber(), image.getPolicyNumber())
                 || conflicts(text.getStartDate(), image.getStartDate())
                 || conflicts(text.getEndDate(), image.getEndDate());
         return WarrantyOcrParser.Result.builder()
@@ -144,6 +145,34 @@ public class WarrantyOcrService {
 
     private static <T> T firstPresent(T first, T second) {
         return first != null ? first : second;
+    }
+
+    /**
+     * 페이지 전체 OCR은 텍스트 층에 있는 증권번호도 다시 읽는데, 영숫자 코드에서 0/O·1/I/L 같은 글자를
+     * 자주 혼동한다(실측: 텍스트 층 "QA-2026-2001"을 OCR이 "04-2026-2001"로 읽음). 그대로 비교하면 같은 번호가 충돌로 판정돼 정상 혼합 PDF가 매번 수동 확인으로 떨어지므로
+     * (2026-10-17 합성 혼합 PDF 실측) 혼동 글자와 구분자를 정규화해 비교한다. 실제로 다른 번호는 계속 충돌이다.
+     */
+    static boolean policyNumbersConflict(String text, String image) {
+        if (text == null || image == null) return false;
+        return !normalizePolicyNumber(text).equals(normalizePolicyNumber(image));
+    }
+
+    private static String normalizePolicyNumber(String value) {
+        StringBuilder normalized = new StringBuilder(value.length());
+        for (char c : value.toUpperCase(java.util.Locale.ROOT).toCharArray()) {
+            switch (c) {
+                case 'O', 'Q', 'D' -> normalized.append('0');
+                case 'I', 'L' -> normalized.append('1');
+                case 'Z' -> normalized.append('2');
+                case 'A' -> normalized.append('4');
+                case 'S' -> normalized.append('5');
+                case 'G' -> normalized.append('6');
+                case 'B' -> normalized.append('8');
+                case '-', ' ', '_', '.' -> { }
+                default -> normalized.append(c);
+            }
+        }
+        return normalized.toString();
     }
 
     private static <T> boolean conflicts(T first, T second) {
