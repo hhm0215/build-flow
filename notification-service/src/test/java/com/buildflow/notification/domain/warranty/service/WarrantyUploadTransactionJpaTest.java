@@ -27,7 +27,7 @@ import static org.mockito.Mockito.doAnswer;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({DefectWarrantyService.class, JpaAuditingConfig.class})
+@Import({DefectWarrantyService.class, WarrantyAuditRecorder.class, JpaAuditingConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class WarrantyUploadTransactionJpaTest {
 

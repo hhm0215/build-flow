@@ -1,11 +1,14 @@
 package com.buildflow.notification.domain.warranty.service;
 
 import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
+import com.buildflow.notification.domain.warranty.dto.WarrantyAuditResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
 import com.buildflow.notification.domain.warranty.dto.WarrantyResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.entity.OcrStatus;
+import com.buildflow.notification.domain.warranty.entity.WarrantyAuditAction;
+import com.buildflow.notification.domain.warranty.repository.WarrantyAuditEventRepository;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import com.buildflow.notification.global.exception.BusinessException;
 import com.buildflow.notification.global.exception.ErrorCode;
@@ -44,7 +47,9 @@ public class DefectWarrantyService {
 
     private final DefectWarrantyRepository warrantyRepository;
     private final WarrantyOcrService ocrService;
+    private final WarrantyAuditEventRepository auditRepository;
     private final SiteReferenceValidator siteReferenceValidator;
+    private final WarrantyAuditRecorder auditRecorder;
 
     @Value("${app.upload-dir:./uploads/warranties}")
     private String uploadDir;
@@ -64,7 +69,15 @@ public class DefectWarrantyService {
                 .memo(request.getMemo())
                 .build();
 
-        return WarrantyResponse.from(warrantyRepository.save(warranty));
+        DefectWarranty saved = warrantyRepository.save(warranty);
+        auditRecorder.record(WarrantyAuditAction.CREATED, saved);
+        return WarrantyResponse.from(saved);
+    }
+
+    public List<WarrantyAuditResponse> findHistory(Long id) {
+        return auditRepository.findByWarrantyIdOrderByOccurredAtAscIdAsc(id).stream()
+                .map(WarrantyAuditResponse::from)
+                .toList();
     }
 
     public List<WarrantyResponse> findAll(Long siteId) {
@@ -101,6 +114,7 @@ public class DefectWarrantyService {
                 request.getCoverageAmount(),
                 request.getMemo()
         );
+        auditRecorder.record(WarrantyAuditAction.MANUAL_UPDATED, warranty);
         return WarrantyResponse.from(warranty);
     }
 
@@ -109,6 +123,7 @@ public class DefectWarrantyService {
         DefectWarranty warranty = getWarrantyForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(warranty.getSiteId());
         String filePath = warranty.getFilePath();
+        auditRecorder.record(WarrantyAuditAction.DELETED, warranty);
         warrantyRepository.delete(warranty);
         // 트랜잭션 커밋 후에만 파일 삭제 — rollback 시 파일은 남고 다음 cleanup job 대상이 됨.
         // (커밋 전 삭제 시 rollback이 일어나면 DB row는 남고 파일은 사라진 dangling 상태가 됨)
@@ -159,6 +174,7 @@ public class DefectWarrantyService {
         DefectWarranty pending;
         try {
             pending = warrantyRepository.save(DefectWarranty.createPending(siteId, stored.toString()));
+            auditRecorder.record(WarrantyAuditAction.UPLOADED, pending);
         } catch (RuntimeException e) {
             deleteFileQuietly(stored.toString());
             throw e;
@@ -168,6 +184,7 @@ public class DefectWarrantyService {
         } catch (TaskRejectedException e) {
             pending.markOcrFailed();
             warrantyRepository.save(pending);
+            auditRecorder.record(WarrantyAuditAction.OCR_FAILED, pending);
             log.warn("OCR 작업 대기열 포화 warrantyId={}", pending.getId());
         }
         log.info("warranty 업로드 접수 id={} siteId={} status={}",

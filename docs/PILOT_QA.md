@@ -90,6 +90,10 @@ Tesseract를 JVM 안(Tess4J/JNA)에서 부르던 방식을 페이지별 별도 �
 - 결과(VPS 동일 896m·`-Xmx320m`): 스캔 1페이지 SUCCESS 2초, 10페이지 SUCCESS 20~22초, 혼합 보완형·증권번호 없음 SUCCESS, 혼합 충돌형 FAILED(값 보존). 최대 anon 742 MiB(Tesseract 프로세스 포함), `memory.max` 접촉 0회. 대기 중 약 650 MiB는 JVM 자체 사용량이라 JNA 제거만으로 줄지는 않았다.
 - 강제 타임아웃: 페이지 제한을 1초로 낮춰 10페이지를 올리자 2초 만에 프로세스 종료·`FAILED`, 남은 Tesseract 프로세스·임시 파일 0개. 정상 설정으로 복원했다. 합성 보증 19건 삭제·현장 보관·업로드 파일 0개.
 
+### 2026-10-17 보증 확인 감사 이력 — 로컬 Docker 실측
+
+`warranty_audit_events`가 자동 생성됐고, 합성 보증의 직접 등록→수동 수정→삭제가 `X-User-Id`(`metal`)로, PDF 업로드는 `metal`·OCR 반영은 `system`·헤더 없는 삭제는 `unknown`으로 시간순 기록됐다. 삭제 후에도 `GET /api/v1/warranties/{id}/history`로 조회된다. 공유 관리자 계정이라 기록자는 계정 단위이며 사람을 증명하지 않는다. Gateway 경유 실제 토큰 경로와 보존 기간·폐기 정책은 PENDING.
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |

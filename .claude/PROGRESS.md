@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 보증 확인 감사 이력 (2026-10-17)
+
+- 보증 값이 바뀌는 6개 경로(직접 등록·업로드·OCR 반영/실패·수동 수정·삭제)를 추가 전용 `warranty_audit_events`로 같은 트랜잭션에 기록하고 `GET /api/v1/warranties/{id}/history`와 보증 수정 모달의 이력 목록을 추가했다. 테스트(백엔드 JPA 4건, 프론트 144건)와 로컬 Docker 실측 PASS. 보존·폐기 정책과 Gateway 실제 토큰 경로는 PENDING(`.claude/plans/2026-10-17-warranty-audit.md`).
+
 ## 완료된 작업 — OCR 별도 프로세스·강제 타임아웃 (2026-10-17)
 
 - Tess4J(JNA) 대신 Tesseract CLI를 페이지마다 별도 프로세스로 실행하고 페이지 시간 제한(`app.ocr.page-timeout-seconds`, 기본 60)·강제 종료·임시 파일 정리를 넣었다. CLI 전환 중 생긴 인식률 회귀(기본 PSM이 빽빽한 페이지 누락)를 컨테이너 비교로 찾아 `--psm 6`으로 바로잡았다. 로컬 Docker에서 스캔·혼합 6종 기대 결과, 최대 742 MiB(896m 한도 내), 1초 제한 시 2초 내 종료·잔여 프로세스 0을 실측. Tess4J 의존성과 `libtesseract-dev` 제거.

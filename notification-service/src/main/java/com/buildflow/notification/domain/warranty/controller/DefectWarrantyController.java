@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.controller;
 
+import com.buildflow.notification.domain.warranty.dto.WarrantyAuditResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
 import com.buildflow.notification.domain.warranty.dto.WarrantyResponse;
 import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
@@ -49,6 +50,12 @@ public class DefectWarrantyController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<WarrantyResponse>> findById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(warrantyService.findById(id)));
+    }
+
+    /** 값 변경 감사 이력(시간순). 삭제된 보증의 이력도 남아 있으면 반환한다. */
+    @GetMapping("/{id}/history")
+    public ResponseEntity<ApiResponse<List<WarrantyAuditResponse>>> findHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(warrantyService.findHistory(id)));
     }
 
     @GetMapping(value = "/{id}/file", produces = MediaType.APPLICATION_PDF_VALUE)

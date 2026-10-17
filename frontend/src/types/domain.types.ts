@@ -301,3 +301,21 @@ export interface WarrantyUpdateRequest {
   endDate: string
   memo: string | null
 }
+
+/** 보증 값 변경 감사 이력(추가 전용). actor는 공유 관리자 계정 단위이며 실제 사람을 증명하지 않는다 */
+export type WarrantyAuditAction = 'CREATED' | 'UPLOADED' | 'OCR_APPLIED' | 'OCR_FAILED' | 'MANUAL_UPDATED' | 'DELETED'
+
+export interface WarrantyAuditEvent {
+  id: number
+  warrantyId: number
+  action: WarrantyAuditAction
+  actor: string
+  insuranceCompany: string | null
+  policyNumber: string | null
+  startDate: string | null
+  endDate: string | null
+  coverageAmount: number | null
+  ocrStatus: OcrStatus | null
+  expiryConfirmedAt: string | null
+  occurredAt: string
+}

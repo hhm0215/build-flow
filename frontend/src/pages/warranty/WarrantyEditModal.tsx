@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { downloadWarrantyPdf, useUpdateWarranty } from '../../api/warranties.api'
 import type { Warranty, WarrantyUpdateRequest } from '../../types'
+import WarrantyHistory from './WarrantyHistory'
 
 interface FormValues {
   insuranceCompany: string
@@ -125,6 +126,10 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
         </Form.Item>
         <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" /></Form.Item>
       </Form>
+      <div style={{ marginTop: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>변경·확인 이력</div>
+        <WarrantyHistory warrantyId={warranty.id} />
+      </div>
     </Modal>
   )
 }

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { setupServer } from 'msw/node'
-import type { ApiResponse, Warranty } from '../../types'
+import type { ApiResponse, Warranty, WarrantyAuditEvent } from '../../types'
 import { warrantiesHandlers } from './warranties.handlers'
 
 const server = setupServer(...warrantiesHandlers)
@@ -55,5 +55,22 @@ describe('보증보험 MSW 수동 보정 계약', () => {
     expect((await fetch(new URL('/api/v1/warranties/999999', document.baseURI), {
       method: 'PUT', headers, body,
     })).status).toBe(404)
+  })
+
+  it('등록·수정·삭제가 감사 이력으로 남고 삭제 뒤에도 조회된다', async () => {
+    const created = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({ siteId: 1, insuranceCompany: '[QA] 서울보증보험', startDate: '2026-10-17', endDate: '2028-10-16' }),
+    })
+    const warranty = (await created.json() as ApiResponse<Warranty>).data
+    await fetch(new URL(`/api/v1/warranties/${warranty.id}`, document.baseURI), {
+      method: 'PUT', headers,
+      body: JSON.stringify({ insuranceCompany: '[QA] 삼성화재', startDate: '2026-10-17', endDate: '2028-10-31' }),
+    })
+    await fetch(new URL(`/api/v1/warranties/${warranty.id}`, document.baseURI), { method: 'DELETE' })
+
+    const history = (await (await fetch(new URL(`/api/v1/warranties/${warranty.id}/history`, document.baseURI))).json() as ApiResponse<WarrantyAuditEvent[]>).data
+    expect(history.map((e) => e.action)).toEqual(['CREATED', 'MANUAL_UPDATED', 'DELETED'])
+    expect(history[1].insuranceCompany).toBe('[QA] 삼성화재')
   })
 })
