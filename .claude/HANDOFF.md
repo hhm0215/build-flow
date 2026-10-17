@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-17 12:05 KST |
-| 브랜치 | `codex/shared-handoff` (`origin/develop` = PR #128 병합 `806c623`) |
-| PR | 공동작업 인계 PR 준비 중; #99 develop→main **draft 유지** |
-| 현재 단계 | Claude의 PR #127 LAN 하드닝·#128 잠금 해제와 CI/세션 기록 대조 완료. 공유 추적 가이드 작성·검증 중 |
-| 다음 첫 행동 | 가이드·양쪽 지침 연결 → CI·리뷰 → `develop` 병합 → 잠금 `IDLE`. 이후 마이그레이션 Phase B 관리자 로그인 401·VPS 운영 DB 게이트는 계속 PENDING이며 독립 안전 작업을 선택 |
+| 갱신 | 2026-10-17 12:10 KST |
+| 브랜치 | 없음 (`develop` = PR #129 병합 `a38322b`) |
+| PR | #129 공동작업 인계 병합; #99 develop→main **draft 유지** |
+| 현재 단계 | Claude PR #127·#128과 마지막 세션을 Git/CI로 대조, 공유 추적 가이드·양쪽 지침 연결을 PR #129로 `develop` 통합. 보안 리뷰 차단 결함 없음 |
+| 다음 첫 행동 | `.claude/BACKLOG.md` P0 업무 동선의 독립 안전 작업을 선택한다. 마이그레이션 Phase B 관리자 로그인은 복원본 비밀번호 불일치 401, VPS 운영 DB 게이트는 권한 있는 Web Console이 필요해 PENDING. `main`/VPS/실데이터는 미반영 |
 
 ## 공통 사용자 지시
 
