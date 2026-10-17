@@ -107,6 +107,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Test release evidence generator
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+      - name: Test cross-agent session fallback
+        run: python3 -m unittest discover -s scripts/agents -p 'test_*.py'
       - name: Test exposure validator
         run: python3 -m unittest discover -s scripts/vps -p 'test_verify_*_compose.py'
       - name: Validate Unix backup privacy gate

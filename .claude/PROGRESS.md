@@ -3,7 +3,12 @@
 > 이 파일은 매 작업 세션 시작/종료 시 업데이트합니다.
 > Claude와 대화 시작할 때 "PROGRESS.md 읽어줘"라고 하면 빠르게 컨텍스트 복원 가능.
 
-## 현재 브랜치: `develop`
+## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
+
+## 진행 중 작업 — Codex ↔ Claude 세션 인계 검증 (2026-10-17)
+
+- `scripts/agents/last_session.py`가 주입된 `AGENTS.md`를 사용자 요청으로 오인하거나 브라우저 맥락 뒤 실제 요청을 누락하던 문제를 수정했다. 기본 출력은 메시지 본문 비공개이며 명시적 로컬 `--show-excerpts`만 발췌를 출력한다. 원시 세션 로그는 저장소에 복사하지 않았다.
+- 합성 회귀 5/5와 기본 비공개 실제 실행, 독립 보안 재검토 PASS. [PR #131](https://github.com/hhm0215/build-flow/pull/131)은 `develop` 대상 draft이며 원격 CI는 진행 중. `main`/VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
 
 ## 완료된 작업 — Codex ↔ Claude Code 공동 인계 연결 (2026-10-17)
 
