@@ -5,10 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
-## 진행 중 작업 — Codex ↔ Claude 세션 인계 검증 (2026-10-17)
+## 완료된 작업 — Codex ↔ Claude 세션 인계 검증 1차 (2026-10-17)
 
 - `scripts/agents/last_session.py`가 주입된 `AGENTS.md`를 사용자 요청으로 오인하거나 브라우저 맥락 뒤 실제 요청을 누락하던 문제를 수정했다. 기본 출력은 메시지 본문 비공개이며 명시적 로컬 `--show-excerpts`만 발췌를 출력한다. 원시 세션 로그는 저장소에 복사하지 않았다.
-- 합성 회귀 5/5와 기본 비공개 실제 실행, 독립 보안 재검토 PASS. [PR #131](https://github.com/hhm0215/build-flow/pull/131)은 `develop` 대상 draft이며 원격 CI는 진행 중. `main`/VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+- 합성 회귀 5/5와 기본 비공개 실제 실행, 독립 보안 재검토 PASS. [PR #131](https://github.com/hhm0215/build-flow/pull/131)은 head `47c7f71`, 필수 CI 5개 PASS 후 `develop` 병합 `3ab1b8e`. 새 Claude 세션의 동일 상태 복원 시험과 원자적 동시 작업 잠금은 아직 **UNVERIFIED/미구현**이므로 완전 자동 기억 공유를 주장하지 않는다. `main`/VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
 
 ## 완료된 작업 — Codex ↔ Claude Code 공동 인계 연결 (2026-10-17)
 
