@@ -5,6 +5,12 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — Codex ↔ Claude Code 공동 인계 연결 (2026-10-17)
+
+- Claude 마지막 세션의 LAN 하드닝 [PR #127](https://github.com/hhm0215/build-flow/pull/127)(병합 `4316d2d`)과 잠금 해제 [PR #128](https://github.com/hhm0215/build-flow/pull/128)(병합 `806c623`)을 세션 요약·Git·GitHub CI로 대조했다. 로컬 `develop`을 `origin/develop`으로 fast-forward하고 사용자 `output/`은 보존했다.
+- `docs/AGENT_COLLABORATION.md`에 규칙·백로그·완료·운영 근거의 탐색 경로와 최신 잠금+열린 PR 교대 절차를 연결하고 `AGENTS.md`·`CLAUDE.md`·HANDOFF에서 이를 참조한다. [PR #129](https://github.com/hhm0215/build-flow/pull/129) head `bd3e0b8`, 필수 CI 5개 PASS, 독립 보안 검토 차단 결함 없음, `develop` 병합 `a38322b`. 도구별 비공개 기억·원시 세션 로그·비밀값은 저장소에 복사하지 않았다.
+- 이 작업은 문서·절차만 변경했다. `main`/VPS는 미반영, 관리자 로그인 401·외부 백업/격리 복원·스키마 게이트는 그대로 PENDING. 첫 실데이터 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — 로컬 서버(LAN) 노출 하드닝 (2026-10-17)
 
 - `docker-compose.lan.yml`로 프론트만 지정 사설 IP:3000에 추가 노출하고 나머지는 127.0.0.1 유지, Gateway CORS를 LAN 출처+localhost로 제한했다. `verify_lan_compose.py`(0.0.0.0·공인·링크로컬 거부, 단일 바인딩, CORS)와 테스트·CI 단계를 추가하고 `docs/LOCAL_SERVER.md` 런북(방화벽 LocalSubnet·Private 규칙, HTTP 평문 한계)을 작성했다. 로컬 Docker에서 LAN 프론트 200·내부 포트 연결 거부·LAN 출처 로그인 CORS 통과·외부 출처 403 실측. 다른 기기 접속·방화벽 규칙 적용은 사용자 환경 PENDING.
