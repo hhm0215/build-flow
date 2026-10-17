@@ -98,7 +98,8 @@ services:
 
   notification-service:
     restart: unless-stopped
-    mem_limit: 640m
+    # 10페이지 스캔 PDF OCR의 실측 최대 anon ≈ 707 MiB(2026-10-17, 힙 320MB). 640m에서는 한도에 상시 접촉해 여유 25%로 상향
+    mem_limit: 896m
     environment:
       JAVA_TOOL_OPTIONS: "-Xms64m -Xmx320m"
     logging: *vps-logging

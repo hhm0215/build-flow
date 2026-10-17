@@ -6,6 +6,7 @@ import net.sourceforge.tess4j.Tesseract;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.ObjectProvider;
@@ -102,7 +103,9 @@ public class WarrantyOcrService {
         Tesseract tesseract = tesseractProvider.getObject();
         for (int i = 0; i < doc.getNumberOfPages(); i++) {
             validateRenderSize(doc.getPage(i).getCropBox(), scanDpi);
-            BufferedImage img = renderer.renderImageWithDPI(i, scanDpi);
+            // Tesseract는 내부에서 흑백으로 변환하므로 처음부터 GRAY로 렌더링해 픽셀당 4바이트→1바이트로 줄인다
+            // (640 MiB 컨테이너에서 10페이지 스캔 PDF가 한도에 닿던 문제, 2026-10-17 실측)
+            BufferedImage img = renderer.renderImageWithDPI(i, scanDpi, ImageType.GRAY);
             try {
                 String pageText = tesseract.doOCR(img);
                 if ((long) sb.length() + pageText.length() + 1 > MAX_TEXT_CHARS) {

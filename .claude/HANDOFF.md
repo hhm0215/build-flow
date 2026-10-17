@@ -18,10 +18,10 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 13:10 KST |
-| 브랜치 | `claude/handoff-claude-filter` |
-| PR | Claude 세션 알림 오인 수정 PR (develop 대상), #99 develop→main **draft 유지** |
-| 현재 단계 | Codex PR #129~#132 검토 완료, 새 Claude 세션 교대 검증 PASS(VPS 실행 이미지만 UNVERIFIED), Claude 로그 알림 오인 수정 |
+| 갱신 | 2026-10-17 14:10 KST |
+| 브랜치 | `claude/ocr-memory` |
+| PR | OCR 메모리 PR (develop 대상), #99 draft 유지 |
+| 현재 단계 | 삭제 동선·스캔 OCR 실측, OCR 메모리 완화와 VPS 한도 896m 조정 → PR·CI·병합 |
 | 다음 첫 행동 | 병합 후 BACKLOG P0 독립 안전 항목 계속 |
 
 ## 공통 사용자 지시
