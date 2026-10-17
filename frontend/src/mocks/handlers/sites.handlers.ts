@@ -16,6 +16,13 @@ function notFound() {
   )
 }
 
+function archivedClientError() {
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 거래처는 현장에 새로 연결할 수 없습니다. 거래처를 복원한 뒤 연결해 주세요.' },
+    { status: 400 },
+  )
+}
+
 function archivedConflict() {
   return HttpResponse.json<ApiResponse<null>>(
     { success: false, data: null, error: '보관된 현장은 복원한 뒤 수정할 수 있습니다.' },
@@ -74,6 +81,7 @@ export const sitesHandlers = [
   http.post<never, SiteCreateRequest>('/api/v1/sites', async ({ request }) => {
     const body = await request.json()
     const client = findMockClientById(body.clientId)
+    if (client?.archivedAt) return archivedClientError()
     if (body.clientId != null && !client) {
       return HttpResponse.json(
         { success: false, error: '거래처를 찾을 수 없습니다.' },
@@ -118,6 +126,7 @@ export const sitesHandlers = [
       )
     }
     const client = findMockClientById(body.clientId ?? undefined)
+    if (client?.archivedAt && client.id !== sites[index].client?.id) return archivedClientError()
     if (body.clientId != null && !client) {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '거래처를 찾을 수 없습니다.' },

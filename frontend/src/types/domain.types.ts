@@ -20,6 +20,8 @@ export interface Client {
   email: string | null
   address: string | null
   memo: string | null
+  /** 보관 시각. null이면 미보관. 보관 거래처는 현장에 새로 연결할 수 없다 */
+  archivedAt: string | null
   createdAt: string
   updatedAt: string
 }

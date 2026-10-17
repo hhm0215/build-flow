@@ -40,9 +40,11 @@ export default function SiteCreateModal({ open, onClose, onCreated }: Props) {
   const [clientOpen, setClientOpen] = useState(false)
   const [newClient, setNewClient] = useState<Client | null>(null)
   const inFlight = useRef(false)
-  const availableClients = newClient && !clients.some((client) => client.id === newClient.id)
-    ? [...clients, newClient]
-    : clients
+  // 보관된 거래처는 새 현장에 연결할 수 없다(서버도 400)
+  const activeClients = clients.filter((client) => !client.archivedAt)
+  const availableClients = newClient && !activeClients.some((client) => client.id === newClient.id)
+    ? [...activeClients, newClient]
+    : activeClients
 
   const close = () => {
     if (clientOpen || inFlight.current || createSite.isPending) return

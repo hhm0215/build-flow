@@ -44,6 +44,9 @@ public class Client {
     @Column(columnDefinition = "TEXT")
     private String memo;
 
+    // 보관 시각(KST). null이면 미보관. 보관해도 연결된 현장·자료는 그대로 유지한다 (ADR-021)
+    private LocalDateTime archivedAt;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -72,5 +75,20 @@ public class Client {
         this.email = email;
         this.address = address;
         this.memo = memo;
+    }
+
+    public boolean isArchived() {
+        return archivedAt != null;
+    }
+
+    /** 이미 보관된 거래처면 최초 보관 시각을 유지한다. */
+    public void archive(LocalDateTime now) {
+        if (archivedAt == null) {
+            archivedAt = now;
+        }
+    }
+
+    public void restore() {
+        archivedAt = null;
     }
 }

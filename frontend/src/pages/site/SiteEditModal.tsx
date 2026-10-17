@@ -38,9 +38,11 @@ export default function SiteEditModal({ site, onClose }: Props) {
   const updateSite = useUpdateSite()
   const [error, setError] = useState<string | null>(null)
   const inFlight = useRef(false)
-  const clientOptions = site.client && !clients.some((client) => client.id === site.client?.id)
-    ? [...clients, site.client]
-    : clients
+  // 보관된 거래처는 새로 연결할 수 없지만, 이미 연결된 거래처는 유지할 수 있다
+  const activeClients = clients.filter((client) => !client.archivedAt || client.id === site.client?.id)
+  const clientOptions = site.client && !activeClients.some((client) => client.id === site.client?.id)
+    ? [...activeClients, site.client]
+    : activeClients
 
   const close = () => {
     if (inFlight.current || updateSite.isPending) return
