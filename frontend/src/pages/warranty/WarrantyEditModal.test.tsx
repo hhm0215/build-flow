@@ -9,6 +9,7 @@ const downloadWarrantyPdf = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/warranties.api', () => ({
   useUpdateWarranty: () => ({ mutateAsync, isPending: false }),
+  useWarrantyHistory: () => ({ data: [], isLoading: false, isError: false }),
   downloadWarrantyPdf,
 }))
 

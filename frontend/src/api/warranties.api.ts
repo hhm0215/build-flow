@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
-import { ApiResponse, Warranty, WarrantyCreateRequest, WarrantyUpdateRequest } from '../types'
+import { ApiResponse, Warranty, WarrantyAuditEvent, WarrantyCreateRequest, WarrantyUpdateRequest } from '../types'
 
 export const WARRANTIES_KEY = {
   all: ['warranties'] as const,
   list: (params?: Record<string, string>) => ['warranties', 'list', params] as const,
   expiring: (days: number) => ['warranties', 'expiring', days] as const,
+  history: (id: number) => ['warranties', 'history', id] as const,
 }
 
 const fetchWarranties = async (params?: Record<string, string>) => {
@@ -102,6 +103,17 @@ export function useDeleteWarranty() {
   return useMutation({
     mutationFn: deleteWarranty,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: WARRANTIES_KEY.all }),
+  })
+}
+
+export function useWarrantyHistory(id: number) {
+  return useQuery({
+    queryKey: WARRANTIES_KEY.history(id),
+    queryFn: async () => {
+      const res = await axiosInstance.get<ApiResponse<WarrantyAuditEvent[]>>(`/warranties/${id}/history`)
+      return res.data.data
+    },
+    enabled: !!id,
   })
 }
 

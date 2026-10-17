@@ -1,5 +1,7 @@
 package com.buildflow.notification.domain.warranty.service;
 
+import com.buildflow.notification.domain.warranty.repository.WarrantyAuditEventRepository;
+
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.entity.OcrStatus;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
@@ -39,7 +41,7 @@ class WarrantyUploadGuardTest {
     private SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
 
     private DefectWarrantyService service() {
-        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, siteReferenceValidator);
+        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class));
         ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
         return service;
     }

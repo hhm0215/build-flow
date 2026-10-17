@@ -3,7 +3,7 @@
 - **시작일**: 2026-10-17
 - **BACKLOG 항목**: P0 "공개 파일럿 CRUD 실동선 검증·결함 수리" — 실데이터 전 확인 근거(누가·언제 어떤 OCR 값을 확인했는지)
 - **예상 규모**: M
-- **상태**: IN_PROGRESS
+- **상태**: DONE
 
 ## 목표
 
@@ -26,3 +26,7 @@
 단위/JPA 테스트(롤백 시 이력 미기록, 삭제 후 이력 유지), 로컬 Docker 실측.
 
 ## 결과 (작업 후 기록)
+
+- 백엔드: `WarrantyAuditEvent`·기록기·`GET /warranties/{id}/history`, 6개 변경 경로 연결. JPA 테스트 4건(시간순·삭제 후 유지·롤백 시 미기록·헤더 검증) 포함 notification 테스트 PASS.
+- 프론트: 타입·`useWarrantyHistory`·MSW 이력·보증 수정 모달의 "변경·확인 이력" 목록. lint·144건·빌드 PASS.
+- 로컬 Docker: 테이블 자동 생성, 등록/수정/삭제 `metal`, 업로드 `metal`→OCR 반영 `system`, 헤더 없는 삭제 `unknown`, 삭제 후 이력 조회 PASS. Gateway 경유 실제 로그인 토큰 경로는 자격 증명이 필요해 미실측.

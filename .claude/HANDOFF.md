@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 16:50 KST |
+| 갱신 | 2026-10-17 17:00 KST |
 | 브랜치 | `claude/warranty-audit` (드래프트 PR로 노출) |
-| PR | #99 develop→main **draft 유지** |
-| 현재 단계 | 보증 확인 감사 이력 착수 (`.claude/plans/2026-10-17-warranty-audit.md`). Claude는 /loop 자율 반복 중 |
-| 다음 첫 행동 | 감사 이력 구현·테스트·Docker 실측 후 PR 준비 완료로 전환·병합 |
+| PR | [#138](https://github.com/hhm0215/build-flow/pull/138) 보증 감사 이력(병합 진행), #99 draft 유지 |
+| 현재 단계 | 보증 감사 이력 구현·테스트·Docker 실측 완료 → CI·병합. Claude는 /loop 자율 반복 중 |
+| 다음 첫 행동 | 병합 후 다음 BACKLOG 로컬 항목(예: 감사 이력·원본 보존/폐기 정책 설계, 프론트 훅 테스트) |
 
 ## 공통 사용자 지시
 
