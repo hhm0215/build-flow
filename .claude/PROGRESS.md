@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 혼합 PDF OCR 충돌 판정 수정 (2026-10-17)
+
+- 합성 혼합 PDF 실측에서 두 결함을 고쳤다: 페이지 전체 OCR이 텍스트 층 증권번호를 다르게 읽어(`QA`→`04`) 정상 문서가 FAILED로 떨어지던 문제(혼동 글자 정규화 비교), OCR이 텍스트 층·이미지 보험사를 함께 읽어 실제 충돌이 SUCCESS로 가려지던 문제(서로 다른 보험사 2개 이상이면 모호 처리). 회귀 테스트 추가, 로컬 Docker에서 보완형 SUCCESS·충돌형 FAILED·스캔 1/10페이지 SUCCESS 재확인. native timeout/격리·VPS 실측은 PENDING.
+
 ## 완료된 작업 — 삭제 동선·스캔 OCR 실측과 OCR 메모리 한도 조정 (2026-10-17)
 
 - 로컬 풀 Docker에서 매입·세금계산서 삭제 후 Kafka 손익·미수금 재집계와 확정 견적 삭제 409를 실측했다. 합성 한글 스캔 PDF의 실제 Tesseract OCR이 1·10페이지 모두 SUCCESS(필수 3필드 정확, 증권번호 라벨 오인식은 선택 필드). VPS와 같은 640 MiB 제한에서 10페이지가 한도에 상시 접촉해, 흑백 렌더링·`OMP_THREAD_LIMIT=1`·`MALLOC_ARENA_MAX=2`를 적용하고 자연 최대 약 707 MiB 실측에 따라 VPS notification `mem_limit`을 896m로 올렸다(배포 시 적용). 근거는 `docs/PILOT_QA.md`.

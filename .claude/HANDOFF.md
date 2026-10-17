@@ -18,10 +18,10 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 14:10 KST |
-| 브랜치 | `claude/ocr-memory` |
-| PR | OCR 메모리 PR (develop 대상), #99 draft 유지 |
-| 현재 단계 | 삭제 동선·스캔 OCR 실측, OCR 메모리 완화와 VPS 한도 896m 조정 → PR·CI·병합 |
+| 갱신 | 2026-10-17 14:50 KST |
+| 브랜치 | `claude/mixed-ocr` |
+| PR | 혼합 PDF OCR 충돌 판정 PR (develop 대상), #99 draft 유지 |
+| 현재 단계 | 혼합 PDF 실측·충돌 판정 결함 수정 → PR·CI·병합 |
 | 다음 첫 행동 | 병합 후 BACKLOG P0 독립 안전 항목 계속 |
 
 ## 공통 사용자 지시
