@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — Codex ↔ Claude 교대 검증 2차 (2026-10-17, Claude)
+
+- Codex PR #129~#132(공동작업 가이드·기본 비공개 세션 요약·주입 지침 필터)를 검토했다. 새 Claude 세션이 `docs/AGENT_COLLABORATION.md`의 교대 질문에 출처와 함께 답했다: 잠금 IDLE·열린 PR #99 draft뿐(`gh pr list`), 다음 우선순위 P0 공개 파일럿 CRUD(BACKLOG), `develop` 4316b2d·`main` 579d542·VPS 저장소 4e56596 깨끗함(VPS `git -c safe.directory` 읽기 전용), V1 40/100·NO-GO(DELIVERY_PLAN). VPS 실행 이미지는 배포 계정 Docker 권한 부재로 **UNVERIFIED**.
+- 발견: Claude 로그는 백그라운드 작업 알림(`<task-notification>`)·명령 메타데이터를 사용자 문자열로 남겨, 작업 완료 직후 끊긴 세션에서 "마지막 사용자 메시지"를 오인할 수 있었다. Claude 쪽에도 주입 메시지 필터와 합성 회귀를 추가했다.
+
 ## 완료된 작업 — Codex ↔ Claude 세션 인계 검증 1차 (2026-10-17)
 
 - `scripts/agents/last_session.py`가 주입된 `AGENTS.md`를 사용자 요청으로 오인하거나 브라우저 맥락 뒤 실제 요청을 누락하던 문제를 수정했다. 기본 출력은 메시지 본문 비공개이며 명시적 로컬 `--show-excerpts`만 발췌를 출력한다. 원시 세션 로그는 저장소에 복사하지 않았다.

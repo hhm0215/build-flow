@@ -36,6 +36,26 @@ def actual_user_text(value):
     return value or None
 
 
+# Claude Code가 사용자 메시지 자리에 남기는 시스템 알림·명령 메타데이터
+CLAUDE_INJECTED_PREFIXES = (
+    "<task-notification>", "<system-reminder>", "<command-name>", "<command-message>",
+    "<local-command-stdout>", "<local-command-caveat>", "[Request interrupted",
+)
+
+
+def actual_claude_user_text(entry):
+    """Claude transcript user strings also carry task notifications and slash-command metadata."""
+    if entry.get("isMeta"):
+        return None
+    content = (entry.get("message") or {}).get("content")
+    if not isinstance(content, str):
+        return None
+    value = content.strip()
+    if not value or value.startswith(CLAUDE_INJECTED_PREFIXES):
+        return None
+    return value
+
+
 def visible_excerpt(value, show_excerpts, limit):
     return value[:limit] if show_excerpts else f"[내용 숨김: {len(value)}자]"
 
@@ -101,8 +121,10 @@ def claude_events(lines):
         ts = d.get("timestamp", "")[:19]
         msg = d.get("message") or {}
         content = msg.get("content")
-        if d.get("type") == "user" and isinstance(content, str):
-            yield ts, "user", content
+        if d.get("type") == "user":
+            text = actual_claude_user_text(d)
+            if text:
+                yield ts, "user", text
         elif d.get("type") == "assistant" and isinstance(content, list):
             for c in content:
                 if c.get("type") == "text" and c.get("text", "").strip():
