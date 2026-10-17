@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [develop, main]
   push:
     branches: [develop, main]
 
@@ -107,12 +107,24 @@ jobs:
       - uses: actions/checkout@v7
       - name: Test release evidence generator
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+      - name: Test cross-agent session fallback
+        run: python3 -m unittest discover -s scripts/agents -p 'test_*.py'
       - name: Test exposure validator
-        run: python3 -m unittest discover -s scripts/vps -p 'test_verify_public_compose.py'
+        run: python3 -m unittest discover -s scripts/vps -p 'test_verify_*_compose.py'
+      - name: Validate Unix backup privacy gate
+        run: |
+          pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1
+          sh -c 'umask 077; exec pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1 -CheckActiveUmask'
       - name: Validate Compose exposure and CORS
         run: |
           docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml config --format json \
             | python3 scripts/vps/verify_public_compose.py
+      - name: Validate LAN Compose exposure and CORS
+        env:
+          LAN_BIND_ADDRESS: 192.168.0.20
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.lan.yml config --format json \
+            | python3 scripts/vps/verify_lan_compose.py
       - name: Validate Caddyfile syntax
         run: |
           docker run --rm --entrypoint caddy -e PUBLIC_HOST=example.org \
@@ -150,7 +162,13 @@ jobs:
           if ($failed) { exit 1 }
       - name: Validate database backup tools
         shell: powershell
-        run: .\scripts\db\test-backup-tools.ps1
+        run: |
+          .\scripts\db\test-backup-tools.ps1
+          .\scripts\db\test-private-backup-path.ps1
+          .\scripts\db\test-restored-warranty-rows.ps1
+          .\scripts\db\test-warranty-volume-preflight.ps1
+          .\scripts\db\test-warranty-snapshot.ps1
+          .\scripts\db\test-warranty-restore-volume.ps1
       - name: Validate read-only USB inventory with synthetic files
         shell: powershell
         run: .\scripts\usb\test-inventory-estimates.ps1

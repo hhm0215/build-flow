@@ -81,24 +81,25 @@ public class OllamaService {
         }
     }
 
+    /**
+     * 모델이 설명·코드블록·"[참고]" 같은 대괄호 문구를 섞어도 실제 항목 배열을 찾도록,
+     * 각 '[' 위치부터 마지막 ']'까지를 순서대로 파싱해 처음 성공한 배열을 쓴다.
+     */
     private List<ParsedItemResult> parseJsonResponse(String text) {
-        String json = extractJsonArray(text);
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.error("Ollama 응답 JSON 파싱 실패");
+        if (text == null || text.isBlank()) {
+            log.error("Ollama 응답 본문이 비어 있음");
             throw new BusinessException(ErrorCode.OLLAMA_PARSE_FAILED);
         }
-    }
-
-    private String extractJsonArray(String text) {
-        int start = text.indexOf('[');
         int end = text.lastIndexOf(']');
-        if (start == -1 || end == -1 || start > end) {
-            log.error("Ollama 응답에서 JSON 배열을 찾을 수 없음");
-            throw new BusinessException(ErrorCode.OLLAMA_PARSE_FAILED);
+        for (int start = text.indexOf('['); start != -1 && start < end; start = text.indexOf('[', start + 1)) {
+            try {
+                return objectMapper.readValue(text.substring(start, end + 1), new TypeReference<>() {});
+            } catch (Exception ignored) {
+                // 다음 '[' 후보로 계속
+            }
         }
-        return text.substring(start, end + 1);
+        log.error("Ollama 응답에서 항목 JSON 배열을 찾을 수 없음");
+        throw new BusinessException(ErrorCode.OLLAMA_PARSE_FAILED);
     }
 
     @Getter

@@ -21,6 +21,7 @@ public class SiteResponse {
     private LocalDate startDate;
     private LocalDate endDate;
     private String memo;
+    private LocalDateTime archivedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -34,6 +35,7 @@ public class SiteResponse {
                 .startDate(site.getStartDate())
                 .endDate(site.getEndDate())
                 .memo(site.getMemo())
+                .archivedAt(site.getArchivedAt())
                 .createdAt(site.getCreatedAt())
                 .updatedAt(site.getUpdatedAt())
                 .build();

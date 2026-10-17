@@ -54,6 +54,9 @@ public final class WarrantyOcrParser {
         LocalDate[] period = findPeriod(normalized);
         return Result.builder()
                 .insuranceCompany(findInsurer(normalized))
+                // 한 문서에서 서로 다른 보험사가 둘 이상 읽히면 어느 쪽이 발행처인지 알 수 없어 수동 확인으로 넘긴다
+                // (혼합 PDF 전체 OCR이 텍스트 층과 이미지의 값을 함께 읽어 충돌이 가려지던 문제, 2026-10-17 실측)
+                .conflicting(countInsurers(normalized) > 1)
                 .policyNumber(findPolicyNumber(normalized))
                 .startDate(period[0])
                 .endDate(period[1])
@@ -65,6 +68,10 @@ public final class WarrantyOcrParser {
             if (text.contains(name)) return name;
         }
         return null;
+    }
+
+    private static long countInsurers(String text) {
+        return KNOWN_INSURERS.stream().filter(text::contains).count();
     }
 
     private static String findPolicyNumber(String text) {
@@ -132,6 +139,12 @@ public final class WarrantyOcrParser {
         private final String policyNumber;
         private final LocalDate startDate;
         private final LocalDate endDate;
+        /** 텍스트 레이어와 이미지 OCR이 서로 다른 값을 제시하면 사용자 확인이 필요하다. */
+        private final boolean conflicting;
+
+        public Result(String insuranceCompany, String policyNumber, LocalDate startDate, LocalDate endDate) {
+            this(insuranceCompany, policyNumber, startDate, endDate, false);
+        }
 
         public static Result empty() {
             return new Result(null, null, null, null);

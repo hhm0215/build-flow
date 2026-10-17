@@ -1,14 +1,38 @@
 [CmdletBinding()]
-param([string]$OutputRoot)
+param(
+    [string]$OutputRoot,
+    [switch]$IncludeWarrantyUploads,
+    [switch]$SyntheticTestSource,
+    [string]$SyntheticProject,
+    [string]$SyntheticNonce
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
+. (Join-Path $PSScriptRoot 'restored-warranty-rows.ps1')
+. (Join-Path $PSScriptRoot 'warranty-snapshot.ps1')
+. (Join-Path $PSScriptRoot 'warranty-volume-copy.ps1')
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+if ($SyntheticTestSource) {
+    if (-not $IncludeWarrantyUploads -or $SyntheticProject -cnotmatch '^buildflowsnap[a-f0-9]{12}$' -or
+        $SyntheticNonce -cnotmatch '^[a-f0-9]{32}$' -or $env:SNAPSHOT_TEST_NONCE -cne $SyntheticNonce) {
+        throw 'Synthetic source requires v2, a random test project, and matching nonce.'
+    }
+} elseif ($PSBoundParameters.ContainsKey('SyntheticProject') -or $PSBoundParameters.ContainsKey('SyntheticNonce')) {
+    throw 'Synthetic project and nonce require -SyntheticTestSource.'
+}
+if ($IncludeWarrantyUploads -and [string]::IsNullOrWhiteSpace($OutputRoot)) {
+    throw 'Integrated snapshot requires an explicit existing private OutputRoot.'
+}
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) { $OutputRoot = Join-Path $repoRoot "backups\db" }
 $schemas = @("buildflow_auth", "buildflow_estimate", "buildflow_site", "buildflow_purchase", "buildflow_tax", "buildflow_notification", "buildflow_chat")
-$composeArgs = @("compose", "-f", (Join-Path $repoRoot "docker-compose.yml"), "-f", (Join-Path $repoRoot "docker-compose.app.yml"))
+$composeArgs = if ($SyntheticTestSource) {
+    @('compose', '--project-directory', $repoRoot, '--project-name', $SyntheticProject, '-f', (Join-Path $PSScriptRoot 'snapshot-test.compose.yml'))
+} else {
+    @("compose", "-f", (Join-Path $repoRoot "docker-compose.yml"), "-f", (Join-Path $repoRoot "docker-compose.app.yml"))
+}
 $mysqlShell = 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --user=root --batch --skip-column-names --raw --execute="$1"'
 $writeCapableServices = @("auth-service", "estimate-service", "site-service", "purchase-service", "tax-service", "notification-service", "chat-service")
 $backupDirectory = $null
@@ -67,6 +91,19 @@ function Assert-NoActiveBuildFlowClients {
     }
 }
 
+function Get-WarrantySourceRows {
+    param([Parameter(Mandatory = $true)][object[]]$Inventory)
+
+    $notification = @($Inventory | Where-Object { $_.name -ceq 'buildflow_notification' })
+    $warranty = @($notification | ForEach-Object { $_.tables } | Where-Object { $_.name -ceq 'defect_warranties' })
+    if ($notification.Count -ne 1 -or $warranty.Count -ne 1) {
+        throw 'Warranty table inventory is missing or duplicated.'
+    }
+    $query = "SELECT id, IF(file_path IS NULL, 'N', CONCAT('H', HEX(CONVERT(file_path USING utf8mb4)))) FROM buildflow_notification.defect_warranties ORDER BY id;"
+    $encoded = @(Invoke-MySqlQuery -Query $query)
+    return @(ConvertFrom-RestoredWarrantyLines -Lines $encoded -ExpectedCount ([long]$warranty[0].rowCount))
+}
+
 function Get-LabelValue {
     param([Parameter(Mandatory = $true)][object]$Labels, [Parameter(Mandatory = $true)][string]$Name)
     $property = $Labels.PSObject.Properties[$Name]
@@ -84,6 +121,10 @@ function Get-SourceIdentity {
         throw "Resolved container is not the Compose mysql service."
     }
     $project = Get-LabelValue -Labels $container.Config.Labels -Name "com.docker.compose.project"
+    if ($SyntheticTestSource -and ($project -cne $SyntheticProject -or
+        (Get-LabelValue -Labels $container.Config.Labels -Name 'com.buildflow.snapshot-test') -cne $SyntheticNonce)) {
+        throw 'Synthetic MySQL project or nonce identity mismatch.'
+    }
     $workingDirectory = Get-LabelValue -Labels $container.Config.Labels -Name "com.docker.compose.project.working_dir"
     $expectedWorkingDirectory = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd('\', '/')
     $actualWorkingDirectory = [System.IO.Path]::GetFullPath($workingDirectory).TrimEnd('\', '/')
@@ -92,6 +133,9 @@ function Get-SourceIdentity {
     }
     if ([string]$container.Config.Image -cne "mysql:8.0") {
         throw "Unexpected MySQL image reference: $($container.Config.Image)"
+    }
+    if ([string]$container.Image -cnotmatch '^sha256:[a-f0-9]{64}$') {
+        throw 'MySQL source image ID is not a pinned SHA-256 digest.'
     }
 
     $dataMounts = @($container.Mounts | Where-Object { $_.Destination -eq "/var/lib/mysql" })
@@ -103,6 +147,10 @@ function Get-SourceIdentity {
     if ((Get-LabelValue -Labels $volume.Labels -Name "com.docker.compose.project") -cne $project -or
         (Get-LabelValue -Labels $volume.Labels -Name "com.docker.compose.volume") -cne "mysql_data") {
         throw "MySQL data volume labels do not match this Compose project and mysql_data."
+    }
+    if ($SyntheticTestSource -and
+        (Get-LabelValue -Labels $volume.Labels -Name 'com.buildflow.snapshot-test') -cne $SyntheticNonce) {
+        throw 'Synthetic MySQL volume nonce identity mismatch.'
     }
     return [ordered]@{
         containerId = [string]$container.Id
@@ -119,6 +167,13 @@ function Test-BroadReadAcl {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     try {
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            $item = Get-Item -LiteralPath $Path -Force
+            if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $true }
+            $metadata = Get-UnixPrivacyMetadata -Path $Path
+            return -not (Test-PrivateUnixMetadata -OwnerUid $metadata.OwnerUid -CurrentUid $metadata.CurrentUid `
+                -OctalMode $metadata.OctalMode -IsDirectory $item.PSIsContainer)
+        }
         $broadIdentities = @("Everyone", "BUILTIN\Users", "NT AUTHORITY\Authenticated Users")
         $readRights = [System.Security.AccessControl.FileSystemRights]::Read -bor [System.Security.AccessControl.FileSystemRights]::ReadAndExecute -bor [System.Security.AccessControl.FileSystemRights]::ReadData
         foreach ($rule in (Get-Acl -LiteralPath $Path).Access) {
@@ -135,7 +190,8 @@ function Test-BroadReadAcl {
     return $false
 }
 
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required. Install and start Docker Desktop." }
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Docker is required and must be running." }
+if ($IncludeWarrantyUploads) { Assert-PrivateUnixUmask }
 
 Push-Location $repoRoot
 try {
@@ -162,19 +218,40 @@ try {
     Assert-NoActiveBuildFlowClients
     $inventoryBefore = @(Get-DatabaseInventory)
     $administratorBefore = Get-AdministratorFingerprint
+    $warrantyBefore = @()
+    $warrantyVolumeBefore = $null
+    if ($IncludeWarrantyUploads) {
+        $warrantyPreflightArguments = @{ PassThru = $true }
+        if ($SyntheticTestSource) {
+            $warrantyPreflightArguments.SyntheticTestSource = $true
+            $warrantyPreflightArguments.SyntheticProject = $SyntheticProject
+            $warrantyPreflightArguments.SyntheticNonce = $SyntheticNonce
+        }
+        $warrantyBefore = @(Get-WarrantySourceRows -Inventory $inventoryBefore)
+        $warrantyVolumeBefore = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') @warrantyPreflightArguments
+    }
 
     $outputRootFull = [System.IO.Path]::GetFullPath($OutputRoot)
-    if (-not (Test-Path -LiteralPath $outputRootFull)) { New-Item -ItemType Directory -Path $outputRootFull | Out-Null }
+    if ($IncludeWarrantyUploads) {
+        if (-not (Test-Path -LiteralPath $outputRootFull -PathType Container)) {
+            throw 'Integrated snapshot OutputRoot must already exist.'
+        }
+        Assert-NoReparseAncestor -Path $outputRootFull
+        Assert-PrivateWarrantyDirectory -Path $outputRootFull
+    }
+    elseif (-not (Test-Path -LiteralPath $outputRootFull)) { New-Item -ItemType Directory -Path $outputRootFull | Out-Null }
     $timestamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ")
     $finalDirectory = Join-Path $outputRootFull $timestamp
     $partialDirectory = Join-Path $outputRootFull (".partial-$timestamp-" + [Guid]::NewGuid().ToString("N"))
     if (Test-Path -LiteralPath $finalDirectory) { throw "Backup directory already exists: $finalDirectory" }
     New-Item -ItemType Directory -Path $partialDirectory | Out-Null
     $backupDirectory = $partialDirectory
+    if ($IncludeWarrantyUploads) { Assert-PrivateWarrantyDirectory -Path $partialDirectory }
     $incompleteMarker = Join-Path $partialDirectory "INCOMPLETE"
     [System.IO.File]::WriteAllText($incompleteMarker, "Backup has not completed verification.`n")
     $broadReadAcl = Test-BroadReadAcl -Path $partialDirectory
     if ($broadReadAcl) {
+        if ($IncludeWarrantyUploads) { throw 'Integrated snapshot directory privacy changed after creation.' }
         Write-Warning "Backup directory may be readable by a broad Windows group. Store the completed backup on an encrypted, access-controlled device."
     }
 
@@ -208,10 +285,40 @@ try {
         throw "Database inventory changed while the backup was running. The dump is not accepted."
     }
 
+    $uploads = $null
+    if ($IncludeWarrantyUploads) {
+        $uploadsDirectory = Join-Path $partialDirectory 'uploads\warranties'
+        New-Item -ItemType Directory -Path $uploadsDirectory -Force | Out-Null
+        Assert-PrivateWarrantyDirectory -Path $uploadsDirectory
+        $copiedFiles = @(Copy-WarrantyVolumeSnapshot -VolumeName ([string]$warrantyVolumeBefore.volumeName) -DestinationDirectory $uploadsDirectory -WorkingDirectory $repoRoot -ImageId ([string]$sourceIdentity.imageId))
+        Assert-NoActiveBuildFlowClients
+        $warrantyVolumeAfter = & (Join-Path $PSScriptRoot 'check-warranty-volume.ps1') @warrantyPreflightArguments
+        if (($warrantyVolumeBefore | ConvertTo-Json -Compress) -cne ($warrantyVolumeAfter | ConvertTo-Json -Compress)) {
+            throw 'Warranty upload volume identity changed during snapshot.'
+        }
+        $inventoryFinal = @(Get-DatabaseInventory)
+        $administratorFinal = Get-AdministratorFingerprint
+        if (($inventoryBefore | ConvertTo-Json -Depth 8 -Compress) -cne ($inventoryFinal | ConvertTo-Json -Depth 8 -Compress) -or
+            ($administratorBefore | ConvertTo-Json -Compress) -cne ($administratorFinal | ConvertTo-Json -Compress)) {
+            throw 'Database inventory changed while the warranty files were copied.'
+        }
+        $warrantyAfter = @(Get-WarrantySourceRows -Inventory $inventoryFinal)
+        if ((ConvertTo-Json -InputObject $warrantyBefore -Depth 4 -Compress) -cne
+            (ConvertTo-Json -InputObject $warrantyAfter -Depth 4 -Compress)) {
+            throw 'Warranty DB references changed during snapshot.'
+        }
+        $uploads = ConvertTo-WarrantyUploadManifest -Rows $warrantyBefore -Files $copiedFiles -ExpectedRowCount $warrantyBefore.Count -Source $warrantyVolumeBefore
+        Assert-PrivateWarrantyDirectory -Path $uploadsDirectory
+        foreach ($copiedFile in $copiedFiles) {
+            Assert-PrivateWarrantyDirectory -Path (Join-Path $uploadsDirectory ([string]$copiedFile.relativePath))
+        }
+        Assert-PrivateWarrantyDirectory -Path $dumpPath
+    }
+
     $hash = (Get-FileHash -LiteralPath $dumpPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $serverVersion = (Invoke-MySqlQuery -Query "SELECT VERSION();" | Select-Object -First 1).Trim()
     $manifest = [ordered]@{
-        formatVersion = 1
+        formatVersion = $(if ($IncludeWarrantyUploads) { 2 } else { 1 })
         createdAtUtc = [DateTime]::UtcNow.ToString("o")
         containsSensitiveData = $true
         mysqlServerVersion = $serverVersion
@@ -221,9 +328,21 @@ try {
         administrator = $administratorBefore
         security = [ordered]@{ plaintext = $true; broadReadAclWarning = $broadReadAcl }
     }
+    if ($IncludeWarrantyUploads) {
+        $manifest.uploads = $uploads
+        $manifest.recoveryStatus = 'source-snapshot-only; isolated DB+volume restore pending'
+    }
     Write-JsonUtf8 -Path (Join-Path $partialDirectory "manifest.json") -Value $manifest
+    if ($IncludeWarrantyUploads) {
+        Assert-PrivateWarrantyDirectory -Path (Join-Path $partialDirectory 'manifest.json')
+        Assert-PrivateWarrantyDirectory -Path $incompleteMarker
+    }
 
-    & (Join-Path $PSScriptRoot "verify-backup.ps1") -BackupDirectory $partialDirectory -AllowIncomplete
+    & (Join-Path $PSScriptRoot "verify-backup.ps1") -BackupDirectory $partialDirectory -AllowIncomplete -AllowUnrestoredV2:$IncludeWarrantyUploads
+    if ($IncludeWarrantyUploads) {
+        Write-Warning "SQL and warranty files were captured in an INCOMPLETE diagnostic snapshot: $partialDirectory. Isolated restore is still required; do not use for operational recovery or real data."
+        return
+    }
     Remove-Item -LiteralPath $incompleteMarker
     Move-Item -LiteralPath $partialDirectory -Destination $finalDirectory
     $backupDirectory = $finalDirectory

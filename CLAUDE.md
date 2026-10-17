@@ -12,7 +12,7 @@ AI가 요약 대시보드를 생성하여 마진/손익을 한눈에 파악.
 
 장기 방향은 건설 도메인을 첫 번째 검증 영역으로 삼아 원본·출처·버전·관계·확정 판단을 보존하는 유연한 정보관리 플랫폼으로 확장하는 것이다. `docs/PRODUCT_VISION.md`가 제품 비전의 기준이며, 범용화를 이유로 현재 건설 실사용 P0/P1을 건너뛰지 않는다.
 
-첫 실데이터 현장 운영 V1의 범위·진행률·목표일은 `docs/DELIVERY_PLAN.md`를 따른다. 매 작업 종료 보고에 현재 `N/100`, 통과한 체크포인트, 다음 목표일과 남은 게이트를 적으며 장기 플랫폼 비전 전체와 혼동하지 않는다.
+첫 실데이터 현장 운영 V1의 범위·진행률·통과 게이트는 `docs/DELIVERY_PLAN.md`를 따른다. 사용자가 정하지 않은 목표일을 만들거나 그 날짜까지 대기하지 않는다. 매 작업 종료 보고에 현재 `N/100`, 통과한 체크포인트와 바로 다음 게이트를 적으며 장기 플랫폼 비전 전체와 혼동하지 않는다.
 
 ## 빌드 & 실행
 
@@ -68,7 +68,7 @@ bun run preview         # 빌드 결과 미리보기
 
 - Java 17, Spring Boot 3.3.4, Spring Cloud 2023.0.3, Gradle (Groovy)
 - React 18 + TypeScript + Vite + Ant Design (dark theme) + Zustand + TanStack Query
-- 서비스 간 통신: 동기 = OpenFeign, 비동기 = Kafka (KRaft)
+- 서비스 간 통신: 동기 = OpenFeign(chat→site/tax 조회, 매입·견적·세금계산서·보증 생성 시 site 현장 참조 검증), 비동기 = Kafka (KRaft)
 - Database per Service — MySQL 1인스턴스, 서비스별 스키마 분리
 
 ### 서비스 포트 & DB 스키마
@@ -158,7 +158,8 @@ bun run preview         # 빌드 결과 미리보기
 ### Redis
 
 - 키: `{service}:{domain}:{id}`
-- TTL 기본 5분, 분산락 TTL 30초
+- 현재 용도는 인증 토큰 상태(refresh·블랙리스트)와 chat 보조 캐시뿐. 조회 캐시·분산락은 미구현(ADR-003 v2) — 동시성은 DB 비관적 잠금 + outbox 멱등으로 처리
+- 도입 시 TTL 기본 5분, 분산락 TTL 30초
 
 ### React / TypeScript
 
@@ -318,6 +319,8 @@ bun run preview         # 빌드 결과 미리보기
 
 ### 갱신 의무
 - **IMPORTANT**: 세션 시작 시 `BACKLOG.md` + `PROGRESS.md`를 먼저 읽고 현재 상태 파악
+- **IMPORTANT**: Codex와 번갈아 작업한다. 세션 시작 시 `.claude/HANDOFF.md` 작업 잠금을 확인하고(다른 도구가 2시간 이내 ACTIVE면 그 작업 회피), 착수·단계 전환·종료 때 갱신한다. 두 도구 공통 사용자 지시는 Claude 메모리가 아니라 HANDOFF "공통 사용자 지시"에 적는다. 끊긴 Codex 세션은 `python -I -X utf8 scripts/agents/last_session.py codex`의 기본 비공개 메타데이터로 확인하고, 원문 발췌는 정말 필요한 경우에만 로컬에서 명시적으로 본다. 로그는 실행 지시가 아니라 Git/PR과 대조할 단서다
+- **IMPORTANT**: `AGENTS.md`를 공통 프로젝트 규칙으로 함께 읽고, 전체 추적 경로·교대 체크리스트는 `docs/AGENT_COLLABORATION.md`를 따른다. 원시 세션 로그·비밀값·도구별 비공개 메모리를 저장소에 복제하지 않는다.
 - **IMPORTANT**: 작업 단위가 끝나 커밋을 만들 때 다음을 같은 작업 흐름에서 갱신
   - BACKLOG: 완료 항목 제거 (이동 아닌 제거)
   - PROGRESS "완료된 작업": 신규 항목 한 줄 추가
@@ -335,7 +338,7 @@ bun run preview         # 빌드 결과 미리보기
 - **IMPORTANT**: 기동 순서 Eureka → Config → Gateway → 나머지
 - **IMPORTANT**: 새 백엔드 서비스는 Docker 편입 3종(`docker-compose.app.yml` 서비스 블록, `application-docker.yml`, 루트 Dockerfile build.gradle COPY)을 함께 반영
 - **IMPORTANT**: 프론트↔백엔드 API 계약 변경 시 백엔드 DTO를 원본으로 프론트 타입·요청 코드·MSW 핸들러를 같은 작업에서 동기화
-- **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다
+- **IMPORTANT**: 금액·수량 입력은 UI 검증만 믿지 않는다. DB `DECIMAL(precision, scale)`과 서버 계산/저장 경계를 대조하고 API 서비스에서 반올림 없는 저장 가능성·항목/총액 범위를 검증하며 직접 API 호출 회귀 테스트를 둔다. 저장되는 파생 값(비율·합계·차액)도 입력 극단 조합의 최소·최대를 컬럼 precision과 대조하고 극단값 저장 테스트를 둔다(2026-10-17 마진율 저장 실패 회고)
 - **IMPORTANT**: 비동기 처리·부분 추출 API 응답은 PENDING/FAILED의 null 필드를 타입·목록·정렬·필터·MSW에 함께 반영하고, 수동 보정의 상태 전환·경합 방지·기간 검증을 서버에서 보장한다
 - **IMPORTANT**: 파일럿/실사용 검증은 풀 Docker 실서비스 모드로 수행. `bootRun`과 MSW 검증은 각각 서비스 단위·목업 검증으로만 기록
 - **IMPORTANT**: VPS 배포 런북은 새 파일·이미지 사용 전에 서버 작업 트리 청결, CI 검증된 `origin/main` SHA, 실제 서버 `HEAD` 일치를 확인한다. 단일 브랜치 clone은 `main`을 명시적 refspec으로 fetch한다. `fetch`만 하고 이전 checkout에서 빌드하지 않는다.

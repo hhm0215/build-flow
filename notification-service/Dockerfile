@@ -27,17 +27,22 @@ RUN gradle :${SERVICE_NAME}:bootJar --no-daemon -x test
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
-# Tesseract 4 + kor·eng traineddata + libtesseract (JNA가 로드)
+# Tesseract 4 CLI + kor·eng traineddata. 앱이 페이지마다 시간 제한을 걸어 별도 프로세스로 실행한다
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr \
         tesseract-ocr-kor \
         tesseract-ocr-eng \
-        libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # /usr/share/tessdata 표준 위치로 심볼릭 링크 (Ubuntu 패키지는 /usr/share/tesseract-ocr/4.00/tessdata에 설치)
 # application.yml의 app.ocr.tessdata-path default와 일치
 RUN ls /usr/share/tesseract-ocr/4.00/tessdata/kor.traineddata && echo "Tesseract 한글 모델 OK"
+
+# Tesseract의 OpenMP 다중 스레드는 페이지마다 작업 메모리를 늘린다. OCR worker가 1개이고 VPS는 2 vCPU·640 MiB 제한이라
+# 공식 권장대로 1 스레드로 고정한다(https://tesseract-ocr.github.io/tessdoc/FAQ.html).
+ENV OMP_THREAD_LIMIT=1
+# JVM의 glibc malloc 아레나 증가를 제한한다(2026-10-17 메모리 실측 후 적용).
+ENV MALLOC_ARENA_MAX=2
 
 RUN groupadd -r spring && useradd -r -g spring spring
 

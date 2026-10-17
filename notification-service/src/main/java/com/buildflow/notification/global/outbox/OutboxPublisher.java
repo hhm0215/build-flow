@@ -24,13 +24,15 @@ public class OutboxPublisher {
     @Scheduled(fixedDelayString = "${app.outbox.poll-delay-ms:1000}")
     public void publishReady() {
         for (int i = 0; i < 100; i++) {
-            OutboxClaim claim;
+            OutboxClaimAttempt attempt;
             try {
-                claim = claimService.claimNext().orElse(null);
+                attempt = claimService.claimNext();
             } catch (Exception e) {
                 log.error("Outbox claim 실패", e);
                 return;
             }
+            if (attempt.retired()) continue;
+            OutboxClaim claim = attempt.claim();
             if (claim == null) return;
 
             try {

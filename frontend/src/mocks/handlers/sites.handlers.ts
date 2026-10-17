@@ -9,12 +9,54 @@ function withCurrentClient(site: Site): Site {
   return { ...site, client: site.client ? findMockClientById(site.client.id) : null }
 }
 
+function notFound() {
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '현장을 찾을 수 없습니다.' },
+    { status: 404 },
+  )
+}
+
+function archivedClientError() {
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 거래처는 현장에 새로 연결할 수 없습니다. 거래처를 복원한 뒤 연결해 주세요.' },
+    { status: 400 },
+  )
+}
+
+function archivedConflict() {
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 현장은 복원한 뒤 수정할 수 있습니다.' },
+    { status: 409 },
+  )
+}
+
+/** 보관 현장에 새 자료 등록 시 각 서비스가 돌려주는 400 (백엔드 SITE_ARCHIVED) */
+export function archivedSiteCreateError(siteId: number | null | undefined) {
+  if (siteId == null || !sites.some((s) => s.id === Number(siteId) && s.archivedAt)) return null
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 현장에는 새 자료를 등록할 수 없습니다. 현장을 복원한 뒤 등록해 주세요.' },
+    { status: 400 },
+  )
+}
+
+/** 보관 현장 소속 기존 자료의 수정·삭제 409 (백엔드 SITE_ARCHIVED_DOCUMENT_LOCKED). 입금 확인은 허용 */
+export function archivedSiteLockError(siteId: number | null | undefined) {
+  if (siteId == null || !sites.some((s) => s.id === Number(siteId) && s.archivedAt)) return null
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 현장의 자료는 현장을 복원한 뒤 수정·삭제할 수 있습니다.' },
+    { status: 409 },
+  )
+}
+
 export const sitesHandlers = [
   // 목록 조회 — GET /api/v1/sites
   http.get('/api/v1/sites', ({ request }) => {
     const url = new URL(request.url)
     const status = url.searchParams.get('status')
-    const filtered = status ? sites.filter((s) => s.status === status) : sites
+    const archived = url.searchParams.get('archived')
+    const filtered = sites
+      .filter((s) => !status || s.status === status)
+      .filter((s) => archived == null || (archived === 'true') === (s.archivedAt != null))
 
     return HttpResponse.json<ApiResponse<Site[]>>({
       success: true,
@@ -39,6 +81,7 @@ export const sitesHandlers = [
   http.post<never, SiteCreateRequest>('/api/v1/sites', async ({ request }) => {
     const body = await request.json()
     const client = findMockClientById(body.clientId)
+    if (client?.archivedAt) return archivedClientError()
     if (body.clientId != null && !client) {
       return HttpResponse.json(
         { success: false, error: '거래처를 찾을 수 없습니다.' },
@@ -54,6 +97,7 @@ export const sitesHandlers = [
       startDate: body.startDate || '',
       endDate: body.endDate || '',
       memo: body.memo || '',
+      archivedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -74,6 +118,7 @@ export const sitesHandlers = [
         { status: 404 },
       )
     }
+    if (sites[index].archivedAt) return archivedConflict()
     if (!body.siteName?.trim()) {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '현장명은 필수입니다.' },
@@ -81,6 +126,7 @@ export const sitesHandlers = [
       )
     }
     const client = findMockClientById(body.clientId ?? undefined)
+    if (client?.archivedAt && client.id !== sites[index].client?.id) return archivedClientError()
     if (body.clientId != null && !client) {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '거래처를 찾을 수 없습니다.' },
@@ -110,11 +156,28 @@ export const sitesHandlers = [
         { status: 404 },
       )
     }
+    if (sites[index].archivedAt) return archivedConflict()
     sites[index] = { ...sites[index], status: body.status as Site['status'], updatedAt: new Date().toISOString() }
     return HttpResponse.json<ApiResponse<Site>>({ success: true, data: sites[index], error: null })
   }),
 
-  // 보관/복원 전까지 하드 삭제 차단 — DELETE /api/v1/sites/:id
+  // 보관 — PATCH /api/v1/sites/:id/archive (이미 보관이면 최초 시각 유지)
+  http.patch<{ id: string }>('/api/v1/sites/:id/archive', ({ params }) => {
+    const index = sites.findIndex((s) => s.id === Number(params.id))
+    if (index === -1) return notFound()
+    sites[index] = { ...sites[index], archivedAt: sites[index].archivedAt ?? new Date().toISOString() }
+    return HttpResponse.json<ApiResponse<Site>>({ success: true, data: withCurrentClient(sites[index]), error: null })
+  }),
+
+  // 복원 — PATCH /api/v1/sites/:id/restore
+  http.patch<{ id: string }>('/api/v1/sites/:id/restore', ({ params }) => {
+    const index = sites.findIndex((s) => s.id === Number(params.id))
+    if (index === -1) return notFound()
+    sites[index] = { ...sites[index], archivedAt: null }
+    return HttpResponse.json<ApiResponse<Site>>({ success: true, data: withCurrentClient(sites[index]), error: null })
+  }),
+
+  // 하드 삭제는 계속 차단(ADR-021) — DELETE /api/v1/sites/:id
   http.delete<{ id: string }>('/api/v1/sites/:id', ({ params }) => {
     if (!sites.some((s) => s.id === Number(params.id))) {
       return HttpResponse.json<ApiResponse<null>>(
@@ -123,7 +186,7 @@ export const sitesHandlers = [
       )
     }
     return HttpResponse.json<ApiResponse<null>>(
-      { success: false, data: null, error: '현장 삭제는 연결 자료 보존을 위해 지원하지 않습니다. 보관 기능을 준비 중입니다.' },
+      { success: false, data: null, error: '현장 삭제는 연결 자료 보존을 위해 지원하지 않습니다. 보관 기능을 사용해 주세요.' },
       { status: 409 },
     )
   }),

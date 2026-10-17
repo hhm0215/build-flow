@@ -46,6 +46,9 @@ public class Site {
     @Column(columnDefinition = "TEXT")
     private String memo;
 
+    // 보관 시각(KST). null이면 미보관. 업무 단계(status)와 별개이며 보관해도 자료·손익은 유지한다 (ADR-021)
+    private LocalDateTime archivedAt;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -77,5 +80,20 @@ public class Site {
 
     public void changeStatus(SiteStatus status) {
         this.status = status;
+    }
+
+    public boolean isArchived() {
+        return archivedAt != null;
+    }
+
+    /** 이미 보관된 현장이면 최초 보관 시각을 유지한다. */
+    public void archive(LocalDateTime now) {
+        if (archivedAt == null) {
+            archivedAt = now;
+        }
+    }
+
+    public void restore() {
+        archivedAt = null;
     }
 }

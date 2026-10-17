@@ -28,6 +28,7 @@ public class WarrantyResponse {
     private Instant expiryConfirmedAt;
     private String memo;
     private OcrStatus ocrStatus;
+    private boolean hasUploadedPdf;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -58,6 +59,7 @@ public class WarrantyResponse {
                 .expiryConfirmedAt(warranty.getExpiryConfirmedAt())
                 .memo(warranty.getMemo())
                 .ocrStatus(warranty.getOcrStatus())
+                .hasUploadedPdf(warranty.getFilePath() != null)
                 .createdAt(warranty.getCreatedAt())
                 .updatedAt(warranty.getUpdatedAt())
                 .build();

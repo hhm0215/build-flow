@@ -1,13 +1,15 @@
 package com.buildflow.notification.global.outbox;
 
 import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
+import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -16,16 +18,39 @@ public class OutboxClaimService {
 
     private final OutboxEventRepository repository;
     private final DefectWarrantyRepository warrantyRepository;
+    private final ObjectMapper objectMapper;
+
+    @Value("${app.warranty.alert-threshold-days:30}")
+    private int thresholdDays;
 
     @Transactional
-    public Optional<OutboxClaim> claimNext() {
+    public OutboxClaimAttempt claimNext() {
         Instant now = Instant.now();
-        return repository.claimReady(now).map(event -> {
-            String token = UUID.randomUUID().toString();
-            event.claim(token, now.plusSeconds(60));
-            return new OutboxClaim(event.getEventId(), event.getTopic(),
-                    event.getRecordKey(), event.getPayloadJson(), token);
-        });
+        if (thresholdDays < 0) throw new IllegalStateException("Invalid warranty alert threshold");
+        OutboxEvent event = repository.claimReady(now).orElse(null);
+        if (event == null) return OutboxClaimAttempt.empty();
+        if ("warranty.expiring".equals(event.getTopic())) {
+            String reason = WarrantyOutboxEligibility.rejectionReason(event,
+                    warrantyFor(event), WarrantyDatePolicy.today(), thresholdDays, objectMapper);
+            if (reason != null) {
+                event.suppress(now, reason);
+                return OutboxClaimAttempt.suppressed();
+            }
+        }
+        String token = UUID.randomUUID().toString();
+        event.claim(token, now.plusSeconds(60));
+        return OutboxClaimAttempt.claimed(new OutboxClaim(event.getEventId(), event.getTopic(),
+                event.getRecordKey(), event.getPayloadJson(), token));
+    }
+
+    private DefectWarranty warrantyFor(OutboxEvent event) {
+        try {
+            long warrantyId = Long.parseLong(event.getRecordKey());
+            if (warrantyId <= 0 || !Long.toString(warrantyId).equals(event.getRecordKey())) return null;
+            return warrantyRepository.findByIdForUpdate(warrantyId).orElse(null);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @Transactional

@@ -48,7 +48,7 @@
 | PATCH | /api/v1/estimates/{id}/confirm | 본문 없음 → `EstimateResponse`; 확정 후 집계 이벤트 발행 | O |
 | DELETE | /api/v1/estimates/{id} | DRAFT만 삭제; CONFIRMED는 충돌 오류 | O |
 
-생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`이다. 수정은 `siteId`를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`), `estimateDate`, `totalAmount`, `memo`, `items[]`, 생성·수정 시각이 포함된다. 금액은 서버가 항목으로 계산한다. 파일을 업로드하거나 다운로드하는 견적 CRUD 경로는 없다.
+생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`이다. 수정은 `siteId`를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`), `estimateDate`, `totalAmount`, `memo`, `items[]`, 생성·수정 시각이 포함된다. 금액은 서버가 항목으로 계산한다. 견적 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 견적을 저장하지 않는다. 파일을 업로드하거나 다운로드하는 견적 CRUD 경로는 없다.
 
 ---
 
@@ -59,14 +59,16 @@
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
 | POST | /api/v1/sites | JSON `SiteCreateRequest` → `SiteResponse` (201) | O |
-| GET | /api/v1/sites?status={status} | 선택적 상태 필터 → `SiteResponse[]`; 서버 검색·페이징 없음 | O |
+| GET | /api/v1/sites?status={status}&archived={true\|false} | 두 필터 모두 선택적 → `SiteResponse[]`; `archived` 미지정은 보관 여부와 무관한 전체(기존 계약); 서버 검색·페이징 없음 | O |
 | GET | /api/v1/sites/{id} | `SiteResponse` (손익 별도) | O |
 | PUT | /api/v1/sites/{id} | JSON `SiteUpdateRequest` → `SiteResponse` | O |
-| PATCH | /api/v1/sites/{id}/status | JSON `{status}` → `SiteResponse` | O |
-| DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 보관·복원 도입 전까지 사용 금지 | O |
+| PATCH | /api/v1/sites/{id}/status | JSON `{status}` → `SiteResponse`; 보관된 현장은 409 | O |
+| PATCH | /api/v1/sites/{id}/archive | 본문 없음 → `SiteResponse`; 보관(멱등, 최초 `archivedAt` 유지) | O |
+| PATCH | /api/v1/sites/{id}/restore | 본문 없음 → `SiteResponse`; 복원(`archivedAt=null`) | O |
+| DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 정리는 보관을 사용 | O |
 | GET | /api/v1/sites/{id}/profit | `ProfitResponse` | O |
 
-생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다.
+생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. `marginRate`는 소수 2자리 %이며 저장 범위(DECIMAL(5,2)) 때문에 −999.99에서 하한 처리된다(매입이 견적의 약 11배 이상인 손실 현장). 정확한 손실은 `margin` 금액으로 본다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다. `SiteResponse.archivedAt`은 보관 시각(KST, 미보관 null)이며 업무 단계 `status`와 별개다. 보관된 현장은 수정·상태 변경이 409이고, 매입·견적·세금계산서·보증 생성은 해당 서비스에서 400으로 거부된다. 보관 현장 소속 기존 문서의 수정·삭제(견적 확정, 보증 수정 포함)는 각 서비스에서 409이며, 매출 세금계산서 입금 확인만 허용한다. 현장 검증 도입 전 생긴 고아 문서(현장 404)는 정정할 수 있도록 막지 않는다. 보관해도 기존 자료·손익 조회는 유지된다(ADR-021).
 
 ### 거래처 (clients)
 
@@ -76,8 +78,10 @@
 | GET | /api/v1/clients | `ClientResponse[]` | O |
 | GET | /api/v1/clients/{id} | `ClientResponse`; 관련 현장·미수금 집계 미포함 | O |
 | PUT | /api/v1/clients/{id} | JSON `ClientUpdateRequest` → `ClientResponse` | O |
+| PATCH | /api/v1/clients/{id}/archive | 본문 없음 → `ClientResponse`; 보관(멱등) | O |
+| PATCH | /api/v1/clients/{id}/restore | 본문 없음 → `ClientResponse`; 복원 | O |
 
-생성·수정 본문은 필수 `companyName`과 선택적 `representative`, `businessNo`, `phone`, `email`, `address`, `memo`이다. 응답에 `id`와 생성·수정 시각이 추가된다.
+생성·수정 본문은 필수 `companyName`과 선택적 `representative`, `businessNo`, `phone`, `email`, `address`, `memo`이다. 응답에 `id`와 생성·수정 시각이 추가된다. 응답의 `archivedAt`은 보관 시각(미보관 null)이다. 목록은 선택적 `archived=true|false` 필터를 받으며 미지정은 전체다. 보관된 거래처는 수정 409, 현장 생성·수정에서 새로 연결하면 400이며, 이미 연결된 현장은 같은 거래처를 유지한 채 수정할 수 있다.
 
 ### 대시보드 (`DashboardController`)
 
@@ -98,7 +102,7 @@
 | PUT | /api/v1/purchases/{id} | JSON `PurchaseUpdateRequest` → `PurchaseResponse`; 현장 ID 변경 불가 | O |
 | DELETE | /api/v1/purchases/{id} | 삭제 | O |
 
-생성 본문은 필수 `siteId`, `itemName`, `quantity`(1 이상 정수), `unitPrice`(0 이상·정수 10자리/소수 2자리 이하)와 선택적 `supplier`, `purchaseDate`, `memo`이다. 수정에서는 `siteId`가 없다. 응답에는 `id`, `siteId`, 요청 필드, 계산된 `totalAmount`, 생성·수정 시각이 포함된다. 총액은 DECIMAL(15,2) 범위이며 검증 실패는 JSON 오류 래퍼의 400이다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
+생성 본문은 필수 `siteId`, `itemName`, `quantity`(1 이상 정수), `unitPrice`(0 이상·정수 10자리/소수 2자리 이하)와 선택적 `supplier`, `purchaseDate`, `memo`이다. 수정에서는 `siteId`가 없다. 응답에는 `id`, `siteId`, 요청 필드, 계산된 `totalAmount`, 생성·수정 시각이 포함된다. 총액은 DECIMAL(15,2) 범위이며 검증 실패는 JSON 오류 래퍼의 400이다. 매입 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 매입/outbox를 저장하지 않는다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
 
 ---
 
@@ -116,7 +120,7 @@
 | DELETE | /api/v1/taxes/{id} | 삭제; 입금 확인 건 불가 | O |
 | GET | /api/v1/taxes/outstanding?siteId={id} | 필수 `siteId` → `OutstandingResponse` | O |
 
-생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`, `paymentDate`, 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`, `outstandingAmount`, `unpaidCount`, `unpaidInvoices[]`이다. 입금 확인 불가 상태는 충돌 오류다.
+생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`, `paymentDate`, 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`, `outstandingAmount`, `unpaidCount`, `unpaidInvoices[]`이다. 입금 확인 불가 상태는 충돌 오류다. 세금계산서 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 세금계산서/outbox를 저장하지 않는다.
 
 ---
 
@@ -130,11 +134,13 @@
 | POST | /api/v1/warranties/upload | multipart `siteId`, `file`(PDF) → PENDING `WarrantyResponse` (202) | O |
 | GET | /api/v1/warranties?siteId={id} | 선택적 현장 필터 → `WarrantyResponse[]` | O |
 | GET | /api/v1/warranties/{id} | `WarrantyResponse`; 비동기 OCR 상태 폴링에 사용 | O |
+| GET | /api/v1/warranties/{id}/history | `WarrantyAuditResponse[]` 시간순; 직접 등록·업로드·OCR 반영/실패·수동 수정·삭제의 변경 후 값 스냅샷. 삭제된 보증도 이력이 있으면 반환 | O |
+| GET | /api/v1/warranties/{id}/file | 업로드 PDF 사본을 첨부파일로 스트리밍; 관리자 access JWT·로그아웃 토큰 폐기를 notification-service에서 재검증 | O |
 | PUT | /api/v1/warranties/{id} | JSON `WarrantyUpdateRequest` → `WarrantyResponse`; OCR 결과 수동 보완 | O |
 | DELETE | /api/v1/warranties/{id} | 삭제 | O |
 | GET | /api/v1/warranties/expiring?days=30 | 선택적 `days`(기본 30) → `WarrantyResponse[]` | O |
 
-직접 등록 본문은 필수 `siteId`, `insuranceCompany`, `startDate`, `endDate`와 선택적 `policyNumber`, `coverageAmount`(원 단위 정수), `memo`이다. 수정 본문은 필수 보험사·시작일·만료일과 선택적 `policyNumber`, `coverageAmount`, `memo`이다. 수정의 선택 필드는 **미전송=기존 유지, JSON null=지움, 값=변경**의 3상태다. 응답에는 `id`, `siteId`, 날짜·금액, `daysUntilExpiry`, `expired`, `expiryConfirmed`, `ocrStatus`(`PENDING`/`SUCCESS`/`FAILED`/`MANUAL`), 생성·수정 시각이 포함된다. `SUCCESS`는 필수 필드 추출 완료일 뿐 사용자 확정이 아니며 `expiryConfirmed=false`; 이때 `expired=false`와 `daysUntilExpiry=0`은 만료 사실을 뜻하지 않는다. 사용자가 원본 대조 후 수정/확인 저장한 `MANUAL`과 유효한 필수 필드가 있을 때만 만료 판단·알림에 사용한다. 서버 내부 `filePath`는 응답하지 않으며 파일 다운로드 API도 아직 없다. PDF 업로드는 20 MiB, 10페이지, 300 DPI 기준 렌더링 1,200만 픽셀/변 5,000픽셀 한도로 거부될 수 있다. OCR 대기열 포화 시 수동 보정 가능한 `FAILED`, 접수 후 30분 초과 `PENDING`도 `FAILED`로 전환된다.
+직접 등록 본문은 필수 `siteId`, `insuranceCompany`, `startDate`, `endDate`와 선택적 `policyNumber`, `coverageAmount`(원 단위 정수), `memo`이다. 수정 본문은 필수 보험사·시작일·만료일과 선택적 `policyNumber`, `coverageAmount`, `memo`이다. 수정의 선택 필드는 **미전송=기존 유지, JSON null=지움, 값=변경**의 3상태다. 응답에는 `id`, `siteId`, 날짜·금액, `daysUntilExpiry`, `expired`, `expiryConfirmed`, `ocrStatus`(`PENDING`/`SUCCESS`/`FAILED`/`MANUAL`), 생성·수정 시각이 포함된다. `SUCCESS`는 필수 필드 추출 완료일 뿐 사용자 확정이 아니며 `expiryConfirmed=false`; 이때 `expired=false`와 `daysUntilExpiry=0`은 만료 사실을 뜻하지 않는다. 사용자가 원본 대조 후 수정/확인 저장한 `MANUAL`과 유효한 필수 필드가 있을 때만 만료 판단·알림에 사용한다. 서버 내부 `filePath`는 응답하지 않는다. `hasUploadedPdf`는 업로드 사본의 DB 연결 여부만 뜻하며 실제 파일이 없으면 다운로드는 404다. 다운로드는 `no-store`·`nosniff`와 동시 요청 상한을 적용한다. PDF 업로드는 20 MiB, 10페이지, 300 DPI 기준 렌더링 1,200만 픽셀/변 5,000픽셀 한도로 거부될 수 있다. OCR 대기열 포화 시 수동 보정 가능한 `FAILED`, 접수 후 30분 초과 `PENDING`도 `FAILED`로 전환된다. 직접 등록과 PDF 업로드는 site-service에서 현장 ID를 먼저 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부한다. 업로드는 이 검증이 끝나기 전 PDF를 저장하거나 OCR을 예약하지 않는다. 감사 이력(`warranty_audit_events`)은 추가 전용이며 `action`(CREATED/UPLOADED/OCR_APPLIED/OCR_FAILED/MANUAL_UPDATED/DELETED), `actor`(Gateway `X-User-Id`, 요청 밖 처리는 `system`, 형식 불일치·누락은 `unknown`), 보험사·증권번호·기간·금액·`ocrStatus`·`expiryConfirmedAt`, `occurredAt`(KST)을 담는다. 공유 관리자 계정이라 actor는 계정 단위이며 실제 사람을 증명하지 않는다. 파일 경로는 담지 않는다.
 
 ### 알림
 

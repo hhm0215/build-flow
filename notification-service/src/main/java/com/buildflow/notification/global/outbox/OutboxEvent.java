@@ -57,6 +57,9 @@ public class OutboxEvent {
     @Column(name = "sent_at")
     private Instant sentAt;
 
+    @Column(name = "suppressed_at")
+    private Instant suppressedAt;
+
     @Column(name = "last_error", length = 500)
     private String lastError;
 
@@ -96,6 +99,18 @@ public class OutboxEvent {
         this.leaseUntil = null;
         this.lastError = error == null ? null : error.substring(0, Math.min(error.length(), 500));
         return true;
+    }
+
+    /** Preserve the original envelope and end retries without claiming a broker ACK. */
+    public void suppress(Instant now, String reasonCode) {
+        if (status != OutboxStatus.PENDING && status != OutboxStatus.CLAIMED) {
+            throw new IllegalStateException("Only undelivered outbox events can be suppressed");
+        }
+        this.status = OutboxStatus.SUPPRESSED;
+        this.suppressedAt = now;
+        this.lastError = reasonCode;
+        this.claimToken = null;
+        this.leaseUntil = null;
     }
 
     private boolean isClaimedBy(String token) {

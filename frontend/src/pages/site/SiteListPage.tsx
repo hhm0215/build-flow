@@ -46,14 +46,24 @@ const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SiteStatus[]).map((s) => ({
   color: STATUS_COLOR[s],
 }))
 
+// 미지정이면 보관되지 않은 현장만 보여준다 (ADR-021: 보관해도 자료·손익은 유지)
+type ArchiveView = 'ARCHIVED' | 'ALL'
+
+const ARCHIVE_OPTIONS: { value: ArchiveView; label: string }[] = [
+  { value: 'ARCHIVED', label: '보관된 현장만' },
+  { value: 'ALL', label: '보관 포함 전체' },
+]
+
 interface SiteFilters {
   q: string
   status: SiteStatus
+  archive: ArchiveView
 }
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
   status: { type: 'enum', values: ['IN_PROGRESS', 'SETTLING', 'WARRANTY', 'COMPLETED'] },
+  archive: { type: 'enum', values: ['ARCHIVED', 'ALL'] },
 }
 
 const ESTIMATE_STATUS_LABEL: Record<string, string> = {
@@ -255,6 +265,8 @@ export default function SiteListPage() {
       const q = rawQ.trim().toLowerCase()
       if (q && !`${site.siteName} ${site.client?.companyName ?? ''}`.toLowerCase().includes(q)) return false
       if (f.status && site.status !== f.status) return false
+      if (f.archive === 'ARCHIVED' && !site.archivedAt) return false
+      if (!f.archive && site.archivedAt) return false
       return true
     },
   })
@@ -403,6 +415,13 @@ export default function SiteListPage() {
                 onChange={(v) => setFilters({ status: v })}
                 width={288}
               />
+              <FilterSelect<ArchiveView>
+                placeholder="보관 제외 (기본)"
+                value={filters.archive}
+                options={ARCHIVE_OPTIONS}
+                onChange={(v) => setFilters({ archive: v })}
+                width={288}
+              />
             </div>
 
             <div
@@ -481,7 +500,10 @@ export default function SiteListPage() {
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{site.client?.companyName ?? '-'}</div>
                         </div>
-                        <InfoBadge color={STATUS_COLOR[site.status]}>{STATUS_LABEL[site.status]}</InfoBadge>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {site.archivedAt && <InfoBadge color="#a1a1aa">보관</InfoBadge>}
+                          <InfoBadge color={STATUS_COLOR[site.status]}>{STATUS_LABEL[site.status]}</InfoBadge>
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

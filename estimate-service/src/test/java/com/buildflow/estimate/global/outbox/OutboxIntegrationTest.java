@@ -4,6 +4,7 @@ import com.buildflow.estimate.domain.estimate.entity.Estimate;
 import com.buildflow.estimate.domain.estimate.entity.EstimateStatus;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
 import com.buildflow.estimate.domain.estimate.service.EstimateService;
+import com.buildflow.estimate.domain.estimate.service.SiteReferenceValidator;
 import com.buildflow.estimate.domain.estimate.event.EstimateParsedPayload;
 import com.buildflow.estimate.global.exception.BusinessException;
 import com.buildflow.estimate.global.exception.ErrorCode;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
@@ -63,6 +65,9 @@ class OutboxIntegrationTest {
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactions;
+
+    // 현장 서비스 없이 outbox 경계만 검증한다(현장 보관 검사는 SiteReferenceValidatorTest)
+    @MockBean private SiteReferenceValidator siteReferenceValidator;
 
     OutboxIntegrationTest(EstimateService estimateService, EstimateRepository estimateRepository,
                           OutboxEventRepository outboxRepository, OutboxClaimService claimService,
