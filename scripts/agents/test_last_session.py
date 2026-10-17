@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from last_session import actual_user_text, codex_events, visible_excerpt
+from last_session import actual_user_text, claude_events, codex_events, visible_excerpt
 
 
 class CodexUserMessageTests(unittest.TestCase):
@@ -39,6 +39,25 @@ class CodexUserMessageTests(unittest.TestCase):
     def test_default_output_hides_session_text(self):
         self.assertEqual(visible_excerpt("secret-like example", False, 800), "[내용 숨김: 19자]")
         self.assertEqual(visible_excerpt("ordinary text", True, 8), "ordinary")
+
+
+class ClaudeUserMessageTests(unittest.TestCase):
+    @staticmethod
+    def entry(content, **extra):
+        return json.dumps({"type": "user", "timestamp": "2026-10-17T04:00:00Z",
+                           "message": {"role": "user", "content": content}, **extra})
+
+    def test_task_notification_after_request_is_not_last_user_message(self):
+        lines = [
+            self.entry("작업 이어서 진행해줘"),
+            self.entry("<task-notification>\n<task-id>abc</task-id>\n</task-notification>"),
+            self.entry("<system-reminder>injected</system-reminder>"),
+            self.entry("<command-name>/clear</command-name>"),
+            self.entry("meta", isMeta=True),
+            self.entry([{"type": "tool_result", "content": "tool output"}]),
+        ]
+        users = [item[2] for item in claude_events(lines) if item[1] == "user"]
+        self.assertEqual(users, ["작업 이어서 진행해줘"])
 
 
 if __name__ == "__main__":

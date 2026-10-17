@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
-| 도구 | Codex |
-| 갱신 | 2026-10-17 12:40 KST |
-| 브랜치 | 없음 (현재 `develop` SHA는 `git rev-parse origin/develop`로 확인) |
-| PR | [#131](https://github.com/hhm0215/build-flow/pull/131) `develop` 병합, #99 develop→main **draft 유지** |
-| 현재 단계 | 세션 추출 오인·누락 수정과 기본 비공개 출력, 합성 회귀·독립 보안 재검토 및 PR #131 필수 CI 5개 PASS 후 `develop` 병합. `main`/VPS/실데이터 미반영 |
-| 다음 첫 행동 | 새 Claude 세션에서 `docs/AGENT_COLLABORATION.md`의 교대 질문에 출처와 함께 답하는지 확인한다(미실측). 동시에 `.claude/BACKLOG.md`의 독립 안전 P0를 계속 처리한다 |
+| 상태 | ACTIVE |
+| 도구 | Claude Code |
+| 갱신 | 2026-10-17 13:10 KST |
+| 브랜치 | `claude/handoff-claude-filter` |
+| PR | Claude 세션 알림 오인 수정 PR (develop 대상), #99 develop→main **draft 유지** |
+| 현재 단계 | Codex PR #129~#132 검토 완료, 새 Claude 세션 교대 검증 PASS(VPS 실행 이미지만 UNVERIFIED), Claude 로그 알림 오인 수정 |
+| 다음 첫 행동 | 병합 후 BACKLOG P0 독립 안전 항목 계속 |
 
 ## 공통 사용자 지시
 
