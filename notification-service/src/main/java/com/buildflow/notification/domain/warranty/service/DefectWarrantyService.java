@@ -85,6 +85,7 @@ public class DefectWarrantyService {
     @Transactional
     public WarrantyResponse update(Long id, WarrantyUpdateRequest request) {
         DefectWarranty warranty = getWarrantyForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(warranty.getSiteId());
         if (warranty.getOcrStatus() == OcrStatus.PENDING) {
             throw new BusinessException(ErrorCode.WARRANTY_OCR_PENDING);
         }
@@ -106,6 +107,7 @@ public class DefectWarrantyService {
     @Transactional
     public void delete(Long id) {
         DefectWarranty warranty = getWarrantyForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(warranty.getSiteId());
         String filePath = warranty.getFilePath();
         warrantyRepository.delete(warranty);
         // 트랜잭션 커밋 후에만 파일 삭제 — rollback 시 파일은 남고 다음 cleanup job 대상이 됨.

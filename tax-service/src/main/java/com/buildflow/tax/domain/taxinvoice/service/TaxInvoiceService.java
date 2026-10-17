@@ -76,6 +76,7 @@ public class TaxInvoiceService {
     @Transactional
     public TaxInvoiceResponse update(Long id, TaxInvoiceUpdateRequest request) {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
         taxInvoice.update(
                 request.getType(),
                 request.getSupplyAmount(),
@@ -111,6 +112,7 @@ public class TaxInvoiceService {
     @Transactional
     public void delete(Long id) {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
         taxInvoice.validateMutable();
         taxInvoiceRepository.delete(taxInvoice);
     }

@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import { archivedSiteCreateError, archivedSiteLockError } from './sites.handlers'
 import { mockWarranties } from '../data/warranties.data'
 import { ApiResponse, Warranty, WarrantyUpdateRequest } from '../../types'
 
@@ -46,6 +47,8 @@ export const warrantiesHandlers = [
     '/api/v1/warranties',
     async ({ request }) => {
       const body = await request.json()
+      const archived = archivedSiteCreateError(body.siteId)
+      if (archived) return archived
       if (!body.siteId || !body.insuranceCompany?.trim() || !body.startDate || !body.endDate
           || body.startDate > body.endDate || (body.coverageAmount != null && body.coverageAmount < 0)) {
         return HttpResponse.json<ApiResponse<null>>(
@@ -90,6 +93,8 @@ export const warrantiesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(warranties[index].siteId)
+    if (locked) return locked
 
     if (warranties[index].ocrStatus === 'PENDING') {
       return HttpResponse.json<ApiResponse<null>>(
@@ -133,6 +138,8 @@ export const warrantiesHandlers = [
 
   // 삭제 — DELETE /api/v1/warranties/:id
   http.delete<{ id: string }>('/api/v1/warranties/:id', ({ params }) => {
+    const locked = archivedSiteLockError(warranties.find((w) => w.id === Number(params.id))?.siteId)
+    if (locked) return locked
     uploadedPdfs.delete(Number(params.id))
     warranties = warranties.filter((w) => w.id !== Number(params.id))
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
@@ -142,6 +149,8 @@ export const warrantiesHandlers = [
   http.post<never, never, ApiResponse<Warranty | null>>('/api/v1/warranties/upload', async ({ request }) => {
     const formData = await request.formData()
     const siteId = Number(formData.get('siteId') ?? 0)
+    const archived = archivedSiteCreateError(siteId)
+    if (archived) return archived
     const file = formData.get('file') as File | null
     if (!file) {
       return HttpResponse.json<ApiResponse<null>>(

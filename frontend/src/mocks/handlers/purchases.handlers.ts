@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import { archivedSiteCreateError, archivedSiteLockError } from './sites.handlers'
 import { mockPurchases } from '../data/purchases.data'
 import { ApiResponse, Purchase, PurchaseCreateRequest, PurchaseUpdateRequest } from '../../types'
 
@@ -60,6 +61,8 @@ export const purchasesHandlers = [
 
   http.post<never, PurchaseCreateRequest>('/api/v1/purchases', async ({ request }) => {
     const body = await request.json()
+    const archived = archivedSiteCreateError(body.siteId)
+    if (archived) return archived
     const amountError = purchaseRequestError(body.quantity, body.unitPrice)
     if (amountError) {
       return HttpResponse.json<ApiResponse<null>>(
@@ -96,6 +99,8 @@ export const purchasesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(purchases[index].siteId)
+    if (locked) return locked
     const body = await request.json()
     const amountError = purchaseRequestError(body.quantity, body.unitPrice)
     if (amountError) {
@@ -128,6 +133,8 @@ export const purchasesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(purchases.find((purchase) => purchase.id === id)?.siteId)
+    if (locked) return locked
     purchases = purchases.filter((p) => p.id !== id)
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
   }),

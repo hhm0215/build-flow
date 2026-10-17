@@ -23,6 +23,24 @@ function archivedConflict() {
   )
 }
 
+/** 보관 현장에 새 자료 등록 시 각 서비스가 돌려주는 400 (백엔드 SITE_ARCHIVED) */
+export function archivedSiteCreateError(siteId: number | null | undefined) {
+  if (siteId == null || !sites.some((s) => s.id === Number(siteId) && s.archivedAt)) return null
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 현장에는 새 자료를 등록할 수 없습니다. 현장을 복원한 뒤 등록해 주세요.' },
+    { status: 400 },
+  )
+}
+
+/** 보관 현장 소속 기존 자료의 수정·삭제 409 (백엔드 SITE_ARCHIVED_DOCUMENT_LOCKED). 입금 확인은 허용 */
+export function archivedSiteLockError(siteId: number | null | undefined) {
+  if (siteId == null || !sites.some((s) => s.id === Number(siteId) && s.archivedAt)) return null
+  return HttpResponse.json<ApiResponse<null>>(
+    { success: false, data: null, error: '보관된 현장의 자료는 현장을 복원한 뒤 수정·삭제할 수 있습니다.' },
+    { status: 409 },
+  )
+}
+
 export const sitesHandlers = [
   // 목록 조회 — GET /api/v1/sites
   http.get('/api/v1/sites', ({ request }) => {

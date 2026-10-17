@@ -5,6 +5,10 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 보관 현장 기존 문서 잠금 (2026-10-17)
+
+- 사용자 위임에 따라 추천안으로 결정: 보관 현장 소속 견적 수정·확정·삭제, 매입·세금계산서·보증 수정·삭제는 409, 매출 입금 확인만 허용. 현장 서비스 장애 503, 고아 문서(현장 404)는 정정 허용. MSW에도 신규 등록 400·수정 409를 동기화했다(#116에서 빠진 MSW 생성 검사 포함). 백엔드 4개 서비스·프론트 140건 테스트, 로컬 풀 Docker 409/200 실측 PASS.
+
 ## 완료된 작업 — 공내역서 AI 응답 JSON 추출 보강 (2026-10-17)
 
 - Ollama 응답 추출 테스트를 추가하며 두 결함을 고쳤다: 모델이 배열 앞에 `[참고]` 같은 대괄호 문구를 붙이면 첫 `[`부터 잘라 422가 나던 문제(각 `[` 후보를 순서대로 파싱), 응답 content가 비면 NPE로 500이 나던 문제(422 파싱 실패). 실제 VPS 모델 답변 검증은 모델 미기동으로 PENDING.
@@ -739,7 +743,7 @@
 
 ## 다음 세션 진입점 (2026-10-17 갱신)
 
-**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#122를 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
+**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#124를 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
 
 **VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 
