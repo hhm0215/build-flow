@@ -1,6 +1,5 @@
 package com.buildflow.notification.domain.warranty.service;
 
-import net.sourceforge.tess4j.Tesseract;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -8,7 +7,6 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.awt.image.BufferedImage;
@@ -40,13 +38,10 @@ class WarrantyOcrServiceTest {
             document.save(pdf.toFile());
         }
 
-        @SuppressWarnings("unchecked")
-        ObjectProvider<Tesseract> provider = mock(ObjectProvider.class);
-        Tesseract tesseract = mock(Tesseract.class);
-        when(provider.getObject()).thenReturn(tesseract);
-        when(tesseract.doOCR(any(BufferedImage.class))).thenReturn(
+        OcrEngine engine = mock(OcrEngine.class);
+        when(engine.recognize(any(BufferedImage.class))).thenReturn(
                 "서울보증보험 증권번호 QA-20261013-0001 보증기간 2026-10-13 ~ 2027-10-12");
-        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), provider);
+        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), engine);
         ReflectionTestUtils.setField(service, "scanDpi", 72);
 
         WarrantyOcrParser.Result result = service.extractResult(pdf);
@@ -55,8 +50,7 @@ class WarrantyOcrServiceTest {
         assertThat(result.getPolicyNumber()).isEqualTo("QA-20261013-0001");
         assertThat(result.getStartDate()).isEqualTo(LocalDate.of(2026, 10, 13));
         assertThat(result.getEndDate()).isEqualTo(LocalDate.of(2027, 10, 12));
-        verify(provider).getObject();
-        verify(tesseract).doOCR(any(BufferedImage.class));
+        verify(engine).recognize(any(BufferedImage.class));
     }
 
     @Test
@@ -131,12 +125,9 @@ class WarrantyOcrServiceTest {
 
     @Test
     void 이미지_OCR_실패_시_기존_부분_텍스트는_보정용으로_남긴다() throws Exception {
-        @SuppressWarnings("unchecked")
-        ObjectProvider<Tesseract> provider = mock(ObjectProvider.class);
-        Tesseract tesseract = mock(Tesseract.class);
-        when(provider.getObject()).thenReturn(tesseract);
-        when(tesseract.doOCR(any(BufferedImage.class))).thenThrow(new IllegalStateException("synthetic failure"));
-        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), provider);
+        OcrEngine engine = mock(OcrEngine.class);
+        when(engine.recognize(any(BufferedImage.class))).thenThrow(new IllegalStateException("synthetic failure"));
+        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), engine);
         ReflectionTestUtils.setField(service, "scanDpi", 72);
         WarrantyOcrParser.Result partial = WarrantyOcrParser.parse("증권번호 QA-20261013-0001");
 
@@ -164,12 +155,9 @@ class WarrantyOcrServiceTest {
             document.addPage(new PDPage());
             document.save(pdf.toFile());
         }
-        @SuppressWarnings("unchecked")
-        ObjectProvider<Tesseract> provider = mock(ObjectProvider.class);
-        Tesseract tesseract = mock(Tesseract.class);
-        when(provider.getObject()).thenReturn(tesseract);
-        when(tesseract.doOCR(any(BufferedImage.class))).thenReturn("recognized but unrelated text");
-        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), provider);
+        OcrEngine engine = mock(OcrEngine.class);
+        when(engine.recognize(any(BufferedImage.class))).thenReturn("recognized but unrelated text");
+        WarrantyOcrService service = new WarrantyOcrService(mock(WarrantyOcrResultService.class), engine);
         ReflectionTestUtils.setField(service, "scanDpi", 72);
 
         assertThat(service.extractResult(pdf).extractedFieldCount()).isZero();
@@ -178,13 +166,12 @@ class WarrantyOcrServiceTest {
     @Test
     void 파서_예외는_PENDING_상태를_FAILED로_넘긴다() {
         WarrantyOcrResultService results = mock(WarrantyOcrResultService.class);
-        @SuppressWarnings("unchecked")
-        ObjectProvider<Tesseract> provider = mock(ObjectProvider.class);
-        WarrantyOcrService service = new WarrantyOcrService(results, provider);
+        OcrEngine engine = mock(OcrEngine.class);
+        WarrantyOcrService service = new WarrantyOcrService(results, engine);
 
         service.processAsync(42L, tempDir.resolve("missing.pdf"));
 
         verify(results).markFailed(42L);
-        verifyNoInteractions(provider);
+        verifyNoInteractions(engine);
     }
 }

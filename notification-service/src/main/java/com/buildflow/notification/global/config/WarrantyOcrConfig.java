@@ -1,11 +1,11 @@
 package com.buildflow.notification.global.config;
 
-import net.sourceforge.tess4j.Tesseract;
+import com.buildflow.notification.domain.warranty.service.OcrEngine;
+import com.buildflow.notification.domain.warranty.service.TesseractCliOcrEngine;
+import com.buildflow.notification.domain.warranty.service.WarrantyOcrService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -35,19 +35,16 @@ public class WarrantyOcrConfig {
     @Value("${app.ocr.languages:kor+eng}")
     private String languages;
 
-    /**
-     * Tesseract native lib + traineddata 경로 바인딩.
-     *
-     * <p>Scope=prototype: Tesseract(tess4j wrapper)는 native libtesseract를 감싸며
-     * thread-safe하지 않음. @Async OCR 동시 호출 시 race / SIGSEGV 위험.
-     * 호출 측은 {@code ObjectProvider<Tesseract>.getObject()}로 매 호출마다 신규 인스턴스를 가져와야 함.
-     */
+    @Value("${app.ocr.executable:tesseract}")
+    private String executable;
+
+    /** 정상 페이지는 약 2초(2026-10-17 실측). 멈춘 네이티브 OCR이 단일 작업자를 영구 점유하지 않도록 끊는다. */
+    @Value("${app.ocr.page-timeout-seconds:60}")
+    private long pageTimeoutSeconds;
+
     @Bean
-    @Scope(BeanDefinition.SCOPE_PROTOTYPE)
-    public Tesseract tesseract() {
-        Tesseract t = new Tesseract();
-        t.setDatapath(tessdataPath);
-        t.setLanguage(languages);
-        return t;
+    public OcrEngine ocrEngine() {
+        return new TesseractCliOcrEngine(executable, tessdataPath, languages, pageTimeoutSeconds,
+                WarrantyOcrService.MAX_TEXT_CHARS);
     }
 }
