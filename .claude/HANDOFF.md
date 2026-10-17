@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 15:30 KST |
-| 브랜치 | `claude/ocr-subprocess` |
-| PR | OCR 별도 프로세스 PR (develop 대상), #99 draft 유지 |
-| 현재 단계 | OCR 별도 프로세스·강제 타임아웃 구현과 로컬 실측 완료 → PR·CI·병합 |
-| 다음 첫 행동 | 병합 후 BACKLOG P0 독립 안전 항목 계속 |
+| 갱신 | 2026-10-17 15:45 KST |
+| 브랜치 | 없음 (`develop`은 `git rev-parse origin/develop`로 확인) |
+| PR | #99 develop→main **draft 유지** |
+| 현재 단계 | Claude 세션 종료. Codex PR #129~#132 검토·교대 검증 PASS 후 PR #133~#136 병합(Claude 알림 필터, OCR 메모리·VPS 한도 896m, 혼합 PDF 충돌 판정, OCR 별도 프로세스·타임아웃) |
+| 다음 첫 행동 | **사용자 필요**: 마이그레이션 Phase B 관리자 로그인 재시도(401), VPS Web Console 작업. 로컬 후보: OCR 결과 확인자·원본 대조 감사 이력 설계(P0 실데이터 전 확인 근거), 프론트 훅 테스트 |
 
 ## 공통 사용자 지시
 
