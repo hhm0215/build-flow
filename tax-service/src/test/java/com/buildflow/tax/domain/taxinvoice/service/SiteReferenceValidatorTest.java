@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +56,26 @@ class SiteReferenceValidatorTest {
 
         assertEquals(ErrorCode.SITE_ARCHIVED,
                 assertThrows(BusinessException.class, () -> validator.requireExistingSite(7L)).getErrorCode());
+    }
+
+    @Test
+    void existingDocumentOnArchivedSiteIsLockedButOrphansStayEditable() throws Exception {
+        String archived = """
+                {"success":true,"data":{"id":7,"archivedAt":"2026-10-17T09:30:00"},"error":null}
+                """;
+        doReturn(new ObjectMapper().readValue(archived, SiteReferenceResponse.class)).when(client).findById(7L);
+        assertEquals(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED,
+                assertThrows(BusinessException.class, () -> validator.requireSiteNotArchived(7L)).getErrorCode());
+
+        doReturn(new SiteReferenceResponse(true, new SiteReferenceResponse.SiteIdentity(8L))).when(client).findById(8L);
+        assertDoesNotThrow(() -> validator.requireSiteNotArchived(8L));
+
+        doThrow(siteError(404)).when(client).findById(9L);
+        assertDoesNotThrow(() -> validator.requireSiteNotArchived(9L));
+
+        doThrow(siteError(503)).when(client).findById(10L);
+        assertEquals(ErrorCode.SITE_REFERENCE_UNAVAILABLE,
+                assertThrows(BusinessException.class, () -> validator.requireSiteNotArchived(10L)).getErrorCode());
     }
 
     @Test

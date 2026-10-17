@@ -16,6 +16,7 @@ public enum ErrorCode {
     INVALID_ESTIMATE_AMOUNT(HttpStatus.BAD_REQUEST, "견적 수량·단가·금액은 저장 가능한 소수 2자리와 범위에 맞아야 합니다."),
     INVALID_SITE_REFERENCE(HttpStatus.BAD_REQUEST, "유효한 현장을 찾을 수 없습니다."),
     SITE_REFERENCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "현장 확인 서비스를 사용할 수 없습니다."),
+    SITE_ARCHIVED_DOCUMENT_LOCKED(HttpStatus.CONFLICT, "보관된 현장의 자료는 현장을 복원한 뒤 수정·삭제할 수 있습니다."),
     SITE_ARCHIVED(HttpStatus.BAD_REQUEST, "보관된 현장에는 새 자료를 등록할 수 없습니다. 현장을 복원한 뒤 등록해 주세요."),
 
     // Parse

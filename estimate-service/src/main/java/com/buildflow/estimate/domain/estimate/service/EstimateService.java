@@ -70,6 +70,7 @@ public class EstimateService {
     @Transactional
     public EstimateResponse update(Long id, EstimateUpdateRequest request) {
         Estimate estimate = getEstimateForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(estimate.getSiteId());
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);
@@ -87,6 +88,7 @@ public class EstimateService {
     @Transactional
     public void delete(Long id) {
         Estimate estimate = getEstimateForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(estimate.getSiteId());
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             throw new BusinessException(ErrorCode.CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED);
@@ -98,6 +100,7 @@ public class EstimateService {
     @Transactional
     public EstimateResponse confirm(Long id) {
         Estimate estimate = getEstimateForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(estimate.getSiteId());
 
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);

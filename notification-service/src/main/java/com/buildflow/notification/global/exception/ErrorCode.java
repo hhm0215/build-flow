@@ -18,6 +18,7 @@ public enum ErrorCode {
     WARRANTY_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "보증금액은 0 이상이어야 합니다."),
     INVALID_SITE_REFERENCE(HttpStatus.BAD_REQUEST, "유효한 현장을 찾을 수 없습니다."),
     SITE_REFERENCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "현장 확인 서비스를 사용할 수 없습니다."),
+    SITE_ARCHIVED_DOCUMENT_LOCKED(HttpStatus.CONFLICT, "보관된 현장의 자료는 현장을 복원한 뒤 수정·삭제할 수 있습니다."),
     SITE_ARCHIVED(HttpStatus.BAD_REQUEST, "보관된 현장에는 새 자료를 등록할 수 없습니다. 현장을 복원한 뒤 등록해 주세요."),
     WARRANTY_FILE_EMPTY(HttpStatus.BAD_REQUEST, "업로드된 파일이 비어 있습니다."),
     WARRANTY_INVALID_PDF(HttpStatus.BAD_REQUEST, "유효한 PDF 파일만 업로드할 수 있습니다."),
