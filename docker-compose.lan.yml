@@ -1,0 +1,14 @@
+# LAN(사무실/가정 내부망) 공개용 override. docker-compose.yml + docker-compose.app.yml 뒤에 적용한다.
+# 프론트(Nginx) 하나만 지정한 사설 IP의 3000번으로 추가 노출하고, Gateway·업무 서비스·MySQL·Redis·Kafka 등
+# 나머지 포트는 기본 파일의 127.0.0.1 바인딩을 그대로 유지한다. 0.0.0.0(모든 인터페이스) 노출은 하지 않는다.
+# 검증: docker compose ... -f docker-compose.lan.yml config --format json | python scripts/vps/verify_lan_compose.py
+# 운영 절차·방화벽: docs/LOCAL_SERVER.md
+services:
+  frontend:
+    ports:
+      - "${LAN_BIND_ADDRESS:?LAN_BIND_ADDRESS must be this PC's private LAN IPv4}:3000:80"
+
+  gateway-server:
+    environment:
+      # 브라우저가 LAN 주소로 접속하면 Nginx가 Origin을 그대로 넘기므로 그 출처만 추가로 허용한다
+      CORS_ALLOWED_ORIGINS: http://${LAN_BIND_ADDRESS:?LAN_BIND_ADDRESS must be this PC's private LAN IPv4}:3000,http://localhost:3000

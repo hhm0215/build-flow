@@ -108,7 +108,7 @@ jobs:
       - name: Test release evidence generator
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
       - name: Test exposure validator
-        run: python3 -m unittest discover -s scripts/vps -p 'test_verify_public_compose.py'
+        run: python3 -m unittest discover -s scripts/vps -p 'test_verify_*_compose.py'
       - name: Validate Unix backup privacy gate
         run: |
           pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1
@@ -117,6 +117,12 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml config --format json \
             | python3 scripts/vps/verify_public_compose.py
+      - name: Validate LAN Compose exposure and CORS
+        env:
+          LAN_BIND_ADDRESS: 192.168.0.20
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.lan.yml config --format json \
+            | python3 scripts/vps/verify_lan_compose.py
       - name: Validate Caddyfile syntax
         run: |
           docker run --rm --entrypoint caddy -e PUBLIC_HOST=example.org \
