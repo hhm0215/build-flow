@@ -5,15 +5,39 @@ commit it, because session text can contain secrets or business data.
 
     python -I -X utf8 scripts/agents/last_session.py codex   [--messages 8]
     python -I -X utf8 scripts/agents/last_session.py claude  [--messages 8]
+
+Content is hidden by default. --show-excerpts prints raw local log excerpts and
+must not be used in shared CI, issue comments, or committed handoff records.
 """
 import argparse
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 REPO_MARKER = "build-flow"
 TAIL_BYTES = 4 * 1024 * 1024
+AMBIENT_CONTEXT = re.compile(
+    r"^\s*<in-app-browser-context\b[^>]*>.*?</in-app-browser-context>\s*",
+    re.DOTALL,
+)
+
+
+def actual_user_text(value):
+    """Ignore injected guidance, but retain a user's request after UI context."""
+    value = AMBIENT_CONTEXT.sub("", value).strip()
+    if value.startswith("# AGENTS.md instructions for "):
+        return None
+    if value.startswith(("<heartbeat>", "<environment_context>")):
+        return None
+    if value.startswith("## My request:"):
+        value = value.removeprefix("## My request:").strip()
+    return value or None
+
+
+def visible_excerpt(value, show_excerpts, limit):
+    return value[:limit] if show_excerpts else f"[내용 숨김: {len(value)}자]"
 
 
 def latest(paths):
@@ -59,8 +83,10 @@ def codex_events(lines):
             if text.strip():
                 yield ts, "assistant", text
         elif p.get("type") == "message" and p.get("role") == "user":
-            text = "".join(c.get("text", "") for c in p.get("content", []) if isinstance(c, dict))
-            if text.strip() and not text.lstrip().startswith("<"):
+            text = actual_user_text("".join(
+                c.get("text", "") for c in p.get("content", []) if isinstance(c, dict)
+            ))
+            if text:
                 yield ts, "user", text
         elif p.get("type") in ("function_call", "custom_tool_call"):
             yield ts, "tool", str(p.get("arguments") or p.get("input") or "")[:200]
@@ -89,6 +115,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("tool", choices=["codex", "claude"])
     parser.add_argument("--messages", type=int, default=8)
+    parser.add_argument("--show-excerpts", action="store_true")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -101,13 +128,14 @@ def main():
     print(f"# {args.tool} 마지막 세션: {path.name} (마지막 기록 {modified})")
     users = [e for e in events if e[1] == "user"]
     if users:
-        print(f"\n## 마지막 사용자 지시 [{users[-1][0]}]\n{users[-1][2][:800]}")
+        print(f"\n## 마지막 사용자 메시지 [{users[-1][0]}]\n"
+              f"{visible_excerpt(users[-1][2], args.show_excerpts, 800)}")
     print(f"\n## 마지막 에이전트 메시지 {args.messages}개")
-    for ts, _, text in [e for e in events if e[1] == "assistant"][-args.messages:]:
-        print(f"- [{ts}] {text.strip()[:600]}")
+    for ts, _, content in [e for e in events if e[1] == "assistant"][-args.messages:]:
+        print(f"- [{ts}] {visible_excerpt(content.strip(), args.show_excerpts, 600)}")
     print("\n## 마지막 도구 호출 5개")
-    for ts, _, text in [e for e in events if e[1] == "tool"][-5:]:
-        print(f"- [{ts}] {text}")
+    for ts, _, content in [e for e in events if e[1] == "tool"][-5:]:
+        print(f"- [{ts}] {visible_excerpt(content, args.show_excerpts, 200)}")
     return 0
 
 
