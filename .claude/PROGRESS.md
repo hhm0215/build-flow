@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 삭제 동선·스캔 OCR 실측과 OCR 메모리 한도 조정 (2026-10-17)
+
+- 로컬 풀 Docker에서 매입·세금계산서 삭제 후 Kafka 손익·미수금 재집계와 확정 견적 삭제 409를 실측했다. 합성 한글 스캔 PDF의 실제 Tesseract OCR이 1·10페이지 모두 SUCCESS(필수 3필드 정확, 증권번호 라벨 오인식은 선택 필드). VPS와 같은 640 MiB 제한에서 10페이지가 한도에 상시 접촉해, 흑백 렌더링·`OMP_THREAD_LIMIT=1`·`MALLOC_ARENA_MAX=2`를 적용하고 자연 최대 약 707 MiB 실측에 따라 VPS notification `mem_limit`을 896m로 올렸다(배포 시 적용). 근거는 `docs/PILOT_QA.md`.
+
 ## 완료된 작업 — Codex ↔ Claude 교대 검증 2차 (2026-10-17, Claude)
 
 - Codex PR #129~#132(공동작업 가이드·기본 비공개 세션 요약·주입 지침 필터)를 검토했다. 새 Claude 세션이 `docs/AGENT_COLLABORATION.md`의 교대 질문에 출처와 함께 답했다: 잠금 IDLE·열린 PR #99 draft뿐(`gh pr list`), 다음 우선순위 P0 공개 파일럿 CRUD(BACKLOG), `develop` 4316b2d·`main` 579d542·VPS 저장소 4e56596 깨끗함(VPS `git -c safe.directory` 읽기 전용), V1 40/100·NO-GO(DELIVERY_PLAN). VPS 실행 이미지는 배포 계정 Docker 권한 부재로 **UNVERIFIED**.
