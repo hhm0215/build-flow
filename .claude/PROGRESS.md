@@ -5,6 +5,11 @@
 
 ## 현재 브랜치: `develop`
 
+## 완료된 작업 — 로컬 서버(LAN) 노출 하드닝 (2026-10-17)
+
+- `docker-compose.lan.yml`로 프론트만 지정 사설 IP:3000에 추가 노출하고 나머지는 127.0.0.1 유지, Gateway CORS를 LAN 출처+localhost로 제한했다. `verify_lan_compose.py`(0.0.0.0·공인·링크로컬 거부, 단일 바인딩, CORS)와 테스트·CI 단계를 추가하고 `docs/LOCAL_SERVER.md` 런북(방화벽 LocalSubnet·Private 규칙, HTTP 평문 한계)을 작성했다. 로컬 Docker에서 LAN 프론트 200·내부 포트 연결 거부·LAN 출처 로그인 CORS 통과·외부 출처 403 실측. 다른 기기 접속·방화벽 규칙 적용은 사용자 환경 PENDING.
+- 마이그레이션 Phase B: 2026-10-17 사용자 실행 `restore-test.ps1 -ValidateLogin`에서 복원·행 수·digest·CHECK TABLE·validate 기동은 PASS, 관리자 로그인은 비밀번호 불일치 401로 미완료(사용자 재시도 필요).
+
 ## 완료된 작업 — 거래처 보관·복원 (2026-10-17)
 
 - ADR-021 3차: 거래처 `archived_at`·보관/복원 API, 보관 거래처 수정 409·새 현장 연결 400(기존 연결 현장은 유지 수정 허용), 거래처 목록 보관 필터. 프론트는 현장 등록/수정 거래처 선택에서 보관 거래처 제외, 거래처 수정 모달에 보관/복원 버튼·보관 경고. 테스트(백엔드·프론트 143건)와 로컬 Docker 실측 PASS. 운영 DB 반영은 마이그레이션 게이트 이후.

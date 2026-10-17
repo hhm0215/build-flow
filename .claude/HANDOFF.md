@@ -15,12 +15,12 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
+| 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 10:20 KST |
-| 브랜치 | 없음 (`develop` = PR #125 병합 뒤) |
-| PR | #99 develop→main **draft 유지** |
-| 현재 단계 | Claude 세션 종료. PR #111~#125 병합(현장 참조 검증, Feign timeout, 현장·거래처 보관과 보관 현장 문서 잠금, 인계 체계, Config import, 번들 분할, ADR-003 v2, 마진율·AI 파싱 결함) |
+| 갱신 | 2026-10-17 11:20 KST |
+| 브랜치 | `claude/next-work` (LAN 하드닝) |
+| PR | LAN 하드닝 PR (develop 대상) — #99 draft 유지 |
+| 현재 단계 | LAN override·검증기·런북 구현과 로컬 실측 완료 → PR·CI·병합 |
 | 다음 첫 행동 | **사용자 필요**: P1 마이그레이션 Phase B(복원 DB 관리자 로그인 검증)와 VPS 운영 DB `SHOW CREATE TABLE`·외부 백업은 관리자 자격 증명/VPS 권한이 있어야 진행 가능. 그 외 로컬 후보: 프론트 훅 테스트, 합성 자료 정리 절차 설계 |
 
 ## 공통 사용자 지시
