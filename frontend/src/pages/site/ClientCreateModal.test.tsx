@@ -18,6 +18,7 @@ const createdClient: Client = {
   email: null,
   address: null,
   memo: null,
+  archivedAt: null,
   createdAt: '2026-09-19T00:00:00',
   updatedAt: '2026-09-19T00:00:00',
 }

@@ -135,4 +135,28 @@ describe('거래처·현장 MSW 계약', () => {
     expect((await fetch(siteUrl)).status).toBe(200)
     expect((await fetch(new URL('/api/v1/sites/999999', document.baseURI), { method: 'DELETE' })).status).toBe(404)
   })
+
+  it('보관 거래처는 수정 409, 새 현장 연결 400이고 기존 연결 현장은 수정할 수 있다', async () => {
+    const json = { 'Content-Type': 'application/json' }
+    const created = await fetch(clientsUrl, { method: 'POST', headers: json, body: JSON.stringify({ companyName: '[QA] 보관 거래처' }) })
+    const client = (await created.json() as ApiResponse<Client>).data
+    expect(client.archivedAt).toBeNull()
+    const linked = await fetch(sitesUrl, { method: 'POST', headers: json, body: JSON.stringify({ siteName: '[QA] 연결 현장', clientId: client.id }) })
+    const site = (await linked.json() as ApiResponse<Site>).data
+
+    const archived = (await (await fetch(new URL(`/api/v1/clients/${client.id}/archive`, document.baseURI), { method: 'PATCH' })).json() as ApiResponse<Client>).data
+    expect(archived.archivedAt).not.toBeNull()
+
+    const edit = await fetch(new URL(`/api/v1/clients/${client.id}`, document.baseURI), { method: 'PUT', headers: json, body: JSON.stringify({ companyName: '수정 시도' }) })
+    expect(edit.status).toBe(409)
+    const newSite = await fetch(sitesUrl, { method: 'POST', headers: json, body: JSON.stringify({ siteName: '[QA] 새 현장', clientId: client.id }) })
+    expect(newSite.status).toBe(400)
+    const keep = await fetch(new URL(`/api/v1/sites/${site.id}`, document.baseURI), { method: 'PUT', headers: json, body: JSON.stringify({ siteName: '[QA] 이름만 수정', clientId: client.id }) })
+    expect(keep.status).toBe(200)
+
+    const archivedOnly = (await (await fetch(new URL('/api/v1/clients?archived=true', document.baseURI))).json() as ApiResponse<Client[]>).data
+    expect(archivedOnly.map((c) => c.id)).toContain(client.id)
+    const restored = (await (await fetch(new URL(`/api/v1/clients/${client.id}/restore`, document.baseURI), { method: 'PATCH' })).json() as ApiResponse<Client>).data
+    expect(restored.archivedAt).toBeNull()
+  })
 })

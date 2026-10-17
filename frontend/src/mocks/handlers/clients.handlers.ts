@@ -9,11 +9,11 @@ export function findMockClientById(id?: number): Client | null {
 }
 
 export const clientsHandlers = [
-  http.get('/api/v1/clients', () => HttpResponse.json<ApiResponse<Client[]>>({
-    success: true,
-    data: clients,
-    error: null,
-  })),
+  http.get('/api/v1/clients', ({ request }) => {
+    const archived = new URL(request.url).searchParams.get('archived')
+    const data = archived == null ? clients : clients.filter((c) => (archived === 'true') === (c.archivedAt != null))
+    return HttpResponse.json<ApiResponse<Client[]>>({ success: true, data, error: null })
+  }),
   http.post<never, ClientCreateRequest>('/api/v1/clients', async ({ request }) => {
     const body = await request.json()
     if (!body.companyName?.trim()) {
@@ -32,6 +32,7 @@ export const clientsHandlers = [
       email: body.email ?? null,
       address: body.address ?? null,
       memo: body.memo ?? null,
+      archivedAt: null,
       createdAt: now,
       updatedAt: now,
     }
@@ -49,6 +50,12 @@ export const clientsHandlers = [
         { status: 404 },
       )
     }
+    if (clients[index].archivedAt) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '보관된 거래처는 복원한 뒤 수정할 수 있습니다.' },
+        { status: 409 },
+      )
+    }
     const body = await request.json()
     if (!body.companyName?.trim()) {
       return HttpResponse.json<ApiResponse<null>>(
@@ -63,4 +70,19 @@ export const clientsHandlers = [
     }
     return HttpResponse.json<ApiResponse<Client>>({ success: true, data: clients[index], error: null })
   }),
+  http.patch<{ id: string }>('/api/v1/clients/:id/archive', ({ params }) => setArchived(Number(params.id), true)),
+  http.patch<{ id: string }>('/api/v1/clients/:id/restore', ({ params }) => setArchived(Number(params.id), false)),
 ]
+
+function setArchived(id: number, archive: boolean) {
+  const index = clients.findIndex((client) => client.id === id)
+  if (index === -1) {
+    return HttpResponse.json<ApiResponse<null>>(
+      { success: false, data: null, error: '거래처를 찾을 수 없습니다.' },
+      { status: 404 },
+    )
+  }
+  const archivedAt = archive ? clients[index].archivedAt ?? new Date().toISOString() : null
+  clients[index] = { ...clients[index], archivedAt }
+  return HttpResponse.json<ApiResponse<Client>>({ success: true, data: clients[index], error: null })
+}

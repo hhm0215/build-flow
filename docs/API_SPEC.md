@@ -78,8 +78,10 @@
 | GET | /api/v1/clients | `ClientResponse[]` | O |
 | GET | /api/v1/clients/{id} | `ClientResponse`; 관련 현장·미수금 집계 미포함 | O |
 | PUT | /api/v1/clients/{id} | JSON `ClientUpdateRequest` → `ClientResponse` | O |
+| PATCH | /api/v1/clients/{id}/archive | 본문 없음 → `ClientResponse`; 보관(멱등) | O |
+| PATCH | /api/v1/clients/{id}/restore | 본문 없음 → `ClientResponse`; 복원 | O |
 
-생성·수정 본문은 필수 `companyName`과 선택적 `representative`, `businessNo`, `phone`, `email`, `address`, `memo`이다. 응답에 `id`와 생성·수정 시각이 추가된다.
+생성·수정 본문은 필수 `companyName`과 선택적 `representative`, `businessNo`, `phone`, `email`, `address`, `memo`이다. 응답에 `id`와 생성·수정 시각이 추가된다. 응답의 `archivedAt`은 보관 시각(미보관 null)이다. 목록은 선택적 `archived=true|false` 필터를 받으며 미지정은 전체다. 보관된 거래처는 수정 409, 현장 생성·수정에서 새로 연결하면 400이며, 이미 연결된 현장은 같은 거래처를 유지한 채 수정할 수 있다.
 
 ### 대시보드 (`DashboardController`)
 

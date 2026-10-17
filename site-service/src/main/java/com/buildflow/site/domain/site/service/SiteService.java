@@ -32,7 +32,7 @@ public class SiteService {
 
     @Transactional
     public SiteResponse create(SiteCreateRequest request) {
-        Client client = resolveClient(request.getClientId());
+        Client client = resolveAssignableClient(request.getClientId(), null);
 
         Site site = Site.builder()
                 .siteName(request.getSiteName())
@@ -66,7 +66,7 @@ public class SiteService {
     public SiteResponse update(Long id, SiteUpdateRequest request) {
         Site site = getSiteForUpdate(id);
         requireNotArchived(site);
-        Client client = resolveClient(request.getClientId());
+        Client client = resolveAssignableClient(request.getClientId(), site.getClient());
 
         site.update(
                 request.getSiteName(),
@@ -122,6 +122,16 @@ public class SiteService {
         if (site.isArchived()) {
             throw new BusinessException(ErrorCode.SITE_ARCHIVED);
         }
+    }
+
+    /** 보관된 거래처는 새로 연결할 수 없다. 이미 연결된 거래처를 유지하는 수정은 허용한다. */
+    private Client resolveAssignableClient(Long clientId, Client current) {
+        Client client = resolveClient(clientId);
+        boolean unchanged = client != null && current != null && client.getId().equals(current.getId());
+        if (client != null && client.isArchived() && !unchanged) {
+            throw new BusinessException(ErrorCode.CLIENT_ARCHIVED_NOT_ASSIGNABLE);
+        }
+        return client;
     }
 
     private Client resolveClient(Long clientId) {
