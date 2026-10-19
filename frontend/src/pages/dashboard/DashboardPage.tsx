@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import { useNavigate } from 'react-router-dom'
 import {
   HardHat,
   TrendingUp,
@@ -241,6 +242,7 @@ function buildStatCards(stats: {
 // ── Main Component ───────────────────────────────
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: statsRefetch } = useDashboardStats()
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary()
 
@@ -316,7 +318,7 @@ export default function DashboardPage() {
             <button style={{
               display: 'flex', alignItems: 'center', gap: 4,
               fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500,
-            }}>
+            }} onClick={() => navigate('/sites')}>
               전체 보기 <ArrowUpRight size={12} strokeWidth={2.5} />
             </button>
           </div>
