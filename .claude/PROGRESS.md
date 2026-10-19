@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 대시보드 AI 요약 실패·빈 결과 구분 (2026-10-19)
+
+- AI 요약 요청 실패와 정상 빈 결과를 구분해 실패 시 오류·재시도를 표시하고, 실패 후 남은 캐시 요약을 현재 결과처럼 보이지 않게 했다. 로컬 프론트 155건·ESLint·TypeScript·Vite 빌드 PASS, 독립 리뷰 차단 결함 없음. [PR #143](https://github.com/hhm0215/build-flow/pull/143) 최종 SHA `6986113` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `92867b7`. 실제 Ollama 요약·공개 VPS 화면은 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
 ## 완료된 작업 — 대시보드 현장 전체 보기 연결 (2026-10-19)
 
 - 대시보드 현장별 손익의 무동작 `전체 보기`를 기존 `/sites` 보호 라우트로 연결하고 클릭·이동 회귀를 추가했다. 로컬 프론트 152건·lint·빌드, 독립 리뷰 차단 결함 없음, [PR #141](https://github.com/hhm0215/build-flow/pull/141) 최종 SHA `d3a9280` CI 5개 PASS(릴리스 후보 1개는 PR에서 정상 skip), `develop` 병합 `bd94cce`. `main`·VPS는 미반영, V1 40/100·실데이터 NO-GO 유지.
