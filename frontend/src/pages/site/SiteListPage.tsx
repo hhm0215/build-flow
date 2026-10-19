@@ -249,9 +249,12 @@ function EmptyRelation({ message }: { message: string }) {
 export default function SiteListPage() {
   const navigate = useNavigate()
   const { data: sitesData, isLoading: sitesLoading, isError: sitesError, refetch: sitesRefetch } = useSites()
-  const { data: estimatesData, isLoading: estimatesLoading } = useEstimates()
-  const { data: purchasesData, isLoading: purchasesLoading } = usePurchases()
-  const { data: taxesData, isLoading: taxesLoading } = useTaxes()
+  const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError, refetch: estimatesRefetch } = useEstimates()
+  const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError, refetch: purchasesRefetch } = usePurchases()
+  const { data: taxesData, isLoading: taxesLoading, isError: taxesError, refetch: taxesRefetch } = useTaxes()
+  const estimatesFailed = estimatesError || (!estimatesLoading && !estimatesData)
+  const purchasesFailed = purchasesError || (!purchasesLoading && !purchasesData)
+  const taxesFailed = taxesError || (!taxesLoading && !taxesData)
 
   const sites = useMemo(() => sitesData ?? [], [sitesData])
   const estimates = useMemo(() => estimatesData ?? [], [estimatesData])
@@ -619,39 +622,41 @@ export default function SiteListPage() {
                   <SummaryCard
                     icon={FileText}
                     title="견적서 합계"
-                    value={formatCompactKRW(estimateTotal)}
-                    description={`${siteEstimates.length}건의 견적서`}
+                    value={estimatesFailed ? '조회 실패' : estimatesLoading ? '불러오는 중' : formatCompactKRW(estimateTotal)}
+                    description={estimatesFailed ? '견적서 목록을 다시 불러오세요' : estimatesLoading ? '조회 중' : `${siteEstimates.length}건의 견적서`}
                     color="#8b5cf6"
                   />
                   <SummaryCard
                     icon={Receipt}
                     title="세금계산서 합계"
-                    value={formatCompactKRW(taxTotal)}
-                    description={`${siteTaxes.length}건의 계산서`}
+                    value={taxesFailed ? '조회 실패' : taxesLoading ? '불러오는 중' : formatCompactKRW(taxTotal)}
+                    description={taxesFailed ? '세금계산서 목록을 다시 불러오세요' : taxesLoading ? '조회 중' : `${siteTaxes.length}건의 계산서`}
                     color="#3b82f6"
                   />
                   <SummaryCard
                     icon={ShoppingBag}
                     title="매입 합계"
-                    value={formatCompactKRW(purchaseTotal)}
-                    description={`${sitePurchases.length}건의 매입`}
+                    value={purchasesFailed ? '조회 실패' : purchasesLoading ? '불러오는 중' : formatCompactKRW(purchaseTotal)}
+                    description={purchasesFailed ? '매입 목록을 다시 불러오세요' : purchasesLoading ? '조회 중' : `${sitePurchases.length}건의 매입`}
                     color="#f59e0b"
                   />
                   <SummaryCard
                     icon={TrendingUp}
                     title="마진"
-                    value={formatCompactKRW(estimateTotal - purchaseTotal)}
-                    description={estimateTotal > 0 ? `마진율 ${((estimateTotal - purchaseTotal) / estimateTotal * 100).toFixed(1)}%` : '아직 산출 전'}
-                    color={estimateTotal - purchaseTotal >= 0 ? '#22c55e' : '#ef4444'}
+                    value={estimatesFailed || purchasesFailed ? '조회 실패' : estimatesLoading || purchasesLoading ? '불러오는 중' : formatCompactKRW(estimateTotal - purchaseTotal)}
+                    description={estimatesFailed || purchasesFailed ? '견적서·매입 조회 후 산출' : estimatesLoading || purchasesLoading ? '조회 중' : estimateTotal > 0 ? `마진율 ${((estimateTotal - purchaseTotal) / estimateTotal * 100).toFixed(1)}%` : '아직 산출 전'}
+                    color={estimatesFailed || purchasesFailed || estimatesLoading || purchasesLoading ? '#a1a1aa' : estimateTotal - purchaseTotal >= 0 ? '#22c55e' : '#ef4444'}
                   />
                 </div>
 
                 <RelationSection
                   icon={FileText}
                   title="견적서"
-                  caption={`선택 현장 기준 ${siteEstimates.length}건`}
+                  caption={estimatesFailed ? '견적서 조회 실패' : estimatesLoading ? '견적서 불러오는 중' : `선택 현장 기준 ${siteEstimates.length}건`}
                 >
-                  {estimatesLoading ? (
+                  {estimatesFailed ? (
+                    <ErrorState message="견적서를 불러오지 못했습니다." onRetry={estimatesRefetch} />
+                  ) : estimatesLoading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {[1, 2].map((i) => (
                         <div key={i} className="shimmer" style={{ height: 74, borderRadius: 10 }} />
@@ -722,9 +727,11 @@ export default function SiteListPage() {
                 <RelationSection
                   icon={Receipt}
                   title="세금계산서"
-                  caption={`선택 현장 기준 ${siteTaxes.length}건 · 미수금 ${formatCompactKRW(unpaidTotal)}`}
+                  caption={taxesFailed ? '세금계산서 조회 실패' : taxesLoading ? '세금계산서 불러오는 중' : `선택 현장 기준 ${siteTaxes.length}건 · 미수금 ${formatCompactKRW(unpaidTotal)}`}
                 >
-                  {taxesLoading ? (
+                  {taxesFailed ? (
+                    <ErrorState message="세금계산서를 불러오지 못했습니다." onRetry={taxesRefetch} />
+                  ) : taxesLoading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {[1, 2].map((i) => (
                         <div key={i} className="shimmer" style={{ height: 74, borderRadius: 10 }} />
@@ -812,9 +819,11 @@ export default function SiteListPage() {
                 <RelationSection
                   icon={ShoppingBag}
                   title="공내역 / 매입 내역"
-                  caption={`선택 현장 기준 ${sitePurchases.length}건`}
+                  caption={purchasesFailed ? '매입 조회 실패' : purchasesLoading ? '매입 불러오는 중' : `선택 현장 기준 ${sitePurchases.length}건`}
                 >
-                  {purchasesLoading ? (
+                  {purchasesFailed ? (
+                    <ErrorState message="매입 내역을 불러오지 못했습니다." onRetry={purchasesRefetch} />
+                  ) : purchasesLoading ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {[1, 2].map((i) => (
                         <div key={i} className="shimmer" style={{ height: 74, borderRadius: 10 }} />
