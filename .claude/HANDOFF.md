@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 09:14 KST |
+| 갱신 | 2026-10-19 09:18 KST |
 | 브랜치 | `codex/dashboard-site-nav` |
-| PR | [#140](https://github.com/hhm0215/build-flow/pull/140) `develop` 병합 완료; 새 드래프트 생성 예정. #139·#99 draft 유지 |
-| 현재 단계 | 대시보드 현장별 손익 ‘전체 보기’ 무동작 수정 및 `/sites` 이동 회귀 1건 PASS |
-| 다음 첫 행동 | 브랜치 푸시·드래프트 PR 생성 → 전체 프론트 검증·독립 리뷰·CI |
+| PR | [#141](https://github.com/hhm0215/build-flow/pull/141) `develop` 대상 드래프트; #140 병합 완료, #139·#99 draft 유지 |
+| 현재 단계 | 대시보드 현장별 손익 ‘전체 보기’ `/sites` 이동 수정, 드래프트 PR 생성·독립 리뷰 차단 결함 없음 |
+| 다음 첫 행동 | 전체 프론트 검증 결과 확인 → 최종 SHA CI 확인 → `develop` 병합 |
 
 ## 공통 사용자 지시
 
