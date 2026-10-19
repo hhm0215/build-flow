@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
+| 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 14:21 KST |
-| 브랜치 | `develop` (`92867b7`) |
-| PR | [#143](https://github.com/hhm0215/build-flow/pull/143) `develop` 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | AI 요약 실패/빈 결과/오래된 캐시 구분 수정 완료. 최종 SHA `6986113` CI 5개 PASS, 독립 리뷰 차단 결함 없음. `main`·VPS 미반영, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | P0 공개 파일럿 CRUD/PDF 미검증 동선에서 #139와 겹치지 않는 독립 항목 선택 |
+| 갱신 | 2026-10-19 14:35 KST |
+| 브랜치 | `codex/site-detail-query-errors` |
+| PR | [#145](https://github.com/hhm0215/build-flow/pull/145) draft. #139·#99 draft와 작업 범위 분리 |
+| 현재 단계 | P0 현장 상세의 견적·매입·세금계산서·보증보험 조회 실패를 0건 대신 오류·재시도로 표시. 로컬 프론트 161건·ESLint·TypeScript·Vite 빌드 PASS; CI·독립 리뷰 전 |
+| 다음 첫 행동 | 변경 커밋·푸시 → 최종 SHA CI·독립 리뷰 → `develop` 병합 |
 
 ## 공통 사용자 지시
 
