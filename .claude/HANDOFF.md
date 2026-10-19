@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 09:18 KST |
-| 브랜치 | `codex/dashboard-site-nav` |
-| PR | [#141](https://github.com/hhm0215/build-flow/pull/141) `develop` 대상 드래프트; #140 병합 완료, #139·#99 draft 유지 |
-| 현재 단계 | 대시보드 현장별 손익 ‘전체 보기’ `/sites` 이동 수정, 드래프트 PR 생성·독립 리뷰 차단 결함 없음 |
-| 다음 첫 행동 | 전체 프론트 검증 결과 확인 → 최종 SHA CI 확인 → `develop` 병합 |
+| 갱신 | 2026-10-19 09:20 KST |
+| 브랜치 | `develop` (`bd94cce`) |
+| PR | [#140](https://github.com/hhm0215/build-flow/pull/140)·[#141](https://github.com/hhm0215/build-flow/pull/141) `develop` 병합 완료; #139·#99 draft 유지 |
+| 현재 단계 | 현장 관계 조회 실패 오표기·대시보드 전체 보기 무동작 수정 완료. `main`·VPS 미반영, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | P0 공개 파일럿 CRUD/보증 PDF·OCR 미검증 동선 중 독립 안전 작업을 선택하고, #139 보존 정책 PR은 겹치지 않게 둔다 |
 
 ## 공통 사용자 지시
 
