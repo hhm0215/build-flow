@@ -50,11 +50,11 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  const { data: unreadCount } = useUnreadCount()
+  const { data: unreadCount, isLoading: unreadLoading, isError: unreadError } = useUnreadCount()
   const { data: notifications } = useNotifications()
   const { mutate: markAsRead } = useMarkAsRead()
 
-  const count = unreadCount ?? 0
+  const count = unreadLoading || unreadError ? 0 : unreadCount ?? 0
   const recent = (notifications ?? []).slice(0, 5)
 
   useEffect(() => {
@@ -183,6 +183,11 @@ export default function NotificationBell() {
                   }}
                 >
                   미읽음 {count}건
+                </span>
+              )}
+              {unreadError && (
+                <span role="status" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  미읽음 건수 조회 실패
                 </span>
               )}
             </div>

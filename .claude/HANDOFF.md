@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 14:49 KST |
+| 갱신 | 2026-10-19 14:52 KST |
 | 브랜치 | `codex/notification-unread-error` |
 | PR | [#147](https://github.com/hhm0215/build-flow/pull/147) draft. #139·#99 draft와 범위 분리 |
-| 현재 단계 | 미읽음 건수 API 실패·오래된 캐시 때 오류·재시도 표시와 전체 읽음 비활성화 구현. 로컬 프론트 163건·ESLint·TypeScript·Vite 빌드 PASS; CI·독립 리뷰 전. 로컬 Docker 엔진 미기동 |
-| 다음 첫 행동 | 변경 커밋·푸시 → 최종 SHA CI·독립 리뷰 → `develop` 병합 |
+| 현재 단계 | 미읽음 건수 API 실패·오래된 캐시 때 페이지 오류·재시도/전체 읽음 비활성화와 헤더 배지 숨김 구현. 독립 리뷰의 누락 지적 보완, 로컬 프론트 165건·ESLint·TypeScript·Vite 빌드 PASS. 최종 SHA CI 전. 로컬 Docker 엔진 미기동 |
+| 다음 첫 행동 | 리뷰 보완 커밋·푸시 → 최종 SHA CI·독립 재검토 → `develop` 병합 |
 
 ## 공통 사용자 지시
 
