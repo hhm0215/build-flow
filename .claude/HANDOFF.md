@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 14:07 KST |
+| 갱신 | 2026-10-19 14:18 KST |
 | 브랜치 | `codex/dashboard-summary-error` |
-| PR | 새 드래프트 생성 예정. #139·#99 draft와 작업 범위 분리 |
-| 현재 단계 | AI 요약 실패/빈 결과/오래된 캐시 구분 수정. 로컬 프론트 테스트 155건·ESLint·TypeScript·Vite 빌드 PASS, 독립 읽기 리뷰 차단 결함 없음. PR·CI 미실행 |
-| 다음 첫 행동 | 승인 검토 가용 시 Git 커밋·푸시·드래프트 PR 생성 → 최종 SHA CI 확인 → `develop` 병합 |
+| PR | [#143](https://github.com/hhm0215/build-flow/pull/143) draft. #139·#99 draft와 작업 범위 분리 |
+| 현재 단계 | AI 요약 실패/빈 결과/오래된 캐시 구분 수정. 로컬 프론트 테스트 155건·ESLint·TypeScript·Vite 빌드 PASS, 독립 읽기 리뷰 차단 결함 없음. #143 CI 진행 중 |
+| 다음 첫 행동 | 최종 SHA CI 확인 → #143 `develop` 병합 → 인계 잠금 종료 및 다음 독립 P0 착수 |
 
 ## 공통 사용자 지시
 
