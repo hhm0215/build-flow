@@ -80,11 +80,11 @@ function formatRelativeTime(dateStr: string): string {
 
 export default function NotificationListPage() {
   const { data, isLoading, isError, refetch } = useNotifications()
-  const { data: unreadCount } = useUnreadCount()
+  const { data: unreadCount, isLoading: unreadLoading, isError: unreadError, refetch: unreadRefetch } = useUnreadCount()
   const { mutate: markAsRead } = useMarkAsRead()
   const { mutate: markAllAsRead } = useMarkAllAsRead()
   const notifications = data ?? []
-  const hasUnread = (unreadCount ?? 0) > 0
+  const hasUnread = !unreadLoading && !unreadError && (unreadCount ?? 0) > 0
 
   return (
     <div>
@@ -97,6 +97,7 @@ export default function NotificationListPage() {
             whileHover={hasUnread ? { scale: 1.02 } : {}}
             whileTap={hasUnread ? { scale: 0.98 } : {}}
             onClick={() => { if (hasUnread) markAllAsRead() }}
+            disabled={!hasUnread}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px',
@@ -115,8 +116,21 @@ export default function NotificationListPage() {
         }
       />
 
+      {unreadError && (
+        <div role="alert" style={{ padding: '12px 20px', marginBottom: 12, border: '1px solid var(--border)', borderRadius: 10 }}>
+          읽지 않은 알림 건수를 불러오지 못했습니다.{' '}
+          <button
+            type="button"
+            onClick={() => void unreadRefetch()}
+            style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
       {/* 미읽음 건수 배너 */}
-      {!isLoading && unreadCount != null && unreadCount > 0 && (
+      {!isLoading && !unreadLoading && !unreadError && unreadCount != null && unreadCount > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
