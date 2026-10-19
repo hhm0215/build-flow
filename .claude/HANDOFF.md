@@ -17,12 +17,12 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | ACTIVE |
-| 도구 | Claude Code |
-| 갱신 | 2026-10-17 17:00 KST |
-| 브랜치 | `claude/warranty-audit` (드래프트 PR로 노출) |
-| PR | [#138](https://github.com/hhm0215/build-flow/pull/138) 보증 감사 이력(병합 진행), #99 draft 유지 |
-| 현재 단계 | 보증 감사 이력 구현·테스트·Docker 실측 완료 → CI·병합. Claude는 /loop 자율 반복 중 |
-| 다음 첫 행동 | 병합 후 다음 BACKLOG 로컬 항목(예: 감사 이력·원본 보존/폐기 정책 설계, 프론트 훅 테스트) |
+| 도구 | Codex |
+| 갱신 | 2026-10-19 09:08 KST |
+| 브랜치 | `codex/site-list-qa` |
+| PR | [#140](https://github.com/hhm0215/build-flow/pull/140) 현장 관계 조회 실패 표시(draft); #139와 파일 비중복, #99 draft 유지 |
+| 현재 단계 | 수정 커밋 `2f5eecd` 푸시 완료. 합성 회귀 7건·프론트 전체 테스트 151건/lint/빌드 PASS, 독립 리뷰 지적 반영. PR #140 CI 검증 중 |
+| 다음 첫 행동 | PR #140 최종 head SHA와 필수 CI 검증 → develop 통합·잠금 해제 |
 
 ## 공통 사용자 지시
 
