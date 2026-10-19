@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 알림 미읽음 건수 조회 실패 표시 (2026-10-19)
+
+- 미읽음 건수 API 실패 시 오래된 캐시 숫자를 알림 페이지·헤더 배지에서 숨기고 오류·재시도를 안내하며, 불확실한 `전체 읽음` 실행을 막았다. 독립 리뷰가 지적한 헤더 누락을 보완·재검토했다. 로컬 프론트 165건·ESLint·TypeScript·Vite 빌드 PASS, [PR #147](https://github.com/hhm0215/build-flow/pull/147) 최종 SHA `61fd3e8` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `7fc1528`. 공개 VPS 장애·복구 화면과 로컬 Docker 통합 테스트는 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
 ## 완료된 작업 — 현장 상세 문서 조회 실패 오표기 방지 (2026-10-19)
 
 - 현장 상세의 견적·매입·세금계산서·보증보험 각 탭에서 조회 실패를 `0건`·빈 목록과 구분하고 재시도를 연결했다. 실패 후 캐시된 옛 문서도 현재 결과처럼 표시하지 않는다. 로컬 프론트 161건·ESLint·TypeScript·Vite 빌드 PASS, 독립 리뷰 차단 결함 없음. [PR #145](https://github.com/hhm0215/build-flow/pull/145) 최종 SHA `51a4acf` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `eabb4c2`. 공개 VPS 화면은 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
