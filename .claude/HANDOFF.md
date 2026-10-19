@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 14:52 KST |
-| 브랜치 | `codex/notification-unread-error` |
-| PR | [#147](https://github.com/hhm0215/build-flow/pull/147) draft. #139·#99 draft와 범위 분리 |
-| 현재 단계 | 미읽음 건수 API 실패·오래된 캐시 때 페이지 오류·재시도/전체 읽음 비활성화와 헤더 배지 숨김 구현. 독립 리뷰의 누락 지적 보완, 로컬 프론트 165건·ESLint·TypeScript·Vite 빌드 PASS. 최종 SHA CI 전. 로컬 Docker 엔진 미기동 |
-| 다음 첫 행동 | 리뷰 보완 커밋·푸시 → 최종 SHA CI·독립 재검토 → `develop` 병합 |
+| 갱신 | 2026-10-19 14:54 KST |
+| 브랜치 | `develop` (`7fc1528`) |
+| PR | [#147](https://github.com/hhm0215/build-flow/pull/147) `develop` 병합 완료. #139·#99 draft 유지 |
+| 현재 단계 | 미읽음 건수 API 실패·오래된 캐시의 페이지·헤더 오표기 수정 완료. 최종 SHA `61fd3e8` CI 5개 PASS, 독립 재검토 차단 결함 없음. 로컬 Docker 엔진 미기동; `main`·VPS 미반영, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | P0 공개 파일럿 CRUD/PDF와 복구·마이그레이션 선행 게이트 중 #139와 겹치지 않는 항목 선택 |
 
 ## 공통 사용자 지시
 
