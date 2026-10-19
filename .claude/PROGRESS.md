@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 현장 관계 조회 실패 금액 오표기 방지 (2026-10-19)
+
+- 현장 목록의 견적·매입·세금계산서 조회 실패가 빈 목록·0원으로 표시되던 문제를 수정했다. 실패 항목별 오류/재시도와 마진 산출 차단, 세금계산서 실패 시 미수금 표시 차단을 구현했다. 로컬 프론트 151건·lint·빌드, 독립 리뷰, [PR #140](https://github.com/hhm0215/build-flow/pull/140) 최종 SHA `295c1d8`의 CI 5개 PASS 후 `develop` 병합 `22e89b7`. `main`·VPS는 미반영, V1 40/100·실데이터 NO-GO 유지.
+
 ## 완료된 작업 — 보증 확인 감사 이력 (2026-10-17)
 
 - 보증 값이 바뀌는 6개 경로(직접 등록·업로드·OCR 반영/실패·수동 수정·삭제)를 추가 전용 `warranty_audit_events`로 같은 트랜잭션에 기록하고 `GET /api/v1/warranties/{id}/history`와 보증 수정 모달의 이력 목록을 추가했다. 테스트(백엔드 JPA 4건, 프론트 144건)와 로컬 Docker 실측 PASS. 보존·폐기 정책과 Gateway 실제 토큰 경로는 PENDING(`.claude/plans/2026-10-17-warranty-audit.md`).

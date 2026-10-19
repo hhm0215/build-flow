@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 09:08 KST |
-| 브랜치 | `codex/site-list-qa` |
-| PR | [#140](https://github.com/hhm0215/build-flow/pull/140) 현장 관계 조회 실패 표시(draft); #139와 파일 비중복, #99 draft 유지 |
-| 현재 단계 | 수정 커밋 `2f5eecd` 푸시 완료. 합성 회귀 7건·프론트 전체 테스트 151건/lint/빌드 PASS, 독립 리뷰 지적 반영. PR #140 CI 검증 중 |
-| 다음 첫 행동 | PR #140 최종 head SHA와 필수 CI 검증 → develop 통합·잠금 해제 |
+| 갱신 | 2026-10-19 09:18 KST |
+| 브랜치 | `codex/dashboard-site-nav` |
+| PR | [#141](https://github.com/hhm0215/build-flow/pull/141) `develop` 대상 드래프트; #140 병합 완료, #139·#99 draft 유지 |
+| 현재 단계 | 대시보드 현장별 손익 ‘전체 보기’ `/sites` 이동 수정, 드래프트 PR 생성·독립 리뷰 차단 결함 없음 |
+| 다음 첫 행동 | 전체 프론트 검증 결과 확인 → 최종 SHA CI 확인 → `develop` 병합 |
 
 ## 공통 사용자 지시
 
