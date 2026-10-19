@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
+| 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-19 09:20 KST |
-| 브랜치 | `develop` (`bd94cce`) |
-| PR | [#140](https://github.com/hhm0215/build-flow/pull/140)·[#141](https://github.com/hhm0215/build-flow/pull/141) `develop` 병합 완료; #139·#99 draft 유지 |
-| 현재 단계 | 현장 관계 조회 실패 오표기·대시보드 전체 보기 무동작 수정 완료. `main`·VPS 미반영, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | P0 공개 파일럿 CRUD/보증 PDF·OCR 미검증 동선 중 독립 안전 작업을 선택하고, #139 보존 정책 PR은 겹치지 않게 둔다 |
+| 갱신 | 2026-10-19 14:18 KST |
+| 브랜치 | `codex/dashboard-summary-error` |
+| PR | [#143](https://github.com/hhm0215/build-flow/pull/143) draft. #139·#99 draft와 작업 범위 분리 |
+| 현재 단계 | AI 요약 실패/빈 결과/오래된 캐시 구분 수정. 로컬 프론트 테스트 155건·ESLint·TypeScript·Vite 빌드 PASS, 독립 읽기 리뷰 차단 결함 없음. #143 CI 진행 중 |
+| 다음 첫 행동 | 최종 SHA CI 확인 → #143 `develop` 병합 → 인계 잠금 종료 및 다음 독립 P0 착수 |
 
 ## 공통 사용자 지시
 

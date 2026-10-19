@@ -244,7 +244,7 @@ function buildStatCards(stats: {
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: statsRefetch } = useDashboardStats()
-  const { data: summary, isLoading: summaryLoading } = useDashboardSummary()
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, refetch: summaryRefetch } = useDashboardSummary()
 
   const statCards = stats ? buildStatCards(stats) : []
   const siteProfits: SiteProfitSummary[] = stats?.siteProfits ?? []
@@ -455,7 +455,9 @@ export default function DashboardPage() {
           </div>
 
           <div style={{ padding: 20, flex: 1, overflow: 'auto' }}>
-            {summaryLoading ? (
+            {summaryError ? (
+              <ErrorState message="AI 요약을 불러오지 못했습니다." onRetry={summaryRefetch} />
+            ) : summaryLoading ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '32px 0' }}>
                 <motion.div
                   animate={{ rotate: 360 }}
