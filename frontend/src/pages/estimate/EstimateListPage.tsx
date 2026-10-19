@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { FileText, Pencil, Plus, Trash2, Sparkles } from 'lucide-react'
-import { Modal, Form, Input, InputNumber, DatePicker, Button, message } from 'antd'
+import { Alert, Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
@@ -88,6 +88,8 @@ export default function EstimateListPage() {
   const [editTarget, setEditTarget] = useState<Estimate | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Estimate | null>(null)
   const [pendingItems, setPendingItems] = useState<ParsedItemResult[] | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const createInFlight = useRef(false)
   const [form] = Form.useForm()
   const createMutation = useCreateEstimate()
 
@@ -106,11 +108,23 @@ export default function EstimateListPage() {
     }
   }
 
-  const handleOk = () => {
-    form.validateFields().then((values) => {
+  const closeCreate = () => {
+    if (createInFlight.current || createMutation.isPending) return
+    setOpen(false)
+    setCreateError(null)
+    form.resetFields()
+    setPendingItems(null)
+  }
+
+  const handleOk = async () => {
+    if (createInFlight.current || createMutation.isPending) return
+    createInFlight.current = true
+    setCreateError(null)
+    try {
+      const values = await form.validateFields()
       const amountError = validateEstimateAmounts(values.items ?? [])
       if (amountError) {
-        message.error(amountError)
+        setCreateError(amountError)
         return
       }
       const items = (values.items ?? []).map(
@@ -131,13 +145,17 @@ export default function EstimateListPage() {
         memo: values.memo || undefined,
       }
 
-      createMutation.mutate(body, {
-        onSuccess: () => {
-          setOpen(false)
-          form.resetFields()
-        },
-      })
-    })
+      setCreateError(null)
+      await createMutation.mutateAsync(body)
+      setOpen(false)
+      form.resetFields()
+    } catch (cause: unknown) {
+      if (cause && typeof cause === 'object' && 'errorFields' in cause) return
+      const responseError = (cause as { response?: { data?: { error?: string } } })?.response?.data?.error
+      setCreateError(responseError ?? '견적서를 작성하지 못했습니다. 다시 시도해 주세요.')
+    } finally {
+      createInFlight.current = false
+    }
   }
 
   return (
@@ -203,7 +221,7 @@ export default function EstimateListPage() {
         title="견적서 작성"
         open={open}
         onOk={handleOk}
-        onCancel={() => { setOpen(false); form.resetFields(); setPendingItems(null) }}
+        onCancel={closeCreate}
         okText="작성"
         cancelText="취소"
         confirmLoading={createMutation.isPending}
@@ -211,6 +229,7 @@ export default function EstimateListPage() {
         afterOpenChange={handleCreateModalAfterOpen}
         width={720}
       >
+        {createError && <Alert type="error" message={createError} showIcon style={{ marginBottom: 16 }} />}
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="siteId"
