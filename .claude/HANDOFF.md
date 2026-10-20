@@ -19,10 +19,10 @@
 | 상태 | ACTIVE |
 | 도구 | Codex |
 | 갱신 | 2026-10-20 21:45 KST |
-| 브랜치 | `codex/chat-flyway-fresh-pilot` (base `develop` `77b0f07`) |
-| PR | 준비 중. #139·#99 draft 유지 |
-| 현재 단계 | 신규 격리 DB 전용 chat Flyway 파일럿 구현 중. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | 실제 로컬 MySQL DDL 기준 V1·opt-in 프로파일·MySQL CI 테스트 작성 |
+| 브랜치 | `codex/estimate-flyway-fresh-pilot` (base `develop` `bd6c21e`) |
+| PR | chat Flyway #154 develop 병합 완료. estimate PR 준비 중. #139·#99 draft 유지 |
+| 현재 단계 | 신규 격리 DB 전용 estimate Flyway 파일럿 구현 중. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | 실제 로컬 MySQL DDL 기준 estimate V1·opt-in 프로파일·MySQL CI 테스트 작성 |
 
 ## 공통 사용자 지시
 
