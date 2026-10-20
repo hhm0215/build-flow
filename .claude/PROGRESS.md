@@ -5,9 +5,13 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
-## 진행 중 — 견적 DB opt-in Flyway 파일럿 (2026-10-20)
+## 진행 중 — 매입 DB opt-in Flyway 파일럿 (2026-10-20)
 
-- 로컬 MySQL 8의 `SHOW CREATE TABLE` 3개를 기준으로 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `estimate-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 읽기 전용 검토 차단 결함 없음. 격리 MySQL CI·PR·운영 DDL 대조는 PENDING. `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO**.
+- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개를 기준으로 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `purchase-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. #156 첫 CI는 MySQL의 `SHOW CREATE TABLE` 문자열 포맷에 묶인 테스트 단언 실패(실제 타입·NULL 제약은 metadata 조회로 교정)로 FAIL; 최종 SHA CI 재실행은 PENDING. `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO**.
+
+## 완료된 작업 — 견적 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL 3개 기준 신규 격리 DB 전용 estimate V1을 만들었다. 로컬 서비스 테스트·릴리스 증거 생성기 7건 PASS, 독립 리뷰 차단 결함 없음. [PR #155](https://github.com/hhm0215/build-flow/pull/155) 최종 SHA `3111103`의 필수 CI 8개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `6aa9713`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
 
 ## 완료된 작업 — 채팅 DB opt-in Flyway 파일럿 (2026-10-20)
 

@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-20 21:57 KST |
-| 브랜치 | `codex/estimate-flyway-fresh-pilot` (base `develop` `bd6c21e`) |
-| PR | [#155](https://github.com/hhm0215/build-flow/pull/155) draft (estimate); chat Flyway #154 develop 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | estimate Flyway 신규 격리 DB 파일럿 구현·로컬 테스트·독립 검토 완료, #155 CI 진행 중. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | #155 격리 MySQL CI 확인·수정/재검증 후 develop 병합, 다음 독립 서비스 착수 |
+| 갱신 | 2026-10-20 22:04 KST |
+| 브랜치 | `codex/purchase-flyway-fresh-pilot` (base `develop` `6aa9713`) |
+| PR | purchase Flyway [#156](https://github.com/hhm0215/build-flow/pull/156) draft, estimate #155 develop 병합 완료. #139·#99 draft 유지 |
+| 현재 단계 | purchase Flyway 신규 격리 DB 파일럿 구현·로컬 테스트·독립 검토 완료, #156 CI 진행 중. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | #156 격리 MySQL CI 확인·수정/재검증 후 develop 병합, 다음 독립 서비스 착수 |
 
 ## 공통 사용자 지시
 
