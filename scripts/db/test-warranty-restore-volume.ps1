@@ -29,7 +29,8 @@ function Invoke-NativeProcess {
     }
     if ($Arguments -contains "type=bind,source=$testRoot,target=/source,readonly") {
         if ($script:mode -eq 'copy-failure') { throw 'Target is not empty' }
-        return [pscustomobject]@{ StandardOutput = '' }
+        $copyCount = if ($script:mode -eq 'wrong-count') { '0:0' } else { "$($script:expected.Count):$($script:expected.Count)" }
+        return [pscustomobject]@{ StandardOutput = "$copyCount`n" }
     }
     $hash = if ($script:mode -eq 'bad-hash') { '0' * 64 } else { $script:expected[0].sha256 }
     $scan = "$hash`t3`t$($script:pdfName)`n"
@@ -52,7 +53,7 @@ try {
             if ($call -notcontains $required) { throw 'Missing sandbox flag.' }
         }
     }
-    foreach ($case in @('wrong-owner', 'bind-volume', 'copy-failure', 'bad-hash', 'extra-target', 'mutate-source')) {
+    foreach ($case in @('wrong-owner', 'bind-volume', 'copy-failure', 'wrong-count', 'bad-hash', 'extra-target', 'mutate-source')) {
         $script:mode = $case
         Assert-Rejected { Invoke-TestRestore }
     }

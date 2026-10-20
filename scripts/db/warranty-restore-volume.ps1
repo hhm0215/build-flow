@@ -84,6 +84,7 @@ function Invoke-WarrantyVolumeRestore {
     # cover hidden entries; any link or directory fails before the first copy.
     $copy = @'
 set -eu
+source_count=0
 for f in /target/* /target/.[!.]* /target/..?*; do
   if [ -e "$f" ] || [ -L "$f" ]; then echo 'Target is not empty' >&2; exit 1; fi
 done
@@ -92,15 +93,23 @@ for f in /source/* /source/.[!.]* /source/..?*; do
   [ -f "$f" ] && [ ! -L "$f" ] || exit 1
   n=${f##*/}
   printf '%s' "$n" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$' || exit 1
+  source_count=$((source_count + 1))
 done
+copied_count=0
 for f in /source/* /source/.[!.]* /source/..?*; do
   [ -e "$f" ] || continue
   cp -- "$f" "/target/${f##*/}"
+  copied_count=$((copied_count + 1))
 done
+printf '%s:%s\n' "$source_count" "$copied_count"
 '@
     $arguments = $base + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy.Replace("`r`n", "`n").Replace("`r", "`n"))
     $copied = Invoke-NativeProcess -FileName docker -Arguments $arguments -WorkingDirectory $WorkingDirectory -RejectStandardError
-    if (-not [string]::IsNullOrWhiteSpace($copied.StandardOutput)) { throw 'Unexpected warranty copy output.' }
+    $copyCounts = $copied.StandardOutput.Trim()
+    if ($copyCounts -cnotmatch '^[0-9]+:[0-9]+$') { throw 'Unexpected warranty copy count output.' }
+    if ($copyCounts -cne "$($ExpectedFiles.Count):$($ExpectedFiles.Count)") {
+        throw "Warranty bind copy count differs from host inventory (expected=$($ExpectedFiles.Count), source:copied=$copyCounts)."
+    }
     $scan = @'
 set -eu
 for f in /target/* /target/.[!.]* /target/..?*; do
