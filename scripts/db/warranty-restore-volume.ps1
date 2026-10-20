@@ -94,7 +94,7 @@ for f in /source/* /source/.[!.]* /source/..?*; do
   cp -- "$f" "/target/${f##*/}"
 done
 '@
-    $arguments = $base + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy)
+    $arguments = $base + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy.Replace("`r`n", "`n").Replace("`r", "`n"))
     $copied = Invoke-NativeProcess -FileName docker -Arguments $arguments -WorkingDirectory $WorkingDirectory -RejectStandardError
     if (-not [string]::IsNullOrWhiteSpace($copied.StandardOutput)) { throw 'Unexpected warranty copy output.' }
     $scan = @'
@@ -109,7 +109,7 @@ for f in /target/* /target/.[!.]* /target/..?*; do
   printf '%s\t%s\t%s\n' "$h" "$b" "$n"
 done
 '@
-    $scanned = Invoke-NativeProcess -FileName docker -Arguments ($base + @('--mount', "type=volume,source=$VolumeName,target=/target,readonly,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $scan)) -WorkingDirectory $WorkingDirectory -RejectStandardError
+    $scanned = Invoke-NativeProcess -FileName docker -Arguments ($base + @('--mount', "type=volume,source=$VolumeName,target=/target,readonly,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $scan.Replace("`r`n", "`n").Replace("`r", "`n"))) -WorkingDirectory $WorkingDirectory -RejectStandardError
     $actual = @(ConvertFrom-WarrantyVolumeScan -Text $scanned.StandardOutput)
     Assert-WarrantyRestoreInventory -Actual $actual -Expected $ExpectedFiles
     $after = @(Get-WarrantyRestoreHostInventory -Directory $source)

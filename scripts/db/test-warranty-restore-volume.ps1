@@ -47,6 +47,7 @@ try {
     $result = @(Invoke-TestRestore)
     if ($result.Count -ne 1 -or $script:calls.Count -ne 3) { throw 'Restore sequence mismatch.' }
     foreach ($call in @($script:calls | Where-Object { $_[0] -eq 'run' })) {
+        if ([string]$call[-1] -cmatch "`r") { throw 'Restore helper passed CRLF to POSIX sh.' }
         foreach ($required in @('--network', 'none', '--cap-drop', 'ALL', '--read-only', 'no-new-privileges')) {
             if ($call -notcontains $required) { throw 'Missing sandbox flag.' }
         }
