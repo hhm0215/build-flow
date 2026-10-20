@@ -80,12 +80,13 @@ function Invoke-WarrantyVolumeRestore {
         $volume.Labels.'com.docker.compose.volume' -cne 'restore_warranty_uploads' -or
         $volume.Labels.'com.buildflow.restore-test' -cne $Nonce) { throw 'Warranty volume ownership validation failed.' }
     $base = @('run', '--rm', '--pull=never', '--network', 'none', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--user', '0:0', '--label', "com.buildflow.restore-test=$Nonce")
+    $copyBase = $base
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
         # The backup package is intentionally owner-only (0700). Root without
         # DAC_READ_SEARCH cannot traverse that bind mount after --cap-drop ALL.
         # Grant read/traverse only; the source remains readonly and the only
         # writable mount is the identity-checked isolated restore volume.
-        $base += @('--cap-add', 'DAC_READ_SEARCH')
+        $copyBase += @('--cap-add', 'DAC_READ_SEARCH')
     }
     # Files are flat and names restricted before every shell operation. Globs also
     # cover hidden entries; any link or directory fails before the first copy.
@@ -110,7 +111,7 @@ for f in /source/* /source/.[!.]* /source/..?*; do
 done
 printf '%s:%s\n' "$source_count" "$copied_count"
 '@
-    $arguments = $base + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy.Replace("`r`n", "`n").Replace("`r", "`n"))
+    $arguments = $copyBase + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy.Replace("`r`n", "`n").Replace("`r", "`n"))
     $copied = Invoke-NativeProcess -FileName docker -Arguments $arguments -WorkingDirectory $WorkingDirectory -RejectStandardError
     $copyCounts = $copied.StandardOutput.Trim()
     if ($copyCounts -cnotmatch '^[0-9]+:[0-9]+$') { throw 'Unexpected warranty copy count output.' }

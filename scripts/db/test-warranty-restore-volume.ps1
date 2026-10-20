@@ -52,9 +52,12 @@ try {
         foreach ($required in @('--network', 'none', '--cap-drop', 'ALL', '--read-only', 'no-new-privileges')) {
             if ($call -notcontains $required) { throw 'Missing sandbox flag.' }
         }
-        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -and
-            ($call -notcontains '--cap-add' -or $call -notcontains 'DAC_READ_SEARCH')) {
-            throw 'Private Unix source bind lacks read-only traversal capability.'
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            $isCopy = $call -contains "type=bind,source=$testRoot,target=/source,readonly"
+            if ($isCopy -and ($call -notcontains '--cap-add' -or $call -notcontains 'DAC_READ_SEARCH')) {
+                throw 'Private Unix source bind lacks read-only traversal capability.'
+            }
+            if (-not $isCopy -and $call -contains '--cap-add') { throw 'Volume-only scan has unnecessary capability.' }
         }
     }
     foreach ($case in @('wrong-owner', 'bind-volume', 'copy-failure', 'wrong-count', 'bad-hash', 'extra-target', 'mutate-source')) {
