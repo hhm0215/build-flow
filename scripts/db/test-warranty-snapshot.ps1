@@ -48,6 +48,15 @@ Assert-Rejected { ConvertTo-WarrantyUploadManifest $rows $files 2 $source } 'loc
 $source.volumeDriver = 'local'
 Assert-Rejected { Invoke-WarrantyVolumeHelper -VolumeName 'synthetic_uploads' -WorkingDirectory $PSScriptRoot -ImageId 'mysql:8.0' -Shell 'true' } 'pinned source image ID'
 
+function Invoke-NativeProcess {
+    param($FileName, $Arguments, $WorkingDirectory, [switch]$RejectStandardError)
+    if ($FileName -cne 'docker' -or $Arguments[-1] -cne "set -eu`ntrue`n") {
+        throw 'Warranty helper did not normalize Windows shell line endings.'
+    }
+    return [pscustomobject]@{ StandardOutput = '' }
+}
+[void](Invoke-WarrantyVolumeHelper -VolumeName 'synthetic_uploads' -WorkingDirectory $PSScriptRoot -ImageId ('sha256:' + ('a' * 64)) -Shell "set -eu`r`ntrue`r")
+
 $copyRoot = Join-Path ([IO.Path]::GetTempPath()) ('buildflow-warranty-snapshot-test-' + [Guid]::NewGuid().ToString('N'))
 try {
     New-Item -ItemType Directory -Path $copyRoot | Out-Null
