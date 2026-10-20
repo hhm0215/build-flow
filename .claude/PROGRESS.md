@@ -5,6 +5,14 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 합성 DB·보증 PDF 복원 CI 및 Windows/Unix 셸 경계 (2026-10-20)
+
+- Windows PowerShell의 CRLF가 컨테이너 `sh` 옵션을 깨던 경로를 LF 정규화로 수정했다. 격리 복원 Linux CI에서 소유자 전용(0700) 백업 폴더를 읽지 못하던 문제는 원본 권한을 완화하지 않고 PDF 복사 helper에만 `DAC_READ_SEARCH`를 부여해 해결했다. 복사 전후 파일 개수, 해시·DB 참조와 auth `ddl-auto=validate` 기동을 합성 데이터로 확인했다. 독립 보안/인프라 리뷰 차단 결함 없음, [PR #150](https://github.com/hhm0215/build-flow/pull/150) 최종 SHA `3e07dec` CI 필수 6개 PASS, `develop` 병합 `0bee1eb`. 관리자 비밀번호 로그인·실제 VPS snapshot·외부 암호화 사본의 빈 환경 복원은 **PENDING/UNVERIFIED**이며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 견적 작성 실패 동선 보강 (2026-10-20)
+
+- 견적 작성 요청의 중복 제출·오류 후 상태 복구 동선을 보강하고 회귀를 추가했다. 로컬 프론트 166건·lint·typecheck·build와 독립 재검토 통과, [PR #149](https://github.com/hhm0215/build-flow/pull/149) 최종 SHA `a496beb` CI 필수 5개 PASS, `develop` 병합 `628281e`. 공개 VPS UI 재검증은 PENDING, `main`·VPS 미반영.
+
 ## 완료된 작업 — 알림 미읽음 건수 조회 실패 표시 (2026-10-19)
 
 - 미읽음 건수 API 실패 시 오래된 캐시 숫자를 알림 페이지·헤더 배지에서 숨기고 오류·재시도를 안내하며, 불확실한 `전체 읽음` 실행을 막았다. 독립 리뷰가 지적한 헤더 누락을 보완·재검토했다. 로컬 프론트 165건·ESLint·TypeScript·Vite 빌드 PASS, [PR #147](https://github.com/hhm0215/build-flow/pull/147) 최종 SHA `61fd3e8` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `7fc1528`. 공개 VPS 장애·복구 화면과 로컬 Docker 통합 테스트는 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
