@@ -5,6 +5,14 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 진행 중 — 견적 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 로컬 MySQL 8의 `SHOW CREATE TABLE` 3개를 기준으로 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `estimate-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 읽기 전용 검토 차단 결함 없음. 격리 MySQL CI·PR·운영 DDL 대조는 PENDING. `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO**.
+
+## 완료된 작업 — 채팅 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL을 기준으로 신규 격리 DB 전용 chat V1을 만들고 기본 Flyway를 비활성화했다. `chat-flyway` CI 격리 MySQL 및 릴리스 후보 의존성·결과 검증을 추가했다. 독립 리뷰 차단 결함 없음, [PR #154](https://github.com/hhm0215/build-flow/pull/154) 최종 SHA `f527aef`의 필수 7개 CI PASS, `develop` 병합 `bd6c21e`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — 거래처 보관과 현장 연결 경합 방벽 (2026-10-20)
 
 - 현장 생성·거래처 변경에서 거래처 행을 `PESSIMISTIC_WRITE`로 잠가 거래처 보관과 직렬화했다. H2/JPA 격리 동시성 회귀에서 보관 트랜잭션이 먼저 잠금을 쥔 경우 현장 연결이 대기한 뒤 409로 거부되고 현장 0건임을 확인했다. 전체 Gradle `build` PASS, 독립 리뷰에서 확정적 결함 없음. [PR #152](https://github.com/hhm0215/build-flow/pull/152) 최종 SHA `810a2c3` CI 필수 6개 PASS, `develop` 병합 `8c17940`. H2는 운영 MySQL의 동시성 실측을 대체하지 않으며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.

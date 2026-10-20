@@ -14,6 +14,7 @@ REQUIRED_RESULTS = {
     "backend": "RESULT_BACKEND",
     "auth-flyway": "RESULT_AUTH_FLYWAY",
     "chat-flyway": "RESULT_CHAT_FLYWAY",
+    "estimate-flyway": "RESULT_ESTIMATE_FLYWAY",
     "frontend": "RESULT_FRONTEND",
     "backup-synthetic": "RESULT_BACKUP_SYNTHETIC",
     "public-compose": "RESULT_PUBLIC_COMPOSE",
