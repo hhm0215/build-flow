@@ -80,6 +80,13 @@ function Invoke-WarrantyVolumeRestore {
         $volume.Labels.'com.docker.compose.volume' -cne 'restore_warranty_uploads' -or
         $volume.Labels.'com.buildflow.restore-test' -cne $Nonce) { throw 'Warranty volume ownership validation failed.' }
     $base = @('run', '--rm', '--pull=never', '--network', 'none', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--user', '0:0', '--label', "com.buildflow.restore-test=$Nonce")
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        # The backup package is intentionally owner-only (0700). Root without
+        # DAC_READ_SEARCH cannot traverse that bind mount after --cap-drop ALL.
+        # Grant read/traverse only; the source remains readonly and the only
+        # writable mount is the identity-checked isolated restore volume.
+        $base += @('--cap-add', 'DAC_READ_SEARCH')
+    }
     # Files are flat and names restricted before every shell operation. Globs also
     # cover hidden entries; any link or directory fails before the first copy.
     $copy = @'

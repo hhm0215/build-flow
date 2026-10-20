@@ -52,6 +52,10 @@ try {
         foreach ($required in @('--network', 'none', '--cap-drop', 'ALL', '--read-only', 'no-new-privileges')) {
             if ($call -notcontains $required) { throw 'Missing sandbox flag.' }
         }
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -and
+            ($call -notcontains '--cap-add' -or $call -notcontains 'DAC_READ_SEARCH')) {
+            throw 'Private Unix source bind lacks read-only traversal capability.'
+        }
     }
     foreach ($case in @('wrong-owner', 'bind-volume', 'copy-failure', 'wrong-count', 'bad-hash', 'extra-target', 'mutate-source')) {
         $script:mode = $case
