@@ -138,7 +138,8 @@ public class SiteService {
         if (clientId == null) {
             return null;
         }
-        return clientRepository.findById(clientId)
+        // 거래처 보관과 새 현장 연결이 같은 행 잠금을 공유해야 검사 후 보관되는 경합을 막는다.
+        return clientRepository.findByIdForUpdate(clientId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CLIENT_NOT_FOUND));
     }
 }

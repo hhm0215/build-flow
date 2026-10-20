@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
+| 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-20 19:52 KST |
-| 브랜치 | `develop` (`0bee1eb`) |
-| PR | #149·#150 `develop` 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | #150 최종 SHA CI 6개 PASS. Windows 및 Linux 합성 DB+보증 PDF snapshot→격리 복원·auth 스키마 기동 PASS. 실제 관리자 로그인·VPS 외부 백업/복원은 미검증. 로컬 Docker 미응답, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | P0 공개 파일럿 CRUD/PDF와 복구·마이그레이션 선행 게이트 중 #139와 겹치지 않는 항목 선택 |
+| 갱신 | 2026-10-20 21:30 KST |
+| 브랜치 | `codex/client-archive-write-barrier` (base `develop` `68c611c`) |
+| PR | 준비 중. #139·#99 draft는 별도 유지 |
+| 현재 단계 | P0 거래처 보관과 현장 생성/연결 경합 방벽 구현·회귀 검증 중. 실데이터 NO-GO, V1 40/100 |
+| 다음 첫 행동 | 거래처 행 잠금 경로 회귀 테스트, 관련/전체 테스트·독립 리뷰 후 PR·CI |
 
 ## 공통 사용자 지시
 
