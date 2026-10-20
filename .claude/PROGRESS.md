@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 거래처 보관과 현장 연결 경합 방벽 (2026-10-20)
+
+- 현장 생성·거래처 변경에서 거래처 행을 `PESSIMISTIC_WRITE`로 잠가 거래처 보관과 직렬화했다. H2/JPA 격리 동시성 회귀에서 보관 트랜잭션이 먼저 잠금을 쥔 경우 현장 연결이 대기한 뒤 409로 거부되고 현장 0건임을 확인했다. 전체 Gradle `build` PASS, 독립 리뷰에서 확정적 결함 없음. [PR #152](https://github.com/hhm0215/build-flow/pull/152) 최종 SHA `810a2c3` CI 필수 6개 PASS, `develop` 병합 `8c17940`. H2는 운영 MySQL의 동시성 실측을 대체하지 않으며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — 합성 DB·보증 PDF 복원 CI 및 Windows/Unix 셸 경계 (2026-10-20)
 
 - Windows PowerShell의 CRLF가 컨테이너 `sh` 옵션을 깨던 경로를 LF 정규화로 수정했다. 격리 복원 Linux CI에서 소유자 전용(0700) 백업 폴더를 읽지 못하던 문제는 원본 권한을 완화하지 않고 PDF 복사 helper에만 `DAC_READ_SEARCH`를 부여해 해결했다. 복사 전후 파일 개수, 해시·DB 참조와 auth `ddl-auto=validate` 기동을 합성 데이터로 확인했다. 독립 보안/인프라 리뷰 차단 결함 없음, [PR #150](https://github.com/hhm0215/build-flow/pull/150) 최종 SHA `3e07dec` CI 필수 6개 PASS, `develop` 병합 `0bee1eb`. 관리자 비밀번호 로그인·실제 VPS snapshot·외부 암호화 사본의 빈 환경 복원은 **PENDING/UNVERIFIED**이며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
