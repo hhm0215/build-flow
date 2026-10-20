@@ -12,6 +12,10 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: false
+    baseline-on-migrate: false
+    clean-disabled: true
   jpa:
     hibernate:
       ddl-auto: update

@@ -66,12 +66,13 @@ class ReleaseCandidateTests(unittest.TestCase):
             build_candidate(self.env, self.root, SHA, False, self.tracked)
 
     def test_rejects_failed_or_missing_job(self):
-        for outcome in ("failure", "skipped", "cancelled", None):
-            with self.subTest(outcome=outcome):
-                self.env["RESULT_BACKEND"] = outcome
-                with self.assertRaises(ValueError):
-                    self.candidate()
-        self.env["RESULT_BACKEND"] = "success"
+        for variable in REQUIRED_RESULTS.values():
+            for outcome in ("failure", "skipped", "cancelled", None):
+                with self.subTest(variable=variable, outcome=outcome):
+                    self.env[variable] = outcome
+                    with self.assertRaises(ValueError):
+                        self.candidate()
+            self.env[variable] = "success"
 
     def test_rejects_invalid_run_numbers_and_missing_file(self):
         for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"):
