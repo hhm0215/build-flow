@@ -5,9 +5,9 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
-## 진행 중 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
+## 완료된 작업 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
 
-- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개 기준 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `tax-service:test`와 릴리스 증거 생성기 7건 PASS. 독립 검토·격리 MySQL CI·PR·운영 DDL 대조는 PENDING. `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO**.
+- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개 기준 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `tax-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. [PR #157](https://github.com/hhm0215/build-flow/pull/157) 최종 SHA `7f5a124`의 필수 CI 10개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `2c508c1`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
 
 ## 완료된 작업 — 매입 DB opt-in Flyway 파일럿 (2026-10-20)
 
