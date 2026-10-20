@@ -20,9 +20,9 @@
 | 도구 | Codex |
 | 갱신 | 2026-10-20 19:29 KST |
 | 브랜치 | `codex/warranty-shell-newlines` (`develop` 기준) |
-| PR | #149 견적 작성 수정 draft/CI 5개 PASS. 복구 셸 줄바꿈 수정은 별도 draft PR 준비 중. #139·#99 draft 유지 |
-| 현재 단계 | 로컬 개발 Compose 프론트 200·무인증 API 401·업무 서비스 7개 health 200. Windows 합성 DB+보증 PDF snapshot→격리 복원 PASS; CRLF 셸 오류 회귀 보강. 실제 VPS 외부 백업·복원은 미검증, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | 복구 셸 수정 PR·CI 검증 후 #149와 순차 병합; 독립적인 운영 복구 선행 게이트 계속 처리 |
+| PR | #149 견적 작성 수정 `develop` 병합 완료. #150 복구 셸 줄바꿈·합성 Docker CI draft 진행 중. #139·#99 draft 유지 |
+| 현재 단계 | Windows 합성 DB+보증 PDF snapshot→격리 복원 PASS. #150 Linux CI는 DB 복원 뒤 보증 PDF 재고 대조 FAIL로 원인 계측 중. 로컬 Docker는 현재 미응답. 실제 VPS 외부 백업·복원은 미검증, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | #150 Linux 합성 복원 CI 실패 원인 수리·최종 SHA 독립 리뷰/CI 후 `develop` 병합; 운영 복구 선행 게이트 계속 처리 |
 
 ## 공통 사용자 지시
 

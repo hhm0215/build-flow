@@ -12,9 +12,12 @@ function Assert-WarrantyRestoreInventory {
             throw 'Invalid warranty restore inventory.'
         }
         $matches = @($Actual | Where-Object { $_.relativePath -ceq $name })
-        if ($matches.Count -ne 1 -or [long]$matches[0].bytes -ne [long]$entry.bytes -or
+        if ($matches.Count -ne 1) {
+            throw "Restored warranty inventory name match count differs (matches=$($matches.Count), actual=$(@($Actual).Count), expected=$(@($Expected).Count))."
+        }
+        if ([long]$matches[0].bytes -ne [long]$entry.bytes -or
             ([string]$matches[0].sha256).ToLowerInvariant() -cne ([string]$entry.sha256).ToLowerInvariant()) {
-            throw 'Restored warranty inventory does not match expected files.'
+            throw 'Restored warranty inventory size or digest differs.'
         }
     }
     if (@($Actual).Count -ne $seen.Count) { throw 'Unexpected warranty restore files.' }
