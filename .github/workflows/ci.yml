@@ -219,6 +219,54 @@ jobs:
           print('Purchase Flyway MySQL integration test executed and passed.')
           PY
 
+  tax-flyway:
+    name: 세금계산서 DB (Flyway · MySQL 8)
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-placeholder-only
+          MYSQL_DATABASE: buildflow_tax_flyway_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=30
+    env:
+      TAX_FLYWAY_INTEGRATION: "true"
+      DB_USERNAME: root
+      DB_PASSWORD: ci-placeholder-only
+      SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/buildflow_tax_flyway_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+      - name: Verify opt-in tax migration against fresh MySQL
+        run: ./gradlew :tax-service:test --tests com.buildflow.tax.TaxFlywayIntegrationTest --no-daemon
+      - name: Assert MySQL integration test actually ran
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          result = Path('tax-service/build/test-results/test/TEST-com.buildflow.tax.TaxFlywayIntegrationTest.xml')
+          suite = ElementTree.parse(result).getroot()
+          assert suite.attrib['tests'] == '1', suite.attrib
+          assert suite.attrib['skipped'] == '0', suite.attrib
+          assert suite.attrib['failures'] == '0', suite.attrib
+          assert suite.attrib['errors'] == '0', suite.attrib
+          print('Tax Flyway MySQL integration test executed and passed.')
+          PY
+
   frontend:
     name: 프론트 (lint · test · build)
     runs-on: ubuntu-24.04
@@ -336,7 +384,7 @@ jobs:
   release-candidate:
     name: 릴리스 후보 증거 (배포 아님)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [backend, auth-flyway, chat-flyway, estimate-flyway, purchase-flyway, frontend, backup-synthetic, public-compose, windows-readiness]
+    needs: [backend, auth-flyway, chat-flyway, estimate-flyway, purchase-flyway, tax-flyway, frontend, backup-synthetic, public-compose, windows-readiness]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -355,6 +403,7 @@ jobs:
           RESULT_CHAT_FLYWAY: ${{ needs['chat-flyway'].result }}
           RESULT_ESTIMATE_FLYWAY: ${{ needs['estimate-flyway'].result }}
           RESULT_PURCHASE_FLYWAY: ${{ needs['purchase-flyway'].result }}
+          RESULT_TAX_FLYWAY: ${{ needs['tax-flyway'].result }}
           RESULT_FRONTEND: ${{ needs.frontend.result }}
           RESULT_BACKUP_SYNTHETIC: ${{ needs['backup-synthetic'].result }}
           RESULT_PUBLIC_COMPOSE: ${{ needs['public-compose'].result }}

@@ -16,6 +16,7 @@ REQUIRED_RESULTS = {
     "chat-flyway": "RESULT_CHAT_FLYWAY",
     "estimate-flyway": "RESULT_ESTIMATE_FLYWAY",
     "purchase-flyway": "RESULT_PURCHASE_FLYWAY",
+    "tax-flyway": "RESULT_TAX_FLYWAY",
     "frontend": "RESULT_FRONTEND",
     "backup-synthetic": "RESULT_BACKUP_SYNTHETIC",
     "public-compose": "RESULT_PUBLIC_COMPOSE",
