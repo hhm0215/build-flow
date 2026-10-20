@@ -101,6 +101,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - name: Build isolated auth schema validation image
+        run: docker build --file Dockerfile --build-arg SERVICE_NAME=auth-service --tag build-flow-auth-service:latest .
       - name: Snapshot and restore isolated synthetic DB and warranty volume
         run: sh -c 'umask 077; exec pwsh -NoProfile -File scripts/db/test-v2-snapshot-docker.ps1'
 

@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-20 19:29 KST |
+| 갱신 | 2026-10-20 19:46 KST |
 | 브랜치 | `codex/warranty-shell-newlines` (`develop` 기준) |
 | PR | #149 견적 작성 수정 `develop` 병합 완료. #150 복구 셸 줄바꿈·합성 Docker CI draft 진행 중. #139·#99 draft 유지 |
-| 현재 단계 | Windows 합성 DB+보증 PDF snapshot→격리 복원 PASS. #150 Linux CI는 DB 복원 뒤 보증 PDF 재고 대조 FAIL로 원인 계측 중. 로컬 Docker는 현재 미응답. 실제 VPS 외부 백업·복원은 미검증, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | #150 Linux 합성 복원 CI 실패 원인 수리·최종 SHA 독립 리뷰/CI 후 `develop` 병합; 운영 복구 선행 게이트 계속 처리 |
+| 현재 단계 | Windows 합성 DB+보증 PDF snapshot→격리 복원 PASS. #150 Linux CI에서 DB·PDF 복원 대조 PASS, 이후 auth 검증 이미지 부재로 전체 FAIL. CI에 격리 auth 이미지를 빌드하도록 수정 중. 로컬 Docker는 현재 미응답. 실제 VPS 외부 백업·복원은 미검증, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | #150 최종 SHA의 합성 복원·auth 기동 포함 CI와 독립 리뷰 확인 후 `develop` 병합; 운영 복구 선행 게이트 계속 처리 |
 
 ## 공통 사용자 지시
 
