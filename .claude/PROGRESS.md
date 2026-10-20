@@ -7,7 +7,7 @@
 
 ## 진행 중 — 매입 DB opt-in Flyway 파일럿 (2026-10-20)
 
-- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개를 기준으로 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `purchase-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. 격리 MySQL CI·PR·운영 DDL 대조는 PENDING. `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO**.
+- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개를 기준으로 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `purchase-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. #156 첫 CI는 MySQL의 `SHOW CREATE TABLE` 문자열 포맷에 묶인 테스트 단언 실패(실제 타입·NULL 제약은 metadata 조회로 교정)로 FAIL; 최종 SHA CI 재실행은 PENDING. `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO**.
 
 ## 완료된 작업 — 견적 DB opt-in Flyway 파일럿 (2026-10-20)
 

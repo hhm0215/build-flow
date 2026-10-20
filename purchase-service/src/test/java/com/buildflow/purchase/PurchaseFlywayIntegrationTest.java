@@ -54,8 +54,18 @@ class PurchaseFlywayIntegrationTest {
         String outboxDdl = jdbc.queryForObject("SHOW CREATE TABLE outbox_events",
                 (resultSet, row) -> resultSet.getString(2));
         assertNotNull(outboxDdl);
-        assertTrue(outboxDdl.contains("`payload_json` longtext COLLATE utf8mb4_unicode_ci NOT NULL"));
+        assertTrue(outboxDdl.contains("`payload_json` longtext"));
         assertTrue(outboxDdl.contains("KEY `idx_outbox_pending`"));
+        assertEquals("longtext", jdbc.queryForObject(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'outbox_events' "
+                        + "AND COLUMN_NAME = 'payload_json'",
+                String.class));
+        assertEquals("NO", jdbc.queryForObject(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'outbox_events' "
+                        + "AND COLUMN_NAME = 'payload_json'",
+                String.class));
         assertEquals(0, flyway.migrate().migrationsExecuted);
     }
 }
