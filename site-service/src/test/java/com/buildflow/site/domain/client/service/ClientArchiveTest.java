@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ClientArchiveTest {
@@ -85,6 +86,19 @@ class ClientArchiveTest {
 
         assertEquals(ErrorCode.CLIENT_ARCHIVED_NOT_ASSIGNABLE, assertThrows(BusinessException.class,
                 () -> siteService.create(request)).getErrorCode());
+        verify(clientRepository).findByIdForUpdate(3L);
+    }
+
+    @Test
+    void activeClientLinkUsesTheSameRowLockAsArchive() {
+        client(3L, "[QA] 진행 거래처", false);
+        SiteCreateRequest request = mock(SiteCreateRequest.class);
+        when(request.getSiteName()).thenReturn("[QA] 새 현장");
+        when(request.getClientId()).thenReturn(3L);
+        when(siteRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertDoesNotThrow(() -> siteService.create(request));
+        verify(clientRepository).findByIdForUpdate(3L);
     }
 
     @Test
