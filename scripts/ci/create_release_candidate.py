@@ -13,7 +13,9 @@ REPOSITORY = "hhm0215/build-flow"
 REQUIRED_RESULTS = {
     "backend": "RESULT_BACKEND",
     "auth-flyway": "RESULT_AUTH_FLYWAY",
+    "chat-flyway": "RESULT_CHAT_FLYWAY",
     "frontend": "RESULT_FRONTEND",
+    "backup-synthetic": "RESULT_BACKUP_SYNTHETIC",
     "public-compose": "RESULT_PUBLIC_COMPOSE",
     "windows-readiness": "RESULT_WINDOWS_READINESS",
 }
@@ -74,7 +76,7 @@ def build_candidate(
 
     results = {job: env.get(variable) for job, variable in REQUIRED_RESULTS.items()}
     if any(result != "success" for result in results.values()):
-        raise ValueError("All five required CI jobs must succeed")
+        raise ValueError("All required CI jobs must succeed")
 
     file_hashes = {
         relative: checked_file_hash(root, relative, tracked_paths)

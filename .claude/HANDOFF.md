@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
+| 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-20 21:40 KST |
-| 브랜치 | `develop` (`8c17940`) |
-| PR | #152 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | 거래처 보관과 현장 연결 경합 방벽 H2/JPA·전체 빌드·CI PASS. 실제 MySQL/VPS 미검증, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | P0 CRUD/PDF 실동선 또는 현장 보관 후 타 서비스 생성 경합의 독립 작업 선택 |
+| 갱신 | 2026-10-20 21:45 KST |
+| 브랜치 | `codex/chat-flyway-fresh-pilot` (base `develop` `77b0f07`) |
+| PR | 준비 중. #139·#99 draft 유지 |
+| 현재 단계 | 신규 격리 DB 전용 chat Flyway 파일럿 구현 중. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | 실제 로컬 MySQL DDL 기준 V1·opt-in 프로파일·MySQL CI 테스트 작성 |
 
 ## 공통 사용자 지시
 
