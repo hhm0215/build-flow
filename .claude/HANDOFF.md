@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-21 08:31 KST |
-| 브랜치 | `codex/tax-flyway-fresh-pilot` (base `develop` `013af0c`) |
-| PR | tax Flyway [#157](https://github.com/hhm0215/build-flow/pull/157) draft, purchase #156 develop 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | tax Flyway 신규 격리 DB 파일럿 구현·로컬 테스트·독립 검토 완료, #157 CI 진행 중. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | #157 격리 MySQL CI 확인·수정/재검증 후 develop 병합, 다음 독립 서비스 착수 |
+| 갱신 | 2026-10-21 08:34 KST |
+| 브랜치 | `codex/migration-status-handoff` (base `develop` `2c508c1`) |
+| PR | tax Flyway [#157](https://github.com/hhm0215/build-flow/pull/157) develop 병합 완료. #139·#99 draft 유지 |
+| 현재 단계 | 신규 격리 DB 전용 auth/chat/estimate/purchase/tax Flyway 파일럿 develop 통합. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | P0 합성 CRUD 실동선 검증·결함 수리. site/notification V1은 실제 MySQL DDL 확보 후 작성(현재 로컬 Docker 엔진 미기동); 기존 DB baseline·운영 적용은 별도 복구 게이트 뒤 |
 
 ## 공통 사용자 지시
 
