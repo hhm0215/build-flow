@@ -65,7 +65,8 @@ function Invoke-WarrantyVolumeRestore {
     $source = [IO.Path]::GetFullPath($UploadsDirectory)
     if ($source.Contains(',') -or $source.Contains('"') -or $source.Contains("`n") -or $source.Contains("`r")) { throw 'Unsafe warranty bind path.' }
     $before = @(Get-WarrantyRestoreHostInventory -Directory $source)
-    Assert-WarrantyRestoreInventory -Actual $before -Expected $ExpectedFiles
+    try { Assert-WarrantyRestoreInventory -Actual $before -Expected $ExpectedFiles }
+    catch { throw "Warranty source inventory check failed before copy: $($_.Exception.Message)" }
     $inspection = Invoke-NativeProcess -FileName docker -Arguments @('volume', 'inspect', $VolumeName) -WorkingDirectory $WorkingDirectory -RejectStandardError
     $volumes = @($inspection.StandardOutput | ConvertFrom-Json)
     if ($volumes.Count -ne 1) { throw 'Warranty volume inspection is ambiguous.' }
@@ -111,8 +112,10 @@ done
 '@
     $scanned = Invoke-NativeProcess -FileName docker -Arguments ($base + @('--mount', "type=volume,source=$VolumeName,target=/target,readonly,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $scan.Replace("`r`n", "`n").Replace("`r", "`n"))) -WorkingDirectory $WorkingDirectory -RejectStandardError
     $actual = @(ConvertFrom-WarrantyVolumeScan -Text $scanned.StandardOutput)
-    Assert-WarrantyRestoreInventory -Actual $actual -Expected $ExpectedFiles
+    try { Assert-WarrantyRestoreInventory -Actual $actual -Expected $ExpectedFiles }
+    catch { throw "Isolated warranty volume inventory check failed after copy: $($_.Exception.Message)" }
     $after = @(Get-WarrantyRestoreHostInventory -Directory $source)
-    Assert-WarrantyRestoreInventory -Actual $after -Expected $before
+    try { Assert-WarrantyRestoreInventory -Actual $after -Expected $before }
+    catch { throw "Warranty source inventory changed during copy: $($_.Exception.Message)" }
     return $actual
 }
