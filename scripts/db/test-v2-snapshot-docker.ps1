@@ -5,7 +5,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 
-if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { throw 'Synthetic snapshot ACL test requires Windows.' }
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $nonce = [Guid]::NewGuid().ToString('N')
 $project = 'buildflowsnap' + $nonce.Substring(0, 12)
@@ -81,6 +80,11 @@ function Assert-TestCleanupIdentity {
 
 function Set-PrivateTestDirectory {
     param([Parameter(Mandatory = $true)][string]$Path)
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        & chmod 700 -- $Path
+        if ($LASTEXITCODE -ne 0) { throw 'Could not prepare private Unix synthetic snapshot directory.' }
+        return
+    }
     $acl = Get-Acl -LiteralPath $Path
     $acl.SetAccessRuleProtection($true, $false)
     foreach ($sidText in @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value, 'S-1-5-18', 'S-1-5-32-544')) {

@@ -29,7 +29,8 @@ function Invoke-NativeProcess {
     }
     if ($Arguments -contains "type=bind,source=$testRoot,target=/source,readonly") {
         if ($script:mode -eq 'copy-failure') { throw 'Target is not empty' }
-        return [pscustomobject]@{ StandardOutput = '' }
+        $copyCount = if ($script:mode -eq 'wrong-count') { '0:0' } else { "$($script:expected.Count):$($script:expected.Count)" }
+        return [pscustomobject]@{ StandardOutput = "$copyCount`n" }
     }
     $hash = if ($script:mode -eq 'bad-hash') { '0' * 64 } else { $script:expected[0].sha256 }
     $scan = "$hash`t3`t$($script:pdfName)`n"
@@ -47,11 +48,19 @@ try {
     $result = @(Invoke-TestRestore)
     if ($result.Count -ne 1 -or $script:calls.Count -ne 3) { throw 'Restore sequence mismatch.' }
     foreach ($call in @($script:calls | Where-Object { $_[0] -eq 'run' })) {
+        if ([string]$call[-1] -cmatch "`r") { throw 'Restore helper passed CRLF to POSIX sh.' }
         foreach ($required in @('--network', 'none', '--cap-drop', 'ALL', '--read-only', 'no-new-privileges')) {
             if ($call -notcontains $required) { throw 'Missing sandbox flag.' }
         }
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            $isCopy = $call -contains "type=bind,source=$testRoot,target=/source,readonly"
+            if ($isCopy -and ($call -notcontains '--cap-add' -or $call -notcontains 'DAC_READ_SEARCH')) {
+                throw 'Private Unix source bind lacks read-only traversal capability.'
+            }
+            if (-not $isCopy -and $call -contains '--cap-add') { throw 'Volume-only scan has unnecessary capability.' }
+        }
     }
-    foreach ($case in @('wrong-owner', 'bind-volume', 'copy-failure', 'bad-hash', 'extra-target', 'mutate-source')) {
+    foreach ($case in @('wrong-owner', 'bind-volume', 'copy-failure', 'wrong-count', 'bad-hash', 'extra-target', 'mutate-source')) {
         $script:mode = $case
         Assert-Rejected { Invoke-TestRestore }
     }

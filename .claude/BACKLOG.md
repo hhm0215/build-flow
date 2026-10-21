@@ -26,6 +26,7 @@
 - **실데이터 전 확인 근거**: 업로드 PDF 사본을 앱에서 다운로드하고 Gateway 우회 직접 호출에도 관리자 토큰·로그아웃 폐기를 재검증하는 코드를 작업 분기에서 검증 중이다(**main·VPS 미반영**). 다운로드는 원본 대조 수단이다. 누가·언제 어떤 값을 확인·수정했는지는 2026-10-17 추가 전용 감사 이력(`/warranties/{id}/history`)으로 남기며(develop, 미배포), 이력·원본의 보존·삭제 정책은 아직 없다. 실데이터 승격 전에 이력·정책과 DB+파일 복원을 설계·검증한다.
 - **알림 재조정·날짜 경계**: 과거 릴리스에서 생성한 미발행 `warranty.expiring` outbox는 새 MANUAL 자격 판정 없이 전송될 수 있다. PR #97(`main` `5dd9a67`)에서 nullable `expiry_confirmed_at`을 추가해 기존 MANUAL 기본값을 확정 증거로 쓰지 않고, 재저장 전에는 조회·스케줄러·소비·화면에서 미확정으로 취급한다. 새 이벤트의 확인 기준과 현재 행을 비교해 구 이벤트의 지연 소비를 무시하고, 재확인 전 구 이벤트의 ACK가 최초 유효 알림을 7일 억제하지 않도록 회귀를 추가했다. 구 이벤트가 PENDING/CLAIMED여도 새 확인본의 최초 이벤트는 enqueue되도록 만료 당일 회귀를 추가했다. 기존 수기 행도 재저장이 필요하며 공유 관리자 계정의 시각만으로 실제 확인자를 증명하지 못한다. 2026-10-15 로컬 후속으로 발행 직전 보증 행 재검증과 원본을 보존하는 `SUPPRESSED` 종결을 구현하고 H2/JPA·발행기 회귀를 통과했다. 새 상태·컬럼은 운영 MySQL 실제 DDL/구 큐·롤백 호환성 미확인이므로 **VPS 미배포**다. 실데이터 승격 전에 구 큐 감사, 명시적 MySQL 확장 마이그레이션·기존 행 NULL 유지·격리 복원과 롤백, 확인자/원본 대조 감사 이력을 검증한다. 삭제/수정 경합·DB 장애·재생과 실제 VPS 검증도 남아 있다. 만료 조회/응답·스케줄러의 KST 업무일 일치와 자정 회귀는 로컬·PR·병합 `main` CI PASS이며 공개 VPS 반영은 PENDING이다.
 - **2026-10-17 현장 참조 후속**: 매입(PR #110)·견적·세금계산서 생성의 `siteId`를 site-service 조회로 검증하고 없는 현장 400/상류 장애 503의 실패-닫힘으로 처리한다(`develop` 통합, **main·VPS 미반영**; 2026-10-17 로컬 풀 Docker에서 실제 Feign/Eureka로 400/201/503 PASS — `docs/PILOT_QA.md`). 보증 직접 등록·PDF 업로드도 같은 검증을 파일 저장·OCR 예약 전에 수행한다(notification-service에 OpenFeign 추가, 640 MiB 컨테이너 메모리 영향은 VPS 미실측). 2026-10-17 현장 보관·복원 1차(`archived_at`, 보관 현장 수정 409·신규 등록 400, 목록 보관 필터·상세 보관/복원 버튼)를 `develop`에 반영했다(운영 DB 반영은 마이그레이션 게이트 이후). 보관 현장 기존 문서는 입금 확인만 허용하고 수정·삭제·확정은 409(2차, 에이전트 결정). 거래처 보관(3차)도 반영했다. 남은 것은 하드 삭제 전 쓰기 장벽(합성 자료 정리 절차와 함께)이다. 현장 하드 삭제는 현재 409로 차단되어 있지만 서비스 간 원자성이나 향후 보관 정책 완료를 뜻하지 않는다.
+- **2026-10-20 거래처 경합 후속**: 거래처 보관과 현장 생성·거래처 변경은 같은 행 잠금으로 직렬화하고 H2/JPA의 보관 선행 경합을 검증했다(PR #152, `develop` 병합). 실제 MySQL 경합·현장 보관과 다른 서비스의 검증 후 생성 경합은 별도 검증/방벽이 필요하다. `main`·VPS 미반영.
 - **관련 파일**: `docs/PILOT_QA.md`, `frontend/src/pages/`, `chat-service`, 각 업무 서비스
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
@@ -33,6 +34,12 @@
 ---
 
 ## P1 — 중기
+
+### 업무 시각 저장 기준 통일 (KST 원시값 +9h 불일치)
+  - 배경: 컨테이너 JVM은 UTC, JDBC는 `serverTimezone=Asia/Seoul`이다. 최근 코드가 `LocalDateTime.now(Asia/Seoul)`로 저장하는 필드(site/client `archived_at`, 보증 감사 `occurred_at`, 보존 `deleted_at`/`purged_at`)는 DB 원시값이 같은 행의 `created_at`보다 +9시간으로 보인다(2026-10-21 Docker 실측). API 왕복 값은 일치해 사용자 화면 오류는 확인되지 않았다
+  - 산출물: 서비스별 시각 생성 기준(JVM 기본 시간대 vs 명시 KST) 하나로 통일, 기존 행 보정 여부 판단, 원시값 대조 테스트
+  - 관련 파일: site-service·notification-service 엔티티/서비스, `application-docker.yml`, `docs/PILOT_QA.md`
+
 
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
@@ -47,7 +54,7 @@
 - **배경**: 인증 서비스는 `schema.sql` + `ddl-auto: validate`, 나머지 DB 사용 6개 서비스는 `ddl-auto: update`이며 버전 관리형 마이그레이션 도구가 없다. 인증 스키마 전환과 실데이터 보존 전에 명시적 백업·복구·검증 경로가 필요하다.
 - **단계**: A) 7개 스키마 백업·오프라인 무결성 검증 → B) 격리 임시 volume 복원·관리자 로그인 검증 → C) auth Flyway 파일럿 → D) chat/estimate → purchase/tax → site/notification 순차 전환 → E) runtime DB 사용자 최소 권한 분리
 - **안전 기준**: 실제 MySQL `SHOW CREATE TABLE`/no-data dump 전에는 V1을 추정 작성하지 않음, 기존 DB는 백업·복원 성공 후 명시적 일회성 baseline, 상시 `baseline-on-migrate=true` 및 Flyway+Hibernate `update` 동시 사용 금지
-- **현재 진행**: Phase A 완료. Phase B의 격리 임시 volume 실제 복원, manifest/행 수/digest/`CHECK TABLE`, auth `ddl-auto=validate`와 전후 DB 불변까지 통과했다. 백업 속 기존 관리자 로그인 검증은 PENDING으로 유지한다. Phase C의 빈 DB 전용 opt-in auth Flyway V1·MySQL 8 CI 파일럿을 준비했고, 기존 DB baseline·프로파일 전환은 하지 않았다.
+- **현재 진행**: Phase A 완료. Phase B의 격리 임시 volume 실제 복원, manifest/행 수/digest/`CHECK TABLE`, auth `ddl-auto=validate`와 전후 DB 불변까지 통과했다. 백업 속 기존 관리자 로그인 검증은 PENDING으로 유지한다. Phase C의 빈 DB 전용 opt-in auth Flyway V1과 Phase D의 chat/estimate/purchase/tax Flyway V1은 격리 MySQL 8 CI를 통과해 develop에 통합했다. 다음 site/notification V1은 실제 MySQL DDL 확보 후 작성한다(2026-10-21 로컬 Docker 엔진 미기동). 기존 DB baseline·운영 프로파일 전환은 하지 않았다.
 - **산출물**: 서비스별 버전 마이그레이션 전략, 인증 스키마 전환 스크립트, 백업·격리 복구 검증, 운영 프로파일의 `ddl-auto` 정책
 - **관련 파일**: 7개 서비스 `application*.yml`, 각 서비스 DB 스키마, 배포 문서
 - **예상 규모**: M~L

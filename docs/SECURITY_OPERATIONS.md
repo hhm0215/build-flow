@@ -124,6 +124,6 @@
 
 ## 역할과 실행 경계
 
-`security-reviewer`는 독립 보안 검토, `infrastructure-reviewer`는 가용성·배포·복구 검토를 담당한다. 이들은 상주 프로세스가 아니다. 작업 시 주 에이전트가 필요에 따라 독립 서브에이전트로 위임하고 결과를 통합한다. 2026-10-09 사용자 요청으로 두 **전용 점검** heartbeat를 삭제했다. 2026-10-14에는 별개의 **연속 개발** heartbeat를 활성화했으며, 이 예약 실행도 BuildFlow 사용자 프롬프트처럼 요청 작업을 처리한 **뒤**, 응답 직전 읽기 전용 종료 점검을 수행한다. 로컬 PC/앱이 꺼진 시간까지 포함한 24시간 서버 감시나 장애 대응 SLA가 아니다. 이메일·Discord 전송은 별도 수신 채널 설정/검증 전까지 완료로 표시하지 않는다.
+`security-reviewer`는 독립 보안 검토, `infrastructure-reviewer`는 가용성·배포·복구 검토를 담당한다. 이들은 상주 프로세스가 아니다. 작업 시 주 에이전트가 필요에 따라 독립 서브에이전트로 위임하고 결과를 통합한다. 2026-10-09 사용자 요청으로 두 **전용 점검** heartbeat를 삭제했고, 별도 **연속 개발** heartbeat도 2026-10-20 사용자 요청으로 취소했다. 이후 이 채팅의 사용자 작업 요청을 처리한 **뒤**, 응답 직전 읽기 전용 종료 점검을 수행한다. 로컬 PC/앱이 꺼진 시간까지 포함한 24시간 서버 감시나 장애 대응 SLA가 아니다. 이메일·Discord 전송은 별도 수신 채널 설정/검증 전까지 완료로 표시하지 않는다.
 
 참고 기준: [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/), [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html), [Docker 포트 공개](https://docs.docker.com/engine/network/port-publishing/), [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https/).

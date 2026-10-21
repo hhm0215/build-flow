@@ -98,7 +98,10 @@ function Invoke-WarrantyVolumeHelper {
     if (-not [string]::IsNullOrWhiteSpace($DestinationDirectory)) {
         $arguments += @('--mount', "type=bind,source=$DestinationDirectory,target=/target")
     }
-    $arguments += @('--entrypoint', 'sh', $ImageId, '-c', $Shell)
+    # Windows PowerShell preserves CRLF in here-strings; POSIX sh treats the
+    # carriage return after `set -eu` as part of the option name.
+    $unixShell = $Shell.Replace("`r`n", "`n").Replace("`r", "`n")
+    $arguments += @('--entrypoint', 'sh', $ImageId, '-c', $unixShell)
     return (Invoke-NativeProcess -FileName 'docker' -Arguments $arguments -WorkingDirectory $WorkingDirectory -RejectStandardError).StandardOutput
 }
 

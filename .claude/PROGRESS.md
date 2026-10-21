@@ -5,6 +5,62 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공통 작업공간 자동 푸시 제거 (2026-10-21)
+
+- Codex가 시작한 미커밋 안전 수정을 세션 중단 후 Claude가 이어받았다. Stop 훅·`--auto` 자동 커밋/푸시 제거, `checkpoint --path` 명시 파일만 커밋, 다른 도구 ACTIVE 잠금·브랜치 보호, fetch/gh 실패 UNVERIFIED 표시. 단위 테스트 20건(UTF-8·cp949) 통과, [PR #160](https://github.com/hhm0215/build-flow/pull/160) 필수 CI 통과. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — Codex↔Claude 공통 작업공간 (2026-10-21)
+
+- `scripts/agents/workspace.py`(`status`: 잠금·열린 PR·모든 작업 폴더의 미커밋/미푸시/PR 없음 표시, `checkpoint`: 잠금 갱신→커밋→푸시→드래프트 PR)와 초기 단위 테스트 7건을 추가했다. [PR #159](https://github.com/hhm0215/build-flow/pull/159)은 `develop`에 병합됐다. 당시 Claude Stop 훅 자동 체크포인트와 Codex heartbeat 자동 실행을 기록했으나, 후속 검토에서 전체 작업 폴더 `git add -A`가 사용자 파일·비밀값을 올릴 수 있음을 발견해 **사용 금지**로 정정했다. 안전 수정 브랜치에서 명시 파일만 체크포인트하도록 변경 중이며 V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
+
+- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개 기준 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `tax-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. [PR #157](https://github.com/hhm0215/build-flow/pull/157) 최종 SHA `7f5a124`의 필수 CI 10개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `2c508c1`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 매입 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL 2개 기준 신규 격리 DB 전용 purchase V1을 만들었다. 첫 CI에서 문자열 포맷 단언이 실패해 `information_schema` 타입·NULL 제약 검사로 교정하고 독립 재검토했다. [PR #156](https://github.com/hhm0215/build-flow/pull/156) 최종 SHA `0bb094a`의 필수 CI 9개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `013af0c`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 견적 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL 3개 기준 신규 격리 DB 전용 estimate V1을 만들었다. 로컬 서비스 테스트·릴리스 증거 생성기 7건 PASS, 독립 리뷰 차단 결함 없음. [PR #155](https://github.com/hhm0215/build-flow/pull/155) 최종 SHA `3111103`의 필수 CI 8개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `6aa9713`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 채팅 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL을 기준으로 신규 격리 DB 전용 chat V1을 만들고 기본 Flyway를 비활성화했다. `chat-flyway` CI 격리 MySQL 및 릴리스 후보 의존성·결과 검증을 추가했다. 독립 리뷰 차단 결함 없음, [PR #154](https://github.com/hhm0215/build-flow/pull/154) 최종 SHA `f527aef`의 필수 7개 CI PASS, `develop` 병합 `bd6c21e`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 거래처 보관과 현장 연결 경합 방벽 (2026-10-20)
+
+- 현장 생성·거래처 변경에서 거래처 행을 `PESSIMISTIC_WRITE`로 잠가 거래처 보관과 직렬화했다. H2/JPA 격리 동시성 회귀에서 보관 트랜잭션이 먼저 잠금을 쥔 경우 현장 연결이 대기한 뒤 409로 거부되고 현장 0건임을 확인했다. 전체 Gradle `build` PASS, 독립 리뷰에서 확정적 결함 없음. [PR #152](https://github.com/hhm0215/build-flow/pull/152) 최종 SHA `810a2c3` CI 필수 6개 PASS, `develop` 병합 `8c17940`. H2는 운영 MySQL의 동시성 실측을 대체하지 않으며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 합성 DB·보증 PDF 복원 CI 및 Windows/Unix 셸 경계 (2026-10-20)
+
+- Windows PowerShell의 CRLF가 컨테이너 `sh` 옵션을 깨던 경로를 LF 정규화로 수정했다. 격리 복원 Linux CI에서 소유자 전용(0700) 백업 폴더를 읽지 못하던 문제는 원본 권한을 완화하지 않고 PDF 복사 helper에만 `DAC_READ_SEARCH`를 부여해 해결했다. 복사 전후 파일 개수, 해시·DB 참조와 auth `ddl-auto=validate` 기동을 합성 데이터로 확인했다. 독립 보안/인프라 리뷰 차단 결함 없음, [PR #150](https://github.com/hhm0215/build-flow/pull/150) 최종 SHA `3e07dec` CI 필수 6개 PASS, `develop` 병합 `0bee1eb`. 관리자 비밀번호 로그인·실제 VPS snapshot·외부 암호화 사본의 빈 환경 복원은 **PENDING/UNVERIFIED**이며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 견적 작성 실패 동선 보강 (2026-10-20)
+
+- 견적 작성 요청의 중복 제출·오류 후 상태 복구 동선을 보강하고 회귀를 추가했다. 로컬 프론트 166건·lint·typecheck·build와 독립 재검토 통과, [PR #149](https://github.com/hhm0215/build-flow/pull/149) 최종 SHA `a496beb` CI 필수 5개 PASS, `develop` 병합 `628281e`. 공개 VPS UI 재검증은 PENDING, `main`·VPS 미반영.
+
+## 완료된 작업 — 알림 미읽음 건수 조회 실패 표시 (2026-10-19)
+
+- 미읽음 건수 API 실패 시 오래된 캐시 숫자를 알림 페이지·헤더 배지에서 숨기고 오류·재시도를 안내하며, 불확실한 `전체 읽음` 실행을 막았다. 독립 리뷰가 지적한 헤더 누락을 보완·재검토했다. 로컬 프론트 165건·ESLint·TypeScript·Vite 빌드 PASS, [PR #147](https://github.com/hhm0215/build-flow/pull/147) 최종 SHA `61fd3e8` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `7fc1528`. 공개 VPS 장애·복구 화면과 로컬 Docker 통합 테스트는 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 현장 상세 문서 조회 실패 오표기 방지 (2026-10-19)
+
+- 현장 상세의 견적·매입·세금계산서·보증보험 각 탭에서 조회 실패를 `0건`·빈 목록과 구분하고 재시도를 연결했다. 실패 후 캐시된 옛 문서도 현재 결과처럼 표시하지 않는다. 로컬 프론트 161건·ESLint·TypeScript·Vite 빌드 PASS, 독립 리뷰 차단 결함 없음. [PR #145](https://github.com/hhm0215/build-flow/pull/145) 최종 SHA `51a4acf` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `eabb4c2`. 공개 VPS 화면은 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 대시보드 AI 요약 실패·빈 결과 구분 (2026-10-19)
+
+- AI 요약 요청 실패와 정상 빈 결과를 구분해 실패 시 오류·재시도를 표시하고, 실패 후 남은 캐시 요약을 현재 결과처럼 보이지 않게 했다. 로컬 프론트 155건·ESLint·TypeScript·Vite 빌드 PASS, 독립 리뷰 차단 결함 없음. [PR #143](https://github.com/hhm0215/build-flow/pull/143) 최종 SHA `6986113` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `92867b7`. 실제 Ollama 요약·공개 VPS 화면은 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 대시보드 현장 전체 보기 연결 (2026-10-19)
+
+- 대시보드 현장별 손익의 무동작 `전체 보기`를 기존 `/sites` 보호 라우트로 연결하고 클릭·이동 회귀를 추가했다. 로컬 프론트 152건·lint·빌드, 독립 리뷰 차단 결함 없음, [PR #141](https://github.com/hhm0215/build-flow/pull/141) 최종 SHA `d3a9280` CI 5개 PASS(릴리스 후보 1개는 PR에서 정상 skip), `develop` 병합 `bd94cce`. `main`·VPS는 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 현장 관계 조회 실패 금액 오표기 방지 (2026-10-19)
+
+- 현장 목록의 견적·매입·세금계산서 조회 실패가 빈 목록·0원으로 표시되던 문제를 수정했다. 실패 항목별 오류/재시도와 마진 산출 차단, 세금계산서 실패 시 미수금 표시 차단을 구현했다. 로컬 프론트 151건·lint·빌드, 독립 리뷰, [PR #140](https://github.com/hhm0215/build-flow/pull/140) 최종 SHA `295c1d8`의 CI 5개 PASS 후 `develop` 병합 `22e89b7`. `main`·VPS는 미반영, V1 40/100·실데이터 NO-GO 유지.
+
 ## 완료된 작업 — 보증 확인 감사 이력 (2026-10-17)
 
 - 보증 값이 바뀌는 6개 경로(직접 등록·업로드·OCR 반영/실패·수동 수정·삭제)를 추가 전용 `warranty_audit_events`로 같은 트랜잭션에 기록하고 `GET /api/v1/warranties/{id}/history`와 보증 수정 모달의 이력 목록을 추가했다. 테스트(백엔드 JPA 4건, 프론트 144건)와 로컬 Docker 실측 PASS. 보존·폐기 정책과 Gateway 실제 토큰 경로는 PENDING(`.claude/plans/2026-10-17-warranty-audit.md`).

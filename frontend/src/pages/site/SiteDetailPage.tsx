@@ -71,6 +71,10 @@ function formatCompactKRW(value: number) {
   return formatKRW(value)
 }
 
+function tabLabel(name: string, count: number, loading: boolean, error: boolean) {
+  return `${name} (${error ? '조회 실패' : loading ? '불러오는 중' : count})`
+}
+
 function formatDate(value?: string | null) {
   if (!value) return '-'
   return value.split('T')[0]
@@ -235,10 +239,10 @@ export default function SiteDetailPage() {
   const restoreSite = useRestoreSite()
 
   const params = useMemo(() => ({ siteId: String(siteId) }), [siteId])
-  const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError } = useEstimates(params)
-  const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError } = usePurchases(params)
-  const { data: taxesData, isLoading: taxesLoading, isError: taxesError } = useTaxes(params)
-  const { data: warrantiesData, isLoading: warrantiesLoading } = useWarranties(params)
+  const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError, refetch: estimatesRefetch } = useEstimates(params)
+  const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError, refetch: purchasesRefetch } = usePurchases(params)
+  const { data: taxesData, isLoading: taxesLoading, isError: taxesError, refetch: taxesRefetch } = useTaxes(params)
+  const { data: warrantiesData, isLoading: warrantiesLoading, isError: warrantiesError, refetch: warrantiesRefetch } = useWarranties(params)
 
   const estimates = (estimatesData ?? []).filter((e) => e.siteId === siteId)
   const purchases = (purchasesData ?? []).filter((p) => p.siteId === siteId)
@@ -406,8 +410,10 @@ export default function SiteDetailPage() {
           items={[
             {
               key: 'estimates',
-              label: `견적서 (${estimates.length})`,
-              children: estimatesLoading ? (
+              label: tabLabel('견적서', estimates.length, estimatesLoading, estimatesError),
+              children: estimatesError ? (
+                <ErrorState message="견적서를 불러오지 못했습니다." onRetry={estimatesRefetch} />
+              ) : estimatesLoading ? (
                 <ListSkeleton />
               ) : sortedEstimates.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -464,8 +470,10 @@ export default function SiteDetailPage() {
             },
             {
               key: 'purchases',
-              label: `매입 (${purchases.length})`,
-              children: purchasesLoading ? (
+              label: tabLabel('매입', purchases.length, purchasesLoading, purchasesError),
+              children: purchasesError ? (
+                <ErrorState message="매입 내역을 불러오지 못했습니다." onRetry={purchasesRefetch} />
+              ) : purchasesLoading ? (
                 <ListSkeleton />
               ) : sortedPurchases.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -519,8 +527,10 @@ export default function SiteDetailPage() {
             },
             {
               key: 'taxes',
-              label: `세금계산서 (${taxes.length})`,
-              children: taxesLoading ? (
+              label: tabLabel('세금계산서', taxes.length, taxesLoading, taxesError),
+              children: taxesError ? (
+                <ErrorState message="세금계산서를 불러오지 못했습니다." onRetry={taxesRefetch} />
+              ) : taxesLoading ? (
                 <ListSkeleton />
               ) : sortedTaxes.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -596,8 +606,10 @@ export default function SiteDetailPage() {
             },
             {
               key: 'warranties',
-              label: `보증보험 (${warranties.length})`,
-              children: warrantiesLoading ? (
+              label: tabLabel('보증보험', warranties.length, warrantiesLoading, warrantiesError),
+              children: warrantiesError ? (
+                <ErrorState message="보증보험을 불러오지 못했습니다." onRetry={warrantiesRefetch} />
+              ) : warrantiesLoading ? (
                 <ListSkeleton />
               ) : sortedWarranties.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

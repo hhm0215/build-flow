@@ -212,7 +212,7 @@ eventId 기반 멱등성 필수.
 
 ## 12. 역할별 에이전트·모델 운용
 
-- **도구 간 인계(Codex ↔ Claude Code)**: 작업 시작 전 `.claude/HANDOFF.md`의 작업 잠금을 확인한다. 다른 도구가 2시간 이내 `ACTIVE`이면 그 브랜치·PR·BACKLOG 항목을 건드리지 않는다. 예약 heartbeat 실행도 같다. 착수·단계 전환·종료 때 잠금을 갱신하고, 두 도구에 공통인 사용자 지시는 도구별 메모리가 아니라 HANDOFF "공통 사용자 지시"에 기록한다. 끊긴 세션은 `scripts/agents/last_session.py`로 확인한 뒤 Git/GitHub 실측과 대조한다.
+- **도구 간 인계(Codex ↔ Claude Code)**: 작업 시작 전 `.claude/HANDOFF.md`의 작업 잠금을 확인한다. 다른 도구가 2시간 이내 `ACTIVE`이면 그 브랜치·PR·BACKLOG 항목을 건드리지 않는다. 착수·단계 전환·종료 때 잠금을 갱신하고, 두 도구에 공통인 사용자 지시는 도구별 메모리가 아니라 HANDOFF "공통 사용자 지시"에 기록한다. 끊긴 세션은 `scripts/agents/last_session.py`로 확인한 뒤 Git/GitHub 실측과 대조한다. 세션 시작 시 `python -I -X utf8 scripts/agents/workspace.py status`로 잠금·열린 PR·작업 폴더를 확인한다. 체크포인트는 `workspace.py checkpoint --tool codex|claude --step ... --next ... --path <검토한 파일>`로 **명시한 파일만** 커밋·푸시한다. `--auto` 커밋·푸시는 비활성화했고 예약 heartbeat는 사용자가 취소했으므로 재생성하지 않는다. 세션이 끊기면 마지막으로 명시적으로 올린 체크포인트까지만 상대 도구가 볼 수 있다.
 - 과거 작업의 추적 경로와 교대 체크리스트는 `docs/AGENT_COLLABORATION.md`를 따른다. 대화별 기억·원시 세션 로그·비밀값을 저장소에 복제하지 않는다.
 
 - 제품이 역할명만 보고 모델을 자동 전환한다고 가정하지 않는다. 사용자가 다중 에이전트 위임을 허용한 작업에서 주 에이전트가 역할과 위험도에 따라 가용 모델·추론 강도를 명시적으로 선택한다.

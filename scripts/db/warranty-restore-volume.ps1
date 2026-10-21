@@ -12,9 +12,12 @@ function Assert-WarrantyRestoreInventory {
             throw 'Invalid warranty restore inventory.'
         }
         $matches = @($Actual | Where-Object { $_.relativePath -ceq $name })
-        if ($matches.Count -ne 1 -or [long]$matches[0].bytes -ne [long]$entry.bytes -or
+        if ($matches.Count -ne 1) {
+            throw "Restored warranty inventory name match count differs (matches=$($matches.Count), actual=$(@($Actual).Count), expected=$(@($Expected).Count))."
+        }
+        if ([long]$matches[0].bytes -ne [long]$entry.bytes -or
             ([string]$matches[0].sha256).ToLowerInvariant() -cne ([string]$entry.sha256).ToLowerInvariant()) {
-            throw 'Restored warranty inventory does not match expected files.'
+            throw 'Restored warranty inventory size or digest differs.'
         }
     }
     if (@($Actual).Count -ne $seen.Count) { throw 'Unexpected warranty restore files.' }
@@ -65,7 +68,8 @@ function Invoke-WarrantyVolumeRestore {
     $source = [IO.Path]::GetFullPath($UploadsDirectory)
     if ($source.Contains(',') -or $source.Contains('"') -or $source.Contains("`n") -or $source.Contains("`r")) { throw 'Unsafe warranty bind path.' }
     $before = @(Get-WarrantyRestoreHostInventory -Directory $source)
-    Assert-WarrantyRestoreInventory -Actual $before -Expected $ExpectedFiles
+    try { Assert-WarrantyRestoreInventory -Actual $before -Expected $ExpectedFiles }
+    catch { throw "Warranty source inventory check failed before copy: $($_.Exception.Message)" }
     $inspection = Invoke-NativeProcess -FileName docker -Arguments @('volume', 'inspect', $VolumeName) -WorkingDirectory $WorkingDirectory -RejectStandardError
     $volumes = @($inspection.StandardOutput | ConvertFrom-Json)
     if ($volumes.Count -ne 1) { throw 'Warranty volume inspection is ambiguous.' }
@@ -76,10 +80,19 @@ function Invoke-WarrantyVolumeRestore {
         $volume.Labels.'com.docker.compose.volume' -cne 'restore_warranty_uploads' -or
         $volume.Labels.'com.buildflow.restore-test' -cne $Nonce) { throw 'Warranty volume ownership validation failed.' }
     $base = @('run', '--rm', '--pull=never', '--network', 'none', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--read-only', '--user', '0:0', '--label', "com.buildflow.restore-test=$Nonce")
+    $copyBase = $base
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+        # The backup package is intentionally owner-only (0700). Root without
+        # DAC_READ_SEARCH cannot traverse that bind mount after --cap-drop ALL.
+        # Grant read/traverse only; the source remains readonly and the only
+        # writable mount is the identity-checked isolated restore volume.
+        $copyBase += @('--cap-add', 'DAC_READ_SEARCH')
+    }
     # Files are flat and names restricted before every shell operation. Globs also
     # cover hidden entries; any link or directory fails before the first copy.
     $copy = @'
 set -eu
+source_count=0
 for f in /target/* /target/.[!.]* /target/..?*; do
   if [ -e "$f" ] || [ -L "$f" ]; then echo 'Target is not empty' >&2; exit 1; fi
 done
@@ -88,15 +101,23 @@ for f in /source/* /source/.[!.]* /source/..?*; do
   [ -f "$f" ] && [ ! -L "$f" ] || exit 1
   n=${f##*/}
   printf '%s' "$n" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$' || exit 1
+  source_count=$((source_count + 1))
 done
+copied_count=0
 for f in /source/* /source/.[!.]* /source/..?*; do
   [ -e "$f" ] || continue
   cp -- "$f" "/target/${f##*/}"
+  copied_count=$((copied_count + 1))
 done
+printf '%s:%s\n' "$source_count" "$copied_count"
 '@
-    $arguments = $base + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy)
+    $arguments = $copyBase + @('--mount', "type=bind,source=$source,target=/source,readonly", '--mount', "type=volume,source=$VolumeName,target=/target,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $copy.Replace("`r`n", "`n").Replace("`r", "`n"))
     $copied = Invoke-NativeProcess -FileName docker -Arguments $arguments -WorkingDirectory $WorkingDirectory -RejectStandardError
-    if (-not [string]::IsNullOrWhiteSpace($copied.StandardOutput)) { throw 'Unexpected warranty copy output.' }
+    $copyCounts = $copied.StandardOutput.Trim()
+    if ($copyCounts -cnotmatch '^[0-9]+:[0-9]+$') { throw 'Unexpected warranty copy count output.' }
+    if ($copyCounts -cne "$($ExpectedFiles.Count):$($ExpectedFiles.Count)") {
+        throw "Warranty bind copy count differs from host inventory (expected=$($ExpectedFiles.Count), source:copied=$copyCounts)."
+    }
     $scan = @'
 set -eu
 for f in /target/* /target/.[!.]* /target/..?*; do
@@ -109,10 +130,12 @@ for f in /target/* /target/.[!.]* /target/..?*; do
   printf '%s\t%s\t%s\n' "$h" "$b" "$n"
 done
 '@
-    $scanned = Invoke-NativeProcess -FileName docker -Arguments ($base + @('--mount', "type=volume,source=$VolumeName,target=/target,readonly,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $scan)) -WorkingDirectory $WorkingDirectory -RejectStandardError
+    $scanned = Invoke-NativeProcess -FileName docker -Arguments ($base + @('--mount', "type=volume,source=$VolumeName,target=/target,readonly,volume-nocopy", '--entrypoint', 'sh', $ImageId, '-c', $scan.Replace("`r`n", "`n").Replace("`r", "`n"))) -WorkingDirectory $WorkingDirectory -RejectStandardError
     $actual = @(ConvertFrom-WarrantyVolumeScan -Text $scanned.StandardOutput)
-    Assert-WarrantyRestoreInventory -Actual $actual -Expected $ExpectedFiles
+    try { Assert-WarrantyRestoreInventory -Actual $actual -Expected $ExpectedFiles }
+    catch { throw "Isolated warranty volume inventory check failed after copy: $($_.Exception.Message)" }
     $after = @(Get-WarrantyRestoreHostInventory -Directory $source)
-    Assert-WarrantyRestoreInventory -Actual $after -Expected $before
+    try { Assert-WarrantyRestoreInventory -Actual $after -Expected $before }
+    catch { throw "Warranty source inventory changed during copy: $($_.Exception.Message)" }
     return $actual
 }
