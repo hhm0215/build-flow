@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공통 작업공간 자동 푸시 제거 (2026-10-21)
+
+- Codex가 시작한 미커밋 안전 수정을 세션 중단 후 Claude가 이어받았다. Stop 훅·`--auto` 자동 커밋/푸시 제거, `checkpoint --path` 명시 파일만 커밋, 다른 도구 ACTIVE 잠금·브랜치 보호, fetch/gh 실패 UNVERIFIED 표시. 단위 테스트 20건(UTF-8·cp949) 통과, [PR #160](https://github.com/hhm0215/build-flow/pull/160) 필수 CI 통과. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — Codex↔Claude 공통 작업공간 (2026-10-21)
 
 - `scripts/agents/workspace.py`(`status`: 잠금·열린 PR·모든 작업 폴더의 미커밋/미푸시/PR 없음 표시, `checkpoint`: 잠금 갱신→커밋→푸시→드래프트 PR)와 초기 단위 테스트 7건을 추가했다. [PR #159](https://github.com/hhm0215/build-flow/pull/159)은 `develop`에 병합됐다. 당시 Claude Stop 훅 자동 체크포인트와 Codex heartbeat 자동 실행을 기록했으나, 후속 검토에서 전체 작업 폴더 `git add -A`가 사용자 파일·비밀값을 올릴 수 있음을 발견해 **사용 금지**로 정정했다. 안전 수정 브랜치에서 명시 파일만 체크포인트하도록 변경 중이며 V1 **40/100** 변동 없음.

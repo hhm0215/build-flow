@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-21 23:25 KST |
-| 브랜치 | `codex/workspace-checkpoint-safety` (Codex 미커밋 작업을 사용자 지시로 Claude가 이어받음) |
-| PR | 생성 중. `codex/site-input-validation`은 PR 없음(Codex 소유, 미변경) |
-| 현재 단계 | 자동 체크포인트 제거·--path 명시 체크포인트 안전 수정 커밋·PR |
-| 다음 첫 행동 | PR CI 통과 → SHA 검증 → develop 병합 → 잠금 IDLE |
+| 갱신 | 2026-10-21 23:40 KST |
+| 브랜치 | 없음 (`codex/workspace-checkpoint-safety`는 PR #160으로 병합 대기) |
+| PR | #160 CI 통과. #139(Claude, 드래프트)·#99(develop→main, 승인 대기). `codex/site-input-validation`은 PR 없음 |
+| 현재 단계 | 공통 작업공간 안전 수정(PR #160) 병합 |
+| 다음 첫 행동 | `codex/site-input-validation` PR 생성·검토 또는 PR #139 develop 최신화·병합 |
 
 ## 공통 사용자 지시
 
