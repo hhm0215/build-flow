@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -15,9 +16,11 @@ import java.math.BigDecimal;
 public class EstimateItemRequest {
 
     @NotBlank(message = "항목명은 필수입니다.")
+    @Size(max = 200, message = "항목명은 200자 이하여야 합니다.")
     private String itemName;
 
     @NotBlank(message = "단위는 필수입니다.")
+    @Size(max = 20, message = "단위는 20자 이하여야 합니다.")
     private String unit;
 
     @NotNull(message = "수량은 필수입니다.")

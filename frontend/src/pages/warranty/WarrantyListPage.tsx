@@ -338,10 +338,10 @@ export default function WarrantyListPage() {
             <SiteSelect placeholder="현장 검색 / 선택" />
           </Form.Item>
           <Form.Item name="insuranceCompany" label="보험사" rules={[{ required: true, message: '보험사를 입력하세요' }]}>
-            <Input placeholder="보험사명" />
+            <Input placeholder="보험사명" maxLength={200} />
           </Form.Item>
           <Form.Item name="policyNumber" label="증권번호" rules={[{ required: true, message: '증권번호를 입력하세요' }]}>
-            <Input placeholder="증권번호" />
+            <Input placeholder="증권번호" maxLength={100} />
           </Form.Item>
           <Form.Item name="coverageAmount" label="보증금액" rules={[{ required: true, message: '보증금액을 입력하세요' }]}>
             <InputNumber<number>
@@ -359,7 +359,7 @@ export default function WarrantyListPage() {
             <DatePicker style={{ width: '100%' }} placeholder="종료일 선택" />
           </Form.Item>
           <Form.Item name="memo" label="메모">
-            <Input.TextArea rows={3} placeholder="메모 (선택)" />
+            <Input.TextArea rows={3} placeholder="메모 (선택)" maxLength={16000} />
           </Form.Item>
         </Form>
       </Modal>

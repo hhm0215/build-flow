@@ -124,7 +124,7 @@ export default function WarrantyEditModal({ warranty, onClose }: Props) {
         <Form.Item name="endDate" label="보증 종료일" rules={[{ required: true, message: '종료일을 선택하세요' }]}>
           <DatePicker style={{ width: '100%' }} placeholder="종료일 선택" />
         </Form.Item>
-        <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" /></Form.Item>
+        <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" maxLength={16000} /></Form.Item>
       </Form>
       <div style={{ marginTop: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>변경·확인 이력</div>
