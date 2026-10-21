@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 컨테이너 JVM 시간대 KST 통일 (2026-10-22)
+
+- 앱 이미지 두 Dockerfile 런타임 단계에 `ENV TZ=Asia/Seoul`을 넣어 `@CreatedDate`·`now()` 저장 기준을 명시적 KST 기록·브라우저 해석과 맞췄다(알림 "9시간 전" 표시 원인). `scripts/ci/test_container_timezone.py`로 고정. Docker 실측·VPS 반영 PENDING(BACKLOG P1 항목에 전환 주의 기록). V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 견적·매입·세금계산서·보증 입력 길이 서버 검증 (2026-10-22)
 
 - 현장·거래처(#161)와 같은 방식으로 나머지 네 서비스의 등록/수정 DTO에 DB 컬럼 한도 `@Size`를 추가했다(보증 수정의 3-state `Optional`은 값 있을 때만 검증, 명시적 null 비우기 유지). DTO 검증 테스트 6건(경계 허용·초과 거부·견적 항목 목록 중첩 검증), 프론트 입력 `maxLength` 동기화, 프론트 lint·테스트 166건 통과. V1 **40/100** 변동 없음.

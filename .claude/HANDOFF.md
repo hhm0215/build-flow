@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 00:18 KST |
-| 브랜치 | 없음 (`claude/input-length-guards`는 PR로 병합) |
-| PR | 입력 길이 검증 PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 견적·매입·세금계산서·보증 입력 길이 서버 검증 |
-| 다음 첫 행동 | BACKLOG P0 CRUD 실동선 다음 결함 탐색(현장 삭제 UI·인증 DELETE 409 실측 등) |
+| 갱신 | 2026-10-22 00:33 KST |
+| 브랜치 | 없음 (`claude/jvm-kst-timezone`은 PR로 병합) |
+| PR | 시간대 통일 PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 컨테이너 JVM 시간대 KST 통일(Docker 실측 PENDING) |
+| 다음 첫 행동 | Docker 기동 후 user.timezone·새 행 원시값 실측 → BACKLOG P1 시간대 항목 마무리 |
 
 ## 공통 사용자 지시
 

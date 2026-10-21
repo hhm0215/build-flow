@@ -25,6 +25,8 @@ RUN gradle :${SERVICE_NAME}:bootJar --no-daemon -x test
 
 # 런타임 — debian jammy + Tesseract + 한글 모델
 FROM eclipse-temurin:17-jre-jammy
+# 업무 시각(LocalDateTime.now, @CreatedDate)을 KST 벽시계로 저장한다. docker exec로 띄운 java도 같은 기준.
+ENV TZ=Asia/Seoul
 WORKDIR /app
 
 # Tesseract 4 CLI + kor·eng traineddata. 앱이 페이지마다 시간 제한을 걸어 별도 프로세스로 실행한다
