@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-21 14:53 KST |
+| 갱신 | 2026-10-21 20:53 KST |
 | 브랜치 | `codex/site-input-validation` (base `develop` `9fe77ea`) |
-| PR | 생성 전. #139·#99 draft는 다른 범위로 유지 |
-| 현재 단계 | P0 현장·거래처 API 입력 길이/현장 날짜 역전 검증과 HTTP 400 회귀 작성 중. 로컬 Docker 엔진 미기동, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | 서비스 테스트 후 독립 리뷰, CI/PR 확인. 기존 DB baseline·VPS 적용은 별도 게이트 뒤 |
+| PR | `codex/site-input-validation` 푸시 완료·PR 생성 PENDING(연동 403/브라우저 승인 검사 실패). #139·#99 draft는 다른 범위로 유지 |
+| 현재 단계 | P0 현장·거래처 API 입력 검증·HTTP 400 회귀 로컬 PASS. 로컬 Docker 엔진 미기동, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | 브랜치 PR→최종 SHA CI→독립 리뷰 근거 확인→develop 병합. 기존 DB baseline·VPS 적용은 별도 게이트 뒤 |
 
 ## 공통 사용자 지시
 

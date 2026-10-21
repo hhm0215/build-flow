@@ -90,6 +90,22 @@ class SiteClientInputValidationTest {
     }
 
     @Test
+    void memoUtf16BoundaryKeepsSupplementaryCharactersWithinTextCapacity() throws Exception {
+        String withinLimit = "😀".repeat(8000);
+        String overLimit = withinLimit + "😀";
+
+        mvc.perform(post("/api/v1/sites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "siteName", "현장", "memo", withinLimit))))
+                .andExpect(status().isCreated());
+
+        assertBadRequest("/api/v1/sites", false,
+                Map.of("siteName", "현장", "memo", overLimit),
+                "메모는 16000자 이하여야 합니다.");
+    }
+
+    @Test
     void clientCreateAndUpdateRejectEveryBoundedColumnOverflow() throws Exception {
         Map<String, Integer> limits = new LinkedHashMap<>();
         limits.put("companyName", 200);

@@ -7,7 +7,7 @@
 
 ## 진행 중 — 현장·거래처 API 입력 검증 (2026-10-21)
 
-- UI에만 있던 문자열 길이 제한을 생성·수정 DTO에 적용하고, 현장 종료일이 시작일보다 빠른 요청을 저장 전 400으로 거부한다. 메모는 MySQL TEXT 바이트 한도 아래로 제한하며 UI 입력 길이도 맞췄다. 로컬 `site-service:test`·전체 Gradle `build`, 프론트 166건·lint·build PASS, 독립 재검토 차단 결함 없음. 최종 SHA CI·`develop` 병합·`main`/VPS 반영은 아직 확인 전이며 V1 **40/100**·실데이터 **NO-GO** 유지.
+- UI에만 있던 문자열 길이 제한을 생성·수정 DTO에 적용하고, 현장 종료일이 시작일보다 빠른 요청을 저장 전 400으로 거부한다. 메모는 MySQL TEXT 바이트 한도 아래로 제한하며 UI 입력 길이도 맞췄다. 로컬 `site-service:test`·전체 Gradle `build`, 프론트 166건·lint·build PASS, 독립 재검토 차단 결함 없음. 이모지 UTF-16 경계(16,000 허용/16,002 거부) 회귀도 PASS. `codex/site-input-validation` 브랜치를 원격에 푸시했으나 GitHub 연동 PR 생성 403과 브라우저 승인 검사 실패로 PR·CI는 아직 PENDING이다. `develop` 병합·`main`/VPS 반영은 하지 않았으며 V1 **40/100**·실데이터 **NO-GO** 유지.
 
 ## 완료된 작업 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
 
