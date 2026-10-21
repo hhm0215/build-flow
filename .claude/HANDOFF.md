@@ -16,15 +16,17 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
+| 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-21 08:34 KST |
-| 브랜치 | `codex/migration-status-handoff` (base `develop` `2c508c1`) |
-| PR | tax Flyway [#157](https://github.com/hhm0215/build-flow/pull/157) develop 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | 신규 격리 DB 전용 auth/chat/estimate/purchase/tax Flyway 파일럿 develop 통합. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | P0 합성 CRUD 실동선 검증·결함 수리. site/notification V1은 실제 MySQL DDL 확보 후 작성(현재 로컬 Docker 엔진 미기동); 기존 DB baseline·운영 적용은 별도 복구 게이트 뒤 |
+| 갱신 | 2026-10-21 14:53 KST |
+| 브랜치 | `codex/site-input-validation` (base `develop` `9fe77ea`) |
+| PR | 생성 전. #139·#99 draft는 다른 범위로 유지 |
+| 현재 단계 | P0 현장·거래처 API 입력 길이/현장 날짜 역전 검증과 HTTP 400 회귀 작성 중. 로컬 Docker 엔진 미기동, V1 40/100·실데이터 NO-GO |
+| 다음 첫 행동 | 서비스 테스트 후 독립 리뷰, CI/PR 확인. 기존 DB baseline·VPS 적용은 별도 게이트 뒤 |
 
 ## 공통 사용자 지시
+
+- 2026-10-21: 에이전트가 `usageLimited`를 보고 근거 없이 자동 작업 중단의 원인·제품 규칙이라고 단정한 오류를 재발시키지 않는다. 상태값의 범위와 계정 사용 가능 여부를 별도로 확인하고, 확인되지 않은 원인·적용일은 추정/`UNVERIFIED`로 표시한다. 오류를 알면 즉시 정정하고 가능한 안전 작업은 계속한다(`AGENTS.md` 15절).
 
 - 2026-10-20: 15분 간격 `buildflow` 예약 heartbeat는 사용자 요청으로 삭제했다. 이 채팅에는 첫 실데이터 현장 1건의 안전한 운영을 완료 조건으로 하는 지속 목표를 설정했다. 매 실행에서 백로그→구현→검증→리뷰→다음 안전 작업을 연속 수행하며 별도 예약 실행을 재생성하지 않는다. 도구의 시간·권한 한계를 숨기거나 운영 게이트를 건너뛰지 않는다.
 
