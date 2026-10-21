@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 00:22 KST |
-| 브랜치 | 없음 (`claude/estimate-parse-limits`는 PR로 병합) |
-| PR | 공내역서 파싱 길이 PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 공내역서 파싱 견적 길이 초과 사전 표시 |
-| 다음 첫 행동 | BACKLOG P1 업무 시각 저장 기준 통일(KST +9h) 조사 또는 P0 CRUD 실동선 다음 결함 |
+| 갱신 | 2026-10-22 00:33 KST |
+| 브랜치 | 없음 (`claude/jvm-kst-timezone`은 PR로 병합) |
+| PR | 시간대 통일 PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 컨테이너 JVM 시간대 KST 통일(Docker 실측 PENDING) |
+| 다음 첫 행동 | Docker 기동 후 user.timezone·새 행 원시값 실측 → BACKLOG P1 시간대 항목 마무리 |
 
 ## 공통 사용자 지시
 

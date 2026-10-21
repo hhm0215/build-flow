@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 컨테이너 JVM 시간대 KST 통일 (2026-10-22)
+
+- 앱 이미지 두 Dockerfile 런타임 단계에 `ENV TZ=Asia/Seoul`을 넣어 `@CreatedDate`·`now()` 저장 기준을 명시적 KST 기록·브라우저 해석과 맞췄다(알림 "9시간 전" 표시 원인). `scripts/ci/test_container_timezone.py`로 고정. Docker 실측·VPS 반영 PENDING(BACKLOG P1 항목에 전환 주의 기록). V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 공내역서 파싱 견적의 길이 초과 사전 표시 (2026-10-22)
 
 - AI 파싱 결과로 견적 작성 폼을 채울 때 파일명 기본 제목을 서버 한도 200자(UTF-16, 서로게이트 쌍 보존)로 자르고, 제목·품목명·단위에 폼 `max` 규칙을 넣어 저장 전 필드 오류로 보이게 했다(#162 서버 400 전 단계). 프론트 테스트 168건·lint·build 통과. V1 **40/100** 변동 없음.
