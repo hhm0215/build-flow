@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
-| 도구 | Codex |
-| 갱신 | 2026-10-21 08:34 KST |
-| 브랜치 | `codex/migration-status-handoff` (base `develop` `2c508c1`) |
-| PR | tax Flyway [#157](https://github.com/hhm0215/build-flow/pull/157) develop 병합 완료. #139·#99 draft 유지 |
-| 현재 단계 | 신규 격리 DB 전용 auth/chat/estimate/purchase/tax Flyway 파일럿 develop 통합. 기존 DB·VPS 설정 변경 없음, V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | P0 합성 CRUD 실동선 검증·결함 수리. site/notification V1은 실제 MySQL DDL 확보 후 작성(현재 로컬 Docker 엔진 미기동); 기존 DB baseline·운영 적용은 별도 복구 게이트 뒤 |
+| 상태 | ACTIVE |
+| 도구 | Claude Code |
+| 갱신 | 2026-10-21 15:15 KST |
+| 브랜치 | `claude/shared-workspace` (체크포인트, 드래프트 PR로 노출) |
+| PR | `claude/shared-workspace`의 드래프트 PR (`gh pr list --head claude/shared-workspace`) |
+| 현재 단계 | 공통 작업공간(status·checkpoint)과 Claude Stop 훅 |
+| 다음 첫 행동 | 규칙 문서(AGENTS/CLAUDE/협업 문서) 갱신 후 준비 완료·CI·병합 |
 
 ## 공통 사용자 지시
 
