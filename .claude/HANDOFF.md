@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-17 17:10 KST |
-| 브랜치 | `claude/warranty-retention` (드래프트 PR로 노출) |
-| PR | 보증 원본 보존 드래프트 PR, #99 draft 유지 |
-| 현재 단계 | 보증 원본 PDF 삭제 후 보존·정리 착수(`.claude/plans/2026-10-17-warranty-retention.md`). Claude /loop 자율 반복 중 |
-| 다음 첫 행동 | 보존 기록·정리 작업 구현·테스트·Docker 실측 후 병합 |
+| 갱신 | 2026-10-21 15:13 KST |
+| 브랜치 | `claude/warranty-retention` (체크포인트, 드래프트 PR로 노출) |
+| PR | `claude/warranty-retention`의 드래프트 PR (`gh pr list --head claude/warranty-retention`) |
+| 현재 단계 | 보증 원본 보존 구현·테스트·로컬 Docker 실측 완료(삭제 시 파일 유지, 보존 기록, 기한 경과 폐기). 미기록: 시간대 저장 불일치(DB 원값 +9h) 발견 |
+| 다음 첫 행동 | PILOT_QA·PROGRESS 결과 기록 후 준비 완료 전환·병합. develop 최신화(#140~#158) 필요 |
 
 ## 공통 사용자 지시
 
