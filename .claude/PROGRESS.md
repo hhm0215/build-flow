@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 현장·거래처 API 입력 검증 (2026-10-21)
+
+- UI에만 있던 문자열 길이 제한을 생성·수정 DTO에 적용하고, 현장 종료일이 시작일보다 빠른 요청을 저장 전 400으로 거부한다. 메모는 MySQL TEXT 바이트 한도 아래로 제한하며 UI 입력 길이도 맞췄다. 로컬 `site-service:test`·전체 Gradle `build`, 프론트 166건·lint·build PASS, 독립 재검토 차단 결함 없음. 이모지 UTF-16 경계(16,000 허용/16,002 거부) 회귀도 PASS. Codex 세션 중단 후 Claude가 develop 최신화·`site-service:test` 재실행하고 [PR #161](https://github.com/hhm0215/build-flow/pull/161)로 병합했다. `develop` 병합·`main`/VPS 반영은 하지 않았으며 V1 **40/100**·실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — 공통 작업공간 자동 푸시 제거 (2026-10-21)
 
 - Codex가 시작한 미커밋 안전 수정을 세션 중단 후 Claude가 이어받았다. Stop 훅·`--auto` 자동 커밋/푸시 제거, `checkpoint --path` 명시 파일만 커밋, 다른 도구 ACTIVE 잠금·브랜치 보호, fetch/gh 실패 UNVERIFIED 표시. 단위 테스트 20건(UTF-8·cp949) 통과, [PR #160](https://github.com/hhm0215/build-flow/pull/160) 필수 CI 통과. V1 **40/100** 변동 없음.

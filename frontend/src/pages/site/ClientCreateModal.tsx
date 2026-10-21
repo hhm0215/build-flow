@@ -90,7 +90,7 @@ export default function ClientCreateModal({ open, onClose, onCreated }: Props) {
           <Input placeholder="이메일 (선택)" maxLength={100} />
         </Form.Item>
         <Form.Item name="address" label="주소"><Input placeholder="주소 (선택)" maxLength={500} /></Form.Item>
-        <Form.Item name="memo" label="메모"><Input.TextArea placeholder="메모 (선택)" rows={3} /></Form.Item>
+        <Form.Item name="memo" label="메모"><Input.TextArea placeholder="메모 (선택)" rows={3} maxLength={16000} /></Form.Item>
       </Form>
     </Modal>
   )

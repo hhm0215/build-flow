@@ -115,7 +115,7 @@ export default function SiteEditModal({ site, onClose }: Props) {
         <Form.Item name="address" label="주소"><Input placeholder="주소 (선택)" maxLength={500} /></Form.Item>
         <Form.Item name="startDate" label="시작일"><DatePicker style={{ width: '100%' }} /></Form.Item>
         <Form.Item name="endDate" label="종료일"><DatePicker style={{ width: '100%' }} /></Form.Item>
-        <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" /></Form.Item>
+        <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" maxLength={16000} /></Form.Item>
       </Form>
     </Modal>
   )
