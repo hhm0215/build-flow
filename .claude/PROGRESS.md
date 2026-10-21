@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 보증 삭제 후 원본 PDF 보존·기한 폐기 (2026-10-21)
+
+- 보증 삭제 시 원본 PDF를 즉시 지우지 않고 보존 기록을 남겨 365일 뒤 폐기한다(이름·경로 검사로 업로드 폴더 밖 삭제 차단). develop 최신화 후 `notification-service:test` 137건 통과, 로컬 풀 Docker 합성 실측 PASS(`docs/PILOT_QA.md`). [PR #139](https://github.com/hhm0215/build-flow/pull/139). VPS 미반영, V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 공통 작업공간 자동 푸시 제거 (2026-10-21)
 
 - Codex가 시작한 미커밋 안전 수정을 세션 중단 후 Claude가 이어받았다. Stop 훅·`--auto` 자동 커밋/푸시 제거, `checkpoint --path` 명시 파일만 커밋, 다른 도구 ACTIVE 잠금·브랜치 보호, fetch/gh 실패 UNVERIFIED 표시. 단위 테스트 20건(UTF-8·cp949) 통과, [PR #160](https://github.com/hhm0215/build-flow/pull/160) 필수 CI 통과. V1 **40/100** 변동 없음.
