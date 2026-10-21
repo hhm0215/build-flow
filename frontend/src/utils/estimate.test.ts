@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Estimate, Purchase } from '../types'
-import { calculateDocumentProfit, sumConfirmedEstimateAmount, validateEstimateAmounts } from './estimate'
+import {
+  calculateDocumentProfit,
+  estimateTitleFromFileName,
+  sumConfirmedEstimateAmount,
+  truncateUtf16,
+  validateEstimateAmounts,
+} from './estimate'
 
 describe('sumConfirmedEstimateAmount', () => {
   it('확정 전 초안 금액은 손익 합계에서 제외한다', () => {
@@ -43,5 +49,18 @@ describe('validateEstimateAmounts', () => {
     expect(validateEstimateAmounts([{ quantity: 0.01, unitPrice: 0.01 }])).not.toBeNull()
     expect(validateEstimateAmounts([{ quantity: 1.0000000001, unitPrice: 1_000_000_000_000 }])).not.toBeNull()
     expect(validateEstimateAmounts([])).not.toBeNull()
+  })
+})
+
+describe('estimateTitleFromFileName', () => {
+  it('확장자를 떼고 서버 한도 200자로 자른다', () => {
+    expect(estimateTitleFromFileName('A동 공내역서.xlsx')).toBe('A동 공내역서')
+    expect(estimateTitleFromFileName(`${'가'.repeat(250)}.XLSX`)).toHaveLength(200)
+  })
+
+  it('이모지 서로게이트 쌍을 반으로 자르지 않는다', () => {
+    const value = `${'가'.repeat(199)}😀`
+    expect(truncateUtf16(value, 200)).toBe('가'.repeat(199))
+    expect(truncateUtf16(value, 201)).toBe(value)
   })
 })

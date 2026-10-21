@@ -46,3 +46,16 @@ export function validateEstimateAmounts(items: { quantity: number; unitPrice: nu
   }
   return null
 }
+
+// 서버 @Size와 같은 UTF-16 길이로 자른다. 끝에서 서로게이트 쌍이 갈라지면 그 반쪽은 버린다.
+export function truncateUtf16(value: string, max: number): string {
+  if (value.length <= max) return value
+  const cut = value.slice(0, max)
+  const last = cut.charCodeAt(cut.length - 1)
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut
+}
+
+// 공내역서 파일명으로 채우는 기본 견적 제목. 서버 한도(200자)를 넘지 않게 자른다.
+export function estimateTitleFromFileName(fileName: string): string {
+  return truncateUtf16(fileName.replace(/\.(xlsx|xls)$/i, '').trim(), 200)
+}

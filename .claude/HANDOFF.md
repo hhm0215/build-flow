@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 00:18 KST |
-| 브랜치 | 없음 (`claude/input-length-guards`는 PR로 병합) |
-| PR | 입력 길이 검증 PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 견적·매입·세금계산서·보증 입력 길이 서버 검증 |
-| 다음 첫 행동 | BACKLOG P0 CRUD 실동선 다음 결함 탐색(현장 삭제 UI·인증 DELETE 409 실측 등) |
+| 갱신 | 2026-10-22 00:22 KST |
+| 브랜치 | 없음 (`claude/estimate-parse-limits`는 PR로 병합) |
+| PR | 공내역서 파싱 길이 PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 공내역서 파싱 견적 길이 초과 사전 표시 |
+| 다음 첫 행동 | BACKLOG P1 업무 시각 저장 기준 통일(KST +9h) 조사 또는 P0 CRUD 실동선 다음 결함 |
 
 ## 공통 사용자 지시
 
