@@ -243,7 +243,7 @@ export default function EstimateListPage() {
             label="견적 제목"
             rules={[{ required: true, message: '견적 제목을 입력하세요' }]}
           >
-            <Input placeholder="견적 제목" />
+            <Input placeholder="견적 제목" maxLength={200} />
           </Form.Item>
           <Form.Item
             name="estimateDate"
@@ -253,7 +253,7 @@ export default function EstimateListPage() {
             <DatePicker style={{ width: '100%' }} placeholder="견적일 선택" />
           </Form.Item>
           <Form.Item name="memo" label="메모">
-            <Input.TextArea rows={2} placeholder="메모 (선택)" />
+            <Input.TextArea rows={2} placeholder="메모 (선택)" maxLength={1000} />
           </Form.Item>
 
           <div style={{
@@ -285,7 +285,7 @@ export default function EstimateListPage() {
                       rules={[{ required: true, message: '품목명' }]}
                       style={{ marginBottom: 8 }}
                     >
-                      <Input placeholder="품목명" />
+                      <Input placeholder="품목명" maxLength={200} />
                     </Form.Item>
                     <Form.Item
                       {...restField}
@@ -293,7 +293,7 @@ export default function EstimateListPage() {
                       rules={[{ required: true, whitespace: true, message: '단위' }]}
                       style={{ marginBottom: 8 }}
                     >
-                      <Input placeholder="EA" />
+                      <Input placeholder="EA" maxLength={20} />
                     </Form.Item>
                     <Form.Item
                       {...restField}

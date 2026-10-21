@@ -109,7 +109,7 @@ export default function TaxEditModal({ invoice, onClose }: Props) {
           <DatePicker style={{ width: '100%' }} placeholder="발행일 선택" />
         </Form.Item>
         <Form.Item name="memo" label="메모">
-          <Input.TextArea rows={3} placeholder="메모" />
+          <Input.TextArea rows={3} placeholder="메모" maxLength={16000} />
         </Form.Item>
       </Form>
     </Modal>

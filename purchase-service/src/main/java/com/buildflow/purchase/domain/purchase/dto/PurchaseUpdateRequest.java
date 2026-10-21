@@ -32,5 +32,7 @@ public class PurchaseUpdateRequest {
     @Size(max = 200, message = "공급업체명은 200자 이하여야 합니다.")
     private String supplier;
     private LocalDate purchaseDate;
+    // Java UTF-16 16,000 code units는 utf8mb4 최악에도 64,000 bytes로 MySQL TEXT 한도 이내다.
+    @Size(max = 16000, message = "메모는 16000자 이하여야 합니다.")
     private String memo;
 }

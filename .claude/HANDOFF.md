@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 00:02 KST |
-| 브랜치 | 없음 (`claude/warranty-retention`은 PR #139로 병합) |
-| PR | #139 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 보증 원본 보존 병합(입력 검증 #161 병합 완료) |
-| 다음 첫 행동 | BACKLOG P0 공개 파일럿 CRUD 실동선 다음 항목 선택 |
+| 갱신 | 2026-10-22 00:18 KST |
+| 브랜치 | 없음 (`claude/input-length-guards`는 PR로 병합) |
+| PR | 입력 길이 검증 PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 견적·매입·세금계산서·보증 입력 길이 서버 검증 |
+| 다음 첫 행동 | BACKLOG P0 CRUD 실동선 다음 결함 탐색(현장 삭제 UI·인증 DELETE 409 실측 등) |
 
 ## 공통 사용자 지시
 
