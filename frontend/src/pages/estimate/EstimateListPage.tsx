@@ -19,7 +19,7 @@ import EstimateConfirmModal from './EstimateConfirmModal'
 import EstimateEditModal from './EstimateEditModal'
 import EstimateDeleteModal from './EstimateDeleteModal'
 import type { Estimate, EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
-import { validateEstimateAmounts } from '../../utils/estimate'
+import { estimateTitleFromFileName, validateEstimateAmounts } from '../../utils/estimate'
 
 const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
@@ -97,8 +97,7 @@ export default function EstimateListPage() {
     setPendingItems(items)
     setUploadOpen(false)
     setOpen(true)
-    const fallbackTitle = fileName.replace(/\.(xlsx|xls)$/i, '')
-    form.setFieldsValue({ title: fallbackTitle })
+    form.setFieldsValue({ title: estimateTitleFromFileName(fileName) })
   }
 
   const handleCreateModalAfterOpen = (visible: boolean) => {
@@ -241,7 +240,7 @@ export default function EstimateListPage() {
           <Form.Item
             name="title"
             label="견적 제목"
-            rules={[{ required: true, message: '견적 제목을 입력하세요' }]}
+            rules={[{ required: true, message: '견적 제목을 입력하세요' }, { max: 200, message: '견적 제목은 200자 이하여야 합니다' }]}
           >
             <Input placeholder="견적 제목" maxLength={200} />
           </Form.Item>
@@ -282,7 +281,7 @@ export default function EstimateListPage() {
                     <Form.Item
                       {...restField}
                       name={[name, 'itemName']}
-                      rules={[{ required: true, message: '품목명' }]}
+                      rules={[{ required: true, message: '품목명' }, { max: 200, message: '품목명은 200자 이하여야 합니다' }]}
                       style={{ marginBottom: 8 }}
                     >
                       <Input placeholder="품목명" maxLength={200} />
@@ -290,7 +289,7 @@ export default function EstimateListPage() {
                     <Form.Item
                       {...restField}
                       name={[name, 'unit']}
-                      rules={[{ required: true, whitespace: true, message: '단위' }]}
+                      rules={[{ required: true, whitespace: true, message: '단위' }, { max: 20, message: '단위는 20자 이하여야 합니다' }]}
                       style={{ marginBottom: 8 }}
                     >
                       <Input placeholder="EA" maxLength={20} />
