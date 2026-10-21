@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({DefectWarrantyService.class, WarrantyOcrResultService.class, WarrantyAuditRecorder.class, JpaAuditingConfig.class})
+@Import({DefectWarrantyService.class, WarrantyOcrResultService.class, WarrantyAuditRecorder.class, WarrantyFileRetentionService.class, JpaAuditingConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class WarrantyAuditJpaTest {
 

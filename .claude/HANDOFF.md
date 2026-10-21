@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-21 23:45 KST |
-| 브랜치 | 없음 (`codex/site-input-validation`은 PR #161로 병합) |
-| PR | #161 병합 대상. #139(Claude, 드래프트)·#99(develop→main, 승인 대기) |
-| 현재 단계 | 현장·거래처 API 입력 검증 병합 |
-| 다음 첫 행동 | PR #139 develop 최신화·결과 기록·병합 |
+| 갱신 | 2026-10-22 00:02 KST |
+| 브랜치 | 없음 (`claude/warranty-retention`은 PR #139로 병합) |
+| PR | #139 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 보증 원본 보존 병합(입력 검증 #161 병합 완료) |
+| 다음 첫 행동 | BACKLOG P0 공개 파일럿 CRUD 실동선 다음 항목 선택 |
 
 ## 공통 사용자 지시
 

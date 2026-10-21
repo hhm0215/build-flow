@@ -21,8 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -50,6 +48,7 @@ public class DefectWarrantyService {
     private final WarrantyAuditEventRepository auditRepository;
     private final SiteReferenceValidator siteReferenceValidator;
     private final WarrantyAuditRecorder auditRecorder;
+    private final WarrantyFileRetentionService fileRetention;
 
     @Value("${app.upload-dir:./uploads/warranties}")
     private String uploadDir;
@@ -122,19 +121,10 @@ public class DefectWarrantyService {
     public void delete(Long id) {
         DefectWarranty warranty = getWarrantyForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(warranty.getSiteId());
-        String filePath = warranty.getFilePath();
         auditRecorder.record(WarrantyAuditAction.DELETED, warranty);
+        // 원본 보존: 파일은 즉시 지우지 않고 보존 기록만 같은 트랜잭션에 남긴다. 기한이 지나면 정리 작업이 폐기한다.
+        fileRetention.retain(warranty);
         warrantyRepository.delete(warranty);
-        // 트랜잭션 커밋 후에만 파일 삭제 — rollback 시 파일은 남고 다음 cleanup job 대상이 됨.
-        // (커밋 전 삭제 시 rollback이 일어나면 DB row는 남고 파일은 사라진 dangling 상태가 됨)
-        if (filePath != null && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    deleteFileQuietly(filePath);
-                }
-            });
-        }
     }
 
     private void deleteFileQuietly(String filePath) {

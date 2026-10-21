@@ -41,7 +41,7 @@ class WarrantyUploadGuardTest {
     private SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
 
     private DefectWarrantyService service() {
-        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class));
+        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class));
         ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
         return service;
     }

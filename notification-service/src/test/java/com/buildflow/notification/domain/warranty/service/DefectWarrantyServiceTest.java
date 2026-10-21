@@ -26,7 +26,7 @@ class DefectWarrantyServiceTest {
     void OCR_처리중에는_수동_수정을_거부한다() {
         DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
         WarrantyOcrService ocrService = mock(WarrantyOcrService.class);
-        DefectWarrantyService service = new DefectWarrantyService(repository, ocrService, mock(WarrantyAuditEventRepository.class), mock(SiteReferenceValidator.class), mock(WarrantyAuditRecorder.class));
+        DefectWarrantyService service = new DefectWarrantyService(repository, ocrService, mock(WarrantyAuditEventRepository.class), mock(SiteReferenceValidator.class), mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class));
         DefectWarranty pending = DefectWarranty.createPending(1L, "warranty.pdf");
         when(repository.findByIdForUpdate(7L)).thenReturn(Optional.of(pending));
 
@@ -40,7 +40,7 @@ class DefectWarrantyServiceTest {
     @Test
     void 역전된_기간은_저장하지_않는다() {
         DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
-        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), mock(SiteReferenceValidator.class), mock(WarrantyAuditRecorder.class));
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), mock(SiteReferenceValidator.class), mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class));
         DefectWarranty warranty = DefectWarranty.builder()
                 .siteId(1L)
                 .insuranceCompany("기존 보험사")
@@ -63,7 +63,7 @@ class DefectWarrantyServiceTest {
     void 없는_현장의_직접_등록은_저장하지_않는다() {
         DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
         SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
-        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class));
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class));
         WarrantyCreateRequest request = mock(WarrantyCreateRequest.class);
         when(request.getSiteId()).thenReturn(99L);
         when(request.getStartDate()).thenReturn(LocalDate.of(2026, 1, 1));

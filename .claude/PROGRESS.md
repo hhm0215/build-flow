@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 보증 삭제 후 원본 PDF 보존·기한 폐기 (2026-10-21)
+
+- 보증 삭제 시 원본 PDF를 즉시 지우지 않고 보존 기록을 남겨 365일 뒤 폐기한다(이름·경로 검사로 업로드 폴더 밖 삭제 차단). develop 최신화 후 `notification-service:test` 137건 통과, 로컬 풀 Docker 합성 실측 PASS(`docs/PILOT_QA.md`). [PR #139](https://github.com/hhm0215/build-flow/pull/139). VPS 미반영, V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 현장·거래처 API 입력 검증 (2026-10-21)
 
 - UI에만 있던 문자열 길이 제한을 생성·수정 DTO에 적용하고, 현장 종료일이 시작일보다 빠른 요청을 저장 전 400으로 거부한다. 메모는 MySQL TEXT 바이트 한도 아래로 제한하며 UI 입력 길이도 맞췄다. 로컬 `site-service:test`·전체 Gradle `build`, 프론트 166건·lint·build PASS, 독립 재검토 차단 결함 없음. 이모지 UTF-16 경계(16,000 허용/16,002 거부) 회귀도 PASS. Codex 세션 중단 후 Claude가 develop 최신화·`site-service:test` 재실행하고 [PR #161](https://github.com/hhm0215/build-flow/pull/161)로 병합했다. `develop` 병합·`main`/VPS 반영은 하지 않았으며 V1 **40/100**·실데이터 **NO-GO** 유지.
