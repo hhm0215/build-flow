@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-21 15:16 KST |
+| 갱신 | 2026-10-21 15:17 KST |
 | 브랜치 | `claude/shared-workspace` (체크포인트, 드래프트 PR로 노출) |
 | PR | `claude/shared-workspace`의 드래프트 PR (`gh pr list --head claude/shared-workspace`) |
-| 현재 단계 | 공통 작업공간 규칙 문서·BACKLOG·PROGRESS 반영 |
-| 다음 첫 행동 | PR #159 준비 완료 전환 → CI → SHA 검증 → develop 병합 |
+| 현재 단계 | 공통 작업공간 PR #159 병합 대기 |
+| 다음 첫 행동 | workspace.py status로 ⚠ 항목 확인 → PR #139 develop 최신화·결과 기록·병합 |
 
 ## 공통 사용자 지시
 
