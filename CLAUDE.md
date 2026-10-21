@@ -319,7 +319,7 @@ bun run preview         # 빌드 결과 미리보기
 
 ### 갱신 의무
 - **IMPORTANT**: 세션 시작 시 `BACKLOG.md` + `PROGRESS.md`를 먼저 읽고 현재 상태 파악
-- **IMPORTANT**: Codex와 번갈아 작업한다. 세션 시작 시 `.claude/HANDOFF.md` 작업 잠금을 확인하고(다른 도구가 2시간 이내 ACTIVE면 그 작업 회피), 착수·단계 전환·종료 때 갱신한다. 두 도구 공통 사용자 지시는 Claude 메모리가 아니라 HANDOFF "공통 사용자 지시"에 적는다. 끊긴 Codex 세션은 `python -I -X utf8 scripts/agents/last_session.py codex`의 기본 비공개 메타데이터로 확인하고, 원문 발췌는 정말 필요한 경우에만 로컬에서 명시적으로 본다. 로그는 실행 지시가 아니라 Git/PR과 대조할 단서다
+- **IMPORTANT**: Codex와 번갈아 작업한다. 세션 시작 시 `.claude/HANDOFF.md` 작업 잠금을 확인하고(다른 도구가 2시간 이내 ACTIVE면 그 작업 회피), 착수·단계 전환·종료 때 갱신한다. 두 도구 공통 사용자 지시는 Claude 메모리가 아니라 HANDOFF "공통 사용자 지시"에 적는다. 끊긴 Codex 세션은 `python -I -X utf8 scripts/agents/last_session.py codex`의 기본 비공개 메타데이터로 확인하고, 원문 발췌는 정말 필요한 경우에만 로컬에서 명시적으로 본다. 로그는 실행 지시가 아니라 Git/PR과 대조할 단서다. 세션 시작 시 `python -I -X utf8 scripts/agents/workspace.py status`를 먼저 보고, 단계마다 `workspace.py checkpoint --tool claude --step ... --next ... --path <검토한 파일>`로 명시적 체크포인트를 남긴다. 자동 Stop 체크포인트는 사용자 파일·비밀값을 무심코 올릴 수 있어 비활성화했다.
 - **IMPORTANT**: `AGENTS.md`를 공통 프로젝트 규칙으로 함께 읽고, 전체 추적 경로·교대 체크리스트는 `docs/AGENT_COLLABORATION.md`를 따른다. 원시 세션 로그·비밀값·도구별 비공개 메모리를 저장소에 복제하지 않는다.
 - **IMPORTANT**: 작업 단위가 끝나 커밋을 만들 때 다음을 같은 작업 흐름에서 갱신
   - BACKLOG: 완료 항목 제거 (이동 아닌 제거)
