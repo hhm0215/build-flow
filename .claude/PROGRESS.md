@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — Codex↔Claude 공통 작업공간 (2026-10-21)
+
+- `scripts/agents/workspace.py`(`status`: 잠금·열린 PR·모든 작업 폴더의 미커밋/미푸시/PR 없음 표시, `checkpoint`: 잠금 갱신→커밋→푸시→드래프트 PR, `--auto`: 자기 도구 접두어 브랜치만)와 단위 테스트 7건을 추가했다. Claude는 프로젝트 Stop 훅으로 자동 체크포인트하고 Codex는 AGENTS.md 규칙으로 heartbeat 끝에 실행한다. 실사용 검증: PR #139 미커밋 10개 파일을 체크포인트해 `0f20c76`으로 노출, 훅 명령을 두 checkout에서 파이프 테스트(무변경 시 무동작). [PR #159](https://github.com/hhm0215/build-flow/pull/159). Codex heartbeat 쪽 실제 실행은 다음 Codex 세션에서 확인 필요, V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
 
 - 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개 기준 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `tax-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. [PR #157](https://github.com/hhm0215/build-flow/pull/157) 최종 SHA `7f5a124`의 필수 CI 10개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `2c508c1`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.

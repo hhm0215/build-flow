@@ -35,6 +35,12 @@
 
 ## P1 — 중기
 
+### 업무 시각 저장 기준 통일 (KST 원시값 +9h 불일치)
+  - 배경: 컨테이너 JVM은 UTC, JDBC는 `serverTimezone=Asia/Seoul`이다. 최근 코드가 `LocalDateTime.now(Asia/Seoul)`로 저장하는 필드(site/client `archived_at`, 보증 감사 `occurred_at`, 보존 `deleted_at`/`purged_at`)는 DB 원시값이 같은 행의 `created_at`보다 +9시간으로 보인다(2026-10-21 Docker 실측). API 왕복 값은 일치해 사용자 화면 오류는 확인되지 않았다
+  - 산출물: 서비스별 시각 생성 기준(JVM 기본 시간대 vs 명시 KST) 하나로 통일, 기존 행 보정 여부 판단, 원시값 대조 테스트
+  - 관련 파일: site-service·notification-service 엔티티/서비스, `application-docker.yml`, `docs/PILOT_QA.md`
+
+
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
 - **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
