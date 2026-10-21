@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
 | 갱신 | 2026-10-21 23:45 KST |
-| 브랜치 | `codex/site-input-validation` (Codex 작업을 사용자 지시로 Claude가 이어받음, develop 최신화) |
-| PR | 생성 중. #139(Claude, 드래프트)·#99(develop→main, 승인 대기) |
-| 현재 단계 | 현장·거래처 API 입력 검증 PR·CI. V1 40/100·실데이터 NO-GO |
-| 다음 첫 행동 | CI 통과 → SHA 검증 → develop 병합 → PR #139 최신화·병합 |
+| 브랜치 | 없음 (`codex/site-input-validation`은 PR #161로 병합) |
+| PR | #161 병합 대상. #139(Claude, 드래프트)·#99(develop→main, 승인 대기) |
+| 현재 단계 | 현장·거래처 API 입력 검증 병합 |
+| 다음 첫 행동 | PR #139 develop 최신화·결과 기록·병합 |
 
 ## 공통 사용자 지시
 
