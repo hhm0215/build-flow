@@ -332,6 +332,7 @@ bun run preview         # 빌드 결과 미리보기
 
 ## 주의사항
 
+- **IMPORTANT**: 목표·채팅·계정·도구의 상태값을 원인으로 단정하지 않는다. `AGENTS.md` 15절에 따라 관찰/추론과 적용 범위를 구분하고, 사용량·해제 시각·작업 중단을 주장하기 전 각 출처를 실측한다. 설명 오류가 확인되면 즉시 정정한다.
 - **IMPORTANT**: 환경변수 하드코딩 절대 금지
 - **IMPORTANT**: 서비스 간 직접 DB 접근 금지 → OpenFeign 또는 Kafka
 - **IMPORTANT**: Entity에 @Data 금지
