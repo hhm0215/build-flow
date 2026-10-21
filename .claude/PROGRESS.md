@@ -7,7 +7,7 @@
 
 ## 완료된 작업 — Codex↔Claude 공통 작업공간 (2026-10-21)
 
-- `scripts/agents/workspace.py`(`status`: 잠금·열린 PR·모든 작업 폴더의 미커밋/미푸시/PR 없음 표시, `checkpoint`: 잠금 갱신→커밋→푸시→드래프트 PR, `--auto`: 자기 도구 접두어 브랜치만)와 단위 테스트 7건을 추가했다. Claude는 프로젝트 Stop 훅으로 자동 체크포인트하고 Codex는 AGENTS.md 규칙으로 heartbeat 끝에 실행한다. 실사용 검증: PR #139 미커밋 10개 파일을 체크포인트해 `0f20c76`으로 노출, 훅 명령을 두 checkout에서 파이프 테스트(무변경 시 무동작). [PR #159](https://github.com/hhm0215/build-flow/pull/159). Codex heartbeat 쪽 실제 실행은 다음 Codex 세션에서 확인 필요, V1 **40/100** 변동 없음.
+- `scripts/agents/workspace.py`(`status`: 잠금·열린 PR·모든 작업 폴더의 미커밋/미푸시/PR 없음 표시, `checkpoint`: 잠금 갱신→커밋→푸시→드래프트 PR)와 초기 단위 테스트 7건을 추가했다. [PR #159](https://github.com/hhm0215/build-flow/pull/159)은 `develop`에 병합됐다. 당시 Claude Stop 훅 자동 체크포인트와 Codex heartbeat 자동 실행을 기록했으나, 후속 검토에서 전체 작업 폴더 `git add -A`가 사용자 파일·비밀값을 올릴 수 있음을 발견해 **사용 금지**로 정정했다. 안전 수정 브랜치에서 명시 파일만 체크포인트하도록 변경 중이며 V1 **40/100** 변동 없음.
 
 ## 완료된 작업 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
 
