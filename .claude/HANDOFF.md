@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 15:35 KST |
-| 브랜치 | 없음 (`claude/release-runbook`은 PR로 병합) |
-| PR | 런북 PR 병합 후 #99(develop→main) 정리. main 병합·VPS 적용은 사용자 승인 대기 |
-| 현재 단계 | VPS 반영 준비(스키마 리허설·백업 스크립트·런북) |
-| 다음 첫 행동 | PR #99 제목·본문 갱신·CI 확인 → 사용자에게 main 병합 승인 요청 → 승인 후 `docs/RELEASE_RUNBOOK.md` 순서로 VPS 적용(사용자 Web Console) |
+| 갱신 | 2026-10-22 15:52 KST |
+| 브랜치 | 없음 |
+| PR | #99 병합(main `1d2497e`). 열린 PR 없음 |
+| 현재 단계 | main 통합 완료, VPS 적용 대기(서버 접근은 사용자 Web Console) |
+| 다음 첫 행동 | VPS에서 `docs/RELEASE_RUNBOOK.md`로 `1d2497e` 적용 후 S01·S10·PROGRESS 기록. 그 전에는 develop BACKLOG 작업 계속 |
 
 ## 공통 사용자 지시
 

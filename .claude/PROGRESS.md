@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — develop → main 통합 (2026-10-22)
+
+- 사용자 승인으로 [PR #99](https://github.com/hhm0215/build-flow/pull/99)(PR #100~#172, 커밋 175개)를 SHA 전체 대조(API 페이지네이션, 175/175 일치)·필수 CI 12개 통과 후 merge commit `1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1`로 `main`에 병합했다. 병합 `main` push CI 성공, `develop`을 같은 SHA로 fast-forward 동기화했다. **공개 VPS는 아직 `4e56596`** — `docs/RELEASE_RUNBOOK.md` 순서(처리 중 작업 0건 → 순차 빌드 → 앱 정지·`predeploy_backup.sh` → 기동 → 확인)로 서버 Web Console에서 적용해야 한다. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — VPS 반영 준비: 스키마 리허설·배포 직전 백업 스크립트·런북 (2026-10-22)
 
 - VPS 실행 코드(`4e56596`) 대비 엔티티 변경은 site·notification뿐임을 확인했다. 구버전 notification 스키마를 격리 DB에 재현하고 새 이미지를 기동해 `ddl-auto=update`가 enum `SUPPRESSED`·nullable 컬럼·새 테이블 2개를 자동 반영하고 기존 행을 보존함을 실측했다(리허설 DB 삭제). `scripts/vps/predeploy_backup.sh`(앱 정지 확인→7개 스키마 덤프·행 수→보증 volume tar→체크섬→임시 MySQL 격리 복원 행 수 대조→임시 자원만 정리)를 로컬 스택에서 21개 테이블 PASS, 앱 실행 중 거부를 확인했다. `docs/RELEASE_RUNBOOK.md`에 사전 점검·빌드·백업·기동·확인·되돌리기 명령을 정리했다. VPS 실행은 사용자 승인 대기. V1 **40/100** 변동 없음.
