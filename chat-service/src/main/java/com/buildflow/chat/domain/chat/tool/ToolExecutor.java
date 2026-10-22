@@ -38,7 +38,7 @@ public class ToolExecutor {
 
     public String execute(String name, JsonNode args) {
         if (!KNOWN.contains(name)) {
-            return "{\"error\":\"알 수 없는 도구: " + name + "\"}";
+            return error("알 수 없는 도구: " + name);
         }
         try {
             Object data = switch (name) {
@@ -52,10 +52,11 @@ public class ToolExecutor {
             };
             return objectMapper.writeValueAsString(data);
         } catch (IllegalArgumentException e) {
-            return "{\"error\":\"" + e.getMessage() + "\"}";
+            return error(e.getMessage());
         } catch (Exception e) {
-            log.warn("도구 실행 실패 name={}: {}", name, e.getMessage());
-            return "{\"error\":\"도구 실행에 실패했습니다: " + name + "\"}";
+            // Feign 예외 메시지에는 상류 응답 본문이 섞일 수 있어 종류만 남긴다.
+            log.warn("도구 실행 실패 name={}: {}", name, e.getClass().getSimpleName());
+            return error("도구 실행에 실패했습니다: " + name);
         }
     }
 
@@ -75,5 +76,14 @@ public class ToolExecutor {
             throw new IllegalArgumentException("siteId가 필요합니다. listSites로 현장 ID를 먼저 확인하세요.");
         }
         return args.get("siteId").asLong();
+    }
+
+    /** 모델이 보낸 도구 이름 등 임의 문자열이 JSON 구조를 깨지 않도록 직렬화기로 감싼다. */
+    private String error(String message) {
+        try {
+            return objectMapper.writeValueAsString(Map.of("error", message));
+        } catch (Exception e) {
+            return "{\"error\":\"도구 결과를 만들지 못했습니다\"}";
+        }
     }
 }
