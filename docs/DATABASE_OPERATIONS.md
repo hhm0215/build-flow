@@ -160,6 +160,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-r
 - CI 미추가: 7개 bootJar 빌드와 JVM 28회 기동이 필요해 무겁고, 서비스별 빈 DB V1+validate는 기존 `*-flyway` CI job이 이미 검증한다. 이 리허설은 엔티티·V1 변경 시와 운영 baseline 직전에 수동으로 다시 돌리는 일회성 게이트로 둔다.
 - 2026-10-23 site `V2__site_status_bidding.sql`(`sites.status` enum에 `BIDDING`): 엔티티 변경은 V1을 고치지 않고 forward 마이그레이션으로 둔다. 리허설 스크립트의 기대 history는 마이그레이션 파일에서 계산한다(legacy `1|1|BASELINE|1;2|2|SQL|1`, 신규 `1|1|SQL|1;2|2|SQL|1`). 2026-10-23 격리 MySQL에서 신규 V1+V2+validate(`SiteFlywayIntegrationTest`)와 V1 스키마→`ddl-auto=update` enum 확장·BIDDING 저장(`SiteStatusLegacySchemaIntegrationTest`), BIDDING 존재 컬럼에 V2 재적용 무해를 확인했다. 7개 서비스 전체 리허설 스크립트 재실행은 미실시.
 
+### 업그레이드·되돌리기 리허설 (tax 분할 입금 + site BIDDING, 2026-10-23)
+
+`scripts/db/upgrade-rehearsal-tax-site.ps1 -OldRoot <운영 SHA 체크아웃>`은 같은 격리 MySQL 구성(무작위 `bfupg<난수>` project, 포트 비게시·tmpfs, nonce label)에서 운영 경로(`ddl-auto update`)로 이전 코드 → 새 코드 → 새 코드 재기동 → 이전 코드(되돌리기) → 새 코드(재반영)를 차례로 띄우고, API는 앱 컨테이너 안 `curl`로 서비스에 직접 호출한다(서비스 자체는 인증 헤더 불요, Feign tax→site는 simple discovery). 이전 코드 체크아웃은 운영 SHA를 `archive`로 임시 폴더에 풀고 tax·site `bootJar`를 만든다.
+
+2026-10-23 실측(이전 `d8f3b3d`, 새 `6ccb3e5`): 24개 검사 중 PASS 23·WARN 1, 정리 후 잔여 0.
+- 업그레이드: 이전 코드로 만든 스키마(`status` enum 4값, `tax_payments` 없음)에서 새 코드가 기동해 `tax_payments`(V2와 같은 컬럼·`idx_tax_payments_invoice`)를 만들고 enum에 `BIDDING`을 추가했다. 합성 매출 3건(미입금 110만·입금 확인 55만·0원) 중 입금 확인 건만 이관 1건, 재기동 중복 0.
+- API: 미수금 110만 → 30만 입금 201 → 80만, 잔액+1·0원 계산서 입금 400, 취소 200 → 110만, 이관 행 취소 후 `confirm-payment`로 재완료. BIDDING 생성 201 → IN_PROGRESS 200, BIDDING 복귀·SETTLING 생성 400.
+- 되돌리기: 이전 코드는 넓어진 enum·새 테이블에서 정상 기동. BIDDING 행이 있으면 현장 목록 500 → `IN_PROGRESS`로 낮추면 200. 이전 tax API 정상(부분 입금은 무시).
+- WARN(되돌리기 경로 한정): 되돌린 상태에서 부분 입금 계산서를 `confirm-payment`하고 재반영하면 `paymentConfirmed=true`·`paymentStatus=PAID`인데 `paidAmount`는 부분 합계(30만/110만)로 남는다. 잔액 입금 기록으로 정상화된다. 운영 대응은 `docs/RELEASE_RUNBOOK.md` 분할 입금 되돌리기 주의. **2026-10-23 수정**: 재반영 시 기동 이관이 "입금 확인인데 유효 입금 합계 < 총액"인 계산서의 잔액을 `기존 입금 확인 이관` 1건으로 채우고, 이관 전에도 입금 확인 건은 총액 입금으로 표시한다(단위 회귀 추가). 되돌린 동안의 입금 확인도 재반영 후 정합하다.
+
 ## Phase E1: 서비스별 runtime DB 계정 (opt-in)
 
 **결정 (2026-10-23, 위임된 에이전트 결정)**: 7개 DB 서비스가 공유하던 MySQL root 대신 서비스마다 `buildflow_<svc>`@`'%'` 계정을 두고, 자기 스키마 `buildflow_<svc>.*`에만 `ALL PRIVILEGES`(DDL 포함)를 준다. 다른 스키마·`mysql` 시스템 스키마·전역 권한(`CREATE USER`, `PROCESS` 등)·`GRANT OPTION`은 없다. 한 서비스의 자격 증명이나 SQL 주입이 다른 서비스 데이터와 계정 관리로 번지는 범위를 줄이는 것이 목적이다.

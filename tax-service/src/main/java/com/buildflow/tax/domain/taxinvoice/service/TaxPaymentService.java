@@ -22,10 +22,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 매출 세금계산서 입금 내역(분할 입금·취소). 모든 변경은 계산서 행 비관적 잠금 아래에서
@@ -123,7 +121,8 @@ public class TaxPaymentService {
         if (invoice.getType() != TaxInvoiceType.SALES) {
             return null;
         }
-        if (invoice.isPaymentConfirmed() && !taxPaymentRepository.existsByTaxInvoiceId(invoice.getId())) {
+        // 입금 확인은 전액 수금 확정 — 이관(잔액 채움) 전에도 총액을 입금액으로 보여 준다.
+        if (invoice.isPaymentConfirmed()) {
             return invoice.getTotalAmount();
         }
         return taxPaymentRepository.sumActiveAmount(invoice.getId());
@@ -141,12 +140,11 @@ public class TaxPaymentService {
         Map<Long, BigDecimal> active = new HashMap<>();
         taxPaymentRepository.sumActiveAmounts(salesIds)
                 .forEach(row -> active.put(row.getTaxInvoiceId(), row.getActiveAmount()));
-        Set<Long> withRows = new HashSet<>(taxPaymentRepository.findInvoiceIdsWithPayments(salesIds));
         for (TaxInvoice invoice : invoices) {
             if (invoice.getType() != TaxInvoiceType.SALES) {
                 continue;
             }
-            BigDecimal paid = (invoice.isPaymentConfirmed() && !withRows.contains(invoice.getId()))
+            BigDecimal paid = invoice.isPaymentConfirmed()
                     ? invoice.getTotalAmount()
                     : active.getOrDefault(invoice.getId(), BigDecimal.ZERO);
             result.put(invoice.getId(), paid);
@@ -168,7 +166,7 @@ public class TaxPaymentService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public int backfillLegacyConfirmed() {
         int migrated = 0;
-        for (Long id : taxInvoiceRepository.findLegacyConfirmedIdsWithoutPayments()) {
+        for (Long id : taxInvoiceRepository.findConfirmedIdsWithUnrecordedBalance()) {
             TaxInvoice invoice = taxInvoiceRepository.findByIdForUpdate(id).orElse(null);
             if (invoice != null && ensureLegacyLedger(invoice)) {
                 migrated++;
@@ -177,10 +175,17 @@ public class TaxPaymentService {
         return migrated;
     }
 
+    /**
+     * "입금 확인"은 전액 수금 확정이므로 유효 입금 합계가 총액보다 작으면 남은 금액을 이관 1건으로 채운다.
+     * 행이 없는 기존 확인 건은 총액 1건, 이전 코드로 되돌린 동안 부분 입금 뒤 확인된 건은 잔액 1건이 된다.
+     */
     private boolean ensureLegacyLedger(TaxInvoice lockedInvoice) {
-        if (!lockedInvoice.isPaymentConfirmed()
-                || lockedInvoice.getTotalAmount().signum() <= 0
-                || taxPaymentRepository.existsByTaxInvoiceId(lockedInvoice.getId())) {
+        if (!lockedInvoice.isPaymentConfirmed() || lockedInvoice.getTotalAmount().signum() <= 0) {
+            return false;
+        }
+        BigDecimal remainder = lockedInvoice.getTotalAmount()
+                .subtract(taxPaymentRepository.sumActiveAmount(lockedInvoice.getId()));
+        if (remainder.signum() <= 0) {
             return false;
         }
         LocalDate date = lockedInvoice.getPaymentDate();
@@ -189,7 +194,7 @@ public class TaxPaymentService {
         }
         taxPaymentRepository.save(TaxPayment.builder()
                 .taxInvoiceId(lockedInvoice.getId())
-                .amount(lockedInvoice.getTotalAmount())
+                .amount(remainder)
                 .paymentDate(date)
                 .memo(LEGACY_MEMO)
                 .build());

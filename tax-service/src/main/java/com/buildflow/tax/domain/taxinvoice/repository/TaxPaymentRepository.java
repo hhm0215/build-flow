@@ -32,9 +32,6 @@ public interface TaxPaymentRepository extends JpaRepository<TaxPayment, Long> {
             + "WHERE p.taxInvoiceId IN :ids AND p.canceledAt IS NULL GROUP BY p.taxInvoiceId")
     List<ActiveAmount> sumActiveAmounts(@Param("ids") Collection<Long> ids);
 
-    @Query("SELECT DISTINCT p.taxInvoiceId FROM TaxPayment p WHERE p.taxInvoiceId IN :ids")
-    List<Long> findInvoiceIdsWithPayments(@Param("ids") Collection<Long> ids);
-
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM TaxPayment p WHERE p.taxInvoiceId = :taxInvoiceId")
     int deleteByTaxInvoiceId(@Param("taxInvoiceId") Long taxInvoiceId);
