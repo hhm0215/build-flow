@@ -182,6 +182,8 @@ export interface PurchaseUpdateRequest {
 
 // ── Tax Invoice (세금계산서) ───────────────────
 export type TaxInvoiceType = 'SALES' | 'PURCHASE'
+/** 매출 수금 상태. 매입은 수금 대상이 아니어서 null. */
+export type TaxPaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID'
 
 export interface TaxInvoice {
   id: number
@@ -192,11 +194,41 @@ export interface TaxInvoice {
   totalAmount: number
   counterparty: string | null
   issueDate: string | null
+  /** 전액 입금 완료(유효 입금 합계 = 총액) */
   paymentConfirmed: boolean
+  /** 완료 시 마지막 유효 입금일 */
   paymentDate: string | null
+  /** 유효 입금 합계(취소 제외). 매입은 null */
+  paidAmount: number | null
+  /** 총액 − 유효 입금 합계. 매입은 null */
+  remainingAmount: number | null
+  paymentStatus: TaxPaymentStatus | null
   memo: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** 매출 세금계산서 입금 1건. 오입금은 삭제하지 않고 취소 시각을 남긴다. */
+export interface TaxPayment {
+  id: number
+  taxInvoiceId: number
+  amount: number
+  paymentDate: string
+  memo: string | null
+  canceled: boolean
+  canceledAt: string | null
+  cancelReason: string | null
+  createdAt: string
+}
+
+export interface TaxPaymentCreateRequest {
+  amount: number
+  paymentDate: string
+  memo?: string
+}
+
+export interface TaxPaymentCancelRequest {
+  reason?: string
 }
 
 export interface TaxInvoiceCreateRequest {

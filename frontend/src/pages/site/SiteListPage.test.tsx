@@ -92,6 +92,7 @@ const populateRelations = () => {
   query.taxes = [{
     id: 12, siteId: 4, type: 'SALES', supplyAmount: 1000, taxAmount: 100, totalAmount: 1100,
     counterparty: null, issueDate: '2026-10-19', paymentConfirmed: false, paymentDate: null,
+    paidAmount: 0, remainingAmount: 1100, paymentStatus: 'UNPAID',
     memo: null, createdAt: '2026-10-19T00:00:00', updatedAt: '2026-10-19T00:00:00',
   }]
 }
