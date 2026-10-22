@@ -22,6 +22,10 @@ fail() { echo "중단: $*" >&2; exit 1; }
 PUBLIC_HOST=$(tr -d '[:space:]' < "$HOST_FILE")
 [[ "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || fail "공개 호스트명 형식이 아니다"
 export PUBLIC_HOST
+# root가 저장소의 git·스크립트를 실행하므로, 배포 계정이 저장소나 .git 설정·훅을 바꿀 수 없어야 한다.
+[ "$(stat -c %U "$REPO" "$REPO/.git" "$REPO/.git/config" "$REPO/.git/hooks" | sort -u)" = root ] || fail "$REPO 와 .git 이 root 소유가 아니다"
+[ -z "$(find "$REPO" -path "$REPO/.git/objects" -prune -o \( -perm -g+w -o -perm -o+w \) -print -quit)" ] || fail "$REPO 안에 group/other 쓰기 가능 파일이 있다"
+git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 cd "$REPO"
 C=(docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml)
 
