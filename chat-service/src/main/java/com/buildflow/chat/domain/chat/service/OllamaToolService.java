@@ -1,5 +1,6 @@
 package com.buildflow.chat.domain.chat.service;
 
+import com.buildflow.chat.domain.chat.tool.IntentRouter;
 import com.buildflow.chat.domain.chat.tool.ToolCatalog;
 import com.buildflow.chat.domain.chat.tool.ToolExecutor;
 import com.buildflow.chat.global.exception.BusinessException;
@@ -103,6 +104,10 @@ public class OllamaToolService {
             JsonNode toolCalls = message.get("tool_calls");
 
             if (toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) {
+                if (round == 0 && applyFallback(messages, statusConsumer)) {
+                    // 데이터 질문인데 도구 없이 답하려 했다 → 규칙으로 고른 도구 결과를 넣고 다시 답하게 한다.
+                    return emitAnswer(textOrFallback(callOllama(messages, null)), statusConsumer, tokenConsumer);
+                }
                 return emitAnswer(textOrFallback(message), statusConsumer, tokenConsumer);
             }
 
@@ -142,6 +147,54 @@ public class OllamaToolService {
             chunks.add(buffer.toString());
         }
         return chunks;
+    }
+
+    /** 마지막 사용자 질문을 규칙 라우터에 넣어 도구를 실행하고 그 왕복을 컨텍스트에 추가한다. 실행했으면 true. */
+    boolean applyFallback(List<Object> messages, Consumer<String> statusConsumer) {
+        String question = lastUserQuestion(messages);
+        List<IntentRouter.SiteRef> sites = IntentRouter.needsSites(question) ? loadSites() : List.of();
+        List<IntentRouter.RoutedCall> routed = IntentRouter.route(question, sites);
+        if (routed.isEmpty()) {
+            return false;
+        }
+        List<Map<String, Object>> calls = routed.stream().map(IntentRouter::asToolCall).toList();
+        Map<String, Object> assistant = new HashMap<>();
+        assistant.put("role", "assistant");
+        assistant.put("content", "");
+        assistant.put("tool_calls", calls);
+        messages.add(assistant);
+        for (Map<String, Object> call : calls) {
+            messages.add(toolResultMessage(objectMapper.valueToTree(call), statusConsumer));
+        }
+        log.info("도구 미선택 질문에 규칙 폴백 적용 tools={}", routed.stream().map(IntentRouter.RoutedCall::tool).toList());
+        return true;
+    }
+
+    private static String lastUserQuestion(List<Object> messages) {
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if (messages.get(i) instanceof Map<?, ?> message && "user".equals(message.get("role"))) {
+                Object content = message.get("content");
+                return content == null ? "" : content.toString();
+            }
+        }
+        return "";
+    }
+
+    private List<IntentRouter.SiteRef> loadSites() {
+        try {
+            JsonNode sites = objectMapper.readTree(toolExecutor.execute("listSites", null));
+            List<IntentRouter.SiteRef> refs = new ArrayList<>();
+            if (sites != null && sites.isArray()) {
+                for (JsonNode site : sites) {
+                    if (site.hasNonNull("id") && site.hasNonNull("siteName")) {
+                        refs.add(new IntentRouter.SiteRef(site.get("id").asLong(), site.get("siteName").asText()));
+                    }
+                }
+            }
+            return refs;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     /**
