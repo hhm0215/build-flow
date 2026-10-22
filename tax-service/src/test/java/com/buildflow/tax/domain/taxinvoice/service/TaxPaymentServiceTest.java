@@ -290,4 +290,13 @@ class TaxPaymentServiceTest {
         ReflectionTestUtils.setField(request, "reason", reason);
         return request;
     }
+
+    @Test
+    void 기동_이관은_커밋된_입금_행을_보도록_READ_COMMITTED로_실행한다() throws Exception {
+        // REPEATABLE READ면 잠금 대기 중 다른 요청이 넣은 이관 행을 못 보고 중복 생성한다(PR #193 리뷰).
+        org.springframework.transaction.annotation.Transactional tx = TaxPaymentService.class
+                .getMethod("backfillLegacyConfirmed")
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+        assertThat(tx.isolation()).isEqualTo(org.springframework.transaction.annotation.Isolation.READ_COMMITTED);
+    }
 }

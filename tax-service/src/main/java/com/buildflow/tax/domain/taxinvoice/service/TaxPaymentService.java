@@ -14,6 +14,7 @@ import com.buildflow.tax.global.exception.ErrorCode;
 import com.buildflow.tax.global.kafka.KafkaProducerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -159,8 +160,12 @@ public class TaxPaymentService {
         taxPaymentRepository.deleteByTaxInvoiceId(taxInvoiceId);
     }
 
-    /** 입금 내역 도입 전 "입금 확인"된 계산서에 총액 1건을 이관한다. 멱등. */
-    @Transactional
+    /**
+     * 입금 내역 도입 전 "입금 확인"된 계산서에 총액 1건을 이관한다. 멱등.
+     * READ_COMMITTED: REPEATABLE READ면 첫 목록 조회 시점 스냅샷이 고정돼, 행 잠금을 기다리는 동안
+     * 다른 요청(입금 기록·취소의 지연 이관)이 커밋한 입금 행을 못 보고 이관 행을 중복 생성할 수 있다.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public int backfillLegacyConfirmed() {
         int migrated = 0;
         for (Long id : taxInvoiceRepository.findLegacyConfirmedIdsWithoutPayments()) {
