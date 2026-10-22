@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 00:33 KST |
-| 브랜치 | 없음 (`claude/jvm-kst-timezone`은 PR로 병합) |
-| PR | 시간대 통일 PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 컨테이너 JVM 시간대 KST 통일(Docker 실측 PENDING) |
-| 다음 첫 행동 | Docker 기동 후 user.timezone·새 행 원시값 실측 → BACKLOG P1 시간대 항목 마무리 |
+| 갱신 | 2026-10-22 14:50 KST |
+| 브랜치 | 없음 (`claude/local-crud-qa`는 PR로 병합) |
+| PR | 로컬 실동선 기록 PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 로컬 풀 Docker CRUD 삭제·재집계·시간대 실측 18/18 PASS |
+| 다음 첫 행동 | BACKLOG P0 남은 로컬 검증 항목(보증 PDF 업로드·OCR 실측 등) 또는 P1 항목 |
 
 ## 공통 사용자 지시
 
