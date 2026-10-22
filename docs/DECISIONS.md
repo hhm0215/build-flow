@@ -273,7 +273,7 @@ v1 머지 자동화 선행 3조건(CI / 머신 리더블 메타 / 풀 사이클 
 ### 새 안전망: Commits SHA 자동 검증 (7단계)
 
 ```
-gh pr view <num> --json commits --jq '.commits[].oid' | sort
+gh api --paginate repos/hhm0215/build-flow/pulls/<num>/commits --jq '.[].sha' | sort   # 2026-10-22: pr view는 100개 상한
 ↕ 비교
 git log --format="%H" origin/main..origin/develop | sort
 → 일치: gh pr merge --merge
