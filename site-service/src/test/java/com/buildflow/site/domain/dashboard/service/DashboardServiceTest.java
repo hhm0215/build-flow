@@ -71,6 +71,25 @@ class DashboardServiceTest {
     }
 
     @Test
+    void 수주_전_현장의_손익은_전체_합계에서_빼고_목록에는_남긴다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                site(2, "입찰현장", SiteStatus.BIDDING),
+                site(1, "A현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(
+                profit(2, "5000", "0"),
+                profit(1, "1000", "800")));
+
+        DashboardStatsResponse stats = service.getStats();
+
+        assertThat(stats.getTotalEstimateAmount()).isEqualByComparingTo("1000");
+        assertThat(stats.getTotalPurchaseAmount()).isEqualByComparingTo("800");
+        assertThat(stats.getTotalMargin()).isEqualByComparingTo("200");
+        assertThat(stats.getAverageMarginRate()).isEqualByComparingTo("20.00");
+        assertThat(stats.getSitesByStatus()).isEqualTo(Map.of("BIDDING", 1, "IN_PROGRESS", 1));
+        assertThat(stats.getSiteProfits().get(0).getEstimateAmount()).isEqualByComparingTo("5000");
+    }
+
+    @Test
     void 현장이_없거나_견적이_0이면_마진율은_0이다() {
         when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
         when(profits.findBySiteIdIn(any())).thenReturn(List.of());

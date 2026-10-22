@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { mockSites } from '../data/sites.data'
-import { ApiResponse, Site, SiteCreateRequest, SiteUpdateRequest } from '../../types'
+import { ApiResponse, Site, SiteCreateRequest, SiteStatus, SiteUpdateRequest } from '../../types'
+import { canTransitionSiteStatus, INITIAL_SITE_STATUSES, SITE_STATUSES } from '../../utils/siteStatus'
 import { findMockClientById } from './clients.handlers'
 
 let sites = [...mockSites]
@@ -88,12 +89,18 @@ export const sitesHandlers = [
         { status: 404 },
       )
     }
+    if (body.status != null && !INITIAL_SITE_STATUSES.includes(body.status)) {
+      return HttpResponse.json(
+        { success: false, error: '새 현장은 수주 전 또는 시공 중으로만 등록할 수 있습니다.' },
+        { status: 400 },
+      )
+    }
     const newSite: Site = {
       id: Math.max(0, ...sites.map((s) => s.id)) + 1,
       siteName: body.siteName,
       client,
       address: body.address || '',
-      status: 'IN_PROGRESS',
+      status: body.status ?? 'IN_PROGRESS',
       startDate: body.startDate || '',
       endDate: body.endDate || '',
       memo: body.memo || '',
@@ -157,7 +164,14 @@ export const sitesHandlers = [
       )
     }
     if (sites[index].archivedAt) return archivedConflict()
-    sites[index] = { ...sites[index], status: body.status as Site['status'], updatedAt: new Date().toISOString() }
+    const next = body.status as SiteStatus
+    if (!SITE_STATUSES.includes(next) || !canTransitionSiteStatus(sites[index].status, next)) {
+      return HttpResponse.json(
+        { success: false, error: '수주 전(BIDDING) 현장은 시공 중으로만 바꿀 수 있고, 수주한 현장은 수주 전으로 되돌릴 수 없습니다.' },
+        { status: 400 },
+      )
+    }
+    sites[index] = { ...sites[index], status: next, updatedAt: new Date().toISOString() }
     return HttpResponse.json<ApiResponse<Site>>({ success: true, data: sites[index], error: null })
   }),
 
