@@ -47,7 +47,8 @@ export interface ClientUpdateRequest {
 }
 
 // ── Site (현장) ───────────────────────────────
-export type SiteStatus = 'IN_PROGRESS' | 'SETTLING' | 'WARRANTY' | 'COMPLETED'
+/** BIDDING = 수주 전·견적 중. 수주하면 IN_PROGRESS로 바꾸고 수주 실패는 보관한다 */
+export type SiteStatus = 'BIDDING' | 'IN_PROGRESS' | 'SETTLING' | 'WARRANTY' | 'COMPLETED'
 
 export interface Site {
   id: number
@@ -71,6 +72,8 @@ export interface SiteCreateRequest {
   startDate?: string
   endDate?: string
   memo?: string
+  /** 생략 시 서버 기본값 IN_PROGRESS. BIDDING/IN_PROGRESS만 허용 */
+  status?: SiteStatus
 }
 
 export interface SiteUpdateRequest {

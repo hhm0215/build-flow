@@ -26,15 +26,18 @@ import { useTaxes } from '../../api/taxes.api'
 import { Site, SiteStatus } from '../../types'
 import { sumConfirmedEstimateAmount } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
+import { SITE_STATUSES } from '../../utils/siteStatus'
 import SiteCreateModal from './SiteCreateModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
+  BIDDING: '수주 전',
   IN_PROGRESS: '시공 중',
   SETTLING: '정산 중',
   WARRANTY: '하자보증',
   COMPLETED: '완료',
 }
 const STATUS_COLOR: Record<SiteStatus, string> = {
+  BIDDING: '#06b6d4',
   IN_PROGRESS: '#3b82f6',
   SETTLING: '#f59e0b',
   WARRANTY: '#8b5cf6',
@@ -63,7 +66,7 @@ interface SiteFilters {
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
-  status: { type: 'enum', values: ['IN_PROGRESS', 'SETTLING', 'WARRANTY', 'COMPLETED'] },
+  status: { type: 'enum', values: SITE_STATUSES },
   archive: { type: 'enum', values: ['ARCHIVED', 'ALL'] },
 }
 

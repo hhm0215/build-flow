@@ -30,27 +30,34 @@ import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
+import { SITE_STATUSES, canTransitionSiteStatus } from '../../utils/siteStatus'
 import { calculateDocumentProfit } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
+  BIDDING: '수주 전',
   IN_PROGRESS: '시공 중',
   SETTLING: '정산 중',
   WARRANTY: '하자보증',
   COMPLETED: '완료',
 }
 const STATUS_COLOR: Record<SiteStatus, string> = {
+  BIDDING: '#06b6d4',
   IN_PROGRESS: '#3b82f6',
   SETTLING: '#f59e0b',
   WARRANTY: '#8b5cf6',
   COMPLETED: '#52525b',
 }
-const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SiteStatus[]).map((s) => ({
-  value: s,
-  label: STATUS_LABEL[s],
-}))
+/** 서버 전환 규칙과 같게, 현재 상태에서 갈 수 없는 상태는 비활성화한다 (수주 전 ↔ 수주 이후 단방향) */
+function statusOptions(current: SiteStatus) {
+  return SITE_STATUSES.map((s) => ({
+    value: s,
+    label: STATUS_LABEL[s],
+    disabled: !canTransitionSiteStatus(current, s),
+  }))
+}
 
 const ESTIMATE_STATUS_LABEL: Record<string, string> = {
   DRAFT: '작성 중',
@@ -800,7 +807,7 @@ function SiteHeaderHero({
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>현장 상태</div>
           <Select
             value={site.status}
-            options={STATUS_OPTIONS}
+            options={statusOptions(site.status)}
             onChange={onStatusChange}
             disabled={statusChanging || archived}
             loading={statusChanging}

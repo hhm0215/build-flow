@@ -33,8 +33,12 @@ public class SiteService {
     @Transactional
     public SiteResponse create(SiteCreateRequest request) {
         Client client = resolveAssignableClient(request.getClientId(), null);
+        if (request.getStatus() != null && !request.getStatus().isInitial()) {
+            throw new BusinessException(ErrorCode.SITE_INITIAL_STATUS_NOT_ALLOWED);
+        }
 
         Site site = Site.builder()
+                .status(request.getStatus())
                 .siteName(request.getSiteName())
                 .client(client)
                 .address(request.getAddress())
@@ -84,6 +88,9 @@ public class SiteService {
     public SiteResponse changeStatus(Long id, SiteStatusUpdateRequest request) {
         Site site = getSiteForUpdate(id);
         requireNotArchived(site);
+        if (!site.getStatus().canTransitionTo(request.getStatus())) {
+            throw new BusinessException(ErrorCode.SITE_STATUS_TRANSITION_NOT_ALLOWED);
+        }
         site.changeStatus(request.getStatus());
         return SiteResponse.from(site);
     }

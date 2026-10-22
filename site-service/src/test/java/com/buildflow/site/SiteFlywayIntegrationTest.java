@@ -34,11 +34,11 @@ class SiteFlywayIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void freshMysqlRunsV1AndHibernateValidatesWithoutCreatingBusinessData() {
+    void freshMysqlRunsV1V2AndHibernateValidatesWithoutCreatingBusinessData() {
         assertNotNull(flyway.info().current());
-        assertEquals("1", flyway.info().current().getVersion().toString());
-        assertEquals(1, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = 1",
+        assertEquals("2", flyway.info().current().getVersion().toString());
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2') AND success = 1",
                 Integer.class));
         for (String table : new String[]{"clients", "sites", "site_profits",
                 "processed_profit_events", "purchase_profit_projections"}) {
@@ -48,7 +48,7 @@ class SiteFlywayIntegrationTest {
         String sitesDdl = jdbc.queryForObject("SHOW CREATE TABLE sites",
                 (resultSet, row) -> resultSet.getString(2));
         assertNotNull(sitesDdl);
-        assertTrue(sitesDdl.contains("enum('COMPLETED','IN_PROGRESS','SETTLING','WARRANTY')"));
+        assertTrue(sitesDdl.contains("enum('BIDDING','COMPLETED','IN_PROGRESS','SETTLING','WARRANTY')"));
         assertTrue(sitesDdl.contains("FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`)"));
         assertTrue(sitesDdl.contains("COLLATE=utf8mb4_unicode_ci"));
         assertEquals("datetime", column("sites", "archived_at"));
