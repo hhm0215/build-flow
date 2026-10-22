@@ -18,6 +18,7 @@ public class ClientResponse {
     private String email;
     private String address;
     private String memo;
+    private LocalDateTime archivedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -31,6 +32,7 @@ public class ClientResponse {
                 .email(client.getEmail())
                 .address(client.getAddress())
                 .memo(client.getMemo())
+                .archivedAt(client.getArchivedAt())
                 .createdAt(client.getCreatedAt())
                 .updatedAt(client.getUpdatedAt())
                 .build();

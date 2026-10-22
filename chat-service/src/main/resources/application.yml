@@ -5,12 +5,17 @@ spring:
   application:
     name: chat-service
   config:
-    import: optional:configserver:http://localhost:8888
+    # Docker는 CONFIG_SERVER_URL=http://config-server:8888, 로컬 기본은 localhost (import는 이 한 곳에서만 선언)
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:3306/buildflow_chat?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&createDatabaseIfNotExist=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: false
+    baseline-on-migrate: false
+    clean-disabled: true
   jpa:
     hibernate:
       ddl-auto: update

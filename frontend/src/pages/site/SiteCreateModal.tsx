@@ -40,9 +40,11 @@ export default function SiteCreateModal({ open, onClose, onCreated }: Props) {
   const [clientOpen, setClientOpen] = useState(false)
   const [newClient, setNewClient] = useState<Client | null>(null)
   const inFlight = useRef(false)
-  const availableClients = newClient && !clients.some((client) => client.id === newClient.id)
-    ? [...clients, newClient]
-    : clients
+  // 보관된 거래처는 새 현장에 연결할 수 없다(서버도 400)
+  const activeClients = clients.filter((client) => !client.archivedAt)
+  const availableClients = newClient && !activeClients.some((client) => client.id === newClient.id)
+    ? [...activeClients, newClient]
+    : activeClients
 
   const close = () => {
     if (clientOpen || inFlight.current || createSite.isPending) return
@@ -120,10 +122,10 @@ export default function SiteCreateModal({ open, onClose, onCreated }: Props) {
               options={availableClients.map((client) => ({ value: client.id, label: client.companyName }))}
             />
           </Form.Item>
-          <Form.Item name="address" label="주소"><Input placeholder="주소 (선택)" /></Form.Item>
+          <Form.Item name="address" label="주소"><Input placeholder="주소 (선택)" maxLength={500} /></Form.Item>
           <Form.Item name="startDate" label="시작일"><DatePicker style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="endDate" label="종료일"><DatePicker style={{ width: '100%' }} /></Form.Item>
-          <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" /></Form.Item>
+          <Form.Item name="memo" label="메모"><Input.TextArea rows={3} placeholder="메모 (선택)" maxLength={16000} /></Form.Item>
         </Form>
       </Modal>
       {clientOpen && (

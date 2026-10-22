@@ -23,9 +23,11 @@ public class TaxInvoiceService {
 
     private final TaxInvoiceRepository taxInvoiceRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final SiteReferenceValidator siteReferenceValidator;
 
     @Transactional
     public TaxInvoiceResponse create(TaxInvoiceCreateRequest request) {
+        siteReferenceValidator.requireExistingSite(request.getSiteId());
         TaxInvoice taxInvoice = TaxInvoice.builder()
                 .siteId(request.getSiteId())
                 .type(request.getType())
@@ -74,6 +76,7 @@ public class TaxInvoiceService {
     @Transactional
     public TaxInvoiceResponse update(Long id, TaxInvoiceUpdateRequest request) {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
         taxInvoice.update(
                 request.getType(),
                 request.getSupplyAmount(),
@@ -109,6 +112,7 @@ public class TaxInvoiceService {
     @Transactional
     public void delete(Long id) {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
         taxInvoice.validateMutable();
         taxInvoiceRepository.delete(taxInvoice);
     }

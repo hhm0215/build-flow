@@ -3,7 +3,7 @@
 > 요구사항 / 문제 / 다음 작업의 **단일 진실원**.
 > 우선순위 그룹(P0/P1/P2) 안에서 위에서 아래 순으로 진행. 글로벌 번호 없음 — 추가/제거 시 재매김 불필요.
 > 작업 시작 시 여기서 선택, 완료 시 PROGRESS.md "완료된 작업"으로 이동 후 여기서 제거.
-> 첫 실데이터 현장 운영 V1의 범위·진행률·목표일은 `docs/DELIVERY_PLAN.md`를 따른다.
+> 첫 실데이터 현장 운영 V1의 범위·진행률·통과 게이트는 `docs/DELIVERY_PLAN.md`를 따른다. 사용자가 정하지 않은 사용 목표일은 없다.
 >
 > 새 항목 형식:
 > - **제목** (헤딩)
@@ -22,9 +22,13 @@
 - **산출물**: `docs/PILOT_QA.md`의 합성 데이터 기준 거래처→현장→견적→매입→세금계산서→보증보험 생성·조회·수정·삭제/확정·집계/PDF 순회, 재현 실패의 회귀 테스트·수리. 사용자 오류 화면·동작을 받으면 세부 결함을 즉시 분리한다.
 - **현재 진행**: 현장 삭제는 백엔드 API만 있고 UI 미연결, 거래처 삭제 API는 없다. 사용자가 종속 자료 보존 방식의 설계를 위임해 ADR-021의 복원 가능한 보관 우선·일반 하드 삭제 금지 정책을 정했다. 무조건 하드 삭제하던 현장 API는 PR #89의 409 fail-closed로 바꾸고 공개 테스트 VPS의 site-service에 반영했다. 서버 내부 health와 무인증 401은 PASS, 인증된 실제 DELETE 409/404는 PENDING이다. 이후 보관 필드의 버전 마이그레이션/복구 → 네 서비스의 새 `siteId` 참조 검증 및 보관 경합 방벽 → 보관·복원 UI 순서로 구현한다. 현재 견적·매입·세금계산서·보증보험 생성/OCR이 임의 `siteId`를 받아 고아 자료를 만들 수 있으므로 삭제 차단만으로 참조 무결성 완료로 표시하지 않는다. 공개 VPS `[QA]` 합성 거래처·현장·견적·매입·매출 세금계산서·보증보험의 생성/수정/재조회, 견적 확정, 입금 확인, 현장 상태 변경, 손익·미수금 집계 및 알림 수신은 실측 PASS다(`docs/PILOT_QA.md`). 삭제·PDF/OCR·실제 AI 답변은 PENDING. AI 모델 부재 시 채팅 전송 차단은 PASS. 업무 순서(견적→현장), 매입 원가/증빙 연결, 분할 입금은 사용자 판단 대기. 알림 이벤트 코드 노출과 견적 AI 파싱 버튼 오표기는 PR #86으로 병합하고 공개 VPS 프론트에 반영했으며, 2026-10-08 로그인 후 새로고침한 실제 화면에서도 각각 `견적/매입/세금계산서/입금/보증` 및 `공내역서 AI 파싱` 문구를 확인했다.
 - **2026-10-13 PDF/OCR 보강**: 업로드 크기·서명/구조·암호화·페이지/렌더 면적 한도, 단일 OCR worker/대기열, 커밋 후 예약과 잠긴 `PENDING` 행만 결과 반영, 30분 초과 `PENDING`의 수동 보정 가능 `FAILED` 복구, 파일/로그 경로 비노출을 구현하고 합성/JPA 회귀를 로컬 통과했다. `main` CI 후 공개 테스트 VPS에는 notification-service만 새 이미지로 반영했고 기존 업로드 volume·HTTPS/401·health 유지 확인. 실제 합성 PDF OCR 성공·native 프로세스 시간/메모리 격리, 삭제 동선, PDF+DB 복구는 계속 PENDING이다. 사용자 업무 PDF나 USB 원본은 시험에 쓰지 않는다.
-- **OCR 후속 검증**: PDFBox에서 50자 이상 텍스트가 나오지만 보증 필드가 0개인 PDF는 Tess4J로 재시도하는 로컬 회귀를 준비했다. 혼합형 PDF에서 텍스트 레이어가 1~3개 필드만 제공하면 이미지 속 누락 필드를 아직 병합하지 못한다. 부분 OCR은 필수 3필드·유효 기간이 없으면 `FAILED`로 표시하고 추출값은 보정용으로 보존한다. 필드가 완전한 `SUCCESS`도 사용자 확정이 아니므로 `MANUAL` 확인·저장 전까지 만료 목록·알림에서 제외하는 로컬 회귀를 추가했다(미배포). 부분 추출·상충 필드의 병합 정책과 합성 혼합 PDF 회귀, 640 MiB notification 컨테이너의 최악 10페이지 OCR 처리시간·메모리/OOM 및 native hard timeout/격리는 배포 전 별도 검증한다. 실제 VPS 업로드/OCR은 미실측이며 통과로 표시하지 않는다.
-- **실데이터 전 확인 근거**: 업로드 원본을 앱에서 안전하게 열람/다운로드하는 경로와 누가·언제 어떤 OCR 값을 확인했는지에 대한 감사 이력이 없다. 이번 `MANUAL` 전환은 알림 안전장치이지만 원본 대조 증거는 아니다. 실데이터 승격 전에 원본 접근·확정 이력 및 보존 정책을 설계·검증한다.
-- **알림 재조정·날짜 경계**: 과거 릴리스에서 생성한 미발행 `warranty.expiring` outbox는 새 MANUAL 자격 판정 없이 전송될 수 있다. PR #97(`main` `5dd9a67`)에서 nullable `expiry_confirmed_at`을 추가해 기존 MANUAL 기본값을 확정 증거로 쓰지 않고, 재저장 전에는 조회·스케줄러·소비·화면에서 미확정으로 취급한다. 새 이벤트의 확인 기준과 현재 행을 비교해 구 이벤트의 지연 소비를 무시하고, 재확인 전 구 이벤트의 ACK가 최초 유효 알림을 7일 억제하지 않도록 회귀를 추가했다. 구 이벤트가 PENDING/CLAIMED여도 새 확인본의 최초 이벤트는 enqueue되도록 만료 당일 회귀를 추가했다. 기존 수기 행도 재저장이 필요하며 공유 관리자 계정의 시각만으로 실제 확인자를 증명하지 못한다. `OutboxClaimService.claimNext()`/`OutboxPublisher`는 구 이벤트 자체를 아직 발행한다. 실데이터 승격 전에 구 큐 감사, 보존 가능한 부적격 종결·재발행 정책, 확인자/원본 대조 감사 이력, 실제 MySQL nullable 컬럼 마이그레이션·기존 행 NULL 유지·롤백을 검증한다. 삭제/수정 경합·DB 장애·재생과 실제 VPS 검증도 남아 있다. 만료 조회/응답·스케줄러의 KST 업무일 일치와 자정 회귀는 로컬·PR·병합 `main` CI PASS이며 공개 VPS 반영은 PENDING이다.
+- **OCR 후속 검증**: PDFBox 텍스트에 보증 필드가 없거나 필수 필드(보험사·시작일·종료일)가 부족한 PDF는 Tess4J로 재시도한다. 짧아도 유효한 텍스트 필드는 보존하고, 이미지 OCR이 실패하면 부분 추출값을 수동 보정용으로 남긴다. 혼합형 PDF에서 부분 텍스트 필드와 이미지 OCR 값을 병합하고 상충하면 추출값을 보존하되 `FAILED`로 수동 확인시키는 코드를 로컬 회귀로 준비했다(**main·VPS 미반영**). 필수 3필드·유효 기간이 없으면 `FAILED`, 완전한 `SUCCESS`도 `MANUAL` 확인·저장 전까지 만료 목록·알림에서 제외한다. 필수 3필드가 완전하면 선택 증권번호만을 위해 native OCR을 추가 실행하지 않는다(640 MiB 컨테이너 자원 경계). 합성 **혼합 PDF**는 2026-10-17 로컬 실측에서 증권번호 OCR 오인식 충돌·보험사 충돌 은폐 결함을 찾아 수정했다(`docs/PILOT_QA.md`). native hard timeout/격리는 2026-10-17 OCR을 페이지별 별도 프로세스·시간 제한으로 바꿔 로컬 실측했다(VPS 미배포). 최악 10페이지 스캔 OCR은 2026-10-17 로컬에서 약 20초·자연 최대 anon 약 707 MiB로 실측해 VPS 한도를 896m로 상향했다(미배포). 실제 VPS 업로드/OCR은 미실측이며 통과로 표시하지 않는다.
+- **실데이터 전 확인 근거**: 업로드 PDF 사본을 앱에서 다운로드하고 Gateway 우회 직접 호출에도 관리자 토큰·로그아웃 폐기를 재검증하는 코드를 작업 분기에서 검증 중이다(**main·VPS 미반영**). 다운로드는 원본 대조 수단이다. 누가·언제 어떤 값을 확인·수정했는지는 2026-10-17 추가 전용 감사 이력(`/warranties/{id}/history`)으로 남기며(develop, 미배포), 이력·원본의 보존·삭제 정책은 아직 없다. 실데이터 승격 전에 이력·정책과 DB+파일 복원을 설계·검증한다.
+- **알림 재조정·날짜 경계**: 과거 릴리스에서 생성한 미발행 `warranty.expiring` outbox는 새 MANUAL 자격 판정 없이 전송될 수 있다. PR #97(`main` `5dd9a67`)에서 nullable `expiry_confirmed_at`을 추가해 기존 MANUAL 기본값을 확정 증거로 쓰지 않고, 재저장 전에는 조회·스케줄러·소비·화면에서 미확정으로 취급한다. 새 이벤트의 확인 기준과 현재 행을 비교해 구 이벤트의 지연 소비를 무시하고, 재확인 전 구 이벤트의 ACK가 최초 유효 알림을 7일 억제하지 않도록 회귀를 추가했다. 구 이벤트가 PENDING/CLAIMED여도 새 확인본의 최초 이벤트는 enqueue되도록 만료 당일 회귀를 추가했다. 기존 수기 행도 재저장이 필요하며 공유 관리자 계정의 시각만으로 실제 확인자를 증명하지 못한다. 2026-10-15 로컬 후속으로 발행 직전 보증 행 재검증과 원본을 보존하는 `SUPPRESSED` 종결을 구현하고 H2/JPA·발행기 회귀를 통과했다. 새 상태·컬럼은 운영 MySQL 실제 DDL/구 큐·롤백 호환성 미확인이므로 **VPS 미배포**다. 실데이터 승격 전에 구 큐 감사, 명시적 MySQL 확장 마이그레이션·기존 행 NULL 유지·격리 복원과 롤백, 확인자/원본 대조 감사 이력을 검증한다. 삭제/수정 경합·DB 장애·재생과 실제 VPS 검증도 남아 있다. 만료 조회/응답·스케줄러의 KST 업무일 일치와 자정 회귀는 로컬·PR·병합 `main` CI PASS이며 공개 VPS 반영은 PENDING이다.
+- **2026-10-17 현장 참조 후속**: 매입(PR #110)·견적·세금계산서 생성의 `siteId`를 site-service 조회로 검증하고 없는 현장 400/상류 장애 503의 실패-닫힘으로 처리한다(`develop` 통합, **main·VPS 미반영**; 2026-10-17 로컬 풀 Docker에서 실제 Feign/Eureka로 400/201/503 PASS — `docs/PILOT_QA.md`). 보증 직접 등록·PDF 업로드도 같은 검증을 파일 저장·OCR 예약 전에 수행한다(notification-service에 OpenFeign 추가, 640 MiB 컨테이너 메모리 영향은 VPS 미실측). 2026-10-17 현장 보관·복원 1차(`archived_at`, 보관 현장 수정 409·신규 등록 400, 목록 보관 필터·상세 보관/복원 버튼)를 `develop`에 반영했다(운영 DB 반영은 마이그레이션 게이트 이후). 보관 현장 기존 문서는 입금 확인만 허용하고 수정·삭제·확정은 409(2차, 에이전트 결정). 거래처 보관(3차)도 반영했다. 남은 것은 하드 삭제 전 쓰기 장벽(합성 자료 정리 절차와 함께)이다. 현장 하드 삭제는 현재 409로 차단되어 있지만 서비스 간 원자성이나 향후 보관 정책 완료를 뜻하지 않는다.
+- **2026-10-20 거래처 경합 후속**: 거래처 보관과 현장 생성·거래처 변경은 같은 행 잠금으로 직렬화하고 H2/JPA의 보관 선행 경합을 검증했다(PR #152, `develop` 병합). 실제 MySQL 경합·현장 보관과 다른 서비스의 검증 후 생성 경합은 별도 검증/방벽이 필요하다. `main`·VPS 미반영.
+- **2026-10-21 입력 검증 후속**: 현장·거래처 생성/수정 API의 DB 문자열 한도 초과와 현장 날짜 역전을 저장 전 400으로 거부하는 회귀를 준비했다. 로컬 서비스/전체 빌드·프론트 검증 PASS, 독립 리뷰 차단 결함 없음. PR·CI·공개 VPS 실측은 별도 확인하며 CRUD 전체 동선 완료로 보지 않는다.
+- **2026-10-22 문자열 한도 확장**: 견적(제목 200·메모 1000·항목명 200·단위 20)·매입/세금계산서 메모(16,000)·보증(보험사 200·증권번호 100·메모 16,000) 등록/수정 API도 DB 컬럼 한도 초과를 저장 전 400으로 막고 프론트 입력 길이를 맞췄다. OCR 추출값은 보험사 고정 목록·증권번호 30자 이하라 한도 안이다. CRUD 전체 실동선 완료로 보지 않는다.
 - **관련 파일**: `docs/PILOT_QA.md`, `frontend/src/pages/`, `chat-service`, 각 업무 서비스
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
@@ -33,11 +37,20 @@
 
 ## P1 — 중기
 
+### 업무 시각 저장 기준 통일 (KST 원시값 +9h 불일치)
+  - 배경: 컨테이너 JVM은 UTC, JDBC는 `serverTimezone=Asia/Seoul`이다. 최근 코드가 `LocalDateTime.now(Asia/Seoul)`로 저장하는 필드(site/client `archived_at`, 보증 감사 `occurred_at`, 보존 `deleted_at`/`purged_at`)는 DB 원시값이 같은 행의 `created_at`보다 +9시간으로 보인다(2026-10-21 Docker 실측). API 왕복 값은 일치해 사용자 화면 오류는 확인되지 않았다
+  - 산출물: 서비스별 시각 생성 기준(JVM 기본 시간대 vs 명시 KST) 하나로 통일, 기존 행 보정 여부 판단, 원시값 대조 테스트
+  - 관련 파일: site-service·notification-service 엔티티/서비스, `application-docker.yml`, `docs/PILOT_QA.md`
+  - 2026-10-22 진행: 원인은 컨테이너 JVM 기본 시간대 UTC다. `@CreatedDate`·`LocalDateTime.now()`(알림·견적 작성일·outbox·대시보드 생성 시각 등)가 UTC 벽시계로 저장되고, API가 시간대 없는 값을 내려 브라우저가 KST로 해석한다 → 새 알림이 "9시간 전", 00~09시 작성일이 전날로 보일 수 있다(코드 대조, 화면 실측 PENDING). **에이전트 결정(추천안, 사용자 위임)**: 앱 이미지에 `ENV TZ=Asia/Seoul`을 넣어 모든 JVM(docker exec 포함)을 KST로 통일하고 CI 정적 테스트로 고정했다. 대안: 응답에 오프셋 포함(Instant/OffsetDateTime) — 변경 범위가 커서 보류.
+  - 2026-10-22 실측: 같은 기반 이미지(`eclipse-temurin:17` jammy)에서 `TZ=Asia/Seoul`이면 JVM 기본 시간대 `Asia/Seoul`·`now()` KST, 없으면 `Etc/UTC`(원인 재현). OS zoneinfo도 포함됨.
+  - 2026-10-22 로컬 풀 Docker 실측 PASS: 컨테이너 `TZ=Asia/Seoul`, 새 행 `created_at`·`archived_at` 원시값 동일 KST 기준, 새 알림 `createdAt` 현재 KST와 1분 이내(`docs/PILOT_QA.md`).
+  - 남은 것: VPS 반영(아래 전환 주의 확인 후). 전환 시점 주의 — 기존 테스트 행의 UTC 값은 9시간 이르게 보이며 보정하지 않는다(실데이터 없음). 배포 순간 처리 중인 outbox의 lease/재시도 시각이 9시간 지난 것으로 보여 즉시 재시도될 수 있고(eventId 멱등), 30분 넘은 것으로 보이는 OCR `PENDING`은 `FAILED`로 전환되어 수동 보정이 필요할 수 있다. VPS 반영 전 처리 중 작업이 없는지 확인한다.
+
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
 - **산출물**: Plain OS Ubuntu 24.04 전환, 새 SSH 지문·전용 계정 검증, Docker/Compose 설치, loopback+SSH 터널 파일럿, 순차 빌드·CRUD/PDF·재부팅 복구 검증, DB+업로드 파일 외부 백업·격리 복원 게이트
 - **현재 진행**: Plain OS Ubuntu 24.04 LTS, 고정 host key·비root 키 접속, Docker/Compose, 서버 전용 비밀값(`0600`)과 앱 기동 완료. SSH 터널에서 관리자 로그인·UI 로그아웃, 임시 현장 생성/조회/삭제·동일 토큰 재사용 401을 확인했다. 커널 패치 후 재부팅·서비스 복귀를 검증했고 공개 HTTPS 테스트 파일럿은 별도 항목에서 관리한다. 전체 업무 CRUD/PDF와 DB+업로드 파일 외부 백업·격리 복원은 미완료다.
-- **복구 선행 작업**: SQL-only v1을 전체 복구로 오인하지 않도록 경고하고, 업로드 파일 전용 오프라인 검사·합성 회귀를 추가했다. v2 전체 검증/복원은 SQL의 실제 파일 참조를 검증할 수 있을 때까지 명시적으로 거부한다. 다음은 쓰기 중지 → 읽기 전용 `warranty_uploads` snapshot/DB 참조 일치 → SQL+파일 v2 생성 → 새 volume의 동일 경로 격리 복원 → 외부 암호화 사본 복원 실측이다. OCR `PENDING`과 Kafka 미소비 `SENT`의 복구/재조정 방안도 별도로 통과해야 한다.
+- **복구 선행 작업**: SQL-only v1을 전체 복구로 오인하지 않도록 경고하고, 업로드 파일 전용 오프라인 검사·합성 회귀를 추가했다. v2 합성 패키지와 격리 복원 DB 행의 ID·파일 경로 대조 준비 도구, `warranty_uploads` 읽기 전용 preflight를 마련했다. DB writer/연결 0 상태에서 SQL과 파일 볼륨을 함께 읽고 SHA·DB 참조를 대조하는 **진단용 v2 snapshot**을 준비했다. 출력은 `INCOMPLETE`로 유지하고 일반 검증·복원은 계속 거부한다. 합성 v2 SQL+PDF 패키지의 새 격리 볼륨 복사·해시·복원 DB 참조 대조와 기존 v1 SQL-only 복원을 로컬 Docker에서 실측했다. 이어 별도 무작위 Compose 프로젝트의 합성 MySQL·업로드 볼륨에서 실제 snapshot 스크립트→새 DB·볼륨 복원까지 실측했다. Windows 전용 ACL 차단을 플랫폼별 비공개 경로·umask·UID 검사로 교체한 PR #109는 Linux/Windows 포함 CI 5개 PASS 후 `develop`에 병합했다. 실제 Ubuntu Docker volume 소유권·VPS 실행은 미검증이다. 이는 운영 원본 snapshot이나 외부 복구의 통과 증거가 아니다. 다음은 실제 쓰기 중지/외부 writer 차단 확인(기본 DB가 다른 외부 writer는 현재 PROCESSLIST 필터만으로 증명 불가) → 운영 원본 snapshot·ACL 실측 → 격리 복원과 관리자 자격 증명 로그인 → 외부 암호화 사본의 빈 환경 복원이다. OCR `PENDING`과 Kafka 미소비 `SENT`의 복구/재조정도 별도로 통과해야 한다.
 - **관련 파일**: `docker-compose.vps.yml`, `docs/VPS_PRIVATE_PILOT.md`, `.claude/plans/2026-10-01-vps-private-pilot.md`
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
@@ -46,7 +59,7 @@
 - **배경**: 인증 서비스는 `schema.sql` + `ddl-auto: validate`, 나머지 DB 사용 6개 서비스는 `ddl-auto: update`이며 버전 관리형 마이그레이션 도구가 없다. 인증 스키마 전환과 실데이터 보존 전에 명시적 백업·복구·검증 경로가 필요하다.
 - **단계**: A) 7개 스키마 백업·오프라인 무결성 검증 → B) 격리 임시 volume 복원·관리자 로그인 검증 → C) auth Flyway 파일럿 → D) chat/estimate → purchase/tax → site/notification 순차 전환 → E) runtime DB 사용자 최소 권한 분리
 - **안전 기준**: 실제 MySQL `SHOW CREATE TABLE`/no-data dump 전에는 V1을 추정 작성하지 않음, 기존 DB는 백업·복원 성공 후 명시적 일회성 baseline, 상시 `baseline-on-migrate=true` 및 Flyway+Hibernate `update` 동시 사용 금지
-- **현재 진행**: Phase A 완료. Phase B의 격리 임시 volume 실제 복원, manifest/행 수/digest/`CHECK TABLE`, auth `ddl-auto=validate`와 전후 DB 불변까지 통과했다. 백업 속 기존 관리자 로그인 검증은 PENDING으로 유지한다. Phase C의 빈 DB 전용 opt-in auth Flyway V1·MySQL 8 CI 파일럿을 준비했고, 기존 DB baseline·프로파일 전환은 하지 않았다.
+- **현재 진행**: Phase A 완료. Phase B의 격리 임시 volume 실제 복원, manifest/행 수/digest/`CHECK TABLE`, auth `ddl-auto=validate`와 전후 DB 불변까지 통과했다. 백업 속 기존 관리자 로그인 검증은 PENDING으로 유지한다. Phase C의 빈 DB 전용 opt-in auth Flyway V1과 Phase D의 chat/estimate/purchase/tax Flyway V1은 격리 MySQL 8 CI를 통과해 develop에 통합했다. 2026-10-22 site V1(5개 테이블)은 로컬 MySQL 8 `SHOW CREATE TABLE`로 작성해 격리 빈 DB에서 V1 적용·Hibernate validate PASS, CI `site-flyway` 작업 추가. notification V1(6개 테이블)도 같은 방식으로 PASS, CI `notification-flyway` 추가 — 7개 DB 서비스 모두 신규 DB 전용 V1을 갖췄다. 남은 것: 기존 DB 일회성 baseline(백업·복원 검증 후), 운영 프로파일 전환, runtime DB 사용자 최소 권한(Phase E). 기존 DB baseline·운영 프로파일 전환은 하지 않았다.
 - **산출물**: 서비스별 버전 마이그레이션 전략, 인증 스키마 전환 스크립트, 백업·격리 복구 검증, 운영 프로파일의 `ddl-auto` 정책
 - **관련 파일**: 7개 서비스 `application*.yml`, 각 서비스 DB 스키마, 배포 문서
 - **예상 규모**: M~L
@@ -66,6 +79,7 @@
 - **배경**: 사용자가 공개 전 체크리스트와 역할별 반복 유지보수를 요청했다. UI 로그아웃 토큰 미폐기와 Compose 검증 우회는 수정·비공개 실측했다. SSH 비밀번호·keyboard-interactive를 차단하고 커널 패치/재부팅 복구를 검증했으며 root 키·외부 22는 터널·복구 경로 때문에 유지한다.
 - **산출물**: `AGENTS.md` 하네스·역할 지침·`docs/SECURITY_OPERATIONS.md`, 코드/CI 회귀, 사용자 프롬프트마다 마지막 단계의 읽기 전용 보안·인프라 점검과 변화 시 보고. 기존 일일 예약 heartbeat 2건은 2026-10-09 사용자 요청으로 삭제했다. SSH 정책 변경·패치/재부팅은 Web Console 및 별도 키 재접속 복구 확인 후 수행.
 - **경계**: 모니터가 서버 변경·백업 복원·포트 개방·운영 배포를 무인 실행하지 않는다. 이메일/Discord 연동은 수신 채널·secret 설정 후 별도 실측.
+- **2026-10-22 발견(Gateway 우회 신뢰 경계)**: 로컬 풀 Docker에서 site·estimate·purchase·tax·notification 서비스 포트(`127.0.0.1:8082~8086`)를 토큰 없이 직접 호출해도 생성·삭제가 성공했다. 외부 공개 포트는 없고(VPS도 127.0.0.1 바인딩) 인증은 Gateway에서만 한다. 서버 안의 다른 프로세스·SSH 터널 사용자가 인증과 감사 기록(`X-User-Id` 임의 지정)을 우회할 수 있다. 추천: 실데이터 전 VPS에서 서비스 포트 게시 제거(내부 네트워크만) 또는 서비스 측 토큰 재검증. 대안: 현 상태 유지(단일 관리자·호스트 신뢰 전제를 문서화).
 - **관련 파일**: `AGENTS.md`, `.claude/agents/`, `frontend`, `scripts/vps/`, `docs/SECURITY_OPERATIONS.md`
 - **예상 규모**: M
 - **상태**: IN_PROGRESS
@@ -93,13 +107,6 @@
 - **예상 규모**: L (원본 카탈로그 → 관계 검토 → Assistant 연동으로 분할)
 - **상태**: TODO
 
-### 로컬 서버 배포 보안 하드닝
-- **배경**: 개발 Compose는 loopback 전용으로 제한했지만 향후 LAN 공개 시 프론트 리버스 프록시만 노출하고 Gateway·8081~8087·MySQL·Redis·Kafka 직접 접근을 차단해야 함
-- **산출물**: 로컬 서버용 Compose override, 외부 노출 포트 정책, Redis/DB 보안, 백업·복구 및 방화벽 런북
-- **관련 파일**: `docker-compose.yml`, `docker-compose.app.yml`, 신규 배포 override, `docs/`
-- **예상 규모**: M
-- **상태**: TODO
-
 ### 실데이터 파일럿 온보딩 (현장 1개 끝까지 입력)
 - **배경**: 실사용 UI 동선과 금액 집계 신뢰성을 먼저 보강한 뒤, 추측 대신 실데이터에서 다음 요구사항 도출 — USB의 실제 현장 자료 1개를 원본 보존·관계 검토부터 거래처→현장→견적(공내역서 파싱)→매입→세금계산서→보증보험까지 실제로 입력
 - **산출물**: 온보딩 중 드러난 갭 목록(입력 필드 부족, 현장별 문서함(원본 파일 보관 — 현재 warranty PDF만 저장됨) 필요성, 과거 현장 일괄 입력 UX 등)을 BACKLOG 신규 항목으로 전환
@@ -112,34 +119,16 @@
 
 ### chat-service Phase 3 (Phase 1·2 완료, 견고화/확장)
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
-- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화, buildMessages 이력 tail 쿼리(LIMIT)
+- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화
+- 2026-10-22: 대화 이력은 최근 `chat.history-limit`개만 DB에서 조회(시각·id 역순 Pageable 후 시간순 복원)하도록 변경 완료
 - 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
-
-### ADR-003 / 아키텍처 문서 ↔ 실구현 drift 정정
-- **배경**: 2026-07-22 실측 — `docs/DECISIONS.md` ADR-003이 "Redis 3용도(캐시 + JWT 블랙리스트 + Redisson 분산락)"로 기록하고 면접 답변 스크립트까지 포함하나, `Redisson`/`RLock`/`@Cacheable`/`CacheManager` 사용처 **0건**. 실사용은 JWT 블랙리스트 + refresh 토큰 + chat 세션뿐. 같은 계열로 CLAUDE.md/AGENTS.md의 "서비스 간 동기 통신 = OpenFeign"도 실제로는 chat-service 2곳(SiteClient/TaxClient)만
-- **선택지**: (a) 문서를 현재 구현에 맞게 정정 (b) ADR대로 Cache Aside·분산락을 실제 구현 후 문서 유지
-- **산출물**: ADR-003 v2(정정 또는 구현 반영) + CLAUDE.md/AGENTS.md 통신 방식 표기 정렬
-- **관련 파일**: `docs/DECISIONS.md`, `CLAUDE.md`, `AGENTS.md`, `auth-service/.../RedisConfig.java`
-- **예상 규모**: S(문서 정정) / M(구현)
-- **상태**: TODO
-
-### Docker Config Client 중복 import 경고 정리
-- **배경**: 2026-09-15 풀 스택 로그에서 Docker용 Config Server 연결은 성공하지만 기본 `application.yml`의 `localhost:8888` import도 함께 평가되어 서비스마다 불필요한 connection-refused 경고가 발생
-- **산출물**: 로컬 기본값과 Docker URL을 단일 placeholder/property 경로로 통합하고 7개 비즈니스 서비스 시작 로그에서 중복 localhost 요청 제거
-- **관련 파일**: 7개 서비스 `application.yml`, `application-docker.yml`, `docker-compose.app.yml`
-- **예상 규모**: S
-- **상태**: TODO
-
-### 프론트 프로덕션 번들 분할
-- **배경**: `bun run build` 결과 메인 JS chunk가 약 1.36MB(gzip 약 430KB)로 Vite 500KB 경고 발생
-- **산출물**: 페이지 lazy loading 또는 `manualChunks` 적용, 기존 라우팅·SSE 동작 회귀 없이 경고 해소/합리적 임계값 문서화
-- **관련 파일**: `frontend/src/App.tsx`, `frontend/vite.config.ts`
-- **예상 규모**: S~M
-- **상태**: TODO
 
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
-- 후보: ProfitService 마진계산, estimate OllamaService JSON추출, tax 미수금 계산, 프론트 다른 훅
+- 2026-10-17: 현장 마진·마진율과 tax 미수금 계산 테스트 추가(마진율 DECIMAL(5,2) 초과 저장 실패 결함 발견·수정)
+- 2026-10-17: estimate Ollama 응답 JSON 추출 테스트 추가(대괄호 설명 앞붙임 파싱 실패·빈 응답 NPE 결함 발견·수정)
+- 2026-10-22: `useFilterParams`(타입별 파싱·잘못된 값 URL 정리·비운 값 삭제)·`useDebouncedValue` 테스트 추가 — 프론트 훅 3개 모두 테스트 보유
+- 남은 후보: 백엔드 서비스 순수 로직 중 테스트 없는 계산·변환
 - **예상 규모**: S~M (점진적)
 
 ---

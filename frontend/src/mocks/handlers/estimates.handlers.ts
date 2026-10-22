@@ -1,4 +1,5 @@
 import { http, HttpResponse, delay } from 'msw'
+import { archivedSiteCreateError, archivedSiteLockError } from './sites.handlers'
 import { mockEstimates } from '../data/estimates.data'
 import { ApiResponse, Estimate, EstimateCreateRequest, EstimateUpdateRequest, ParseResult } from '../../types'
 import { validateEstimateAmounts } from '../../utils/estimate'
@@ -35,6 +36,8 @@ export const estimatesHandlers = [
 
   http.post<never, EstimateCreateRequest>('/api/v1/estimates', async ({ request }) => {
     const body = await request.json()
+    const archived = archivedSiteCreateError(body.siteId)
+    if (archived) return archived
     const amountError = validateEstimateAmounts(body.items ?? [])
     if (amountError) {
       return HttpResponse.json<ApiResponse<null>>(
@@ -75,6 +78,8 @@ export const estimatesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(estimates[index].siteId)
+    if (locked) return locked
     if (estimates[index].status === 'CONFIRMED') {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '이미 확정된 견적서입니다.' },
@@ -115,6 +120,8 @@ export const estimatesHandlers = [
         { status: 404 },
       )
     }
+    const deleteLocked = archivedSiteLockError(estimate.siteId)
+    if (deleteLocked) return deleteLocked
     if (estimate.status === 'CONFIRMED') {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '확정된 견적서는 삭제할 수 없습니다.' },
@@ -133,6 +140,8 @@ export const estimatesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(estimates[index].siteId)
+    if (locked) return locked
     estimates[index] = { ...estimates[index], status: 'CONFIRMED', updatedAt: new Date().toISOString() }
     return HttpResponse.json<ApiResponse<Estimate>>({ success: true, data: estimates[index], error: null })
   }),

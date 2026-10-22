@@ -8,6 +8,7 @@ import com.buildflow.chat.domain.chat.repository.ChatSessionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -37,8 +38,37 @@ class ChatServiceTest {
         ReflectionTestUtils.setField(chatService, "historyLimit", 20);
         ReflectionTestUtils.setField(chatService, "sessionTtlMinutes", 30L);
         ReflectionTestUtils.setField(chatService, "streamTimeoutSeconds", 180L);
-        when(messageRepository.findBySessionIdOrderByCreatedAtAsc(any())).thenReturn(List.of());
+        when(messageRepository.findBySessionIdOrderByCreatedAtDescIdDesc(any(), any())).thenReturn(List.of());
         when(ollamaToolService.isAvailable()).thenReturn(true);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void historyQueriesOnlyTheLatestLimitAndSendsItOldestFirst() {
+        ReflectionTestUtils.setField(chatService, "historyLimit", 2);
+        ChatRequest request = request("이어서 질문");
+        when(messageRepository.findBySessionIdOrderByCreatedAtDescIdDesc(any(), any())).thenReturn(List.of(
+                new ChatMessage("s", ChatRole.ASSISTANT, "최신 답변"),
+                new ChatMessage("s", ChatRole.USER, "직전 질문")));
+        when(ollamaToolService.runStreaming(anyList(), any(), any())).thenReturn("답변");
+
+        chatService.stream(request);
+
+        verify(messageRepository).findBySessionIdOrderByCreatedAtDescIdDesc(any(), eq(PageRequest.of(0, 2)));
+        ArgumentCaptor<List<Object>> messages = ArgumentCaptor.forClass(List.class);
+        verify(ollamaToolService).runStreaming(messages.capture(), any(), any());
+        assertThat(messages.getValue()).extracting(m -> ((java.util.Map<String, String>) m).get("content"))
+                .endsWith("직전 질문", "최신 답변", "이어서 질문");
+    }
+
+    @Test
+    void zeroHistoryLimitSkipsHistoryQuery() {
+        ReflectionTestUtils.setField(chatService, "historyLimit", 0);
+        when(ollamaToolService.runStreaming(anyList(), any(), any())).thenReturn("답변");
+
+        chatService.stream(request("질문"));
+
+        verify(messageRepository, never()).findBySessionIdOrderByCreatedAtDescIdDesc(any(), any());
     }
 
     @Test

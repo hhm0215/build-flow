@@ -38,5 +38,7 @@ public class TaxInvoiceCreateRequest {
     @Size(max = 200, message = "거래처는 200자 이하여야 합니다.")
     private String counterparty;
     private LocalDate issueDate;
+    // Java UTF-16 16,000 code units는 utf8mb4 최악에도 64,000 bytes로 MySQL TEXT 한도 이내다.
+    @Size(max = 16000, message = "메모는 16000자 이하여야 합니다.")
     private String memo;
 }

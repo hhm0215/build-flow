@@ -4,9 +4,12 @@ import ClientEditModal, { toClientUpdateRequest } from './ClientEditModal'
 import type { Client } from '../../types'
 
 const mutateAsync = vi.hoisted(() => vi.fn())
+const archiveMutate = vi.hoisted(() => vi.fn())
 
 vi.mock('../../api/clients.api', () => ({
   useUpdateClient: () => ({ mutateAsync, isPending: false }),
+  useArchiveClient: () => ({ mutate: archiveMutate, isPending: false }),
+  useRestoreClient: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 const client: Client = {
@@ -18,6 +21,7 @@ const client: Client = {
   email: null,
   address: '서울',
   memo: null,
+  archivedAt: null,
   createdAt: '2026-09-19T00:00:00',
   updatedAt: '2026-09-19T00:00:00',
 }
@@ -42,6 +46,20 @@ afterEach(() => {
 })
 
 describe('ClientEditModal', () => {
+  it('보관된 거래처는 경고를 보여주고 저장을 막는다', () => {
+    render(<ClientEditModal client={{ ...client, archivedAt: '2026-10-17T09:00:00' }} onClose={vi.fn()} />)
+    expect(screen.getByText(/보관된 거래처입니다/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '거래처 복원' })).toBeInTheDocument()
+  })
+
+  it('보관 버튼은 확인 후 보관 요청을 보낸다', async () => {
+    render(<ClientEditModal client={client} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: '거래처 보관' }))
+    fireEvent.click(await screen.findByRole('button', { name: '보관' }))
+    await waitFor(() => expect(archiveMutate).toHaveBeenCalledWith(6, expect.any(Object)))
+  })
+
   it('비운 선택 필드를 null로 보내 전체 교체한다', () => {
     expect(toClientUpdateRequest({ companyName: ' 새 이름 ', representative: '  ' })).toEqual({
       companyName: '새 이름',

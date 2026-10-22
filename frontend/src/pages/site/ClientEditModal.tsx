@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { Alert, Form, Input, Modal } from 'antd'
-import { useUpdateClient } from '../../api/clients.api'
+import { Alert, Button, Form, Input, Modal, Popconfirm, message } from 'antd'
+import { useArchiveClient, useRestoreClient, useUpdateClient } from '../../api/clients.api'
 import type { Client, ClientUpdateRequest } from '../../types'
 
 interface ClientEditValues {
@@ -34,6 +34,10 @@ interface Props {
 export default function ClientEditModal({ client, onClose }: Props) {
   const [form] = Form.useForm<ClientEditValues>()
   const updateClient = useUpdateClient()
+  const archiveClient = useArchiveClient()
+  const restoreClient = useRestoreClient()
+  const archived = !!client.archivedAt
+  const archiveBusy = archiveClient.isPending || restoreClient.isPending
   const [error, setError] = useState<string | null>(null)
   const inFlight = useRef(false)
 
@@ -59,6 +63,20 @@ export default function ClientEditModal({ client, onClose }: Props) {
     }
   }
 
+  const toggleArchive = () => {
+    const mutation = archived ? restoreClient : archiveClient
+    mutation.mutate(client.id, {
+      onSuccess: () => {
+        message.success(archived ? '거래처를 복원했습니다.' : '거래처를 보관했습니다. 연결된 현장과 자료는 그대로 유지됩니다.')
+        onClose()
+      },
+      onError: (cause: unknown) => {
+        const responseError = (cause as { response?: { data?: { error?: string } } })?.response?.data?.error
+        setError(responseError ?? (archived ? '복원하지 못했습니다.' : '보관하지 못했습니다.'))
+      },
+    })
+  }
+
   return (
     <Modal
       title="거래처 수정"
@@ -66,6 +84,26 @@ export default function ClientEditModal({ client, onClose }: Props) {
       onOk={submit}
       onCancel={close}
       okText="저장"
+      okButtonProps={{ disabled: archived }}
+      footer={(_, { OkBtn, CancelBtn }) => (
+        <>
+          <Popconfirm
+            title={archived ? '거래처를 복원할까요?' : '거래처를 보관할까요?'}
+            description={archived
+              ? '복원하면 다시 수정하고 새 현장에 연결할 수 있습니다.'
+              : '보관하면 수정과 새 현장 연결이 막힙니다. 연결된 현장·자료는 유지되고 언제든 복원할 수 있습니다.'}
+            okText={archived ? '복원' : '보관'}
+            cancelText="취소"
+            onConfirm={toggleArchive}
+          >
+            <Button loading={archiveBusy} style={{ float: 'left' }}>
+              {archived ? '거래처 복원' : '거래처 보관'}
+            </Button>
+          </Popconfirm>
+          <CancelBtn />
+          <OkBtn />
+        </>
+      )}
       cancelText="취소"
       confirmLoading={updateClient.isPending}
       closable={!updateClient.isPending}
@@ -76,6 +114,7 @@ export default function ClientEditModal({ client, onClose }: Props) {
     >
       <Form
         form={form}
+        disabled={archived}
         layout="vertical"
         style={{ marginTop: 20 }}
         initialValues={{
@@ -94,6 +133,9 @@ export default function ClientEditModal({ client, onClose }: Props) {
           showIcon
           style={{ marginBottom: 16 }}
         />
+        {archived && (
+          <Alert type="warning" message="보관된 거래처입니다. 복원한 뒤 수정할 수 있습니다." showIcon style={{ marginBottom: 16 }} />
+        )}
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
         <Form.Item name="companyName" label="업체명" rules={[{ required: true, whitespace: true, message: '업체명을 입력하세요' }]}>
           <Input placeholder="업체명" maxLength={200} />
@@ -105,7 +147,7 @@ export default function ClientEditModal({ client, onClose }: Props) {
           <Input placeholder="이메일 (선택)" maxLength={100} />
         </Form.Item>
         <Form.Item name="address" label="주소"><Input placeholder="주소 (선택)" maxLength={500} /></Form.Item>
-        <Form.Item name="memo" label="메모"><Input.TextArea placeholder="메모 (선택)" rows={3} /></Form.Item>
+        <Form.Item name="memo" label="메모"><Input.TextArea placeholder="메모 (선택)" rows={3} maxLength={16000} /></Form.Item>
       </Form>
     </Modal>
   )

@@ -25,9 +25,11 @@ public class PurchaseService {
 
     private final PurchaseRepository purchaseRepository;
     private final KafkaProducerService kafkaProducerService;
+    private final SiteReferenceValidator siteReferenceValidator;
 
     @Transactional
     public PurchaseResponse create(PurchaseCreateRequest request) {
+        siteReferenceValidator.requireExistingSite(request.getSiteId());
         Purchase purchase = Purchase.builder()
                 .siteId(request.getSiteId())
                 .itemName(request.getItemName())
@@ -69,6 +71,7 @@ public class PurchaseService {
     @Transactional
     public PurchaseResponse update(Long id, PurchaseUpdateRequest request) {
         Purchase purchase = getPurchaseForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(purchase.getSiteId());
         BigDecimal oldTotalAmount = purchase.getTotalAmount();
 
         purchase.update(
@@ -96,6 +99,7 @@ public class PurchaseService {
     @Transactional
     public void delete(Long id) {
         Purchase purchase = getPurchaseForUpdate(id);
+        siteReferenceValidator.requireSiteNotArchived(purchase.getSiteId());
         long deleteRevision = purchase.incrementEventRevision();
 
         kafkaProducerService.sendPurchaseDeleted(

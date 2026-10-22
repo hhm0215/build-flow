@@ -20,6 +20,8 @@ export interface Client {
   email: string | null
   address: string | null
   memo: string | null
+  /** 보관 시각. null이면 미보관. 보관 거래처는 현장에 새로 연결할 수 없다 */
+  archivedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -56,6 +58,8 @@ export interface Site {
   startDate: string | null
   endDate: string | null
   memo: string | null
+  /** 보관 시각. null이면 미보관 (업무 단계 status와 별개) */
+  archivedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -273,6 +277,8 @@ export interface Warranty {
   expiryConfirmed?: boolean
   expiryConfirmedAt?: string | null
   ocrStatus?: OcrStatus
+  /** 업로드 사본의 DB 연결 여부. 실제 파일이 없으면 다운로드는 404로 거부된다. */
+  hasUploadedPdf?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -294,4 +300,22 @@ export interface WarrantyUpdateRequest {
   startDate: string
   endDate: string
   memo: string | null
+}
+
+/** 보증 값 변경 감사 이력(추가 전용). actor는 공유 관리자 계정 단위이며 실제 사람을 증명하지 않는다 */
+export type WarrantyAuditAction = 'CREATED' | 'UPLOADED' | 'OCR_APPLIED' | 'OCR_FAILED' | 'MANUAL_UPDATED' | 'DELETED'
+
+export interface WarrantyAuditEvent {
+  id: number
+  warrantyId: number
+  action: WarrantyAuditAction
+  actor: string
+  insuranceCompany: string | null
+  policyNumber: string | null
+  startDate: string | null
+  endDate: string | null
+  coverageAmount: number | null
+  ocrStatus: OcrStatus | null
+  expiryConfirmedAt: string | null
+  occurredAt: string
 }

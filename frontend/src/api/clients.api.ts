@@ -27,6 +27,33 @@ export function useCreateClient() {
   })
 }
 
+async function invalidateClientDependents(queryClient: ReturnType<typeof useQueryClient>) {
+  await queryClient.invalidateQueries({ queryKey: CLIENTS_KEY })
+  await queryClient.invalidateQueries({ queryKey: SITES_KEY.all })
+}
+
+export function useArchiveClient() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await axiosInstance.patch<ApiResponse<Client>>(`/clients/${id}/archive`)
+      return response.data.data
+    },
+    onSuccess: () => invalidateClientDependents(queryClient),
+  })
+}
+
+export function useRestoreClient() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await axiosInstance.patch<ApiResponse<Client>>(`/clients/${id}/restore`)
+      return response.data.data
+    },
+    onSuccess: () => invalidateClientDependents(queryClient),
+  })
+}
+
 export function useUpdateClient() {
   const queryClient = useQueryClient()
   return useMutation({

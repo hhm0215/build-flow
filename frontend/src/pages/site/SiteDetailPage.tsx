@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Select, Tabs, message } from 'antd'
+import { Button, Popconfirm, Select, Tabs, message } from 'antd'
 import { motion } from 'motion/react'
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Building2,
   CalendarDays,
@@ -18,6 +20,8 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import ErrorState from '../../components/ErrorState'
 import {
+  useArchiveSite,
+  useRestoreSite,
   useSite,
   useUpdateSiteStatus,
 } from '../../api/sites.api'
@@ -65,6 +69,10 @@ function formatCompactKRW(value: number) {
   if (Math.abs(value) >= 100_000_000) return `₩${(value / 100_000_000).toFixed(1)}억`
   if (Math.abs(value) >= 1_000_000) return `₩${(value / 1_000_000).toFixed(1)}M`
   return formatKRW(value)
+}
+
+function tabLabel(name: string, count: number, loading: boolean, error: boolean) {
+  return `${name} (${error ? '조회 실패' : loading ? '불러오는 중' : count})`
 }
 
 function formatDate(value?: string | null) {
@@ -227,12 +235,14 @@ export default function SiteDetailPage() {
 
   const { data: site, isLoading: siteLoading, isError: siteError, refetch: siteRefetch } = useSite(siteId)
   const updateStatus = useUpdateSiteStatus()
+  const archiveSite = useArchiveSite()
+  const restoreSite = useRestoreSite()
 
   const params = useMemo(() => ({ siteId: String(siteId) }), [siteId])
-  const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError } = useEstimates(params)
-  const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError } = usePurchases(params)
-  const { data: taxesData, isLoading: taxesLoading, isError: taxesError } = useTaxes(params)
-  const { data: warrantiesData, isLoading: warrantiesLoading } = useWarranties(params)
+  const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError, refetch: estimatesRefetch } = useEstimates(params)
+  const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError, refetch: purchasesRefetch } = usePurchases(params)
+  const { data: taxesData, isLoading: taxesLoading, isError: taxesError, refetch: taxesRefetch } = useTaxes(params)
+  const { data: warrantiesData, isLoading: warrantiesLoading, isError: warrantiesError, refetch: warrantiesRefetch } = useWarranties(params)
 
   const estimates = (estimatesData ?? []).filter((e) => e.siteId === siteId)
   const purchases = (purchasesData ?? []).filter((p) => p.siteId === siteId)
@@ -275,6 +285,16 @@ export default function SiteDetailPage() {
         onError: () => message.error('상태 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.'),
       },
     )
+  }
+
+  const handleArchiveToggle = () => {
+    if (!site) return
+    const restoring = !!site.archivedAt
+    const mutation = restoring ? restoreSite : archiveSite
+    mutation.mutate(siteId, {
+      onSuccess: () => message.success(restoring ? '현장을 복원했습니다.' : '현장을 보관했습니다. 자료와 손익은 그대로 유지됩니다.'),
+      onError: () => message.error(restoring ? '복원에 실패했습니다. 잠시 후 다시 시도해 주세요.' : '보관에 실패했습니다. 잠시 후 다시 시도해 주세요.'),
+    })
   }
 
   if (invalidId) {
@@ -331,6 +351,8 @@ export default function SiteDetailPage() {
         onClientEdit={() => setClientEditOpen(true)}
         onStatusChange={handleStatusChange}
         statusChanging={updateStatus.isPending}
+        onArchiveToggle={handleArchiveToggle}
+        archiveChanging={archiveSite.isPending || restoreSite.isPending}
       />
 
       <div
@@ -388,8 +410,10 @@ export default function SiteDetailPage() {
           items={[
             {
               key: 'estimates',
-              label: `견적서 (${estimates.length})`,
-              children: estimatesLoading ? (
+              label: tabLabel('견적서', estimates.length, estimatesLoading, estimatesError),
+              children: estimatesError ? (
+                <ErrorState message="견적서를 불러오지 못했습니다." onRetry={estimatesRefetch} />
+              ) : estimatesLoading ? (
                 <ListSkeleton />
               ) : sortedEstimates.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -446,8 +470,10 @@ export default function SiteDetailPage() {
             },
             {
               key: 'purchases',
-              label: `매입 (${purchases.length})`,
-              children: purchasesLoading ? (
+              label: tabLabel('매입', purchases.length, purchasesLoading, purchasesError),
+              children: purchasesError ? (
+                <ErrorState message="매입 내역을 불러오지 못했습니다." onRetry={purchasesRefetch} />
+              ) : purchasesLoading ? (
                 <ListSkeleton />
               ) : sortedPurchases.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -501,8 +527,10 @@ export default function SiteDetailPage() {
             },
             {
               key: 'taxes',
-              label: `세금계산서 (${taxes.length})`,
-              children: taxesLoading ? (
+              label: tabLabel('세금계산서', taxes.length, taxesLoading, taxesError),
+              children: taxesError ? (
+                <ErrorState message="세금계산서를 불러오지 못했습니다." onRetry={taxesRefetch} />
+              ) : taxesLoading ? (
                 <ListSkeleton />
               ) : sortedTaxes.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -578,8 +606,10 @@ export default function SiteDetailPage() {
             },
             {
               key: 'warranties',
-              label: `보증보험 (${warranties.length})`,
-              children: warrantiesLoading ? (
+              label: tabLabel('보증보험', warranties.length, warrantiesLoading, warrantiesError),
+              children: warrantiesError ? (
+                <ErrorState message="보증보험을 불러오지 못했습니다." onRetry={warrantiesRefetch} />
+              ) : warrantiesLoading ? (
                 <ListSkeleton />
               ) : sortedWarranties.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -670,13 +700,18 @@ function SiteHeaderHero({
   onClientEdit,
   onStatusChange,
   statusChanging,
+  onArchiveToggle,
+  archiveChanging,
 }: {
   site: Site
   onEdit: () => void
   onClientEdit: () => void
   onStatusChange: (status: SiteStatus) => void
   statusChanging: boolean
+  onArchiveToggle: () => void
+  archiveChanging: boolean
 }) {
+  const archived = !!site.archivedAt
   return (
     <motion.section
       initial={{ opacity: 0, y: 8 }}
@@ -730,6 +765,7 @@ function SiteHeaderHero({
               {site.client?.companyName ?? '거래처 미지정'}
             </InfoBadge>
             <InfoBadge color={STATUS_COLOR[site.status]}>{STATUS_LABEL[site.status]}</InfoBadge>
+            {archived && <InfoBadge color="#a1a1aa">보관됨 · {formatDate(site.archivedAt)}</InfoBadge>}
           </div>
           <div
             style={{
@@ -763,13 +799,14 @@ function SiteHeaderHero({
             value={site.status}
             options={STATUS_OPTIONS}
             onChange={onStatusChange}
-            disabled={statusChanging}
+            disabled={statusChanging || archived}
             loading={statusChanging}
             style={{ width: '100%' }}
           />
           <Button
             icon={<Pencil size={14} />}
             onClick={onEdit}
+            disabled={archived}
             style={{ width: '100%', marginTop: 12 }}
           >
             현장 수정
@@ -782,6 +819,28 @@ function SiteHeaderHero({
             >
               거래처 수정
             </Button>
+          )}
+          <Popconfirm
+            title={archived ? '현장을 복원할까요?' : '현장을 보관할까요?'}
+            description={archived
+              ? '복원하면 다시 수정하고 새 자료를 등록할 수 있습니다.'
+              : '보관하면 수정과 새 자료 등록이 막힙니다. 기존 자료와 손익은 유지되고 언제든 복원할 수 있습니다.'}
+            okText={archived ? '복원' : '보관'}
+            cancelText="취소"
+            onConfirm={onArchiveToggle}
+          >
+            <Button
+              icon={archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+              loading={archiveChanging}
+              style={{ width: '100%', marginTop: 8 }}
+            >
+              {archived ? '현장 복원' : '현장 보관'}
+            </Button>
+          </Popconfirm>
+          {archived && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 6 }}>
+              보관된 현장은 복원한 뒤 수정할 수 있습니다.
+            </div>
           )}
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 12, marginBottom: 4 }}>
             등록일

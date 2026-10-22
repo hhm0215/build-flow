@@ -29,13 +29,24 @@ public class ClientController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ClientResponse>>> findAll() {
-        return ResponseEntity.ok(ApiResponse.success(clientService.findAll()));
+    public ResponseEntity<ApiResponse<List<ClientResponse>>> findAll(
+            @RequestParam(required = false) Boolean archived) {
+        return ResponseEntity.ok(ApiResponse.success(clientService.findAll(archived)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ClientResponse>> findById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(clientService.findById(id)));
+    }
+
+    @PatchMapping("/{id}/archive")
+    public ResponseEntity<ApiResponse<ClientResponse>> archive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(clientService.archive(id)));
+    }
+
+    @PatchMapping("/{id}/restore")
+    public ResponseEntity<ApiResponse<ClientResponse>> restore(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(clientService.restore(id)));
     }
 
     @PutMapping("/{id}")

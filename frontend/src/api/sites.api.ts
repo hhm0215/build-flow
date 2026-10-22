@@ -37,6 +37,16 @@ const updateSiteStatus = async ({ id, status }: { id: number; status: string }) 
   return res.data.data
 }
 
+const archiveSite = async (id: number) => {
+  const res = await axiosInstance.patch<ApiResponse<Site>>(`/sites/${id}/archive`)
+  return res.data.data
+}
+
+const restoreSite = async (id: number) => {
+  const res = await axiosInstance.patch<ApiResponse<Site>>(`/sites/${id}/restore`)
+  return res.data.data
+}
+
 const fetchProfit = async (siteId: number) => {
   const res = await axiosInstance.get<ApiResponse<Profit>>(`/sites/${siteId}/profit`)
   return res.data.data
@@ -83,6 +93,22 @@ export function useUpdateSiteStatus() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateSiteStatus,
+    onSuccess: () => invalidateSiteDependents(queryClient),
+  })
+}
+
+export function useArchiveSite() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: archiveSite,
+    onSuccess: () => invalidateSiteDependents(queryClient),
+  })
+}
+
+export function useRestoreSite() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: restoreSite,
     onSuccess: () => invalidateSiteDependents(queryClient),
   })
 }

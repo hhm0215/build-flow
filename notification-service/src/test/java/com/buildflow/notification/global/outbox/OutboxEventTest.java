@@ -33,4 +33,22 @@ class OutboxEventTest {
         assertNull(event.getClaimToken());
         assertEquals("{\"eventId\":\"event-1\"}", event.getPayloadJson());
     }
+
+    @Test
+    void suppressionRetainsOriginalEnvelopeAndNeverClaimsBrokerAck() {
+        Instant now = Instant.parse("2026-10-15T00:00:00Z");
+        OutboxEvent event = new OutboxEvent("event-2", "warranty.expiring", "7", "{}", now);
+        event.claim("expired-token", now.minusSeconds(1));
+
+        event.suppress(now, "WARRANTY_UNCONFIRMED");
+
+        assertEquals(OutboxStatus.SUPPRESSED, event.getStatus());
+        assertEquals(now, event.getSuppressedAt());
+        assertEquals("WARRANTY_UNCONFIRMED", event.getLastError());
+        assertNull(event.getClaimToken());
+        assertNull(event.getLeaseUntil());
+        assertNull(event.getSentAt());
+        assertEquals("{}", event.getPayloadJson());
+        assertFalse(event.markSent("expired-token", now));
+    }
 }

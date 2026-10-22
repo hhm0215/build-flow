@@ -2,10 +2,19 @@ server:
   port: 8082
 
 spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          # 현장 참조 검증은 DB 트랜잭션 안에서 호출되므로 기본 10s/60s 대신 짧게 제한하고 실패 시 503
+          estimateSiteReferenceClient:
+            connect-timeout: 2000
+            read-timeout: 3000
   application:
     name: estimate-service
   config:
-    import: optional:configserver:http://localhost:8888
+    # Docker는 CONFIG_SERVER_URL=http://config-server:8888, 로컬 기본은 localhost (import는 이 한 곳에서만 선언)
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:3306/buildflow_estimate?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:root}
@@ -18,6 +27,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
     show-sql: false
+  flyway:
+    enabled: false
+    baseline-on-migrate: false
+    clean-disabled: true
   data:
     redis:
       host: ${REDIS_HOST:localhost}

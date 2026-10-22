@@ -140,4 +140,17 @@ class DefectWarrantyUpdateTest {
         assertThat(w.getStartDate()).isEqualTo(LocalDate.of(2027, 10, 12));
         assertThat(w.getEndDate()).isEqualTo(LocalDate.of(2026, 10, 13));
     }
+
+    @Test
+    void OCR_두_방식의_추출값이_충돌하면_완전한_필드도_수동_확인이_필요하다() {
+        DefectWarranty w = DefectWarranty.createPending(1L, "warranty.pdf");
+        w.applyOcrResult("서울보증보험", "QA-20261013-0001",
+                LocalDate.of(2026, 10, 13), LocalDate.of(2027, 10, 12), true);
+
+        assertThat(w.getOcrStatus()).isEqualTo(OcrStatus.FAILED);
+        assertThat(w.getInsuranceCompany()).isEqualTo("서울보증보험");
+        assertThat(w.getPolicyNumber()).isEqualTo("QA-20261013-0001");
+        assertThat(w.getExpiryConfirmedAt()).isNull();
+        assertThat(WarrantyResponse.from(w).isExpiryConfirmed()).isFalse();
+    }
 }

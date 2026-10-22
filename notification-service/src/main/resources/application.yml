@@ -2,15 +2,29 @@ server:
   port: 8086
 
 spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          # 현장 참조 검증은 DB 트랜잭션 안에서 호출되므로 기본 10s/60s 대신 짧게 제한하고 실패 시 503
+          notificationSiteReferenceClient:
+            connect-timeout: 2000
+            read-timeout: 3000
   application:
     name: notification-service
   config:
-    import: optional:configserver:http://localhost:8888
+    # Docker는 CONFIG_SERVER_URL=http://config-server:8888, 로컬 기본은 localhost (import는 이 한 곳에서만 선언)
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:3306/buildflow_notification?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&createDatabaseIfNotExist=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
   jpa:
     hibernate:
       ddl-auto: update
@@ -18,6 +32,10 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
     show-sql: false
+  flyway:
+    enabled: false
+    baseline-on-migrate: false
+    clean-disabled: true
   task:
     scheduling:
       # Outbox ACK 대기와 매일 09:00 보증보험 스캔을 서로 막지 않도록 분리
@@ -56,10 +74,10 @@ app:
     # 스케줄 cron — 매일 09:00
     scheduler-cron: "0 0 9 * * *"
   upload-dir: ${UPLOAD_DIR:./uploads/warranties}
+  warranty-file-jwt-secret: ${JWT_SECRET:}
   # multipart 업로드 제한 (Spring 기본 1MB / 10MB로 줄여진 것을 PDF 사이즈에 맞춰 확장)
   ocr:
-    # PDFBox 텍스트 추출 결과가 이 길이 미만이면 Tess4J OCR fallback
-    min-text-length: 50
+    # PDFBox 텍스트의 필수 보증 필드가 부족하면 Tess4J OCR fallback
     # 스캔 PDF 렌더링 DPI (높을수록 정확도↑, 처리 시간↑)
     scan-dpi: 300
     # Tesseract traineddata 경로 (Docker: debian jammy 기본 경로)

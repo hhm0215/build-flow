@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { FileText, Pencil, Plus, Trash2, Sparkles } from 'lucide-react'
-import { Modal, Form, Input, InputNumber, DatePicker, Button, message } from 'antd'
+import { Alert, Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/PageHeader'
@@ -19,7 +19,7 @@ import EstimateConfirmModal from './EstimateConfirmModal'
 import EstimateEditModal from './EstimateEditModal'
 import EstimateDeleteModal from './EstimateDeleteModal'
 import type { Estimate, EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
-import { validateEstimateAmounts } from '../../utils/estimate'
+import { estimateTitleFromFileName, validateEstimateAmounts } from '../../utils/estimate'
 
 const STATUS_LABEL: Record<EstimateStatus, string> = {
   DRAFT: '작성 중',
@@ -88,6 +88,8 @@ export default function EstimateListPage() {
   const [editTarget, setEditTarget] = useState<Estimate | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Estimate | null>(null)
   const [pendingItems, setPendingItems] = useState<ParsedItemResult[] | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const createInFlight = useRef(false)
   const [form] = Form.useForm()
   const createMutation = useCreateEstimate()
 
@@ -95,8 +97,7 @@ export default function EstimateListPage() {
     setPendingItems(items)
     setUploadOpen(false)
     setOpen(true)
-    const fallbackTitle = fileName.replace(/\.(xlsx|xls)$/i, '')
-    form.setFieldsValue({ title: fallbackTitle })
+    form.setFieldsValue({ title: estimateTitleFromFileName(fileName) })
   }
 
   const handleCreateModalAfterOpen = (visible: boolean) => {
@@ -106,11 +107,23 @@ export default function EstimateListPage() {
     }
   }
 
-  const handleOk = () => {
-    form.validateFields().then((values) => {
+  const closeCreate = () => {
+    if (createInFlight.current || createMutation.isPending) return
+    setOpen(false)
+    setCreateError(null)
+    form.resetFields()
+    setPendingItems(null)
+  }
+
+  const handleOk = async () => {
+    if (createInFlight.current || createMutation.isPending) return
+    createInFlight.current = true
+    setCreateError(null)
+    try {
+      const values = await form.validateFields()
       const amountError = validateEstimateAmounts(values.items ?? [])
       if (amountError) {
-        message.error(amountError)
+        setCreateError(amountError)
         return
       }
       const items = (values.items ?? []).map(
@@ -131,13 +144,17 @@ export default function EstimateListPage() {
         memo: values.memo || undefined,
       }
 
-      createMutation.mutate(body, {
-        onSuccess: () => {
-          setOpen(false)
-          form.resetFields()
-        },
-      })
-    })
+      setCreateError(null)
+      await createMutation.mutateAsync(body)
+      setOpen(false)
+      form.resetFields()
+    } catch (cause: unknown) {
+      if (cause && typeof cause === 'object' && 'errorFields' in cause) return
+      const responseError = (cause as { response?: { data?: { error?: string } } })?.response?.data?.error
+      setCreateError(responseError ?? '견적서를 작성하지 못했습니다. 다시 시도해 주세요.')
+    } finally {
+      createInFlight.current = false
+    }
   }
 
   return (
@@ -203,7 +220,7 @@ export default function EstimateListPage() {
         title="견적서 작성"
         open={open}
         onOk={handleOk}
-        onCancel={() => { setOpen(false); form.resetFields(); setPendingItems(null) }}
+        onCancel={closeCreate}
         okText="작성"
         cancelText="취소"
         confirmLoading={createMutation.isPending}
@@ -211,6 +228,7 @@ export default function EstimateListPage() {
         afterOpenChange={handleCreateModalAfterOpen}
         width={720}
       >
+        {createError && <Alert type="error" message={createError} showIcon style={{ marginBottom: 16 }} />}
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="siteId"
@@ -222,9 +240,9 @@ export default function EstimateListPage() {
           <Form.Item
             name="title"
             label="견적 제목"
-            rules={[{ required: true, message: '견적 제목을 입력하세요' }]}
+            rules={[{ required: true, message: '견적 제목을 입력하세요' }, { max: 200, message: '견적 제목은 200자 이하여야 합니다' }]}
           >
-            <Input placeholder="견적 제목" />
+            <Input placeholder="견적 제목" maxLength={200} />
           </Form.Item>
           <Form.Item
             name="estimateDate"
@@ -234,7 +252,7 @@ export default function EstimateListPage() {
             <DatePicker style={{ width: '100%' }} placeholder="견적일 선택" />
           </Form.Item>
           <Form.Item name="memo" label="메모">
-            <Input.TextArea rows={2} placeholder="메모 (선택)" />
+            <Input.TextArea rows={2} placeholder="메모 (선택)" maxLength={1000} />
           </Form.Item>
 
           <div style={{
@@ -263,18 +281,18 @@ export default function EstimateListPage() {
                     <Form.Item
                       {...restField}
                       name={[name, 'itemName']}
-                      rules={[{ required: true, message: '품목명' }]}
+                      rules={[{ required: true, message: '품목명' }, { max: 200, message: '품목명은 200자 이하여야 합니다' }]}
                       style={{ marginBottom: 8 }}
                     >
-                      <Input placeholder="품목명" />
+                      <Input placeholder="품목명" maxLength={200} />
                     </Form.Item>
                     <Form.Item
                       {...restField}
                       name={[name, 'unit']}
-                      rules={[{ required: true, whitespace: true, message: '단위' }]}
+                      rules={[{ required: true, whitespace: true, message: '단위' }, { max: 20, message: '단위는 20자 이하여야 합니다' }]}
                       style={{ marginBottom: 8 }}
                     >
-                      <Input placeholder="EA" />
+                      <Input placeholder="EA" maxLength={20} />
                     </Form.Item>
                     <Form.Item
                       {...restField}

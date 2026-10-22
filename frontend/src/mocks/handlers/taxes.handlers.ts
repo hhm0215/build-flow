@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw'
+import { archivedSiteCreateError, archivedSiteLockError } from './sites.handlers'
 import dayjs from 'dayjs'
 import { mockTaxInvoices } from '../data/taxes.data'
 import { ApiResponse, TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceUpdateRequest } from '../../types'
@@ -85,6 +86,8 @@ export const taxesHandlers = [
 
   http.post<never, TaxInvoiceCreateRequest>('/api/v1/taxes', async ({ request }) => {
     const body = await request.json()
+    const archived = archivedSiteCreateError(body.siteId)
+    if (archived) return archived
     const amountError = taxAmountError(body.supplyAmount, body.taxAmount)
     if (amountError) {
       return HttpResponse.json<ApiResponse<null>>(
@@ -123,6 +126,8 @@ export const taxesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(taxInvoices[index].siteId)
+    if (locked) return locked
     if (taxInvoices[index].paymentConfirmed) {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '입금 확인된 세금계산서는 수정하거나 삭제할 수 없습니다.' },
@@ -217,6 +222,8 @@ export const taxesHandlers = [
         { status: 404 },
       )
     }
+    const locked = archivedSiteLockError(taxInvoices[index].siteId)
+    if (locked) return locked
     if (taxInvoices[index].paymentConfirmed) {
       return HttpResponse.json<ApiResponse<null>>(
         { success: false, data: null, error: '입금 확인된 세금계산서는 수정하거나 삭제할 수 없습니다.' },

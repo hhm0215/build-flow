@@ -2,6 +2,7 @@ package com.buildflow.notification.domain.warranty.service;
 
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
 import com.buildflow.notification.domain.warranty.entity.OcrStatus;
+import com.buildflow.notification.domain.warranty.entity.WarrantyAuditAction;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,19 +16,30 @@ import java.time.LocalDate;
 public class WarrantyOcrResultService {
 
     private final DefectWarrantyRepository repository;
+    private final WarrantyAuditRecorder auditRecorder;
 
     @Transactional
     public boolean apply(Long id, String insurer, String policyNumber, LocalDate startDate, LocalDate endDate) {
+        return apply(id, insurer, policyNumber, startDate, endDate, false);
+    }
+
+    @Transactional
+    public boolean apply(Long id, String insurer, String policyNumber, LocalDate startDate, LocalDate endDate,
+                         boolean conflicting) {
         DefectWarranty warranty = repository.findByIdForUpdate(id).orElse(null);
         if (warranty == null || warranty.getOcrStatus() != OcrStatus.PENDING) return false;
-        warranty.applyOcrResult(insurer, policyNumber, startDate, endDate);
+        warranty.applyOcrResult(insurer, policyNumber, startDate, endDate, conflicting);
+        auditRecorder.record(WarrantyAuditAction.OCR_APPLIED, warranty);
         return true;
     }
 
     @Transactional
     public void markFailed(Long id) {
         repository.findByIdForUpdate(id).ifPresent(warranty -> {
-            if (warranty.getOcrStatus() == OcrStatus.PENDING) warranty.markOcrFailed();
+            if (warranty.getOcrStatus() == OcrStatus.PENDING) {
+                warranty.markOcrFailed();
+                auditRecorder.record(WarrantyAuditAction.OCR_FAILED, warranty);
+            }
         });
     }
 }

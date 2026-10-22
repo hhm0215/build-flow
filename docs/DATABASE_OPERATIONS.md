@@ -35,6 +35,8 @@ docker compose up -d mysql
 
 현재 `backup.ps1`의 `formatVersion: 1`은 **SQL 전용**이다. 보증보험 PDF가 저장되는 `warranty_uploads` volume, Kafka broker 상태는 포함하지 않는다. 따라서 이 도구의 성공이나 아래 SQL 격리 복원 성공만으로 VPS 실데이터 운영/완전 복구 게이트를 통과했다고 판정하지 않는다. 업로드 volume은 앱의 `/app/uploads/warranties`에 연결되고 DB `defect_warranties.file_path`는 그 절대경로를 저장한다.
 
+`-IncludeWarrantyUploads -OutputRoot <이미 존재하는 비공개 디렉터리>`는 SQL과 보증 파일을 함께 읽는 **진단용 v2 snapshot**이다. Linux 실행 경로는 현재 사용자 소유의 `0700` 출력 디렉터리, 시작 시점의 `umask 0077`(새 PowerShell 프로세스를 띄우기 전에 설정), 생성 파일 `0600`, 링크·교체 가능한 공유 쓰기 조상이 없는 경로를 요구한다. Docker 복사 helper도 호스트 실행 UID/GID로 동작하므로 원본 volume을 그 계정으로 읽을 수 없으면 중단한다. 출력은 언제나 `INCOMPLETE`이며 일반 검증·운영 복원으로 승격되지 않는다. 실제 Ubuntu 호스트의 UID/ACL·Docker volume 접근, 외부 writer 차단, 격리 복원과 관리자 로그인은 별도 실측 전까지 `PENDING/UNVERIFIED`다. 이 경로를 사용해도 USB 원본이나 운영 volume을 정리하지 않는다.
+
 스크립트는 컨테이너 내부 `MYSQL_ROOT_PASSWORD`를 자식 프로세스 환경으로만 전달하고 값을 명령행, manifest, 로그에 기록하지 않는다. `mysqldump`는 InnoDB 일관성 확보를 위한 `--single-transaction`, 큰 테이블 스트리밍을 위한 `--quick`, stored object 보존을 위한 `--routines --triggers --events`, 불필요한 tablespace 권한을 피하는 `--no-tablespaces`를 사용한다.
 
 백업 후 또는 다른 저장 장치로 복사한 뒤에는 Docker 없이 다음 검증을 실행한다.
@@ -45,7 +47,13 @@ docker compose up -d mysql
 
 성공 조건은 dump가 비어 있지 않고, manifest의 SHA-256과 일치하며, 7개 스키마·테이블 정의·단일 관리자 행·mysqldump 완료 footer가 manifest와 일치하는 것이다. 이 검증은 파일 손상 여부를 확인하지만 실제 복원 성공을 대신하지 않으며, dump와 manifest를 함께 바꾸는 공격을 막는 전자서명도 아니다.
 
-차기 통합 패키지를 위한 `verify-warranty-files.ps1`은 파일만 검사하는 준비 도구다. 고정 경로 `uploads/warranties` 아래 일반 파일의 바이트 수·SHA-256, manifest 내부의 참조 ID, SQL과 같은 Compose project의 별도 volume 신원을 확인한다. 파일 누락·추가·변조, 중복/위험 상대경로, 링크·하위 디렉터리, manifest에 적힌 파일이 없는 참조는 실패한다. **이 검사는 SQL의 실제 `defect_warranties.file_path`와 대조하지 못한다.** 그러므로 `verify-backup.ps1`과 `restore-test.ps1`은 `formatVersion: 2`를 명시적으로 거부한다. v2 백업 생성·DB/파일 통합 격리 복원·실제 DB 참조 검증을 구현하기 전에는 합성 파일 검사 통과를 운영 백업 성공으로 기록하지 않는다.
+차기 통합 패키지를 위한 `verify-warranty-files.ps1`은 파일만 검사하는 준비 도구다. 고정 경로 `uploads/warranties` 아래 일반 파일의 바이트 수·SHA-256, manifest 내부의 참조 ID, SQL과 같은 Compose project의 별도 volume 신원을 확인한다. 파일 누락·추가·변조, 중복/위험 상대경로, 링크·하위 디렉터리, manifest에 적힌 파일이 없는 참조는 실패한다. **이 검사만으로는 SQL의 실제 `defect_warranties.file_path`와 대조하지 못한다.**
+
+`verify-warranty-references.ps1 -BackupDirectory <v2 패키지> -RestoredDbRowsPath <격리 복원 DB 행 JSON>`은 두 번째 오프라인 준비 도구다. JSON 배열의 각 행은 `warrantyId`와 `filePath`(파일 없는 수동 행은 `null`)를 포함해야 한다. 파일 경로가 있는 DB 행과 manifest의 ID·상대경로를 양방향 대조하고 전체 행 수를 `defect_warranties` inventory와 비교하며, 패키지 파일의 SHA-256 검사도 먼저 수행한다. 합성 정상·누락·불일치·중복·미완료 패키지 거부 회귀를 통과했다. **JSON을 실제 격리 복원한 DB에서 추출했는지 이 도구 자체는 증명하지 못한다.** 원본 DB의 데이터가 아니라 격리 복원 DB에서 읽기 전용으로 추출한 행 수·출처·시각을 작업 기록에 남겨야 한다. 행 JSON에는 실제 파일 경로가 있으므로 백업과 동일한 접근 통제를 적용하고 Git에 넣지 않는다. 이 검사 성공도 복구 완료 판정이 아니다.
+
+`verify-backup.ps1`과 `restore-test.ps1`은 `formatVersion: 2`를 계속 명시적으로 거부한다. 일관된 v2 백업 생성·격리 복원·실제 DB 추출을 연결하고 관리자 로그인과 이벤트/OCR 재조정까지 검증하기 전에는 운영 백업 성공으로 기록하지 않는다.
+
+SQL 전용 v1 백업의 격리 복원에서는 `-WarrantyRowsExportPath`에 **절대 경로**를 지정하면 복원된 `defect_warranties`의 ID·파일 경로를 JSON 배열로 추출할 수 있다. 경로의 부모 디렉터리는 미리 만들어 두고 현재 사용자만 읽을 수 있도록 제한해야 한다. 원본 백업 디렉터리나 Git 추적 폴더에는 쓰지 않으며 기존 파일은 덮어쓰지 않는다. `<경로>.evidence.json`에는 덤프·manifest·행 JSON SHA-256과 격리 복원 컨테이너/volume/nonce를 기록한다. 실제 경로 값은 콘솔에 출력하지 않는다. 이 메타데이터는 전자서명이 아니며 v1의 업로드 파일이 복원되지 않았으므로 **부분 진단 증거**일 뿐이다. v2 통합 복원 거부와 실데이터 NO-GO는 그대로 유지된다.
 
 통합 백업 구현 전 추가 중단 조건도 있다. 메모리 기반 비동기 OCR의 `PENDING` 행은 중지 후 자동 복구된다고 보장할 수 없다. Kafka outbox의 `SENT`는 broker 수락일 뿐 소비 완료가 아니므로 SQL+PDF만 복원하면 미소비 이벤트가 유실될 수 있다. OCR 대기 0건과 이벤트 drain/재조정 근거가 마련되기 전 전체 업무 복구 판정은 `PENDING`이다. 외부 물리 저장장치에 암호화된 복사본을 보관하고, 별도 빈 환경에서 DB와 파일을 같은 컨테이너 경로에 복원해 참조/해시/로그인을 확인해야 한다.
 
@@ -69,6 +77,12 @@ docker compose up -d mysql
 
 ```powershell
 .\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp> -ValidateLogin
+```
+
+필요할 때만 보호된 로컬 경로로 복원 DB 참조를 추출한다. 기존 행 JSON·증거 파일은 보존하고 새 경로를 사용한다.
+
+```powershell
+.\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp> -ValidateLogin -WarrantyRowsExportPath C:\protected\restore-evidence\warranty-rows.json
 ```
 
 ### 복원 검증 원칙

@@ -3,7 +3,247 @@
 > 이 파일은 매 작업 세션 시작/종료 시 업데이트합니다.
 > Claude와 대화 시작할 때 "PROGRESS.md 읽어줘"라고 하면 빠르게 컨텍스트 복원 가능.
 
-## 현재 브랜치: `develop`
+## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
+
+## 완료된 작업 — VPS 반영 준비: 스키마 리허설·배포 직전 백업 스크립트·런북 (2026-10-22)
+
+- VPS 실행 코드(`4e56596`) 대비 엔티티 변경은 site·notification뿐임을 확인했다. 구버전 notification 스키마를 격리 DB에 재현하고 새 이미지를 기동해 `ddl-auto=update`가 enum `SUPPRESSED`·nullable 컬럼·새 테이블 2개를 자동 반영하고 기존 행을 보존함을 실측했다(리허설 DB 삭제). `scripts/vps/predeploy_backup.sh`(앱 정지 확인→7개 스키마 덤프·행 수→보증 volume tar→체크섬→임시 MySQL 격리 복원 행 수 대조→임시 자원만 정리)를 로컬 스택에서 21개 테이블 PASS, 앱 실행 중 거부를 확인했다. `docs/RELEASE_RUNBOOK.md`에 사전 점검·빌드·백업·기동·확인·되돌리기 명령을 정리했다. VPS 실행은 사용자 승인 대기. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 프론트 필터·디바운스 훅 테스트 (2026-10-22)
+
+- `useFilterParams` 4건(스키마 타입 파싱, 잘못된 값 버림·URL 정리·스키마 밖 파라미터 유지, 빈 문자열 무시, setFilters 쓰기·삭제)과 `useDebouncedValue` 2건을 추가했다. 프론트 테스트 174건·lint 통과. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 채팅 이력 최근 N개만 조회 (2026-10-22)
+
+- `buildMessages`가 세션 전체 이력을 읽고 메모리에서 자르던 것을 `findBySessionIdOrderByCreatedAtDescIdDesc(Pageable)`로 최근 `history-limit`개만 조회하도록 바꿨다(같은 시각은 id로 순서 고정, 0이면 조회 생략). 단위 테스트 2건 추가, `chat-service:test` 통과. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 알림·보증 DB opt-in Flyway 파일럿 (2026-10-22)
+
+- 로컬 MySQL 8 실제 DDL 6개 테이블(알림·처리 이벤트·outbox·보증·감사·원본 보존) 기준 신규 격리 DB 전용 notification V1을 작성했다. 기본 Flyway disabled·`notification-flyway` 프로파일 `ddl-auto=validate`. 로컬 격리 DB 통합 테스트 PASS(테스트 DB 삭제), CI `notification-flyway` 필수 작업 추가. 이로써 7개 DB 서비스 모두 신규 DB V1 보유, 기존 DB baseline·운영 전환은 미실시. V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 현장 DB opt-in Flyway 파일럿 (2026-10-22)
+
+- 로컬 MySQL 8 실제 DDL 5개 테이블 기준 신규 격리 DB 전용 site V1을 작성했다. 기본 Flyway disabled·`site-flyway` 프로파일 `ddl-auto=validate`, 기존 DB baseline/전환은 하지 않는다. 로컬 격리 DB에서 통합 테스트 PASS(테스트 DB 삭제), `site-service:test` 44건 통과, CI에 `site-flyway` 필수 작업·릴리스 증거 매핑 추가. V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 로컬 풀 Docker CRUD 삭제·재집계·시간대 실측 (2026-10-22)
+
+- 최신 `develop`으로 전체 이미지를 순차 재빌드(기존 볼륨 유지)하고 합성 `[QA]` 자료로 견적 초안 삭제, 매입 삭제 후 손익 재집계, 미입금 세금계산서 삭제·입금 확인 건 삭제 409, 입력 길이 400, 새 알림·DB 원시값 KST 일치 18/18 PASS(서비스 포트 직접 호출). Gateway·화면·공개 VPS는 PENDING. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 컨테이너 JVM 시간대 KST 통일 (2026-10-22)
+
+- 앱 이미지 두 Dockerfile 런타임 단계에 `ENV TZ=Asia/Seoul`을 넣어 `@CreatedDate`·`now()` 저장 기준을 명시적 KST 기록·브라우저 해석과 맞췄다(알림 "9시간 전" 표시 원인). `scripts/ci/test_container_timezone.py`로 고정. 2026-10-22 기반 이미지 실측: `TZ` 지정 시 JVM `Asia/Seoul`, 미지정 시 `Etc/UTC`. 풀 스택 새 행 원시값·VPS 반영 PENDING(BACKLOG P1 항목에 전환 주의 기록). V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 공내역서 파싱 견적의 길이 초과 사전 표시 (2026-10-22)
+
+- AI 파싱 결과로 견적 작성 폼을 채울 때 파일명 기본 제목을 서버 한도 200자(UTF-16, 서로게이트 쌍 보존)로 자르고, 제목·품목명·단위에 폼 `max` 규칙을 넣어 저장 전 필드 오류로 보이게 했다(#162 서버 400 전 단계). 프론트 테스트 168건·lint·build 통과. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 견적·매입·세금계산서·보증 입력 길이 서버 검증 (2026-10-22)
+
+- 현장·거래처(#161)와 같은 방식으로 나머지 네 서비스의 등록/수정 DTO에 DB 컬럼 한도 `@Size`를 추가했다(보증 수정의 3-state `Optional`은 값 있을 때만 검증, 명시적 null 비우기 유지). DTO 검증 테스트 6건(경계 허용·초과 거부·견적 항목 목록 중첩 검증), 프론트 입력 `maxLength` 동기화, 프론트 lint·테스트 166건 통과. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 보증 삭제 후 원본 PDF 보존·기한 폐기 (2026-10-21)
+
+- 보증 삭제 시 원본 PDF를 즉시 지우지 않고 보존 기록을 남겨 365일 뒤 폐기한다(이름·경로 검사로 업로드 폴더 밖 삭제 차단). develop 최신화 후 `notification-service:test` 137건 통과, 로컬 풀 Docker 합성 실측 PASS(`docs/PILOT_QA.md`). [PR #139](https://github.com/hhm0215/build-flow/pull/139). VPS 미반영, V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 현장·거래처 API 입력 검증 (2026-10-21)
+
+- UI에만 있던 문자열 길이 제한을 생성·수정 DTO에 적용하고, 현장 종료일이 시작일보다 빠른 요청을 저장 전 400으로 거부한다. 메모는 MySQL TEXT 바이트 한도 아래로 제한하며 UI 입력 길이도 맞췄다. 로컬 `site-service:test`·전체 Gradle `build`, 프론트 166건·lint·build PASS, 독립 재검토 차단 결함 없음. 이모지 UTF-16 경계(16,000 허용/16,002 거부) 회귀도 PASS. Codex 세션 중단 후 Claude가 develop 최신화·`site-service:test` 재실행하고 [PR #161](https://github.com/hhm0215/build-flow/pull/161)로 병합했다. `develop` 병합·`main`/VPS 반영은 하지 않았으며 V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 공통 작업공간 자동 푸시 제거 (2026-10-21)
+
+- Codex가 시작한 미커밋 안전 수정을 세션 중단 후 Claude가 이어받았다. Stop 훅·`--auto` 자동 커밋/푸시 제거, `checkpoint --path` 명시 파일만 커밋, 다른 도구 ACTIVE 잠금·브랜치 보호, fetch/gh 실패 UNVERIFIED 표시. 단위 테스트 20건(UTF-8·cp949) 통과, [PR #160](https://github.com/hhm0215/build-flow/pull/160) 필수 CI 통과. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — Codex↔Claude 공통 작업공간 (2026-10-21)
+
+- `scripts/agents/workspace.py`(`status`: 잠금·열린 PR·모든 작업 폴더의 미커밋/미푸시/PR 없음 표시, `checkpoint`: 잠금 갱신→커밋→푸시→드래프트 PR)와 초기 단위 테스트 7건을 추가했다. [PR #159](https://github.com/hhm0215/build-flow/pull/159)은 `develop`에 병합됐다. 당시 Claude Stop 훅 자동 체크포인트와 Codex heartbeat 자동 실행을 기록했으나, 후속 검토에서 전체 작업 폴더 `git add -A`가 사용자 파일·비밀값을 올릴 수 있음을 발견해 **사용 금지**로 정정했다. 안전 수정 브랜치에서 명시 파일만 체크포인트하도록 변경 중이며 V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 세금계산서 DB opt-in Flyway 파일럿 (2026-10-21)
+
+- 로컬 MySQL 8의 `SHOW CREATE TABLE` 2개 기준 신규 격리 DB 전용 V1을 작성했다. 기본 Flyway disabled·전용 프로파일 `ddl-auto=validate`이며 기존 DB baseline/전환은 하지 않는다. 로컬 `tax-service:test`와 릴리스 증거 생성기 7건 PASS, 독립 검토 차단 결함 없음. [PR #157](https://github.com/hhm0215/build-flow/pull/157) 최종 SHA `7f5a124`의 필수 CI 10개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `2c508c1`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 매입 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL 2개 기준 신규 격리 DB 전용 purchase V1을 만들었다. 첫 CI에서 문자열 포맷 단언이 실패해 `information_schema` 타입·NULL 제약 검사로 교정하고 독립 재검토했다. [PR #156](https://github.com/hhm0215/build-flow/pull/156) 최종 SHA `0bb094a`의 필수 CI 9개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `013af0c`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 견적 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL 3개 기준 신규 격리 DB 전용 estimate V1을 만들었다. 로컬 서비스 테스트·릴리스 증거 생성기 7건 PASS, 독립 리뷰 차단 결함 없음. [PR #155](https://github.com/hhm0215/build-flow/pull/155) 최종 SHA `3111103`의 필수 CI 8개 PASS(신규 MySQL 통합 테스트 실제 실행), `develop` 병합 `6aa9713`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 채팅 DB opt-in Flyway 파일럿 (2026-10-20)
+
+- 실제 로컬 MySQL 8 DDL을 기준으로 신규 격리 DB 전용 chat V1을 만들고 기본 Flyway를 비활성화했다. `chat-flyway` CI 격리 MySQL 및 릴리스 후보 의존성·결과 검증을 추가했다. 독립 리뷰 차단 결함 없음, [PR #154](https://github.com/hhm0215/build-flow/pull/154) 최종 SHA `f527aef`의 필수 7개 CI PASS, `develop` 병합 `bd6c21e`. 기존 DB baseline·VPS 전환은 미실시, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 거래처 보관과 현장 연결 경합 방벽 (2026-10-20)
+
+- 현장 생성·거래처 변경에서 거래처 행을 `PESSIMISTIC_WRITE`로 잠가 거래처 보관과 직렬화했다. H2/JPA 격리 동시성 회귀에서 보관 트랜잭션이 먼저 잠금을 쥔 경우 현장 연결이 대기한 뒤 409로 거부되고 현장 0건임을 확인했다. 전체 Gradle `build` PASS, 독립 리뷰에서 확정적 결함 없음. [PR #152](https://github.com/hhm0215/build-flow/pull/152) 최종 SHA `810a2c3` CI 필수 6개 PASS, `develop` 병합 `8c17940`. H2는 운영 MySQL의 동시성 실측을 대체하지 않으며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 합성 DB·보증 PDF 복원 CI 및 Windows/Unix 셸 경계 (2026-10-20)
+
+- Windows PowerShell의 CRLF가 컨테이너 `sh` 옵션을 깨던 경로를 LF 정규화로 수정했다. 격리 복원 Linux CI에서 소유자 전용(0700) 백업 폴더를 읽지 못하던 문제는 원본 권한을 완화하지 않고 PDF 복사 helper에만 `DAC_READ_SEARCH`를 부여해 해결했다. 복사 전후 파일 개수, 해시·DB 참조와 auth `ddl-auto=validate` 기동을 합성 데이터로 확인했다. 독립 보안/인프라 리뷰 차단 결함 없음, [PR #150](https://github.com/hhm0215/build-flow/pull/150) 최종 SHA `3e07dec` CI 필수 6개 PASS, `develop` 병합 `0bee1eb`. 관리자 비밀번호 로그인·실제 VPS snapshot·외부 암호화 사본의 빈 환경 복원은 **PENDING/UNVERIFIED**이며 `main`·VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 견적 작성 실패 동선 보강 (2026-10-20)
+
+- 견적 작성 요청의 중복 제출·오류 후 상태 복구 동선을 보강하고 회귀를 추가했다. 로컬 프론트 166건·lint·typecheck·build와 독립 재검토 통과, [PR #149](https://github.com/hhm0215/build-flow/pull/149) 최종 SHA `a496beb` CI 필수 5개 PASS, `develop` 병합 `628281e`. 공개 VPS UI 재검증은 PENDING, `main`·VPS 미반영.
+
+## 완료된 작업 — 알림 미읽음 건수 조회 실패 표시 (2026-10-19)
+
+- 미읽음 건수 API 실패 시 오래된 캐시 숫자를 알림 페이지·헤더 배지에서 숨기고 오류·재시도를 안내하며, 불확실한 `전체 읽음` 실행을 막았다. 독립 리뷰가 지적한 헤더 누락을 보완·재검토했다. 로컬 프론트 165건·ESLint·TypeScript·Vite 빌드 PASS, [PR #147](https://github.com/hhm0215/build-flow/pull/147) 최종 SHA `61fd3e8` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `7fc1528`. 공개 VPS 장애·복구 화면과 로컬 Docker 통합 테스트는 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 현장 상세 문서 조회 실패 오표기 방지 (2026-10-19)
+
+- 현장 상세의 견적·매입·세금계산서·보증보험 각 탭에서 조회 실패를 `0건`·빈 목록과 구분하고 재시도를 연결했다. 실패 후 캐시된 옛 문서도 현재 결과처럼 표시하지 않는다. 로컬 프론트 161건·ESLint·TypeScript·Vite 빌드 PASS, 독립 리뷰 차단 결함 없음. [PR #145](https://github.com/hhm0215/build-flow/pull/145) 최종 SHA `51a4acf` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `eabb4c2`. 공개 VPS 화면은 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 대시보드 AI 요약 실패·빈 결과 구분 (2026-10-19)
+
+- AI 요약 요청 실패와 정상 빈 결과를 구분해 실패 시 오류·재시도를 표시하고, 실패 후 남은 캐시 요약을 현재 결과처럼 보이지 않게 했다. 로컬 프론트 155건·ESLint·TypeScript·Vite 빌드 PASS, 독립 리뷰 차단 결함 없음. [PR #143](https://github.com/hhm0215/build-flow/pull/143) 최종 SHA `6986113` CI 5개 PASS(릴리스 후보는 PR에서 정상 skip), `develop` 병합 `92867b7`. 실제 Ollama 요약·공개 VPS 화면은 PENDING, `main`·VPS 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 대시보드 현장 전체 보기 연결 (2026-10-19)
+
+- 대시보드 현장별 손익의 무동작 `전체 보기`를 기존 `/sites` 보호 라우트로 연결하고 클릭·이동 회귀를 추가했다. 로컬 프론트 152건·lint·빌드, 독립 리뷰 차단 결함 없음, [PR #141](https://github.com/hhm0215/build-flow/pull/141) 최종 SHA `d3a9280` CI 5개 PASS(릴리스 후보 1개는 PR에서 정상 skip), `develop` 병합 `bd94cce`. `main`·VPS는 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 현장 관계 조회 실패 금액 오표기 방지 (2026-10-19)
+
+- 현장 목록의 견적·매입·세금계산서 조회 실패가 빈 목록·0원으로 표시되던 문제를 수정했다. 실패 항목별 오류/재시도와 마진 산출 차단, 세금계산서 실패 시 미수금 표시 차단을 구현했다. 로컬 프론트 151건·lint·빌드, 독립 리뷰, [PR #140](https://github.com/hhm0215/build-flow/pull/140) 최종 SHA `295c1d8`의 CI 5개 PASS 후 `develop` 병합 `22e89b7`. `main`·VPS는 미반영, V1 40/100·실데이터 NO-GO 유지.
+
+## 완료된 작업 — 보증 확인 감사 이력 (2026-10-17)
+
+- 보증 값이 바뀌는 6개 경로(직접 등록·업로드·OCR 반영/실패·수동 수정·삭제)를 추가 전용 `warranty_audit_events`로 같은 트랜잭션에 기록하고 `GET /api/v1/warranties/{id}/history`와 보증 수정 모달의 이력 목록을 추가했다. 테스트(백엔드 JPA 4건, 프론트 144건)와 로컬 Docker 실측 PASS. 보존·폐기 정책과 Gateway 실제 토큰 경로는 PENDING(`.claude/plans/2026-10-17-warranty-audit.md`).
+
+## 완료된 작업 — OCR 별도 프로세스·강제 타임아웃 (2026-10-17)
+
+- Tess4J(JNA) 대신 Tesseract CLI를 페이지마다 별도 프로세스로 실행하고 페이지 시간 제한(`app.ocr.page-timeout-seconds`, 기본 60)·강제 종료·임시 파일 정리를 넣었다. CLI 전환 중 생긴 인식률 회귀(기본 PSM이 빽빽한 페이지 누락)를 컨테이너 비교로 찾아 `--psm 6`으로 바로잡았다. 로컬 Docker에서 스캔·혼합 6종 기대 결과, 최대 742 MiB(896m 한도 내), 1초 제한 시 2초 내 종료·잔여 프로세스 0을 실측. Tess4J 의존성과 `libtesseract-dev` 제거.
+
+## 완료된 작업 — 혼합 PDF OCR 충돌 판정 수정 (2026-10-17)
+
+- 합성 혼합 PDF 실측에서 두 결함을 고쳤다: 페이지 전체 OCR이 텍스트 층 증권번호를 다르게 읽어(`QA`→`04`) 정상 문서가 FAILED로 떨어지던 문제(혼동 글자 정규화 비교), OCR이 텍스트 층·이미지 보험사를 함께 읽어 실제 충돌이 SUCCESS로 가려지던 문제(서로 다른 보험사 2개 이상이면 모호 처리). 회귀 테스트 추가, 로컬 Docker에서 보완형 SUCCESS·충돌형 FAILED·스캔 1/10페이지 SUCCESS 재확인. native timeout/격리·VPS 실측은 PENDING.
+
+## 완료된 작업 — 삭제 동선·스캔 OCR 실측과 OCR 메모리 한도 조정 (2026-10-17)
+
+- 로컬 풀 Docker에서 매입·세금계산서 삭제 후 Kafka 손익·미수금 재집계와 확정 견적 삭제 409를 실측했다. 합성 한글 스캔 PDF의 실제 Tesseract OCR이 1·10페이지 모두 SUCCESS(필수 3필드 정확, 증권번호 라벨 오인식은 선택 필드). VPS와 같은 640 MiB 제한에서 10페이지가 한도에 상시 접촉해, 흑백 렌더링·`OMP_THREAD_LIMIT=1`·`MALLOC_ARENA_MAX=2`를 적용하고 자연 최대 약 707 MiB 실측에 따라 VPS notification `mem_limit`을 896m로 올렸다(배포 시 적용). 근거는 `docs/PILOT_QA.md`.
+
+## 완료된 작업 — Codex ↔ Claude 교대 검증 2차 (2026-10-17, Claude)
+
+- Codex PR #129~#132(공동작업 가이드·기본 비공개 세션 요약·주입 지침 필터)를 검토했다. 새 Claude 세션이 `docs/AGENT_COLLABORATION.md`의 교대 질문에 출처와 함께 답했다: 잠금 IDLE·열린 PR #99 draft뿐(`gh pr list`), 다음 우선순위 P0 공개 파일럿 CRUD(BACKLOG), `develop` 4316b2d·`main` 579d542·VPS 저장소 4e56596 깨끗함(VPS `git -c safe.directory` 읽기 전용), V1 40/100·NO-GO(DELIVERY_PLAN). VPS 실행 이미지는 배포 계정 Docker 권한 부재로 **UNVERIFIED**.
+- 발견: Claude 로그는 백그라운드 작업 알림(`<task-notification>`)·명령 메타데이터를 사용자 문자열로 남겨, 작업 완료 직후 끊긴 세션에서 "마지막 사용자 메시지"를 오인할 수 있었다. Claude 쪽에도 주입 메시지 필터와 합성 회귀를 추가했다.
+
+## 완료된 작업 — Codex ↔ Claude 세션 인계 검증 1차 (2026-10-17)
+
+- `scripts/agents/last_session.py`가 주입된 `AGENTS.md`를 사용자 요청으로 오인하거나 브라우저 맥락 뒤 실제 요청을 누락하던 문제를 수정했다. 기본 출력은 메시지 본문 비공개이며 명시적 로컬 `--show-excerpts`만 발췌를 출력한다. 원시 세션 로그는 저장소에 복사하지 않았다.
+- 합성 회귀 5/5와 기본 비공개 실제 실행, 독립 보안 재검토 PASS. [PR #131](https://github.com/hhm0215/build-flow/pull/131)은 head `47c7f71`, 필수 CI 5개 PASS 후 `develop` 병합 `3ab1b8e`. 새 Claude 세션의 동일 상태 복원 시험과 원자적 동시 작업 잠금은 아직 **UNVERIFIED/미구현**이므로 완전 자동 기억 공유를 주장하지 않는다. `main`/VPS 미반영, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — Codex ↔ Claude Code 공동 인계 연결 (2026-10-17)
+
+- Claude 마지막 세션의 LAN 하드닝 [PR #127](https://github.com/hhm0215/build-flow/pull/127)(병합 `4316d2d`)과 잠금 해제 [PR #128](https://github.com/hhm0215/build-flow/pull/128)(병합 `806c623`)을 세션 요약·Git·GitHub CI로 대조했다. 로컬 `develop`을 `origin/develop`으로 fast-forward하고 사용자 `output/`은 보존했다.
+- `docs/AGENT_COLLABORATION.md`에 규칙·백로그·완료·운영 근거의 탐색 경로와 최신 잠금+열린 PR 교대 절차를 연결하고 `AGENTS.md`·`CLAUDE.md`·HANDOFF에서 이를 참조한다. [PR #129](https://github.com/hhm0215/build-flow/pull/129) head `bd3e0b8`, 필수 CI 5개 PASS, 독립 보안 검토 차단 결함 없음, `develop` 병합 `a38322b`. 도구별 비공개 기억·원시 세션 로그·비밀값은 저장소에 복사하지 않았다.
+- 이 작업은 문서·절차만 변경했다. `main`/VPS는 미반영, 관리자 로그인 401·외부 백업/격리 복원·스키마 게이트는 그대로 PENDING. 첫 실데이터 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 로컬 서버(LAN) 노출 하드닝 (2026-10-17)
+
+- `docker-compose.lan.yml`로 프론트만 지정 사설 IP:3000에 추가 노출하고 나머지는 127.0.0.1 유지, Gateway CORS를 LAN 출처+localhost로 제한했다. `verify_lan_compose.py`(0.0.0.0·공인·링크로컬 거부, 단일 바인딩, CORS)와 테스트·CI 단계를 추가하고 `docs/LOCAL_SERVER.md` 런북(방화벽 LocalSubnet·Private 규칙, HTTP 평문 한계)을 작성했다. 로컬 Docker에서 LAN 프론트 200·내부 포트 연결 거부·LAN 출처 로그인 CORS 통과·외부 출처 403 실측. 다른 기기 접속·방화벽 규칙 적용은 사용자 환경 PENDING.
+- 마이그레이션 Phase B: 2026-10-17 사용자 실행 `restore-test.ps1 -ValidateLogin`에서 복원·행 수·digest·CHECK TABLE·validate 기동은 PASS, 관리자 로그인은 비밀번호 불일치 401로 미완료(사용자 재시도 필요).
+
+## 완료된 작업 — 거래처 보관·복원 (2026-10-17)
+
+- ADR-021 3차: 거래처 `archived_at`·보관/복원 API, 보관 거래처 수정 409·새 현장 연결 400(기존 연결 현장은 유지 수정 허용), 거래처 목록 보관 필터. 프론트는 현장 등록/수정 거래처 선택에서 보관 거래처 제외, 거래처 수정 모달에 보관/복원 버튼·보관 경고. 테스트(백엔드·프론트 143건)와 로컬 Docker 실측 PASS. 운영 DB 반영은 마이그레이션 게이트 이후.
+
+## 완료된 작업 — 보관 현장 기존 문서 잠금 (2026-10-17)
+
+- 사용자 위임에 따라 추천안으로 결정: 보관 현장 소속 견적 수정·확정·삭제, 매입·세금계산서·보증 수정·삭제는 409, 매출 입금 확인만 허용. 현장 서비스 장애 503, 고아 문서(현장 404)는 정정 허용. MSW에도 신규 등록 400·수정 409를 동기화했다(#116에서 빠진 MSW 생성 검사 포함). 백엔드 4개 서비스·프론트 140건 테스트, 로컬 풀 Docker 409/200 실측 PASS.
+
+## 완료된 작업 — 공내역서 AI 응답 JSON 추출 보강 (2026-10-17)
+
+- Ollama 응답 추출 테스트를 추가하며 두 결함을 고쳤다: 모델이 배열 앞에 `[참고]` 같은 대괄호 문구를 붙이면 첫 `[`부터 잘라 422가 나던 문제(각 `[` 후보를 순서대로 파싱), 응답 content가 비면 NPE로 500이 나던 문제(422 파싱 실패). 실제 VPS 모델 답변 검증은 모델 미기동으로 PENDING.
+
+## 완료된 작업 — 손익·미수금 테스트와 마진율 저장 결함 수정 (2026-10-17)
+
+- 테스트 확장 중 `site_profits.margin_rate`(DECIMAL(5,2))가 매입이 견적의 약 11배를 넘는 손실 현장에서 범위를 넘어 저장이 실패(H2 재현, MySQL strict 동일)하는 결함을 찾았다. 마진 금액은 그대로 두고 표시용 마진율만 −999.99로 하한 처리했다(컬럼 확장은 마이그레이션 게이트 대상). 마진·마진율, tax 미수금(부분 입금·소수 금액·빈 현장) 테스트를 추가했다.
+
+## 완료된 작업 — ADR-003 v2 문서 정정 (2026-10-17)
+
+- Redis 실사용(인증 refresh·블랙리스트, chat 보조 캐시)과 미구현(조회 캐시·Redisson 분산락 0건)을 실측해 ADR-003에 v2 정정을 추가하고 v1 면접 답변을 계획 기록으로 표시했다. 실제 동시성 제어(DB 비관적 잠금 + outbox 멱등)와 재도입 조건을 명시하고 CLAUDE.md·AGENTS.md의 Redis·OpenFeign 표기를 맞췄다. 선택지 (b) 캐시·분산락 구현은 필요가 실측될 때 재검토.
+
+## 완료된 작업 — 프론트 번들 분할 (2026-10-17)
+
+- 로그인 외 8개 페이지를 `React.lazy`로 분리하고 react·antd·markdown을 vendor 청크로 나눴다. 단일 1.42 MB(gzip 443 KB) → 앱 250 KB + vendor(react 162·antd 761·markdown 117 KB) + 페이지별 10~22 KB. antd는 단일 라이브러리라 임계값을 800 KB로 문서화했다. catch-all vendor는 개발 전용 msw를 첫 화면으로 끌어와 제외했고, 프로덕션 preview에서 페이지 청크 지연 로드·msw 미로드를 확인했다.
+
+## 완료된 작업 — Config Server import 단일화 (2026-10-17)
+
+- 7개 서비스의 Config import를 `application.yml`의 `${CONFIG_SERVER_URL:http://localhost:8888}` 한 곳으로 통합하고 Docker 프로필 중복 선언을 제거, compose는 `CONFIG_SERVER_URL`을 전달한다. 로컬 풀 Docker 재기동에서 7개 서비스 `localhost:8888` 시도 0건·Config Server 조회·8개 health UP. 현장 보관 뒤 기존 문서 수정/입금 확인 규칙은 `docs/PILOT_QA.md` 사용자 판단 대기로 기록.
+
+## 완료된 작업 — 현장 보관·복원 1차 (2026-10-17)
+
+- ADR-021 추천안대로 site-service `archived_at`·보관/복원 API, 보관 현장 수정 409와 네 생성 서비스 신규 등록 400, 프론트 목록 보관 필터(기본 보관 제외)·상세 보관/복원 버튼·등록 폼 현장 선택에서 보관 제외를 구현했다. 테스트·로컬 풀 Docker 실측 PASS(`.claude/plans/2026-10-17-site-archive.md`). 운영 DB·VPS 반영은 마이그레이션 게이트 이후, V1 **40/100**·실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — Codex↔Claude 인계 체계 (2026-10-17)
+
+- 두 도구가 모두 읽는 `.claude/HANDOFF.md`(작업 잠금·공통 사용자 지시)와 끊긴 세션 요약 `scripts/agents/last_session.py`(읽기 전용, 출력 비커밋)를 추가하고 AGENTS.md·CLAUDE.md에 확인 규칙을 넣었다. Codex 자체 메모리 DB는 비어 있어 저장소 문서가 실질적인 공유 기억이다. 별도 `memory-bus` 프로젝트는 설계 단계라 현재 인계 수단으로 쓰지 않는다. Codex `buildflow` heartbeat는 ACTIVE 상태 그대로이며 잠금 규칙으로 충돌을 피한다.
+
+## 완료된 작업 — 현장 참조 Feign 시간 한도·깨진 본문 400 (2026-10-17)
+
+- 매입·견적·세금계산서·보증의 현장 참조 Feign 클라이언트에 connect 2s/read 3s를 명시하고, 현장·견적·보증 서비스에 깨진 요청 본문 400 처리(본문 비기록)를 추가했다. 5개 서비스 테스트 PASS, 로컬 풀 Docker 재실측에서 503 약 4초·깨진 JSON 400·거부 시 행 미생성 확인. 공개 VPS 반영 PENDING.
+
+## 완료된 작업 — 현장 참조 검증 로컬 풀 Docker 실측 (2026-10-17)
+
+- `develop` `7652cea` 이미지 5개를 순차 재빌드해 기존 볼륨 유지 상태로 기동하고, 매입·견적·세금계산서·보증 등록/업로드의 실제 Feign/Eureka 경로에서 없는 현장 400, 정상 현장 201, site-service 중지 503과 거부 시 행·파일 미생성을 확인했다(`docs/PILOT_QA.md`). Gateway·공개 VPS 실측과 배포는 PENDING. timeout·깨진 JSON 500은 후속 PR에서 수정.
+
+## 진행 중 — 보증 등록·업로드 현장 참조 검증 (2026-10-17)
+
+- notification-service에 OpenFeign을 추가하고 보증 직접 등록과 PDF 업로드에서 현장 ID를 site-service로 확인한다. 업로드는 검증 전 PDF 저장·DB 행·OCR 예약을 하지 않는다(없는 현장 400, 상류 장애 503). notification 테스트 119건 로컬 PASS, PR #112 CI 5개 PASS 후 `develop` 병합 `7652cea`. 이로써 매입·견적·세금계산서·보증 네 생성 경로의 현장 참조 검증이 모두 `develop` 대상이 됐다. 실제 Feign/Eureka·VPS 메모리 영향과 보관 경합 방벽, `main`/VPS 배포는 PENDING. V1 **40/100**, 실데이터 **NO-GO** 유지.
+
+## 진행 중 — 견적·세금계산서 생성 현장 참조 검증 (2026-10-17)
+
+- PR #110의 매입 패턴을 `estimate-service`·`tax-service` 생성 경로에 적용했다. site-service Feign 조회로 없는 현장 400, 상류 오류·응답 불일치 503으로 실패-닫힘 처리하고 저장/outbox 이전에 검증한다. 두 서비스 테스트(견적 36·세금계산서 31건) 로컬 PASS, PR #111 CI 5개 PASS 후 `develop` 병합 `5821506`. 실제 Feign/Eureka·Docker/VPS 실측과 `main`/VPS 배포는 PENDING. 보증 직접 등록·업로드 검증은 notification-service에 OpenFeign 도입이 필요해 다음 작업으로 분리했다. 첫 실데이터 현장 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
+## 진행 중 — 매입 생성 현장 참조 검증 (2026-10-17)
+
+- `purchase-service` 생성 경로에 site-service Feign 조회를 추가해 없는 현장 400, 상류 오류·응답 불일치 503으로 실패-닫힘 처리하고 저장/outbox 이전에 검증한다. 매입 서비스 JPA·단위 회귀는 로컬 PASS, 독립 보안 리뷰에 신규 P0/P1 없음. PR #110 필수 CI 5개 PASS 후 `develop` 병합 `87381fc`. 실제 Feign/Eureka·Docker/VPS 실측과 `main`/VPS 배포는 PENDING이다. 첫 실데이터 현장 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
+## 진행 중 — Ubuntu 진단용 백업 비공개 경로 게이트 (2026-10-17)
+
+- Windows 전용 ACL 때문에 Ubuntu에서 즉시 거부되던 SQL+보증 PDF v2 진단 snapshot에 Unix UID·mode·`umask 0077` 검사와 링크/공유 쓰기 조상 차단을 추가했다. Docker 파일 복사는 호스트 실행 UID/GID·컨테이너 `umask 077`로 제한하고, 권한 불일치는 중단한다. PR #109의 Linux/Windows 포함 필수 CI 5개 PASS 후 `develop` 병합 `50de5c6`; 실제 Docker volume 소유권·VPS snapshot은 PENDING이다. v2는 계속 `INCOMPLETE`이며 운영 복구 증거가 아니다. 외부 writer 차단·빈 환경 복원·관리자 로그인·암호화 오프사이트 사본은 미완료, 실데이터 NO-GO·V1 **40/100** 유지.
+
+## 진행 중 — 합성 Docker 원본 snapshot→격리 복원 (2026-10-16)
+
+- 실제 개발·운영 Compose의 고정 컨테이너명·공유 네트워크·기존 볼륨을 사용하지 않는 별도 합성 Compose와 무작위 프로젝트/nonce 경로를 마련했다. 합성 DB 7개·관리자 1행·보증 참조/NULL 행과 PDF 2개를 새 볼륨에 넣고 `backup.ps1 -IncludeWarrantyUploads`의 실제 Docker 경로로 `INCOMPLETE` v2 패키지를 생성했다. 이후 별도 새 DB·볼륨에 복원해 행/파일 해시·참조·auth 스키마를 확인했다. 격리 프로젝트의 컨테이너·볼륨·네트워크 정리도 확인했다.
+- 이 근거는 **합성 데이터의 로컬 실행**이다. 운영 원본의 쓰기 중지/ACL·실제 관리자 로그인, 외부 암호화 사본의 빈 환경 복원, OCR/Kafka 재조정과 VPS 적용은 PENDING/UNVERIFIED다. 실데이터 NO-GO와 V1 **40/100**을 유지한다.
+
+## 진행 중 — 진단용 v2 SQL+보증 파일 격리 복원 회귀 (2026-10-16)
+
+- `INCOMPLETE` v2는 기본 복원에서 거부하고 명시적 진단 옵션에서만 새 무작위 Docker 프로젝트·빈 보증 볼륨으로 복사한다. 원본은 읽기 전용이며 복사 전후 해시, 복원 파일의 해시·크기, 복원 DB의 보증 ID·경로·NULL을 대조한다. 복사 helper는 witness 컨테이너의 실제 이미지 ID로 고정하고 네트워크·추가 권한을 차단한다.
+- 합성 v2의 7개 DB·보증 파일 2개(참조 1개, 미참조 1개) 격리 복원과 기존 v1 SQL-only 회귀를 로컬 Docker에서 통과했다. 두 격리 프로젝트·임시 볼륨 정리를 확인했다. Windows PowerShell 5.1/7 도구 회귀와 독립 보안·인프라 정적 검토에서 신규 P0~P2 결함은 없었다. 실제 관리자 자격 증명 로그인, 실제 원본 snapshot, 외부 암호화 사본의 빈 환경 복원, OCR/Kafka 재조정 및 VPS 적용은 PENDING/UNVERIFIED다. V1 **40/100**, 실데이터 **NO-GO** 유지.
+
+## 진행 중 — SQL+보증 파일 진단용 v2 snapshot (2026-10-16)
+
+- `backup.ps1 -IncludeWarrantyUploads -OutputRoot <기존 비공개 폴더>` opt-in에서 DB writer·연결 중지, MySQL/업로드 볼륨 신원과 참조 행을 확인하고 SQL dump·읽기 전용 업로드 볼륨 사본의 파일 크기/SHA·참조를 대조하도록 준비했다. 출력은 `.partial-*`와 `INCOMPLETE`를 유지하고 일반 v2 검증·격리 복원은 계속 거부한다. 운영 복구 완료나 실데이터 승인으로 간주하지 않는다.
+- Windows PowerShell 5.1·7 합성 검증과 독립 보안·인프라 정적 리뷰에서 새 차단 보안 결함은 없었고, 누락 `OutputRoot`와 빈 보증 파일 집합의 경계 오류를 수정했다. 실제 Docker snapshot/ACL 상속·격리 복원·외부 사본과 VPS 실측은 PENDING/UNVERIFIED다. V1 40/100, `main`/VPS 미반영, 실데이터 NO-GO 유지.
+
+## 완료된 작업 — 날짜 없는 V1 완료선·격리 복원 참조 증거 (2026-10-16, develop 통합)
+
+- [PR #103](https://github.com/hhm0215/build-flow/pull/103)의 필수 CI 5개 PASS와 정확한 단일 head SHA `f3675980b55ef9e60d92a41ea3ea48d31d415e1e` 대조 후 merge commit `c05d1beeb01d88a1d3da970df3690b91d684503d`로 `develop`에 병합했다. v1 SQL 격리 복원 DB의 보증 ID·파일 경로 opt-in 추출/해시·출처 기록은 Windows PowerShell 5.1·7 합성 테스트와 독립 인프라·보안 검토를 통과했다. 실제 Docker 격리 복원·SQL+업로드 통합 복원은 PENDING이며 `main`/VPS 미반영이다.
+- [PR #104](https://github.com/hhm0215/build-flow/pull/104)의 필수 CI 5개 PASS와 단일 head SHA `39a025ed94a4962c8d64f786656fe1327099ff91` 대조 후 merge commit `d99f6e94eb37fb16f6eca148dbb6c7ea415030bd`로 `develop`에 병합했다. 사용자와 합의하지 않은 사용 목표일은 폐기하고 첫 현장 수동 입력의 안전한 운영을 V1 100%로 맞췄다. USB 가져오기는 후속 작업으로 남는다. V1 40/100과 실데이터 NO-GO는 유지한다.
+
+## 진행 중 — 보증 파일 볼륨 읽기 전용 사전 검사 (2026-10-16)
+
+- SQL-only v1과 실제 파일을 혼동하지 않도록 별도 `check-warranty-volume.ps1`을 추가했다. MySQL Compose 프로젝트·작업 디렉터리·DB 볼륨, 같은 프로젝트의 `warranty_uploads` local volume, 실행 중 파일 볼륨 사용자와 7개 DB writer 서비스를 검사해 불일치·활성 사용을 거부한다. 합성 PowerShell 5.1 회귀 PASS. 아직 파일 복사·DB 참조 추출·v2 백업 생성·격리 복원은 하지 않았고 외부 writer도 미검증이다. 실제 Docker 엔진이 없어 동작 실측은 PENDING; V1 40/100, 실데이터 NO-GO, `main`/VPS 미반영이다.
+
+## 진행 중 — 날짜 없는 즉시 운영 게이트·격리 복원 행 출처 (2026-10-16)
+
+- 사용자가 합의하지 않은 V1 사용 목표일을 폐기하고 `docs/DELIVERY_PLAN.md`를 통과 증거 순서로 바꿨다. 날짜를 기다리지 않고 첫 실데이터 현장에 필요한 복구·스키마·업무 동선·복귀를 병렬로 진행한다.
+- v1 SQL 격리 복원의 인증/행 수 재검증 후 복원 DB에서 보증 ID·파일 경로를 고정 읽기 쿼리로 추출하는 opt-in 도구를 추가했다. UTF-8 hex를 엄격 복호화하고 행 수·ID 중복을 검사하며 보호된 기존 디렉터리에 새 파일과 SHA/복원 신원 증거를 덮어쓰기 없이 만든다. 원본 백업은 변경하지 않는다. PowerShell 5.1·7 합성 회귀 PASS. 독립 인프라/보안 검토를 반영해 v2는 계속 fail-closed이며 SQL+파일 통합 복원 PASS로 계산하지 않는다. Docker 실제 복원·관리자 로그인·외부 암호화 사본은 PENDING, 실데이터 NO-GO·V1 40/100 유지.
+
+## 완료된 작업 — 복원 DB·보증 파일 참조 대조 (2026-10-16, develop 통합)
+
+- v2 합성 패키지의 파일 SHA-256·manifest 참조와, 별도로 전달한 격리 복원 DB 행 JSON의 보증 ID·절대 파일 경로를 양방향 비교하는 오프라인 도구를 추가했다. 정상/경로 불일치/누락/추가/중복/행 형식 실패 회귀를 Windows PowerShell과 PowerShell 7에서 통과했다. 독립 보안·복구 리뷰의 P2 두 건을 수정했고 PR #102의 CI 5개 PASS 뒤 `develop` 병합 `4e83281`을 확인했다. JSON이 실제 복원 DB에서 나왔다는 출처는 도구가 증명하지 않으므로 v2 백업·복원은 계속 fail-closed다. 실제 통합 백업·격리 복원·관리자 로그인·외부 암호화 사본·OCR/Kafka 재조정은 PENDING, `main`/VPS 미반영·실데이터 NO-GO·V1 40/100 유지.
+
+## 완료된 작업 — 보증보험 PDF 원본 확인 경로 (2026-10-16, develop 통합)
+
+- 보증보험 업로드 사본을 파일명·경로 비노출로 내려받는 API와 확인 화면 버튼을 구현했다. 내부 notification 포트의 Gateway 우회를 막도록 서비스에서 JWT 서명·access/ADMIN/authVersion 2·Redis 로그아웃 블랙리스트를 다시 검사한다. PDF는 크기·매직·UUID 경로·symlink를 검사하고 2개 동시 스트림으로 제한한다. 없는 파일/수동 등록은 404, 무인증은 401이다.
+- notification-service 테스트, 전체 백엔드 테스트, 프론트 40파일 136건·lint·build는 로컬 PASS. 독립 보안/코드 리뷰가 찾은 401→500 매핑과 응답 중 메모리 보유 문제를 수정하고 재검토에서 신규 P0~P2 차단 결함이 없었다. PR #101의 CI 5개 PASS 후 `develop` 병합 커밋 `e816d62`까지 확인했다. 실제 VPS 다운로드/401·복원은 **PENDING**이며 `main`/VPS 미반영이다. 확인자 감사·보존 정책·실데이터 백업/격리 복원도 PENDING, V1 40/100·실데이터 NO-GO 유지.
+
+## 진행 중 — 보증 만료 구 outbox 발행 전 차단 (2026-10-15)
+
+- `warranty.expiring`을 claim하기 직전에 원본 envelope·현장/보험사/종료일·확인 세대·현재 MANUAL·KST 알림 기간을 DB 행 잠금 아래 재검증한다. 부적격 행은 JSON/eventId를 바꾸지 않고 `SUPPRESSED`·사유 코드·시각으로 보존하며, 한 행씩 짧은 트랜잭션을 마친 뒤 다음 행으로 진행한다. lease 만료 후 이미 broker가 수락한 메시지는 consumer 재검증이 막으며 `SUPPRESSED`는 이후 재전송 금지의 의미다.
+- notification-service 전체 테스트와 전체 백엔드 `gradlew test` 로컬 PASS, 독립 보안 리뷰에서 새 코드 P1 결함 없음. 실제 MySQL의 ENUM/nullable 컬럼·기존 큐·명시적 migration/구 이미지 롤백은 `UNVERIFIED`; 공개 VPS는 이전 코드 그대로이며 배포·실데이터 승격 **NO-GO**. 사용자 소유 `EstimateService.java`와 `output/`은 그대로 보존한다.
 
 ## 완료된 작업 — 보증보험 OCR·만료 알림 GitHub 통합 (2026-10-14)
 
@@ -12,6 +252,7 @@
 
 ## 현재 진행 중 — 보증보험 PDF/OCR 공개 파일럿 검증 (2026-10-13)
 
+- 2026-10-15 혼합 PDF 후속(별도 작업 분기, main·VPS 미반영): 텍스트 레이어의 필수 보증 필드가 부족하면 이미지 OCR까지 실행해 누락 필드를 보완한다. 짧은 유효 텍스트와 이미지 OCR 실패 전의 부분값도 보존한다. 양쪽 값이 상충하면 텍스트 값을 보존하되 `FAILED`로 수동 확인을 요구하고, 화면에는 원본과 모든 값의 대조를 안내한다. 완전한 추출도 관리자 저장 전에는 만료 알림에 넣지 않는다. 병합·엔티티·잠금 결과 반영·화면 회귀를 추가했다. 로컬 전체 Gradle 테스트, 프론트 lint·40파일 135건 테스트·빌드 PASS, 독립 보안/코드 리뷰에 신규 P0~P2 결함 없음. 실제 혼합 PDF 생성·VPS 합성 업로드/OCR, native 시간·메모리 격리와 실데이터 복구 게이트는 PENDING이다. V1은 40/100 유지한다.
 - 2026-10-14 확인 출처 fail-closed 후속(로컬, 미배포): nullable `expiry_confirmed_at`이 없는 기존 수기/OCR 행은 MANUAL 상태여도 미확정으로 조회·표시·알림 제외한다. 최초 확인 또는 보험사/시작일/종료일 변경 때만 새 확인 시각과 알림 세대를 만들며, 메모만 수정하면 기존 cooldown을 유지한다. 새 outbox 이벤트의 확인 기준이 현재 행과 일치해야 소비한다. 독립 보안 리뷰가 발견한 구 이벤트 ACK의 7일 false suppression을 확인 변경 시 marker 초기화와 지연 ACK의 생성시각 재검증으로 보완했고, 재검토에서 발견된 구 PENDING의 새 확인 차단도 만료 당일 회귀로 수리했다. 전체 `gradlew test`, frontend 40파일 135건·lint·build는 로컬 PASS(프론트는 앞선 변경 기준); CI·실제 MySQL ALTER/기존 NULL/롤백·VPS QA는 PENDING. 구 outbox 발행 자체와 확인자/원본 대조 감사는 미완료이고 실데이터 NO-GO·V1 40/100 유지. 사용자 소유 `EstimateService.java` 수정과 `output/`은 건드리지 않았다.
 - 2026-10-14 만료 Kafka 소비 경계의 1차 fail-closed 보완(로컬, 미배포): 현재 보증 행 잠금 후 MANUAL·필수 필드·KST 0~설정일 범위·이벤트의 현장/보험사/종료일 스냅샷을 재검증한다. 부적격/삭제 이벤트는 알림 없이 처리 영수증을 남겨 나중 재생으로 되살아나지 않게 하고, 적격 메시지의 남은 일수는 현재 행과 KST 날짜로 재계산한다. 수정·삭제도 같은 행 잠금을 사용한다. 관련 JPA/Kafka 테스트와 `notification-service:test` 전체·`gradlew test` PASS, 알림 쓰기 실패 시 영수증 롤백 회귀도 PASS. 독립 보안 리뷰에서 새 P0/P1 코드 결함은 없었다. 구 outbox 자체는 여전히 Kafka에 발행될 수 있고, 기존 OCR 행의 MANUAL 기본값은 실제 사용자 확인의 증거가 아니다. 구 큐 감사/종결·cooldown 재조정·MySQL 동시성/복구 게이트 전에는 공개 VPS에 반영하지 않는다. V1 40/100 유지.
 - 2026-10-14 KST 만료일 경계 정렬(로컬, 미배포): 목록/만료 임박 조회·응답·엔티티·알림 스케줄러·outbox ACK가 공통 업무일을 사용한다. 다건 목록은 요청당 날짜를 한 번 캡처한다. UTC 15:00→KST 자정과 만료 당일/다음날 회귀 추가, `notification-service:test`와 전체 백엔드 `gradlew test` PASS. 독립 코드 리뷰에서 P1 이상 없고 제안한 다건 목록 경계도 보완했다. CI·PR·VPS 반영은 PENDING이며 V1은 40/100 유지한다.
@@ -641,9 +882,9 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-14 갱신)
+## 다음 세션 진입점 (2026-10-17 갱신)
 
-**Git 상태**: PR #97 병합 후 `main`·`develop`은 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`로 동기화됐다. PR CI와 병합 `main` CI는 PASS지만 VPS 배포는 PENDING이다. `EstimateService.java`의 기존 로컬 미커밋 변경과 `output/`은 사용자 소유로 보존하며 PR에 포함하지 않는다.
+**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#125를 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
 
 **VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
 

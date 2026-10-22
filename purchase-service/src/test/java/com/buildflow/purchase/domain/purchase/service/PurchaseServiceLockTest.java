@@ -18,7 +18,8 @@ class PurchaseServiceLockTest {
 
     private final PurchaseRepository repository = mock(PurchaseRepository.class);
     private final KafkaProducerService producer = mock(KafkaProducerService.class);
-    private final PurchaseService service = new PurchaseService(repository, producer);
+    private final SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
+    private final PurchaseService service = new PurchaseService(repository, producer, siteReferenceValidator);
 
     @Test
     void mutationLookupUsesPessimisticWriteLock() throws NoSuchMethodException {
