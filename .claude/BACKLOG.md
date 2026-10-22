@@ -128,7 +128,8 @@
 - 2026-10-17: 현장 마진·마진율과 tax 미수금 계산 테스트 추가(마진율 DECIMAL(5,2) 초과 저장 실패 결함 발견·수정)
 - 2026-10-17: estimate Ollama 응답 JSON 추출 테스트 추가(대괄호 설명 앞붙임 파싱 실패·빈 응답 NPE 결함 발견·수정)
 - 2026-10-22: `useFilterParams`(타입별 파싱·잘못된 값 URL 정리·비운 값 삭제)·`useDebouncedValue` 테스트 추가 — 프론트 훅 3개 모두 테스트 보유
-- 남은 후보: 백엔드 서비스 순수 로직 중 테스트 없는 계산·변환
+- 2026-10-22: 보증 만료 알림 발행 직전 판정(`WarrantyOutboxEligibility`)·대시보드 손익 집계(`DashboardService`) 테스트 추가
+- 남은 후보: site `OllamaService` 요약 프롬프트·응답 처리
 - **예상 규모**: S~M (점진적)
 
 ---

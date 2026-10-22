@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 대시보드 손익 집계 테스트 (2026-10-22)
+
+- `DashboardService` 3건: 현장별 손익 합산·상태별 개수·생성순 유지, 손익 기록 없는 현장 0 표시, 평균 마진율이 단순 평균이 아닌 총마진/총견적(가중)임을 고정, 현장 없음·견적 0일 때 마진율 0, 요약 생성 시각. 코드 변경 없음. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — develop → main 통합 (2026-10-22)
 
 - 사용자 승인으로 [PR #99](https://github.com/hhm0215/build-flow/pull/99)(PR #100~#172, 커밋 175개)를 SHA 전체 대조(API 페이지네이션, 175/175 일치)·필수 CI 12개 통과 후 merge commit `1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1`로 `main`에 병합했다. 병합 `main` push CI 성공, `develop`을 같은 SHA로 fast-forward 동기화했다. **공개 VPS는 아직 `4e56596`** — `docs/RELEASE_RUNBOOK.md` 순서(처리 중 작업 0건 → 순차 빌드 → 앱 정지·`predeploy_backup.sh` → 기동 → 확인)로 서버 Web Console에서 적용해야 한다. V1 **40/100** 변동 없음.
