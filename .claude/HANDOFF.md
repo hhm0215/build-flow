@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 15:05 KST |
-| 브랜치 | 없음 (`claude/site-flyway-v1`은 PR로 병합) |
-| PR | site Flyway PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 현장 DB opt-in Flyway V1 |
-| 다음 첫 행동 | notification V1(6개 테이블) 로컬 MySQL DDL로 작성·격리 DB 검증 |
+| 갱신 | 2026-10-22 15:10 KST |
+| 브랜치 | 없음 (`claude/notification-flyway-v1`은 PR로 병합) |
+| PR | notification Flyway PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 알림·보증 DB opt-in Flyway V1(7개 서비스 V1 완료) |
+| 다음 첫 행동 | 마이그레이션 Phase E(runtime DB 최소 권한) 설계 또는 P0 Gateway 경유 실동선 |
 
 ## 공통 사용자 지시
 

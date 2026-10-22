@@ -21,6 +21,8 @@ dependencies {
     // PDF OCR (Phase 2)
     implementation 'org.apache.pdfbox:pdfbox:3.0.3'
 
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-mysql'
     runtimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testRuntimeOnly 'com.h2database:h2'
