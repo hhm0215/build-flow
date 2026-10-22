@@ -27,6 +27,8 @@
 
 **공개 결정:** 사용자가 승인한 테스트 데이터 전용 80/443 파일럿을 운영 중이다. 첫 공개에서 S06 Host 실패를 발견해 볼륨 보존 롤백했고, PR #75의 5개 CI 통과·독립 리뷰·재배포 뒤 정상 호스트와 잘못된 Host의 외부 응답을 재검증했다. S05 공개 경로의 동일 토큰 로그아웃 401, 실제 인증서 갱신, 전 서비스 로그 검토는 미완료다. 이 상태를 실데이터 운영 승인으로 해석하지 않는다. 외부 백업·격리 복원과 DB 마이그레이션/최소 권한 전에는 업무 원본을 입력하지 않는다.
 
+2026-10-22 S01/S10 재확인: 2026-10-22 VPS 반영: 사용자가 Web Console root로 `buildflow-release` 래퍼·`/etc/buildflow/public_host`·sudoers 1줄을 설치했고, 에이전트가 PC에서 `buildflow-deploy` SSH(IP, 호스트 키 일치)로 `sudo buildflow-release deploy 1d2497e…`를 실행했다. 처리 중 작업 0건 → 기존 이미지 `pre-4e565968db0b` 보존 → 11개 이미지 순차 빌드 → 앱 정지 → `predeploy_backup.sh`(테이블 19개 덤프, 보증 업로드 0개, 임시 MySQL 복원 행 수 일치, 서버 `/root/buildflow-backups/20261022T081904Z`) → 기동 순으로 성공(EXIT 0). HEAD `1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1`, 앱 컨테이너 전부 Up, 외부 HTTPS `/` 200·무인증 API 401. DB 새 컬럼·테이블과 컨테이너 TZ의 서버 내부 실측은 deploy 계정 권한 밖이라 UNVERIFIED(앱 정상 기동으로 간접 확인), 로그인 후 화면·합성 CRUD는 PENDING. 되돌리기: `sudo buildflow-release rollback 4e565968db0b2600238f0e05add9891277d2f2fd`.
+
 **SSH와 CI/CD:** CI만으로 VPS 배포 경로가 생기지 않는다. 현재 Web Console 접속 기록에는 내부 root 공개키 경로가 있어 `PermitRootLogin no`를 복구 검증 없이 적용하지 않는다. `PasswordAuthentication`뿐 아니라 `KbdInteractiveAuthentication`의 유효 설정도 확인한다. 외부 22 차단은 터널과 일일 SSH 점검을 끊는다. 운영 VPS에 일반 self-hosted Actions runner나 Docker/root 권한을 배포 우회책으로 추가하지 않는다(현재 GitHub 저장소는 PUBLIC). 온디맨드 22는 ADR-020의 대체 경로를 실측한 뒤 별도 승인·롤백 절차로 검토한다.
 
 **릴리스 후보 증거:** `main`의 기존 5개 CI가 모두 성공한 경우에만 `docs/RELEASE_CANDIDATE.md`의 후보 JSON을 만든다. 후보는 `deploy_authorized=false`·`real_data_ready=false`이며 이미지/서버 SHA 검증, 백업·복원, 승격 승인 또는 배포를 수행하지 않는다. 실데이터 운영 게이트와 CD 활성화는 계속 `PENDING`이다.

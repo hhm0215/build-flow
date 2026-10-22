@@ -44,7 +44,7 @@
   - 2026-10-22 진행: 원인은 컨테이너 JVM 기본 시간대 UTC다. `@CreatedDate`·`LocalDateTime.now()`(알림·견적 작성일·outbox·대시보드 생성 시각 등)가 UTC 벽시계로 저장되고, API가 시간대 없는 값을 내려 브라우저가 KST로 해석한다 → 새 알림이 "9시간 전", 00~09시 작성일이 전날로 보일 수 있다(코드 대조, 화면 실측 PENDING). **에이전트 결정(추천안, 사용자 위임)**: 앱 이미지에 `ENV TZ=Asia/Seoul`을 넣어 모든 JVM(docker exec 포함)을 KST로 통일하고 CI 정적 테스트로 고정했다. 대안: 응답에 오프셋 포함(Instant/OffsetDateTime) — 변경 범위가 커서 보류.
   - 2026-10-22 실측: 같은 기반 이미지(`eclipse-temurin:17` jammy)에서 `TZ=Asia/Seoul`이면 JVM 기본 시간대 `Asia/Seoul`·`now()` KST, 없으면 `Etc/UTC`(원인 재현). OS zoneinfo도 포함됨.
   - 2026-10-22 로컬 풀 Docker 실측 PASS: 컨테이너 `TZ=Asia/Seoul`, 새 행 `created_at`·`archived_at` 원시값 동일 KST 기준, 새 알림 `createdAt` 현재 KST와 1분 이내(`docs/PILOT_QA.md`).
-  - 남은 것: VPS 반영(아래 전환 주의 확인 후). 전환 시점 주의 — 기존 테스트 행의 UTC 값은 9시간 이르게 보이며 보정하지 않는다(실데이터 없음). 배포 순간 처리 중인 outbox의 lease/재시도 시각이 9시간 지난 것으로 보여 즉시 재시도될 수 있고(eventId 멱등), 30분 넘은 것으로 보이는 OCR `PENDING`은 `FAILED`로 전환되어 수동 보정이 필요할 수 있다. VPS 반영 전 처리 중 작업이 없는지 확인한다.
+  - 2026-10-22 VPS `1d2497e` 반영 완료(처리 중 작업 0건 확인 후 배포). 남은 것: 서버 내부 컨테이너 TZ·새 행 원시값 실측(root 권한 필요). 전환 시점 주의 — 기존 테스트 행의 UTC 값은 9시간 이르게 보이며 보정하지 않는다(실데이터 없음). 배포 순간 처리 중인 outbox의 lease/재시도 시각이 9시간 지난 것으로 보여 즉시 재시도될 수 있고(eventId 멱등), 30분 넘은 것으로 보이는 OCR `PENDING`은 `FAILED`로 전환되어 수동 보정이 필요할 수 있다. VPS 반영 전 처리 중 작업이 없는지 확인한다.
 
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.

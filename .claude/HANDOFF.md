@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 16:05 KST |
-| 브랜치 | 없음 (`claude/vps-release-wrapper`는 PR로 병합) |
-| PR | main `1d2497e` 통합 완료. VPS 적용 대기 |
-| 현재 단계 | SSH(`buildflow-deploy`, IP 접속) 로그인 확인. 배포 권한 없음(sudo 암호·docker 거부) → sudo 허용 래퍼 `buildflow-release` 준비 |
-| 다음 첫 행동 | 서버에 래퍼 설치(일회성 root) 후 `sudo buildflow-release deploy 1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1` |
+| 갱신 | 2026-10-22 17:30 KST |
+| 브랜치 | 없음 |
+| PR | 열린 PR 없음. main·develop·VPS 모두 `1d2497e` 기준(develop은 이후 문서·테스트 PR 추가) |
+| 현재 단계 | 공개 VPS `1d2497e` 반영 완료(외부 200/401). 이후 배포는 PC에서 `ssh buildflow-deploy@187.127.107.70 sudo buildflow-release deploy <main SHA>` |
+| 다음 첫 행동 | 로그인 후 화면·합성 CRUD 공개 실측은 사용자 로그인 필요. 그 외 BACKLOG 다음 안전 항목 진행 |
 
 ## 공통 사용자 지시
 
