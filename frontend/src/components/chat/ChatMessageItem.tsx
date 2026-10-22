@@ -9,6 +9,7 @@ function ChatMessageItem({ message }: { message: ChatMessage }) {
       {message.role === 'assistant' && message.status === 'complete'
         ? <ReactMarkdown>{message.content}</ReactMarkdown>
         : <span>{message.content || (message.status === 'streaming' ? '...' : '')}</span>}
+      {message.errorNote && <p className="chat-error-note" role="alert">답변이 중간에 끊겼습니다. {message.errorNote}</p>}
     </div>
   )
 }
