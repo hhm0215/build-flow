@@ -1,0 +1,47 @@
+# Estimate revision upgrade rehearsal: isolated MySQL 8 + single-node KRaft Kafka.
+# No host ports, no named or anonymous volumes (tmpfs data dirs), every resource labelled with the run nonce.
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${REHEARSAL_DB_PASSWORD:?Synthetic password required}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    labels:
+      com.buildflow.flyway-rehearsal: ${REHEARSAL_NONCE:?Synthetic nonce required}
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysql --user=root --host=127.0.0.1 --protocol=TCP --batch --skip-column-names --execute='SELECT 1' | grep -qx 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  kafka:
+    image: bitnamilegacy/kafka:3.7
+    environment:
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_CFG_NUM_PARTITIONS: 3
+    labels:
+      com.buildflow.flyway-rehearsal: ${REHEARSAL_NONCE:?Synthetic nonce required}
+    tmpfs:
+      - /bitnami/kafka:mode=1777
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 5s
+      timeout: 10s
+      retries: 36
+
+networks:
+  default:
+    labels:
+      com.buildflow.flyway-rehearsal: ${REHEARSAL_NONCE:?Synthetic nonce required}

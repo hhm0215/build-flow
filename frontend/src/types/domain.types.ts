@@ -95,7 +95,10 @@ export interface Profit {
 }
 
 // ── Estimate (견적서) ─────────────────────────
-export type EstimateStatus = 'DRAFT' | 'CONFIRMED'
+// SUPERSEDED: 같은 수정 체인의 새 확정본으로 대체됨 — 이력만 남고 손익에서 빠진다.
+export type EstimateStatus = 'DRAFT' | 'CONFIRMED' | 'SUPERSEDED'
+// REVISION은 revisionOfId 견적을 대체(같은 체인), ADDITIONAL은 별도 금액으로 합산(새 체인).
+export type EstimateKind = 'ORIGINAL' | 'REVISION' | 'ADDITIONAL'
 
 export interface EstimateItem {
   id: number
@@ -114,6 +117,11 @@ export interface Estimate {
   estimateDate: string
   totalAmount: number
   memo: string
+  kind: EstimateKind
+  revisionOfId: number | null
+  /** 수정 체인 루트 id (원본·추가공사·기존 견적은 자기 id) */
+  chainRootId: number
+  supersededById: number | null
   items: EstimateItem[]
   createdAt: string
   updatedAt: string
@@ -125,6 +133,9 @@ export interface EstimateCreateRequest {
   estimateDate: string
   items: Omit<EstimateItem, 'id'>[]
   memo?: string
+  /** 생략하면 ORIGINAL. REVISION·ADDITIONAL은 revisionOfId 필수 */
+  kind?: EstimateKind
+  revisionOfId?: number
 }
 
 export interface EstimateUpdateRequest {

@@ -65,6 +65,40 @@ class ProfitServiceKafkaTest {
         siteId = siteRepository.saveAndFlush(Site.builder().siteName("동시 처리 현장").build()).getId();
     }
 
+    /**
+     * 견적 수정본 확정은 estimate.deleted(reason=SUPERSEDED, 이전 확정본 금액) + estimate.parsed(새 금액)
+     * 두 토픽으로 나뉘어 순서가 보장되지 않는다. 어느 순서·중복 재전송이든 최종 견적 합계는
+     * 최신 확정본 + 추가공사여야 한다.
+     */
+    @Test
+    void supersededRevisionPairConvergesToLatestConfirmedPlusAdditionalInAnyOrder() {
+        String original = UUID.randomUUID().toString();
+        String additional = UUID.randomUUID().toString();
+        String supersede = UUID.randomUUID().toString();
+        String revision = UUID.randomUUID().toString();
+
+        for (boolean deleteFirst : new boolean[] {true, false}) {
+            setUp();
+            profitService.applyEvent(original, ProfitEventType.ESTIMATE_PARSED, siteId, new BigDecimal("1000.00"), null);
+            profitService.applyEvent(additional, ProfitEventType.ESTIMATE_PARSED, siteId, new BigDecimal("300.00"), null);
+            if (deleteFirst) {
+                profitService.applyEvent(supersede, ProfitEventType.ESTIMATE_DELETED, siteId, new BigDecimal("1000.00"), null);
+                profitService.applyEvent(revision, ProfitEventType.ESTIMATE_PARSED, siteId, new BigDecimal("1200.00"), null);
+            } else {
+                profitService.applyEvent(revision, ProfitEventType.ESTIMATE_PARSED, siteId, new BigDecimal("1200.00"), null);
+                profitService.applyEvent(supersede, ProfitEventType.ESTIMATE_DELETED, siteId, new BigDecimal("1000.00"), null);
+            }
+            assertFalse(profitService.applyEvent(supersede, ProfitEventType.ESTIMATE_DELETED,
+                    siteId, new BigDecimal("1000.00"), null));
+            assertFalse(profitService.applyEvent(revision, ProfitEventType.ESTIMATE_PARSED,
+                    siteId, new BigDecimal("1200.00"), null));
+
+            SiteProfit profit = profitRepository.findBySiteId(siteId).orElseThrow();
+            assertEquals(0, profit.getTotalEstimateAmount().compareTo(new BigDecimal("1500.00")));
+            assertEquals(4, processedRepository.count());
+        }
+    }
+
     @Test
     void duplicateEventChangesProfitOnlyOnce() {
         String eventId = UUID.randomUUID().toString();

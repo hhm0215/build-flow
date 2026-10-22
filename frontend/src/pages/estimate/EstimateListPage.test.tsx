@@ -46,6 +46,10 @@ const estimate = (id: number, status: Estimate['status']): Estimate => ({
   estimateDate: '2026-09-19',
   totalAmount: 120000,
   memo: '',
+  kind: 'ORIGINAL',
+  revisionOfId: null,
+  chainRootId: id,
+  supersededById: null,
   items: [],
   createdAt: '2026-09-19T00:00:00',
   updatedAt: '2026-09-19T00:00:00',
@@ -113,6 +117,45 @@ describe('EstimateListPage', () => {
     expect(buttons).toHaveLength(1)
     fireEvent.click(buttons[0])
     expect(screen.getByTestId('confirm-target')).toHaveTextContent('DRAFT 견적 1')
+  })
+
+  it('확정 견적에서 항목을 복사한 수정본 초안을 원 견적 관계와 함께 작성한다', async () => {
+    estimates.items = [{
+      ...estimate(2, 'CONFIRMED'),
+      title: '본공사',
+      items: [{ id: 1, itemName: '철골', unit: '식', quantity: 2, unitPrice: 5000, amount: 10000 }],
+    }]
+    estimates.create.mockResolvedValue({})
+    render(<MemoryRouter><EstimateListPage /></MemoryRouter>)
+
+    fireEvent.click(screen.getByRole('button', { name: '수정본' }))
+    expect(await screen.findByText('수정본 작성')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('견적 제목')).toHaveValue('본공사 (수정본)')
+    expect(screen.getByPlaceholderText('품목명')).toHaveValue('철골')
+    fireEvent.change(screen.getByRole('textbox', { name: '견적일' }), { target: { value: '2026-10-23' } })
+    fireEvent.click(screen.getByRole('button', { name: /^작성$/ }))
+
+    await waitFor(() => expect(estimates.create).toHaveBeenCalledTimes(1))
+    expect(estimates.create.mock.calls[0][0]).toMatchObject({
+      siteId: 3, kind: 'REVISION', revisionOfId: 2, title: '본공사 (수정본)',
+      items: [{ itemName: '철골', unit: '식', quantity: 2, unitPrice: 5000, amount: 10000 }],
+    })
+  })
+
+  it('대체된 견적은 금액에 취소선을 긋고 관계·이력을 표시한다', () => {
+    estimates.items = [
+      { ...estimate(1, 'SUPERSEDED'), supersededById: 2 },
+      { ...estimate(2, 'CONFIRMED'), kind: 'REVISION', revisionOfId: 1, chainRootId: 1 },
+    ]
+    render(<MemoryRouter><EstimateListPage /></MemoryRouter>)
+
+    expect(screen.getByText('대체됨')).toBeInTheDocument()
+    expect(screen.getByText('수정본 ← #1')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '이력' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: '확정' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: '이력' })[1])
+    expect(screen.getByText('견적 변경 이력')).toBeInTheDocument()
+    expect(screen.getByTestId('chain-1')).toHaveTextContent('#2로 대체')
   })
 
   it('작성 중인 견적에만 수정·삭제 버튼을 표시하고 대상 견적을 연다', () => {

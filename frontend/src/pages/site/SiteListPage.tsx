@@ -73,10 +73,12 @@ const FILTER_SCHEMA: FilterSchema = {
 const ESTIMATE_STATUS_LABEL: Record<string, string> = {
   DRAFT: '작성 중',
   CONFIRMED: '확정',
+  SUPERSEDED: '대체됨',
 }
 const ESTIMATE_STATUS_COLOR: Record<string, string> = {
   DRAFT: '#71717a',
   CONFIRMED: '#22c55e',
+  SUPERSEDED: '#a1a1aa',
 }
 
 function formatKRW(value: number) {

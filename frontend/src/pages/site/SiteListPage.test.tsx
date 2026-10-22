@@ -83,7 +83,7 @@ const renderPage = () => render(<MemoryRouter><SiteListPage /></MemoryRouter>)
 const populateRelations = () => {
   query.estimates = [{
     id: 10, siteId: 4, title: '합성 견적', status: 'CONFIRMED', estimateDate: '2026-10-19',
-    totalAmount: 3000, memo: '', items: [], createdAt: '2026-10-19T00:00:00', updatedAt: '2026-10-19T00:00:00',
+    totalAmount: 3000, memo: '', kind: 'ORIGINAL', revisionOfId: null, chainRootId: 10, supersededById: null, items: [], createdAt: '2026-10-19T00:00:00', updatedAt: '2026-10-19T00:00:00',
   }]
   query.purchases = [{
     id: 11, siteId: 4, itemName: '합성 매입', quantity: 1, unitPrice: 800, totalAmount: 800,
