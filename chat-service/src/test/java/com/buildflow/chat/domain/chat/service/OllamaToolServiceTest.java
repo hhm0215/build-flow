@@ -149,4 +149,59 @@ class OllamaToolServiceTest {
         assertThat(statuses).isEmpty();
         verify(executor, never()).execute(any(), any());
     }
+
+    @Test
+    void 도구를_고르지_않은_데이터_질문은_규칙_폴백_결과로_다시_답한다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        when(executor.execute(eq("listSites"), any())).thenReturn("[{\"id\":3,\"siteName\":\"부산 창고\"}]");
+        when(executor.execute(eq("getSiteProfit"), any())).thenReturn("{\"margin\":500}");
+        List<String> bodies = new ArrayList<>();
+        AtomicInteger calls = new AtomicInteger();
+        WebClient client = WebClient.builder()
+                .exchangeFunction(request -> {
+                    String answer = calls.getAndIncrement() == 0 ? "마진은 아마 1억 원입니다." : "부산 창고 마진은 500원입니다.";
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header("Content-Type", "application/json")
+                            .body("{\"message\":{\"role\":\"assistant\",\"content\":\"" + answer + "\"}}")
+                            .build());
+                })
+                .build();
+        OllamaToolService service = new OllamaToolService(client, new ObjectMapper(), executor);
+        ReflectionTestUtils.setField(service, "model", "qwen2.5:7b");
+        ReflectionTestUtils.setField(service, "timeoutSeconds", 5);
+        ReflectionTestUtils.setField(service, "maxToolRounds", 4);
+        List<Object> messages = new ArrayList<>(List.of(Map.of("role", "user", "content", "부산 창고 마진 얼마야?")));
+
+        String answer = service.run(messages);
+
+        assertThat(answer).isEqualTo("부산 창고 마진은 500원입니다.");
+        assertThat(calls).hasValue(2);
+        assertThat(messages).anySatisfy(m -> assertThat(m).isEqualTo(Map.of(
+                "role", "tool", "tool_name", "getSiteProfit", "content", "{\"margin\":500}")));
+    }
+
+    @Test
+    void 업무와_무관한_질문은_폴백_없이_첫_답변을_쓴다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        AtomicInteger calls = new AtomicInteger();
+        WebClient client = WebClient.builder()
+                .exchangeFunction(request -> {
+                    calls.incrementAndGet();
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header("Content-Type", "application/json")
+                            .body("{\"message\":{\"role\":\"assistant\",\"content\":\"안녕하세요\"}}")
+                            .build());
+                })
+                .build();
+        OllamaToolService service = new OllamaToolService(client, new ObjectMapper(), executor);
+        ReflectionTestUtils.setField(service, "model", "qwen2.5:7b");
+        ReflectionTestUtils.setField(service, "timeoutSeconds", 5);
+        ReflectionTestUtils.setField(service, "maxToolRounds", 4);
+
+        String answer = service.run(new ArrayList<>(List.of(Map.of("role", "user", "content", "안녕"))));
+
+        assertThat(answer).isEqualTo("안녕하세요");
+        assertThat(calls).hasValue(1);
+        verify(executor, never()).execute(any(), any());
+    }
 }
