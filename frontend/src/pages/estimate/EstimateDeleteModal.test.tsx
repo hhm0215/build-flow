@@ -12,6 +12,7 @@ vi.mock('../../api/estimates.api', () => ({
 const estimate = {
   id: 9, siteId: 3, title: '초안 견적', status: 'DRAFT', estimateDate: '2026-09-19',
   totalAmount: 1000, memo: '', items: [], createdAt: '', updatedAt: '',
+  kind: 'ORIGINAL', revisionOfId: null, chainRootId: 9, supersededById: null,
 } satisfies Estimate
 
 beforeEach(() => {

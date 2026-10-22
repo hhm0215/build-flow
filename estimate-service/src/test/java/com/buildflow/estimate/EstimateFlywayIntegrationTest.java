@@ -37,9 +37,9 @@ class EstimateFlywayIntegrationTest {
     @Test
     void freshMysqlRunsV1AndHibernateValidatesWithoutCreatingBusinessData() {
         assertNotNull(flyway.info().current());
-        assertEquals("1", flyway.info().current().getVersion().toString());
-        assertEquals(1, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = 1",
+        assertEquals("2", flyway.info().current().getVersion().toString());
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('1', '2') AND success = 1",
                 Integer.class));
         for (String table : new String[] {"estimates", "estimate_items", "outbox_events"}) {
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class));
@@ -48,7 +48,9 @@ class EstimateFlywayIntegrationTest {
         String estimatesDdl = jdbc.queryForObject("SHOW CREATE TABLE estimates",
                 (resultSet, row) -> resultSet.getString(2));
         assertNotNull(estimatesDdl);
-        assertTrue(estimatesDdl.contains("enum('CONFIRMED','DRAFT')"));
+        assertTrue(estimatesDdl.contains("enum('CONFIRMED','DRAFT','SUPERSEDED')"));
+        assertTrue(estimatesDdl.contains("`kind` enum('ADDITIONAL','ORIGINAL','REVISION')"));
+        assertTrue(estimatesDdl.contains("KEY `idx_estimates_chain_root` (`chain_root_id`)"));
         assertTrue(estimatesDdl.contains("COLLATE=utf8mb4_unicode_ci"));
 
         String itemsDdl = jdbc.queryForObject("SHOW CREATE TABLE estimate_items",

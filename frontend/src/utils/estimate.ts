@@ -6,6 +6,33 @@ export function sumConfirmedEstimateAmount(estimates: Estimate[]): number {
     .reduce((sum, estimate) => sum + estimate.totalAmount, 0)
 }
 
+// 서버와 같은 체인 규칙: 수정본은 원 견적의 체인 루트를 잇고, 원본·추가공사는 자기 자신이 루트다.
+export function chainRootOf(estimate: Pick<Estimate, 'id' | 'chainRootId'>): number {
+  return estimate.chainRootId ?? estimate.id
+}
+
+/** 같은 수정 체인의 견적(원본 + 수정본)을 생성 순으로 반환한다. */
+export function estimateChain(estimates: Estimate[], target: Estimate): Estimate[] {
+  const root = chainRootOf(target)
+  return estimates
+    .filter((estimate) => estimate.siteId === target.siteId && chainRootOf(estimate) === root)
+    .sort((a, b) => a.id - b.id)
+}
+
+/** 체인 구성원 중 하나를 원 견적으로 둔 추가공사 견적. */
+export function additionsOfChain(estimates: Estimate[], chain: Estimate[]): Estimate[] {
+  const ids = new Set(chain.map((estimate) => estimate.id))
+  return estimates
+    .filter((estimate) => estimate.kind === 'ADDITIONAL' && estimate.revisionOfId != null && ids.has(estimate.revisionOfId))
+    .sort((a, b) => a.id - b.id)
+}
+
+/** target을 확정하면 대체될 현재 확정본(같은 체인에 최대 1개). */
+export function estimateSupersededByConfirming(estimates: Estimate[], target: Estimate): Estimate | null {
+  return estimateChain(estimates, target)
+    .find((estimate) => estimate.id !== target.id && estimate.status === 'CONFIRMED') ?? null
+}
+
 export function calculateDocumentProfit(estimates: Estimate[], purchases: Purchase[]) {
   const totalEstimateAmount = sumConfirmedEstimateAmount(estimates)
   const totalPurchaseAmount = purchases.reduce((sum, purchase) => sum + purchase.totalAmount, 0)

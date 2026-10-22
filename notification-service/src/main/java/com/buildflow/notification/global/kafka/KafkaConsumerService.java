@@ -61,8 +61,12 @@ public class KafkaConsumerService {
     @KafkaListener(topics = "estimate.deleted", groupId = "notification-service-group")
     public void consumeEstimateDeleted(String message) {
         Event event = parse(message, "ESTIMATE_DELETED");
-        notificationService.createNotification(event.eventId(), "ESTIMATE_DELETED",
-                String.format("견적서(ID: %d)가 삭제되었습니다.", requiredId(event.payload(), "estimateId")),
+        Long estimateId = requiredId(event.payload(), "estimateId");
+        String content = "SUPERSEDED".equals(optionalText(event.payload(), "reason"))
+                ? String.format("견적서(ID: %d)가 수정본(ID: %d) 확정으로 대체되었습니다.",
+                        estimateId, requiredId(event.payload(), "supersededById"))
+                : String.format("견적서(ID: %d)가 삭제되었습니다.", estimateId);
+        notificationService.createNotification(event.eventId(), "ESTIMATE_DELETED", content,
                 requiredId(event.payload(), "siteId"));
     }
 

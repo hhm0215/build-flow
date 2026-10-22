@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { FileText, Pencil, Plus, Trash2, Sparkles } from 'lucide-react'
+import { FileText, GitBranch, History, Pencil, Plus, Trash2, Sparkles } from 'lucide-react'
 import { Alert, Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
@@ -18,22 +18,42 @@ import UploadParseModal from './UploadParseModal'
 import EstimateConfirmModal from './EstimateConfirmModal'
 import EstimateEditModal from './EstimateEditModal'
 import EstimateDeleteModal from './EstimateDeleteModal'
+import EstimateChainModal from './EstimateChainModal'
 import type { Estimate, EstimateStatus, EstimateCreateRequest, ParsedItemResult } from '../../types'
-import { estimateTitleFromFileName, validateEstimateAmounts } from '../../utils/estimate'
-
-const STATUS_LABEL: Record<EstimateStatus, string> = {
-  DRAFT: '작성 중',
-  CONFIRMED: '확정',
-}
-const STATUS_COLOR: Record<EstimateStatus, string> = {
-  DRAFT: '#71717a',
-  CONFIRMED: '#22c55e',
-}
+import {
+  estimateSupersededByConfirming,
+  estimateTitleFromFileName,
+  truncateUtf16,
+  validateEstimateAmounts,
+} from '../../utils/estimate'
+import {
+  ESTIMATE_KIND_LABEL,
+  ESTIMATE_STATUS_COLOR as STATUS_COLOR,
+  ESTIMATE_STATUS_LABEL as STATUS_LABEL,
+} from './estimateLabels'
 
 const STATUS_OPTIONS = [
   { value: 'DRAFT' as const, label: STATUS_LABEL.DRAFT, color: STATUS_COLOR.DRAFT },
   { value: 'CONFIRMED' as const, label: STATUS_LABEL.CONFIRMED, color: STATUS_COLOR.CONFIRMED },
+  { value: 'SUPERSEDED' as const, label: STATUS_LABEL.SUPERSEDED, color: STATUS_COLOR.SUPERSEDED },
 ] as const
+
+/** 확정(또는 대체된) 견적에서 만드는 수정본·추가공사 초안. 수정본은 항목을 복사하고 추가공사는 빈 항목으로 시작한다. */
+interface DerivedDraft {
+  kind: 'REVISION' | 'ADDITIONAL'
+  source: Estimate
+}
+
+function derivedInitialValues({ kind, source }: DerivedDraft) {
+  const suffix = kind === 'REVISION' ? ' (수정본)' : ' (추가공사)'
+  return {
+    siteId: source.siteId,
+    title: truncateUtf16(source.title, 200 - suffix.length) + suffix,
+    items: kind === 'REVISION'
+      ? source.items.map(({ itemName, unit, quantity, unitPrice }) => ({ itemName, unit, quantity, unitPrice }))
+      : [],
+  }
+}
 
 interface EstimateFilters {
   q: string
@@ -46,7 +66,7 @@ interface EstimateFilters {
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
-  status: { type: 'enum', values: ['DRAFT', 'CONFIRMED'] },
+  status: { type: 'enum', values: ['DRAFT', 'CONFIRMED', 'SUPERSEDED'] },
   startDate: { type: 'date' },
   endDate: { type: 'date' },
   minAmount: { type: 'number' },
@@ -87,6 +107,24 @@ export default function EstimateListPage() {
   const [confirmTarget, setConfirmTarget] = useState<Estimate | null>(null)
   const [editTarget, setEditTarget] = useState<Estimate | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Estimate | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<Estimate | null>(null)
+  const [derived, setDerived] = useState<DerivedDraft | null>(null)
+  const relatedIds = useMemo(() => {
+    const ids = new Set<number>()
+    estimates.forEach((est) => {
+      if (est.revisionOfId != null) {
+        ids.add(est.id)
+        ids.add(est.revisionOfId)
+      }
+    })
+    return ids
+  }, [estimates])
+
+  const openDerived = (source: Estimate, kind: DerivedDraft['kind']) => {
+    setDerived({ source, kind })
+    setCreateError(null)
+    setOpen(true)
+  }
   const [pendingItems, setPendingItems] = useState<ParsedItemResult[] | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const createInFlight = useRef(false)
@@ -113,6 +151,7 @@ export default function EstimateListPage() {
     setCreateError(null)
     form.resetFields()
     setPendingItems(null)
+    setDerived(null)
   }
 
   const handleOk = async () => {
@@ -142,11 +181,13 @@ export default function EstimateListPage() {
         estimateDate: dayjs(values.estimateDate).format('YYYY-MM-DD'),
         items,
         memo: values.memo || undefined,
+        ...(derived ? { kind: derived.kind, revisionOfId: derived.source.id } : {}),
       }
 
       setCreateError(null)
       await createMutation.mutateAsync(body)
       setOpen(false)
+      setDerived(null)
       form.resetFields()
     } catch (cause: unknown) {
       if (cause && typeof cause === 'object' && 'errorFields' in cause) return
@@ -210,14 +251,18 @@ export default function EstimateListPage() {
       {confirmTarget && (
         <EstimateConfirmModal
           estimate={confirmTarget}
+          supersedes={estimateSupersededByConfirming(estimates, confirmTarget)}
           onClose={() => setConfirmTarget(null)}
         />
       )}
       {editTarget && <EstimateEditModal estimate={editTarget} onClose={() => setEditTarget(null)} />}
       {deleteTarget && <EstimateDeleteModal estimate={deleteTarget} onClose={() => setDeleteTarget(null)} />}
+      {historyTarget && (
+        <EstimateChainModal estimate={historyTarget} estimates={estimates} onClose={() => setHistoryTarget(null)} />
+      )}
 
       <Modal
-        title="견적서 작성"
+        title={derived ? `${ESTIMATE_KIND_LABEL[derived.kind]} 작성` : '견적서 작성'}
         open={open}
         onOk={handleOk}
         onCancel={closeCreate}
@@ -229,14 +274,33 @@ export default function EstimateListPage() {
         width={720}
       >
         {createError && <Alert type="error" message={createError} showIcon style={{ marginBottom: 16 }} />}
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item
-            name="siteId"
-            label="현장"
-            rules={[{ required: true, message: '현장을 선택하세요' }]}
-          >
-            <SiteSelect placeholder="현장 검색 / 선택" />
-          </Form.Item>
+        {derived && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={derived.kind === 'REVISION'
+              ? `원 견적 #${derived.source.id} ‘${derived.source.title}’의 항목을 복사했습니다. 이 수정본을 확정하면 기존 확정본은 대체됨으로 남고 손익에서 빠집니다.`
+              : `원 견적 #${derived.source.id} ‘${derived.source.title}’에 대한 추가공사입니다. 확정하면 원 견적과 별도로 합산됩니다.`}
+          />
+        )}
+        <Form
+          form={form}
+          layout="vertical"
+          style={{ marginTop: 16 }}
+          initialValues={derived ? derivedInitialValues(derived) : undefined}
+        >
+          {derived ? (
+            <Form.Item name="siteId" hidden><Input /></Form.Item>
+          ) : (
+            <Form.Item
+              name="siteId"
+              label="현장"
+              rules={[{ required: true, message: '현장을 선택하세요' }]}
+            >
+              <SiteSelect placeholder="현장 검색 / 선택" />
+            </Form.Item>
+          )}
           <Form.Item
             name="title"
             label="견적 제목"
@@ -431,7 +495,7 @@ export default function EstimateListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['제목', '상태', '총액', '항목 수', '견적일', '처리'].map((h) => (
+                {['제목', '관계', '상태', '총액', '항목 수', '견적일', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -454,6 +518,10 @@ export default function EstimateListPage() {
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                     {est.title}
                   </td>
+                  <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {ESTIMATE_KIND_LABEL[est.kind]}
+                    {est.revisionOfId != null && ` ← #${est.revisionOfId}`}
+                  </td>
                   <td style={{ padding: '14px 20px' }}>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: '3px 8px',
@@ -465,7 +533,10 @@ export default function EstimateListPage() {
                       {STATUS_LABEL[est.status]}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>
+                  <td style={{
+                    padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600,
+                    textDecoration: est.status === 'SUPERSEDED' ? 'line-through' : 'none',
+                  }}>
                     {est.totalAmount > 0 ? formatKRW(est.totalAmount) : '—'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
@@ -475,13 +546,23 @@ export default function EstimateListPage() {
                     {est.estimateDate}
                   </td>
                   <td style={{ padding: '14px 20px' }}>
-                    {est.status === 'DRAFT' ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <Button size="small" onClick={() => setConfirmTarget(est)}>확정</Button>
-                        <Button size="small" icon={<Pencil size={12} />} onClick={() => setEditTarget(est)}>수정</Button>
-                        <Button size="small" danger icon={<Trash2 size={12} />} onClick={() => setDeleteTarget(est)}>삭제</Button>
-                      </div>
-                    ) : '—'}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {est.status === 'DRAFT' ? (
+                        <>
+                          <Button size="small" onClick={() => setConfirmTarget(est)}>확정</Button>
+                          <Button size="small" icon={<Pencil size={12} />} onClick={() => setEditTarget(est)}>수정</Button>
+                          <Button size="small" danger icon={<Trash2 size={12} />} onClick={() => setDeleteTarget(est)}>삭제</Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button size="small" icon={<GitBranch size={12} />} onClick={() => openDerived(est, 'REVISION')}>수정본</Button>
+                          <Button size="small" icon={<Plus size={12} />} onClick={() => openDerived(est, 'ADDITIONAL')}>추가공사</Button>
+                        </>
+                      )}
+                      {relatedIds.has(est.id) && (
+                        <Button size="small" icon={<History size={12} />} onClick={() => setHistoryTarget(est)}>이력</Button>
+                      )}
+                    </div>
                   </td>
                 </motion.tr>
               ))}

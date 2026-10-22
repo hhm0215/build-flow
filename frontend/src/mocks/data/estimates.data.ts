@@ -9,6 +9,7 @@ export const mockEstimates: Estimate[] = [
     estimateDate: '2026-01-10',
     totalAmount: 25_000_000,
     memo: '',
+    kind: 'ORIGINAL', revisionOfId: null, chainRootId: 1, supersededById: null,
     items: [
       { id: 1, itemName: '구조용 철골 용접', unit: '식', quantity: 1, unitPrice: 15_000_000, amount: 15_000_000 },
       { id: 2, itemName: '배관 연결 용접', unit: 'm', quantity: 200, unitPrice: 50_000, amount: 10_000_000 },
@@ -24,6 +25,7 @@ export const mockEstimates: Estimate[] = [
     estimateDate: '2026-03-05',
     totalAmount: 20_000_000,
     memo: '추가공사 견적',
+    kind: 'ADDITIONAL', revisionOfId: 1, chainRootId: 2, supersededById: null,
     items: [
       { id: 3, itemName: '추가 배관 설치', unit: '식', quantity: 1, unitPrice: 12_000_000, amount: 12_000_000 },
       { id: 4, itemName: '방청 도장', unit: '㎡', quantity: 400, unitPrice: 20_000, amount: 8_000_000 },
@@ -39,6 +41,7 @@ export const mockEstimates: Estimate[] = [
     estimateDate: '2026-01-28',
     totalAmount: 28_000_000,
     memo: '',
+    kind: 'ORIGINAL', revisionOfId: null, chainRootId: 3, supersededById: null,
     items: [
       { id: 5, itemName: '급수 배관', unit: 'm', quantity: 500, unitPrice: 35_000, amount: 17_500_000 },
       { id: 6, itemName: '배수 배관', unit: 'm', quantity: 350, unitPrice: 30_000, amount: 10_500_000 },
@@ -54,6 +57,7 @@ export const mockEstimates: Estimate[] = [
     estimateDate: '2025-09-20',
     totalAmount: 62_000_000,
     memo: '',
+    kind: 'ORIGINAL', revisionOfId: null, chainRootId: 4, supersededById: null,
     items: [
       { id: 7, itemName: '고압 배관 설치', unit: 'm', quantity: 800, unitPrice: 55_000, amount: 44_000_000 },
       { id: 8, itemName: '밸브 설치', unit: '개', quantity: 60, unitPrice: 300_000, amount: 18_000_000 },
@@ -69,6 +73,7 @@ export const mockEstimates: Estimate[] = [
     estimateDate: '2026-04-01',
     totalAmount: 0,
     memo: '초안',
+    kind: 'ORIGINAL', revisionOfId: null, chainRootId: 5, supersededById: null,
     items: [],
     createdAt: '2026-04-01T14:00:00',
     updatedAt: '2026-04-01T14:00:00',

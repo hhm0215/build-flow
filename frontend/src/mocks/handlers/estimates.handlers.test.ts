@@ -76,6 +76,43 @@ describe('견적 MSW 수정·삭제 계약', () => {
     expect((await fetch(itemUrl)).status).toBe(200)
   })
 
+  it('수정본 확정은 이전 확정본을 대체됨으로 남기고, 관계 오류는 400·대체본 변경은 409다', async () => {
+    const post = async (body: Record<string, unknown>) => fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        siteId: 3, title: '체인', estimateDate: '2026-10-23',
+        items: [{ itemName: '자재', unit: 'EA', quantity: 1, unitPrice: 1000, amount: 1000 }],
+        ...body,
+      }),
+    })
+    const confirm = (id: number) =>
+      fetch(new URL(`/api/v1/estimates/${id}/confirm`, document.baseURI), { method: 'PATCH' })
+    const get = async (id: number) =>
+      (await (await fetch(new URL(`/api/v1/estimates/${id}`, document.baseURI))).json() as ApiResponse<Estimate>).data
+
+    const original = (await (await post({})).json() as ApiResponse<Estimate>).data
+    expect((await post({ kind: 'REVISION', revisionOfId: original.id })).status).toBe(400) // 초안은 원 견적 불가
+    await confirm(original.id)
+    expect((await post({ siteId: 4, kind: 'REVISION', revisionOfId: original.id })).status).toBe(400)
+    expect((await post({ kind: 'ORIGINAL', revisionOfId: original.id })).status).toBe(400)
+
+    const revision = (await (await post({ kind: 'REVISION', revisionOfId: original.id })).json() as ApiResponse<Estimate>).data
+    const additional = (await (await post({ kind: 'ADDITIONAL', revisionOfId: original.id })).json() as ApiResponse<Estimate>).data
+    expect(revision).toMatchObject({ kind: 'REVISION', revisionOfId: original.id, chainRootId: original.chainRootId })
+    expect(additional.chainRootId).toBe(additional.id)
+
+    expect((await confirm(revision.id)).status).toBe(200)
+    expect((await confirm(additional.id)).status).toBe(200)
+    expect(await get(original.id)).toMatchObject({ status: 'SUPERSEDED', supersededById: revision.id })
+    expect((await get(revision.id)).status).toBe('CONFIRMED')
+    expect((await get(additional.id)).status).toBe('CONFIRMED')
+
+    const originalUrl = new URL(`/api/v1/estimates/${original.id}`, document.baseURI)
+    expect((await fetch(originalUrl, { method: 'DELETE' })).status).toBe(409)
+    expect((await confirm(original.id)).status).toBe(409)
+    expect((await confirm(revision.id)).status).toBe(409)
+  })
+
   it('DB 정밀도에서 항목 금액이 달라지는 요청은 400으로 거절한다', async () => {
     const invalid = await fetch(url, {
       method: 'POST', headers,
