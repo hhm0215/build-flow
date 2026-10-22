@@ -5,6 +5,18 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공개 VPS를 main `0fe8c9a`로 반영 (2026-10-23)
+
+- 2026-10-23 `sudo buildflow-release deploy 0fe8c9a…`(PR #198: 분할 입금·수주 전 상태·매입 증빙 연결·채팅 끊김 표시)가 처리 중 작업 0건과 백업·격리 복원 확인을 거쳐 EXIT 0으로 끝났다.
+- 스키마는 ddl-auto update로 자동 반영했다. 사전 운영형 리허설(PR #197)은 PASS였다. 반영 후 실측:
+  - 공개 `/` 200, 무인증 API 401
+  - loopback 프론트→Gateway 세금계산서 API 401
+  - 리스닝 포트 변화 없음(22/80/443, loopback 3000·3306·8080)
+  - tax·site·purchase 재시작 없이 Up
+- UNVERIFIED(root 권한 필요): DB 안의 `tax_payments` 생성·기존 입금 확인 이관 건수, `sites.status` BIDDING.
+- 되돌리기: `sudo buildflow-release rollback d8f3b3dfa04b1073bc66bba715d32e845e205348`. BIDDING 행이 있으면 런북 절차를 먼저 따른다.
+- V1 **40/100** 유지.
+
 ## 완료된 작업 — tax 분할 입금·site BIDDING 업그레이드 리허설 (2026-10-23)
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-tax-site.ps1`: 격리 MySQL 8(`bfupg<난수>`, 포트 비게시·tmpfs)에서 운영 main `d8f3b3d` 코드로 스키마·합성 행을 만들고 develop `6ccb3e5`를 `ddl-auto update`로 올렸다. `tax_payments` 생성·입금 확인 건만 이관 1건·재기동 중복 0·미수금/부분 입금/초과 400/취소, enum `BIDDING`·생성·IN_PROGRESS 전환, 이전 코드 되돌리기(BIDDING 낮춘 뒤 정상) PASS 23. WARN 1: 되돌림 중 부분 입금 계산서를 입금 확인 후 재반영하면 PAID인데 입금액이 부분 합계(잔액 기록으로 정상화) → `docs/RELEASE_RUNBOOK.md` 되돌리기 주의. 잔여 리소스 0. **VPS 미반영**. V1 **40/100** 유지.
