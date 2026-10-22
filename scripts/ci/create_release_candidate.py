@@ -18,6 +18,7 @@ REQUIRED_RESULTS = {
     "purchase-flyway": "RESULT_PURCHASE_FLYWAY",
     "tax-flyway": "RESULT_TAX_FLYWAY",
     "site-flyway": "RESULT_SITE_FLYWAY",
+    "notification-flyway": "RESULT_NOTIFICATION_FLYWAY",
     "frontend": "RESULT_FRONTEND",
     "backup-synthetic": "RESULT_BACKUP_SYNTHETIC",
     "public-compose": "RESULT_PUBLIC_COMPOSE",
