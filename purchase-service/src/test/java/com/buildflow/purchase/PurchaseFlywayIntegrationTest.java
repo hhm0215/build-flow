@@ -35,9 +35,9 @@ class PurchaseFlywayIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void freshMysqlRunsV1AndHibernateValidatesWithoutCreatingBusinessData() {
+    void freshMysqlRunsV1V2AndHibernateValidatesWithoutCreatingBusinessData() {
         assertNotNull(flyway.info().current());
-        assertEquals("1", flyway.info().current().getVersion().toString());
+        assertEquals("2", flyway.info().current().getVersion().toString());
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = 1",
                 Integer.class));
@@ -50,6 +50,8 @@ class PurchaseFlywayIntegrationTest {
         assertTrue(purchasesDdl.contains("`event_revision` bigint NOT NULL"));
         assertTrue(purchasesDdl.contains("`unit_price` decimal(12,2) NOT NULL"));
         assertTrue(purchasesDdl.contains("COLLATE=utf8mb4_unicode_ci"));
+        assertTrue(purchasesDdl.contains("`evidence_tax_invoice_id` bigint DEFAULT NULL"));
+        assertTrue(purchasesDdl.contains("KEY `idx_purchases_evidence_tax_invoice`"));
 
         String outboxDdl = jdbc.queryForObject("SHOW CREATE TABLE outbox_events",
                 (resultSet, row) -> resultSet.getString(2));

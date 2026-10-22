@@ -31,6 +31,7 @@
 - **2026-10-22 문자열 한도 확장**: 견적(제목 200·메모 1000·항목명 200·단위 20)·매입/세금계산서 메모(16,000)·보증(보험사 200·증권번호 100·메모 16,000) 등록/수정 API도 DB 컬럼 한도 초과를 저장 전 400으로 막고 프론트 입력 길이를 맞췄다. OCR 추출값은 보험사 고정 목록·증권번호 30자 이하라 한도 안이다. CRUD 전체 실동선 완료로 보지 않는다.
 - **2026-10-23 분할 입금**: 에이전트 결정(위임)으로 매출 세금계산서 입금 내역 다건 기록·취소(삭제 아님)·잔액 기준 미수금, 초과 400, 보관 현장 기록 허용/취소 409를 `claude/tax-partial-payments`에 구현(단위·H2·MSW PASS). 남은 것: PR·CI, 로컬 풀 Docker에서 `tax_payments` 자동 생성·기존 입금 확인 이관 실측, VPS 반영. **main·VPS 미반영**.
 - **2026-10-23 수주 전 현장(BIDDING)**: 업무 순서(견적→계약→현장) 해소를 위해 현장 상태 `BIDDING`을 추가했다(에이전트 결정, `docs/PILOT_QA.md`). 브랜치 `claude/site-bidding-status` 푸시, PR·`main`·VPS 미반영. 남은 것: PR/CI, 공개 VPS 반영 후 `sites.status` enum 확인(`docs/RELEASE_RUNBOOK.md`)과 BIDDING 현장 생성→견적→수주 전환 실동선 실측.
+- **2026-10-23 매입↔증빙 세금계산서 연결**: 에이전트 결정(위임)으로 원가는 매입 항목만, 매입 계산서는 증빙 연결(`evidence_tax_invoice_id`)·현장별 대조 요약, 연결된 계산서 삭제/매출 전환 409를 `claude/purchase-evidence-link`에 구현(단위·MSW PASS). 남은 것: PR·CI, 풀 Docker에서 컬럼 자동 추가·Feign 양방향 실측, VPS 반영 후 운영 DDL이 Flyway V1과 달라지는 점 반영. **main·VPS 미반영**.
 - **관련 파일**: `docs/PILOT_QA.md`, `frontend/src/pages/`, `chat-service`, 각 업무 서비스
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS

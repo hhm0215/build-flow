@@ -24,7 +24,8 @@ class TaxInvoiceOutstandingTest {
     private final TaxInvoiceRepository repository = mock(TaxInvoiceRepository.class);
     private final TaxPaymentService paymentService = mock(TaxPaymentService.class);
     private final TaxInvoiceService service = new TaxInvoiceService(
-            repository, mock(KafkaProducerService.class), mock(SiteReferenceValidator.class), paymentService);
+            repository, mock(KafkaProducerService.class), mock(SiteReferenceValidator.class), paymentService,
+            mock(PurchaseEvidenceGuard.class));
 
     private static TaxInvoice sales(long id, String supply, String tax, LocalDate issueDate) {
         TaxInvoice invoice = TaxInvoice.builder()

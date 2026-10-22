@@ -36,6 +36,7 @@ vi.mock('../../api/estimates.api', () => ({
 }))
 vi.mock('../../api/purchases.api', () => ({
   usePurchases: () => ({ data: query.purchases, isLoading: false, isError: query.purchasesError, refetch: query.purchasesRefetch }),
+  usePurchaseEvidenceSummary: () => ({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() }),
 }))
 vi.mock('../../api/taxes.api', () => ({
   useTaxes: () => ({ data: query.taxes, isLoading: false, isError: query.taxesError, refetch: query.taxesRefetch }),
