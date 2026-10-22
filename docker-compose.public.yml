@@ -3,20 +3,25 @@
 # Business services trust the Gateway's X-User-Id and do not re-check JWTs, so
 # their ports are not published at all: only Gateway/frontend stay on loopback
 # for the SSH tunnel. Health is checked inside the containers (buildflow-release status).
-x-internal-only: &internal-only
-  ports: !reset []
-
 services:
-  eureka-server: *internal-only
-  config-server: *internal-only
-  auth-service: *internal-only
-  estimate-service: *internal-only
-  site-service: *internal-only
-  purchase-service: *internal-only
-  tax-service: *internal-only
-  notification-service: *internal-only
-  chat-service: *internal-only
-
+  eureka-server:
+    ports: !reset []
+  config-server:
+    ports: !reset []
+  auth-service:
+    ports: !reset []
+  estimate-service:
+    ports: !reset []
+  site-service:
+    ports: !reset []
+  purchase-service:
+    ports: !reset []
+  tax-service:
+    ports: !reset []
+  notification-service:
+    ports: !reset []
+  chat-service:
+    ports: !reset []
   gateway-server:
     environment:
       CORS_ALLOWED_ORIGINS: https://${PUBLIC_HOST:?PUBLIC_HOST must be set in environment},http://localhost:13000,http://127.0.0.1:13000
