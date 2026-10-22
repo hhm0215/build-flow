@@ -11,7 +11,7 @@
 
 ## 완료된 작업 — 공개 스택 업무 서비스 포트 비게시 (2026-10-22)
 
-- 2026-10-22 Gateway 우회 차단: 공개 VPS override에서 auth·estimate·site·purchase·tax·notification·chat·Eureka·Config 포트를 호스트에 게시하지 않고(`ports: !reset []`, VPS Compose v5.5.1 실측), CI 검증기가 frontend·gateway·DB/메시징 외 게시를 거부한다(회귀 2건, 21개 PASS). `buildflow-release status`에 컨테이너 내부 health 점검을 추가했다(설치본은 root 갱신 전 미적용). 계획 `.claude/plans/2026-10-22-vps-internal-ports.md`. V1 **40/100** 유지 — 보안 게이트 보강이며 새 체크포인트 통과는 아니다.
+- 2026-10-22 Gateway 우회 차단: 공개 VPS override에서 auth·estimate·site·purchase·tax·notification·chat·Eureka·Config 포트를 호스트에 게시하지 않고(`ports: !reset []`, VPS Compose v5.5.1 실측), CI 검증기가 frontend·gateway·DB/메시징 외 게시를 거부한다(회귀 2건, 21개 PASS). `buildflow-release status`에 컨테이너 내부 health 점검을 추가했다(설치본은 root 갱신 전 미적용). 계획 `.claude/plans/2026-10-22-vps-internal-ports.md`. 후속으로 Redis·Kafka·Zipkin 포트도 비게시(호스트 게시는 Caddy 80/443 외 loopback frontend·gateway·mysql만). V1 **40/100** 유지 — 보안 게이트 보강이며 새 체크포인트 통과는 아니다.
 
 ## 완료된 작업 — 공개 VPS를 main `1d2497e`로 반영 (2026-10-22)
 

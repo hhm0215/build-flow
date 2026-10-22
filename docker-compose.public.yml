@@ -3,7 +3,15 @@
 # Business services trust the Gateway's X-User-Id and do not re-check JWTs, so
 # their ports are not published at all: only Gateway/frontend stay on loopback
 # for the SSH tunnel. Health is checked inside the containers (buildflow-release status).
+# Redis (no password, token blacklist), Kafka (event injection) and Zipkin (traces)
+# are not published either; MySQL stays on loopback behind its password.
 services:
+  redis:
+    ports: !reset []
+  kafka:
+    ports: !reset []
+  zipkin:
+    ports: !reset []
   eureka-server:
     ports: !reset []
   config-server:

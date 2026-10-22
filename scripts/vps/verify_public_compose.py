@@ -6,8 +6,9 @@ import re
 import sys
 
 # Business services trust Gateway headers (X-User-Id) without re-checking JWTs,
-# so only these may publish a port, and only on loopback.
-LOOPBACK_ALLOWED = {"frontend", "gateway-server", "mysql", "redis", "kafka", "zipkin"}
+# Redis has no password and Kafka accepts any producer, so only these may
+# publish a port, and only on loopback.
+LOOPBACK_ALLOWED = {"frontend", "gateway-server", "mysql"}
 
 
 def verify_service_isolation(service_name: str, service: dict, volumes: dict) -> None:
