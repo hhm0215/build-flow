@@ -4,6 +4,7 @@
 #   sudo buildflow-release status
 #   sudo buildflow-release deploy <CI 검증된 origin/main 40자리 SHA>
 #   sudo buildflow-release rollback <되돌릴 이전 40자리 SHA>
+#   sudo buildflow-release schema            # 읽기 전용: 업무 스키마 SHOW CREATE TABLE만 stdout으로
 #
 # deploy는 docs/RELEASE_RUNBOOK.md 순서를 그대로 실행한다: 처리 중 작업 0건 → 현재 이미지 보존 →
 # main SHA 일치 확인·checkout → 순차 빌드 → 앱 정지 → 백업·격리 복원 확인 → 기동.
@@ -15,6 +16,7 @@ REPO=/opt/buildflow
 HOST_FILE=/etc/buildflow/public_host
 BACKUP_ROOT=/root/buildflow-backups
 APPS=(frontend gateway-server auth-service site-service estimate-service purchase-service tax-service notification-service chat-service)
+SCHEMAS=(buildflow_auth buildflow_chat buildflow_estimate buildflow_purchase buildflow_tax buildflow_site buildflow_notification)
 
 fail() { echo "중단: $*" >&2; exit 1; }
 [ "$(id -u)" = 0 ] || fail "root(sudo)로 실행한다"
@@ -22,6 +24,10 @@ fail() { echo "중단: $*" >&2; exit 1; }
 PUBLIC_HOST=$(tr -d '[:space:]' < "$HOST_FILE")
 [[ "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || fail "공개 호스트명 형식이 아니다"
 export PUBLIC_HOST
+# root가 저장소의 git·스크립트를 실행하므로, 배포 계정이 저장소나 .git 설정·훅을 바꿀 수 없어야 한다.
+[ "$(stat -c %U "$REPO" "$REPO/.git" "$REPO/.git/config" "$REPO/.git/hooks" | sort -u)" = root ] || fail "$REPO 와 .git 이 root 소유가 아니다"
+[ -z "$(find "$REPO" -path "$REPO/.git/objects" -prune -o \( -perm -g+w -o -perm -o+w \) -print -quit)" ] || fail "$REPO 안에 group/other 쓰기 가능 파일이 있다"
+git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 cd "$REPO"
 C=(docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml)
 
@@ -53,9 +59,39 @@ SELECT (SELECT COUNT(*) FROM buildflow_notification.outbox_events WHERE status I
      + (SELECT COUNT(*) FROM buildflow_notification.defect_warranties WHERE ocr_status = \"PENDING\")" 2>/dev/null'
 }
 
+# 읽기 전용 질의. 쿼리는 stdin으로 넘겨 셸 인용을 피하고, 비밀번호는 컨테이너 안 환경변수에서만 읽는다.
+mysql_ro() {
+  docker exec -i buildflow-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot -N -B --raw --default-character-set=utf8mb4'
+}
+
+# 하드코딩한 업무 스키마의 테이블 구조만 출력한다. 데이터 행·계정·비밀값은 조회하지 않고 쓰기도 없다.
+# AUTO_INCREMENT=N(행 수 단서)은 지운다. 형식은 scripts/db/flyway-ddl-compare.ps1 ConvertFrom-DdlDump 입력이다.
+schema_dump() {
+  local db t tables
+  local -a names
+  echo "-- buildflow-release schema HEAD $(git rev-parse HEAD) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  for db in "${SCHEMAS[@]}"; do
+    echo "-- schema: $db"
+    # 대입으로 받아야 질의 실패가 set -e로 중단된다(for 목록 안 치환은 실패를 삼킨다).
+    tables=$(printf "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME;\n" "$db" | mysql_ro)
+    [ -n "$tables" ] || continue
+    mapfile -t names <<< "$tables"
+    for t in "${names[@]}"; do
+      [[ "$t" =~ ^[A-Za-z0-9_]+$ ]] || fail "예상 밖 테이블 이름: $db"
+      echo "-- table: $t"
+      printf 'SHOW CREATE TABLE `%s`.`%s`;\n' "$db" "$t" | mysql_ro | sed -E '1s/^[A-Za-z0-9_]+\t//; s/ AUTO_INCREMENT=[0-9]+//'
+      echo ";"
+    done
+  done
+}
+
 case "$MODE" in
   status)
     status
+    ;;
+  schema)
+    [ -z "$SHA" ] || fail "schema 모드는 인자를 받지 않는다"
+    schema_dump
     ;;
   deploy)
     check_sha
@@ -106,6 +142,6 @@ case "$MODE" in
     echo "되돌림: HEAD=$SHA (DB 스키마 추가분은 이전 코드와 호환되어 그대로 둔다)"
     ;;
   *)
-    fail "사용법: buildflow-release status | deploy <sha> | rollback <sha>"
+    fail "사용법: buildflow-release status | schema | deploy <sha> | rollback <sha>"
     ;;
 esac

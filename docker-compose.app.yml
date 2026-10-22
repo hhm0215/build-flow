@@ -105,8 +105,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${AUTH_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       REDIS_HOST: redis
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
@@ -139,8 +139,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${ESTIMATE_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${ESTIMATE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # 기본은 호스트 native Ollama. Compose Ollama profile은 http://ollama:11434로 override한다.
@@ -176,8 +176,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${SITE_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${SITE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # 컨테이너 localhost는 호스트 Ollama에 도달하지 못하므로 host.docker.internal을 사용한다.
@@ -212,8 +212,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${PURCHASE_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${PURCHASE_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
@@ -246,8 +246,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${TAX_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${TAX_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
@@ -280,8 +280,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       UPLOAD_DIR: /app/uploads/warranties
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
@@ -318,8 +318,8 @@ services:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
       CONFIG_SERVER_URL: http://config-server:8888
       DB_HOST: mysql
-      DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      DB_USERNAME: ${CHAT_DB_USERNAME:-${DB_USERNAME:-root}}
+      DB_PASSWORD: ${CHAT_DB_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD must be set in .env}}
       REDIS_HOST: redis
       # 기본은 호스트 native Ollama. Compose Ollama profile은 http://ollama:11434로 override한다.
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}

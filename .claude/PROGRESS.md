@@ -5,6 +5,30 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 운영 DDL ↔ V1 대조 경로 준비 (2026-10-23)
+
+- 2026-10-23 root 래퍼 `buildflow-release`에 읽기 전용 `schema` 모드(하드코딩 7개 스키마, `information_schema.TABLES` 목록 → `SHOW CREATE TABLE`, `AUTO_INCREMENT=N` 제거, 데이터·계정·비밀값 미조회)를 추가하고, 리허설에 `-ProdDdlPath`(+Docker 없는 `-V1DdlDirectory`) 서비스별 차이 표를 붙였다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`로 분리, 합성 픽스처(일치·컬럼 타입 차이·테이블 누락·빈 스키마·UTF-16 입력) 테스트를 CI windows-readiness에, 래퍼 `bash -n`을 public-compose에 연결. 직전 리허설 출력으로 오프라인 대조 7/7 MATCH 재현. 운영 실측은 main 병합·root 래퍼 재설치 후 PENDING. V1 **40/100** 유지.
+
+## 완료된 작업 — Flyway 기존 DB baseline 격리 리허설 (2026-10-23)
+
+- 2026-10-23 `scripts/db/flyway-baseline-rehearsal.ps1`(+ compose): 무작위 `bfbase<난수>` project의 포트 비게시·tmpfs MySQL 8에서 7개 DB 서비스를 운영 방식(ddl-auto update, auth schema.sql)으로 `*_legacy`, Flyway V1로 `*_v1`에 만들어 정규화 `SHOW CREATE TABLE`과 `information_schema`(컬럼·인덱스·FK·CHECK)를 비교했다. 의미 차이 0 — charset 표기(`CHARACTER SET` 중복 출력)와 site·notification 컬럼 순서만 무해 차이. legacy에 일회성 baseline(1) 후 일반 flyway 프로파일 재기동에서 migrate 0·Hibernate validate·history `1|1|BASELINE|1` 7/7 PASS, 정리 후 잔여 리소스 0. 운영 VPS 실제 DDL은 접근 권한이 없어 미대조(배포 전 덤프 19개 vs 현재 21개 테이블) — 운영 백업 격리 복원본 비교가 남은 게이트. CI는 무거워 미추가(`docs/DATABASE_OPERATIONS.md`). V1 **40/100** 유지.
+
+## 완료된 작업 — 공개 스택 프록시 네트워크 분리 (2026-10-23)
+
+- 2026-10-23 독립 보안 검토 후속(Low): 공개 override에서만 `buildflow-edge` 네트워크를 만들어 caddy·frontend는 edge에만, gateway-server는 edge와 `buildflow-net` 둘 다 붙였다(서비스마다 `networks: !override`, 별칭 없음). 로컬(app.yml)·LAN 구성은 불변. `verify_public_compose.py`가 caddy/frontend의 내부 서비스 네트워크 공유·`network_mode`·기본 네트워크와 gateway 양쪽 연결 누락을 거부한다(회귀 6건, 27개 PASS, 이전 구성은 거부 확인). 무작위 이름 네트워크 실측에서 edge 쪽은 `gateway-server`만 해석·HTTP 성공, `site-service`·`redis`는 해석 불가. VPS 미반영(배포 시 caddy·frontend·gateway 재생성). V1 **40/100** 유지.
+
+## 완료된 작업 — 서비스별 DB 계정 E1 준비 (2026-10-23)
+
+- 2026-10-23 DB 마이그레이션 Phase E1: 7개 DB 서비스가 공유하던 root 대신 `buildflow_<svc>`@'%' 계정에 자기 스키마 ALL(DDL 포함, `ddl-auto: update` 유지 때문)만 주는 `scripts/db/service-accounts.ps1`(비밀번호는 환경변수/`-EnvFile`→stdin, 재실행 시 권한 drift 제거)과 `docker-compose.app.yml`의 `<SVC>_DB_USERNAME/PASSWORD` opt-in(미설정 시 기존 root 경로)을 추가했다. 무작위 격리 project MySQL 8에서 7계정 생성·자기 스키마 DDL/DML·타 스키마/`mysql.user`/CREATE DATABASE/CREATE USER 거부·재실행 idempotent·site-service를 `buildflow_site`로 기동해 health UP까지 PASS, CI `db-service-accounts` job 추가. 기존 로컬·VPS DB에는 적용하지 않았다. E2(DML 전용)는 Flyway 운영 전환 후. V1 **40/100** 유지.
+
+## 완료된 작업 — AI 채팅 모델 실시간 토큰 스트리밍 (2026-10-23)
+
+- 2026-10-23 chat Phase 3 이관 항목: `OllamaToolService`가 도구 없이 새로 생성하는 최종 답변(규칙 폴백 후 재답변, 도구 라운드 상한 후 강제 답변)을 Ollama `stream:true`(NDJSON)로 받아 `message.content` 조각이 도착하는 대로 SSE token으로 넘기고 전체 연결 문자열을 반환한다. 바이트를 누적해 개행에서만 줄을 잘라 청크 경계·한글 중간 분할에 안전하고, 앞쪽 공백만 온 조각은 보류해 빈 답변이면 기존 안내 문구를 흘린다. 오류 줄·HTTP 오류·timeout(조각 간·전체 경과)은 `CHAT_LLM_FAILED`, 조각 소비자 예외(SSE 끊김)는 호출 스레드에서 그대로 전파. 도구 선택 라운드는 stream:false 유지, 첫 라운드 무도구 답변은 재생성 없이 기존 조각 relay(LLM 1회). 단위 테스트 7건 추가(chat 39개 중 38 PASS·Flyway 통합 1 skip). 실제 Ollama 스트리밍 실측은 PENDING. V1 **40/100** 유지.
+
+## 완료된 작업 — 릴리스 보안 검토 후속 (2026-10-23)
+
+- 2026-10-23 security-reviewer 독립 검토(`1d2497e..da012cd`)에서 Critical/High 코드 결함 없음. 후속: `buildflow-release`가 저장소·`.git` root 소유와 group/other 쓰기 불가를 확인하고 git을 `core.hooksPath=/dev/null`·`core.fsmonitor=false`로 실행, 런북 래퍼 설치 원본을 `origin/main`으로 변경. chat `ToolExecutor` 오류 JSON을 직렬화기로 감싸고(도구 이름 따옴표 회귀) 실패 로그는 예외 종류만 남긴다. 서버 비root 실측: 저장소 root 소유·쓰기 가능 파일 0·deploy 계정 docker 그룹 없음. 새 래퍼는 root 재설치 전 미적용. V1 **40/100** 유지.
+
 ## 완료된 작업 — AI 채팅 규칙 폴백 라우터 (2026-10-22)
 
 - 2026-10-22 chat Phase 3 마지막 항목: 모델이 첫 라운드에서 도구 없이 답한 질문에 손익·미수·견적·매입·요약·현장 목록 키워드가 있으면 `IntentRouter`가 질문 속 현장 이름(공백 무시, 긴 이름 우선 최대 3개)으로 도구를 골라 실행하고, 그 결과를 넣어 도구 없이 다시 답하게 한다. 현장을 특정하지 못하면 전체 요약·현장 목록을 근거로 넣는다. 업무와 무관한 질문은 기존처럼 첫 답변(LLM 1회). 단위 테스트 9건 추가(chat 32개 PASS). 실제 7b 모델 실측은 PENDING. V1 **40/100** 유지.

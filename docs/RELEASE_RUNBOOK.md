@@ -17,8 +17,10 @@
 PC의 `buildflow-deploy` SSH 키로 접속한 에이전트가 배포할 수 있도록, root 소유 래퍼 하나만 sudo로 허용한다. 래퍼는 CI 검증된 `origin/main`과 정확히 같은 40자리 SHA만 배포하고, 아래 0~5단계(처리 중 작업 0건, 이미지 보존, 순차 빌드, 백업·격리 복원 확인, 기동)를 그대로 실행한다. 임의 명령은 받지 않는다. 일회성 설정은 Web Console root에서 한다.
 
 ```bash
-cd /opt/buildflow && git fetch origin
-git show origin/develop:scripts/vps/root/buildflow-release > /usr/local/sbin/buildflow-release
+cd /opt/buildflow && git fetch origin main:refs/remotes/origin/main
+chown -R root:root /opt/buildflow && chmod -R go-w /opt/buildflow   # 래퍼가 소유권·쓰기 권한을 검사한다
+id buildflow-deploy   # docker 그룹이 없어야 한다(있으면 sudo 제한이 무의미)
+git show origin/main:scripts/vps/root/buildflow-release > /usr/local/sbin/buildflow-release   # CI 검증된 main 기준
 chown root:root /usr/local/sbin/buildflow-release && chmod 755 /usr/local/sbin/buildflow-release
 install -d -m 700 /etc/buildflow && printf '%s
 ' "실제-공개-호스트명" > /etc/buildflow/public_host && chmod 600 /etc/buildflow/public_host
@@ -27,7 +29,23 @@ printf '%s
 chmod 440 /etc/sudoers.d/buildflow-release && visudo -cf /etc/sudoers.d/buildflow-release
 ```
 
-이후 PC에서: `ssh buildflow-deploy@<서버> sudo buildflow-release status | deploy <main SHA> | rollback <이전 SHA>`. 접속 시 호스트 키는 2026-10-22 확인한 ED25519 `SHA256:7bqzBJZH/AYX6h8HYLuhDR/0+vUjcFqqo8fUWLJ2zCs`와 일치해야 한다(PC `known_hosts`의 호스트명 항목은 재설치 전 키라 IP 항목으로 접속한다).
+래퍼를 갱신할 때도 같은 명령으로 `origin/main`에서 다시 설치한다(2026-10-23 보안 검토: 설치 원본을 develop에서 main으로, 저장소 root 소유·git 훅 비활성 검사 추가). 2026-10-23 비root 실측: `/opt/buildflow`·`.git`·`.git/config`·`.git/hooks` 모두 `root:root`, deploy 계정 쓰기 가능 파일 0, deploy 계정 그룹에 docker 없음.
+
+이후 PC에서: `ssh buildflow-deploy@<서버> sudo buildflow-release status | schema | deploy <main SHA> | rollback <이전 SHA>`. 접속 시 호스트 키는 2026-10-22 확인한 ED25519 `SHA256:7bqzBJZH/AYX6h8HYLuhDR/0+vUjcFqqo8fUWLJ2zCs`와 일치해야 한다(PC `known_hosts`의 호스트명 항목은 재설치 전 키라 IP 항목으로 접속한다).
+
+### 운영 DDL 받기 (`schema`, 읽기 전용 — Flyway baseline 게이트용)
+
+`schema` 모드는 `docker exec buildflow-mysql`로 하드코딩한 7개 업무 스키마(`buildflow_auth/chat/estimate/purchase/tax/site/notification`)의 테이블 목록을 `information_schema.TABLES`에서 얻어 `SHOW CREATE TABLE`만 stdout으로 출력한다. `AUTO_INCREMENT=N`은 지우고, 데이터 행·사용자 계정·비밀값은 조회하지 않으며 쓰기·재기동도 없다. 출력은 앞에 `-- schema:`/`-- table:` 표식이 붙은 텍스트다.
+
+```bash
+# PC(Git Bash 또는 cmd)에서 — 출력은 테이블 구조뿐이지만 저장소 밖 개인 폴더에 둔다
+ssh buildflow-deploy@<서버 IP> sudo buildflow-release schema > prod-ddl.sql
+# 대조 (Docker 불필요: 직전 리허설 출력 폴더의 <service>-v1.sql 사용)
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-rehearsal.ps1 -ProdDdlPath prod-ddl.sql -V1DdlDirectory <리허설 출력 폴더>
+# 또는 V1 스키마를 새로 만들며 같이 대조: -ProdDdlPath prod-ddl.sql 만 추가
+```
+
+Windows PowerShell 5.1의 `>`는 UTF-16으로 저장하지만 비교 스크립트는 BOM을 인식하므로 그대로 써도 된다. **`schema` 모드는 2026-10-23 추가분이라, 서버의 `/usr/local/sbin/buildflow-release`가 이 변경이 `main`에 병합된 뒤 root가 위 설치 명령으로 다시 설치하기 전에는 없다**(래퍼는 root 소유라 배포 계정·에이전트가 갱신할 수 없다). 결과 해석과 차이 처리 원칙은 `docs/DATABASE_OPERATIONS.md` "기존 DB baseline 리허설"을 따른다.
 
 ## 0. 사전 조건
 

@@ -117,6 +117,82 @@ CI의 `인증 DB (Flyway · MySQL 8)` job은 임시 MySQL 8의 빈 `buildflow_au
 
 기존 데이터가 있는 스키마는 V1을 그대로 실행하거나 자동 baseline하지 않는다. Phase B의 관리자 로그인 검증과 원본/복원 DB의 실제 `SHOW CREATE TABLE` 대조가 끝난 뒤, **격리 복원 환경**에서 일회성 `baseline(version=1)`·`migrate`·로그인/로그아웃·행/제약 불변을 먼저 검증한다. 그 전에는 운영 프로파일 전환, `schema.sql` 제거 또는 VPS 배포를 하지 않는다. MySQL DDL 실패는 전체 트랜잭션 롤백으로 복구된다고 가정하지 않는다.
 
+### 기존 DB baseline 리허설 (ddl-auto 스키마 ↔ V1 정합)
+
+`scripts/db/flyway-baseline-rehearsal.ps1`은 "운영과 같은 방식으로 만든 스키마"에 `baseline(version=1)`을 걸어도 안전한지 격리 환경에서 확인한다. Windows PowerShell 5.1에서 실행하며 pwsh 전용 문법은 쓰지 않는다.
+
+```powershell
+.\gradlew.bat :auth-service:bootJar :chat-service:bootJar :estimate-service:bootJar :purchase-service:bootJar :tax-service:bootJar :site-service:bootJar :notification-service:bootJar -x test
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-rehearsal.ps1   # -BuildJars, -Services tax 등 선택
+```
+
+절차:
+
+1. 무작위 Compose project `bfbase<난수>`에 MySQL 8 하나만 띄운다(`flyway-baseline-rehearsal.compose.yml`). 호스트 포트를 게시하지 않고 데이터는 tmpfs라 named/anonymous volume이 생기지 않으며, 컨테이너·네트워크에 실행별 nonce label을 붙인다. 기존 `buildflow` project·볼륨·이미지는 건드리지 않는다.
+2. 스키마 A(`buildflow_<svc>_legacy`): 로컬 bootJar를 `eclipse-temurin:17-jre-jammy` 컨테이너에 읽기 전용으로 마운트해 **기본 프로파일**(ddl-auto `update`, auth는 `schema.sql` + `validate`)로 기동한다. Eureka·Config·Kafka 리스너·토픽 생성은 끄고 DB만 실제로 쓴다.
+3. 스키마 B(`buildflow_<svc>_v1`): `<svc>-flyway` 프로파일로 기동해 V1 적용 + Hibernate `validate`.
+4. 비교: 정규화한 `SHOW CREATE TABLE`(`AUTO_INCREMENT=n` 제거, 아래 charset 표기 정규화)의 줄 단위 비교와 `information_schema`의 테이블 엔진·collation, 컬럼(타입·NULL·기본값·extra·collation), 인덱스, FK(참조·규칙), CHECK 제약 집합 비교. 컬럼 순서만 다른 테이블은 무해로 따로 표시한다.
+5. 차이가 0인 서비스만 A에 일회성 `--spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=1`을 **명령행 인자로 한 번만** 주어 baseline하고, 이어서 일반 `<svc>-flyway` 프로파일(상시 `baseline-on-migrate=false`)로 재기동해 "up to date / No migration necessary"·기동 성공·history가 정확히 `1|1|BASELINE|1`(B는 `1|1|SQL|1`)인지 확인한다.
+6. 종료 시 nonce label을 재확인한 앱 컨테이너만 `stop`·`rm`하고, project 이름(`^bfbase\d+$`)과 label이 맞을 때만 `docker compose down`(`-v` 없음)한 뒤 남은 컨테이너·네트워크·볼륨 0개를 확인한다. 로그·정규화 DDL·`report.txt`·`summary.json`은 `%TEMP%\buildflow-flyway-rehearsal-<nonce>`에 남는다.
+
+**2026-10-23 결과 (develop `ade9577`, MySQL 8.0.46) — 7개 서비스 ALL PASSED**
+
+| 서비스 | 테이블 | 의미 차이 | DDL 줄 차이 | 컬럼 순서만 다름 | baseline → migrate 0 + validate |
+|---|---|---|---|---|---|
+| auth | 1 | 0 | 0 | - | PASS |
+| chat | 2 | 0 | 0 | - | PASS |
+| estimate | 3 | 0 | 0 | - | PASS |
+| purchase | 2 | 0 | 0 | - | PASS |
+| tax | 2 | 0 | 0 | - | PASS |
+| site | 5 | 0 | 0 | `clients`, `sites` | PASS |
+| notification | 6 | 0 | 0 | `defect_warranties`, `outbox_events` | PASS |
+
+무해로 판정한 정규화 차이:
+
+- **charset 표기**: V1처럼 컬럼에 `COLLATE`를 명시해 만든 테이블은 `SHOW CREATE TABLE`이 `CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`로 출력하고, Hibernate가 만든 테이블은 `COLLATE utf8mb4_unicode_ci`만 출력한다(B쪽 74개 컬럼). `information_schema`의 charset·collation은 동일하므로 데이터 사전 표기 차이다.
+- **컬럼 순서**: 빈 DB에서 Hibernate는 `id` 뒤 알파벳 순으로 만들지만, V1은 나중에 `ddl-auto update`가 끝에 덧붙인 컬럼(`clients/sites.archived_at`, `defect_warranties.expiry_confirmed_at`, `outbox_events.suppressed_at`)이 마지막에 있는 로컬 DB에서 떠 왔다. 운영 DB도 같은 이력이라면 V1 순서가 더 가깝다. 컬럼 순서는 Flyway baseline·Hibernate validate에 영향이 없다.
+
+한계와 남은 위험:
+
+- 이 리허설의 A는 **현재 코드로 빈 DB에서 새로 만든** ddl-auto 스키마다. 운영 VPS 스키마는 과거 엔티티 이력 위에 `update`가 누적된 결과이며, `update`는 컬럼 타입 변경·NOT NULL/UNIQUE 추가·컬럼 삭제를 반영하지 않으므로 운영에만 남은 오래된 컬럼·제약이 있을 수 있다. 에이전트는 VPS DB 접근 권한이 없어 **운영 실제 `SHOW CREATE TABLE`과는 대조하지 못했다.** (2026-10-22 배포 전 백업 덤프는 19개 테이블, 현재 코드 기준은 21개 — 배포 후 `update`로 생긴 테이블이 있는지 미확인.)
+- 따라서 운영 baseline 전 필수 게이트: 운영 백업(no-data 포함) → 격리 복원 → 복원 스키마와 V1 스키마를 같은 기준(정규화 `SHOW CREATE TABLE` + `information_schema` 집합)으로 비교. 차이가 나오면 V1을 운영에 맞춰 고치지 않고(V1은 이미 신규 DB 기준으로 통합됨), **추천안: baseline 전에 운영 쪽을 V1과 같게 만드는 수동 정렬 SQL을 격리 복원본에서 먼저 검증한 뒤 운영에 적용하고 baseline(version=1)** 한다. V2 정합 마이그레이션은 신규 DB(V1)에도 같은 변경을 강제해 V1·V2 의미가 꼬이므로 운영 전용 잔여물 정리에는 쓰지 않는다. 운영 백업 복원과 이 비교는 사용자 승인된 VPS 작업 경로로만 수행한다.
+- **운영 DDL 1차 대조 경로 (2026-10-23 추가)**: root 래퍼의 읽기 전용 `sudo buildflow-release schema`로 운영 7개 스키마의 `SHOW CREATE TABLE`을 PC에 받아 `-ProdDdlPath prod-ddl.sql`(Docker 없이 하려면 `-V1DdlDirectory <리허설 출력 폴더>` 추가)로 V1과 같은 정규화(`AUTO_INCREMENT=n` 제거·charset 표기·`flyway_schema_history` 제외)로 비교한다. 서비스별로 prod/V1 테이블 수, 한쪽에만 있는 테이블, 줄 차이 테이블, 컬럼 순서만 다른 테이블을 표로 내고 차이가 있으면 종료 코드 1이다. 받는 절차와 래퍼 재설치 필요성은 `docs/RELEASE_RUNBOOK.md` "운영 DDL 받기"를 따른다. 이 경로는 DDL 텍스트 비교만 하므로 `information_schema` 집합 비교·격리 복원 baseline 리허설을 대신하지 않는다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`, 합성 픽스처 테스트는 `scripts/db/test-flyway-ddl-compare.ps1`(CI windows-readiness)다.
+- CI 미추가: 7개 bootJar 빌드와 JVM 28회 기동이 필요해 무겁고, 서비스별 빈 DB V1+validate는 기존 `*-flyway` CI job이 이미 검증한다. 이 리허설은 엔티티·V1 변경 시와 운영 baseline 직전에 수동으로 다시 돌리는 일회성 게이트로 둔다.
+
+## Phase E1: 서비스별 runtime DB 계정 (opt-in)
+
+**결정 (2026-10-23, 위임된 에이전트 결정)**: 7개 DB 서비스가 공유하던 MySQL root 대신 서비스마다 `buildflow_<svc>`@`'%'` 계정을 두고, 자기 스키마 `buildflow_<svc>.*`에만 `ALL PRIVILEGES`(DDL 포함)를 준다. 다른 스키마·`mysql` 시스템 스키마·전역 권한(`CREATE USER`, `PROCESS` 등)·`GRANT OPTION`은 없다. 한 서비스의 자격 증명이나 SQL 주입이 다른 서비스 데이터와 계정 관리로 번지는 범위를 줄이는 것이 목적이다.
+
+- **대안 — 처음부터 DML 전용**: 운영은 아직 Hibernate `ddl-auto: update`(auth는 `schema.sql`)라서 기동 시 `CREATE/ALTER TABLE` 권한이 필요하다. DML만 주면 Entity 변경 후 기동이 실패하므로 Flyway 운영 전환 전에는 채택하지 않는다.
+- **E2(후속)**: 서비스별 Flyway 운영 전환이 끝나면 runtime 계정은 `SELECT/INSERT/UPDATE/DELETE`만 두고, 마이그레이션은 별도 계정이나 배포 단계에서 수행한다.
+- **기본값 불변**: `docker-compose.app.yml`은 `<SVC>_DB_USERNAME`/`<SVC>_DB_PASSWORD`가 없으면 기존 `DB_USERNAME`(기본 root)/`DB_PASSWORD`를 그대로 쓴다. 앱 `application.yml`의 `DB_USERNAME`/`DB_PASSWORD` 키는 바꾸지 않았다.
+
+### 계정 생성·갱신
+
+비밀번호는 파일·명령행에 남기지 않는다. 현재 PowerShell 프로세스 환경변수 `<SVC>_DB_PASSWORD`(예: `SITE_DB_PASSWORD`, 16자 이상) 또는 `-EnvFile .env`의 `*_DB_PASSWORD` 줄에서 읽어 `docker exec -i` stdin으로 mysql에 전달한다. root 비밀번호는 대상 컨테이너의 `MYSQL_ROOT_PASSWORD`를 컨테이너 안에서만 사용한다.
+
+```powershell
+.\scripts\db\service-accounts.ps1 -EnvFile .\.env          # 7개 전체, 기본 대상 buildflow-mysql
+.\scripts\db\service-accounts.ps1 -Service site -EnvFile .\.env
+```
+
+스크립트는 하나라도 비밀번호가 없거나 짧으면 아무 계정도 바꾸지 않고 중단한다. 재실행은 안전하다: `CREATE USER IF NOT EXISTS` → 비밀번호를 입력값으로 재설정 → `REVOKE ALL PRIVILEGES, GRANT OPTION` → 자기 스키마 `GRANT ALL`을 다시 적용하므로 손으로 붙인 추가 권한(drift)도 제거된다. `docker/mysql/init`은 새 volume에서만 실행되므로 계정·비밀번호를 넣지 않는다.
+
+적용 순서: 백업 → 스크립트 실행 → `.env`에 `<SVC>_DB_USERNAME=buildflow_<svc>`와 같은 비밀번호를 **쌍으로** 추가 → 해당 서비스만 재생성 → health·로그 확인. USERNAME만 넣고 PASSWORD를 빠뜨리면 root 비밀번호로 접속을 시도해 인증 실패로 기동이 멈춘다(안전 실패). 되돌리기는 두 키를 지우고 서비스를 재생성하면 root 경로로 복귀한다.
+
+### 검증
+
+`scripts/db/test-service-accounts-docker.ps1`은 무작위 Compose project(`bfacct<난수>`, 호스트 DB 포트 없음)의 MySQL 8에서 다음을 확인하고 그 project의 컨테이너와 이름·label을 재확인한 자기 volume만 제거한다. CI `db-service-accounts` job이 같은 스크립트를 실행한다.
+
+- 비밀번호 1개 누락 시 거부·계정 0개, 7계정 생성 시 출력에 비밀번호 미노출
+- 각 계정 `SHOW GRANTS`가 정확히 `USAGE ON *.*` + 자기 스키마 `ALL`
+- 자기 스키마 `CREATE/ALTER/INDEX/INSERT/UPDATE/SELECT/DELETE/DROP` 허용, `CREATE DATABASE IF NOT EXISTS <자기 스키마>`(chat/notification JDBC `createDatabaseIfNotExist`) 허용
+- 다른 스키마 SELECT/INSERT(1142), `mysql.user`(1142), 새 DB 생성(1044), `CREATE USER`(1227) 거부, `SHOW DATABASES`에 자기 BuildFlow 스키마만 노출
+- 교차 스키마 SELECT·전역 `PROCESS`를 주입한 뒤 재실행하면 제거되고 계정 수 7 유지
+- `-ValidateSiteService`: site-service 이미지를 `buildflow_site`로 기동해 `/actuator/health` UP, Hibernate `update`가 테이블 생성
+
+2026-10-23 로컬 Windows Docker에서 전 항목 PASS(site 테이블 5개). **기존 로컬·VPS DB에는 계정을 만들지 않았고 VPS에 적용하지 않았다.** 운영 적용은 백업·서비스별 전환 확인을 거친 별도 작업이다.
+
 ## 참고
 
 - [Flyway baselines](https://documentation.red-gate.com/fd/baselines-273973441.html)
