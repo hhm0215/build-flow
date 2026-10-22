@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 서비스별 DB 계정 E1 준비 (2026-10-23)
+
+- 2026-10-23 DB 마이그레이션 Phase E1: 7개 DB 서비스가 공유하던 root 대신 `buildflow_<svc>`@'%' 계정에 자기 스키마 ALL(DDL 포함, `ddl-auto: update` 유지 때문)만 주는 `scripts/db/service-accounts.ps1`(비밀번호는 환경변수/`-EnvFile`→stdin, 재실행 시 권한 drift 제거)과 `docker-compose.app.yml`의 `<SVC>_DB_USERNAME/PASSWORD` opt-in(미설정 시 기존 root 경로)을 추가했다. 무작위 격리 project MySQL 8에서 7계정 생성·자기 스키마 DDL/DML·타 스키마/`mysql.user`/CREATE DATABASE/CREATE USER 거부·재실행 idempotent·site-service를 `buildflow_site`로 기동해 health UP까지 PASS, CI `db-service-accounts` job 추가. 기존 로컬·VPS DB에는 적용하지 않았다. E2(DML 전용)는 Flyway 운영 전환 후. V1 **40/100** 유지.
+
 ## 완료된 작업 — AI 채팅 규칙 폴백 라우터 (2026-10-22)
 
 - 2026-10-22 chat Phase 3 마지막 항목: 모델이 첫 라운드에서 도구 없이 답한 질문에 손익·미수·견적·매입·요약·현장 목록 키워드가 있으면 `IntentRouter`가 질문 속 현장 이름(공백 무시, 긴 이름 우선 최대 3개)으로 도구를 골라 실행하고, 그 결과를 넣어 도구 없이 다시 답하게 한다. 현장을 특정하지 못하면 전체 요약·현장 목록을 근거로 넣는다. 업무와 무관한 질문은 기존처럼 첫 답변(LLM 1회). 단위 테스트 9건 추가(chat 32개 PASS). 실제 7b 모델 실측은 PENDING. V1 **40/100** 유지.

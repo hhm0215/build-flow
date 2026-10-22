@@ -394,6 +394,16 @@ jobs:
       - name: Snapshot and restore isolated synthetic DB and warranty volume
         run: sh -c 'umask 077; exec pwsh -NoProfile -File scripts/db/test-v2-snapshot-docker.ps1'
 
+  db-service-accounts:
+    name: 서비스별 DB 계정 (E1 · MySQL 8)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build site-service image for runtime account boot check
+        run: docker build --file Dockerfile --build-arg SERVICE_NAME=site-service --tag build-flow-site-service:latest .
+      - name: Verify own-schema-only accounts in isolated MySQL
+        run: pwsh -NoProfile -File scripts/db/test-service-accounts-docker.ps1 -ValidateSiteService
+
   public-compose:
     name: VPS HTTPS (Compose · Caddy)
     runs-on: ubuntu-24.04
