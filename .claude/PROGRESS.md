@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 로컬 풀 Docker CRUD 삭제·재집계·시간대 실측 (2026-10-22)
+
+- 최신 `develop`으로 전체 이미지를 순차 재빌드(기존 볼륨 유지)하고 합성 `[QA]` 자료로 견적 초안 삭제, 매입 삭제 후 손익 재집계, 미입금 세금계산서 삭제·입금 확인 건 삭제 409, 입력 길이 400, 새 알림·DB 원시값 KST 일치 18/18 PASS(서비스 포트 직접 호출). Gateway·화면·공개 VPS는 PENDING. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 컨테이너 JVM 시간대 KST 통일 (2026-10-22)
 
 - 앱 이미지 두 Dockerfile 런타임 단계에 `ENV TZ=Asia/Seoul`을 넣어 `@CreatedDate`·`now()` 저장 기준을 명시적 KST 기록·브라우저 해석과 맞췄다(알림 "9시간 전" 표시 원인). `scripts/ci/test_container_timezone.py`로 고정. 2026-10-22 기반 이미지 실측: `TZ` 지정 시 JVM `Asia/Seoul`, 미지정 시 `Etc/UTC`. 풀 스택 새 행 원시값·VPS 반영 PENDING(BACKLOG P1 항목에 전환 주의 기록). V1 **40/100** 변동 없음.
