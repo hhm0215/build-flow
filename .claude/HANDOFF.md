@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 15:20 KST |
-| 브랜치 | 없음 (`claude/chat-history-tail`은 PR로 병합) |
-| PR | 채팅 이력 PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 채팅 이력 최근 N개 조회 |
-| 다음 첫 행동 | BACKLOG 다음 안전 항목(chat Phase 3 나머지·테스트 커버리지) |
+| 갱신 | 2026-10-22 15:35 KST |
+| 브랜치 | 없음 (`claude/release-runbook`은 PR로 병합) |
+| PR | 런북 PR 병합 후 #99(develop→main) 정리. main 병합·VPS 적용은 사용자 승인 대기 |
+| 현재 단계 | VPS 반영 준비(스키마 리허설·백업 스크립트·런북) |
+| 다음 첫 행동 | PR #99 제목·본문 갱신·CI 확인 → 사용자에게 main 병합 승인 요청 → 승인 후 `docs/RELEASE_RUNBOOK.md` 순서로 VPS 적용(사용자 Web Console) |
 
 ## 공통 사용자 지시
 

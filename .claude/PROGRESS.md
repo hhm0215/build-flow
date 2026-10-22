@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — VPS 반영 준비: 스키마 리허설·배포 직전 백업 스크립트·런북 (2026-10-22)
+
+- VPS 실행 코드(`4e56596`) 대비 엔티티 변경은 site·notification뿐임을 확인했다. 구버전 notification 스키마를 격리 DB에 재현하고 새 이미지를 기동해 `ddl-auto=update`가 enum `SUPPRESSED`·nullable 컬럼·새 테이블 2개를 자동 반영하고 기존 행을 보존함을 실측했다(리허설 DB 삭제). `scripts/vps/predeploy_backup.sh`(앱 정지 확인→7개 스키마 덤프·행 수→보증 volume tar→체크섬→임시 MySQL 격리 복원 행 수 대조→임시 자원만 정리)를 로컬 스택에서 21개 테이블 PASS, 앱 실행 중 거부를 확인했다. `docs/RELEASE_RUNBOOK.md`에 사전 점검·빌드·백업·기동·확인·되돌리기 명령을 정리했다. VPS 실행은 사용자 승인 대기. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 프론트 필터·디바운스 훅 테스트 (2026-10-22)
 
 - `useFilterParams` 4건(스키마 타입 파싱, 잘못된 값 버림·URL 정리·스키마 밖 파라미터 유지, 빈 문자열 무시, setFilters 쓰기·삭제)과 `useDebouncedValue` 2건을 추가했다. 프론트 테스트 174건·lint 통과. V1 **40/100** 변동 없음.
