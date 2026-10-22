@@ -54,7 +54,7 @@ public final class ToolCatalog {
                         "전체 현장에 대한 AI 요약 대시보드를 조회한다.",
                         noParams()),
                 tool("listEstimatesBySite",
-                        "특정 현장의 견적서 목록(제목, 상태 DRAFT/CONFIRMED, 견적일, 금액)을 조회한다. 손익에는 확정(CONFIRMED) 견적만 반영된다.",
+                        "특정 현장의 견적서 목록(제목, 상태 DRAFT/CONFIRMED/SUPERSEDED, 견적일, 금액)을 조회한다. 손익에는 확정(CONFIRMED) 견적만 반영되고, 수정본에 대체된(SUPERSEDED) 견적은 이력일 뿐 손익에서 빠진다.",
                         siteIdParam()),
                 tool("listPurchasesBySite",
                         "특정 현장의 매입 목록(품목, 수량, 단가, 금액, 공급업체, 매입일)을 조회한다.",

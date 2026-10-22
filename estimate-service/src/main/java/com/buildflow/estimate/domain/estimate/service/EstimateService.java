@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -120,8 +121,11 @@ public class EstimateService {
         siteReferenceValidator.requireSiteNotArchived(estimate.getSiteId());
         requireDraft(estimate);
 
-        List<Estimate> effective = estimateRepository
-                .findChainMembersByStatusForUpdate(chainRootId, EstimateStatus.CONFIRMED);
+        List<Estimate> effective = new ArrayList<>();
+        if (root.getStatus() == EstimateStatus.CONFIRMED) {
+            effective.add(root);
+        }
+        effective.addAll(estimateRepository.findRevisionsByStatusForUpdate(chainRootId, EstimateStatus.CONFIRMED));
         for (Estimate previous : effective) {
             if (previous == estimate) {
                 continue;
