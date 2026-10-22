@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 매입 항목 ↔ 증빙 매입 세금계산서 연결 (2026-10-23)
+
+- 2026-10-23 PILOT_QA 원가·세금계산서 행 해소(에이전트 결정, 사용자 위임): 원가 단일 진실원은 매입 항목 유지, 매입 계산서는 증빙으로만 연결. purchase-service에 nullable `evidence_tax_invoice_id`(+인덱스, Flyway V2 멱등)와 `PUT/DELETE /purchases/{id}/evidence`, `GET /purchases/evidence-summary?siteId`, `GET /purchases/evidence-links?taxInvoiceId`를 추가했다. 연결은 tax-service Feign 조회로 없는/매출/다른 현장 계산서 400, 장애 503, 보관 현장 409이며 손익 이벤트 없음. tax-service는 연결된 매입 계산서 삭제·매출 전환 409(purchase Feign, 장애 503). 프론트 매입 목록 증빙 열·연결 모달, 현장 상세 매입 탭 대조 요약(미연결 금액, 계산서−연결 매입 차이 공급가/합계 기준, 끊어진 연결·매입 없는 계산서 경고), MSW 동기화. purchase 43(1 skip)·tax 72(1 skip)·Vitest 199 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+
 ## 완료된 작업 — 공개 VPS를 main `da012cd`·`d8f3b3d`로 반영 (2026-10-23)
 
 - 2026-10-23 PC에서 `sudo buildflow-release deploy`로 두 번 반영했다. 두 번 모두 처리 중 작업 0건, 백업·격리 복원 확인, EXIT 0이었다.

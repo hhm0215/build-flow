@@ -19,7 +19,7 @@ vi.mock('./PurchaseDeleteModal', () => ({
 
 const purchase = (id: number, itemName: string, purchaseDate: string | null): Purchase => ({
   id, siteId: 3, itemName, quantity: 2, unitPrice: 1000, totalAmount: 2000,
-  supplier: null, purchaseDate, memo: null,
+  supplier: null, purchaseDate, memo: null, evidenceTaxInvoiceId: null,
   createdAt: '2026-09-24T00:00:00', updatedAt: '2026-09-24T00:00:00',
 })
 

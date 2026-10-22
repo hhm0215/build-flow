@@ -21,6 +21,8 @@ public class PurchaseResponse {
     private String supplier;
     private LocalDate purchaseDate;
     private String memo;
+    /** 증빙 매입 세금계산서 ID. 미연결이면 null. */
+    private Long evidenceTaxInvoiceId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -35,6 +37,7 @@ public class PurchaseResponse {
                 .supplier(purchase.getSupplier())
                 .purchaseDate(purchase.getPurchaseDate())
                 .memo(purchase.getMemo())
+                .evidenceTaxInvoiceId(purchase.getEvidenceTaxInvoiceId())
                 .createdAt(purchase.getCreatedAt())
                 .updatedAt(purchase.getUpdatedAt())
                 .build();

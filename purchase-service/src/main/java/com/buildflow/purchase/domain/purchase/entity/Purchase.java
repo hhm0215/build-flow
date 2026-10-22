@@ -17,7 +17,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "purchases")
+@Table(name = "purchases", indexes = @Index(
+        name = "idx_purchases_evidence_tax_invoice", columnList = "evidence_tax_invoice_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
@@ -56,6 +57,12 @@ public class Purchase {
     @Column(nullable = false)
     private long eventRevision = 1L;
 
+    /**
+     * 증빙 매입 세금계산서 ID(tax-service). 원가의 단일 진실원은 매입 항목이며 계산서는 증빙으로만 연결한다.
+     * 매입 1건은 계산서 최대 1건, 계산서 1건은 같은 현장 매입 0..N건과 연결된다. 손익 이벤트와 무관하다.
+     */
+    private Long evidenceTaxInvoiceId;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -92,6 +99,15 @@ public class Purchase {
         this.purchaseDate = purchaseDate;
         this.memo = memo;
         this.eventRevision = Math.addExact(this.eventRevision, 1L);
+    }
+
+    /** 연결 대상 검증(존재·매입 유형·같은 현장)은 서비스가 tax-service 조회로 먼저 끝낸다. */
+    public void linkEvidence(Long taxInvoiceId) {
+        this.evidenceTaxInvoiceId = taxInvoiceId;
+    }
+
+    public void unlinkEvidence() {
+        this.evidenceTaxInvoiceId = null;
     }
 
     public long incrementEventRevision() {

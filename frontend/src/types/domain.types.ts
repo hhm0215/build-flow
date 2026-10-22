@@ -160,8 +160,48 @@ export interface Purchase {
   supplier: string | null
   purchaseDate: string | null
   memo: string | null
+  /** 증빙 매입 세금계산서 ID. 미연결이면 null. 원가 계산에는 영향 없음 */
+  evidenceTaxInvoiceId: number | null
   createdAt: string
   updatedAt: string
+}
+
+export interface PurchaseEvidenceLinkRequest {
+  taxInvoiceId: number
+}
+
+/** 매입 계산서 1건 기준 연결 매입 대조. 차이 = 계산서 금액 − 연결 매입 합계 */
+export interface PurchaseInvoiceEvidence {
+  taxInvoiceId: number
+  counterparty: string | null
+  issueDate: string | null
+  supplyAmount: number
+  totalAmount: number
+  linkedPurchaseCount: number
+  linkedPurchaseAmount: number
+  supplyDifference: number
+  totalDifference: number
+}
+
+/** 현장별 매입 항목 ↔ 매입 세금계산서 증빙 대조. 원가는 매입 항목만 사용한다 */
+export interface PurchaseEvidenceSummary {
+  siteId: number
+  purchaseCount: number
+  purchaseAmount: number
+  linkedPurchaseCount: number
+  linkedPurchaseAmount: number
+  /** 증빙 미연결(끊어진 연결 포함) */
+  unlinkedPurchaseCount: number
+  unlinkedPurchaseAmount: number
+  /** 연결된 계산서가 삭제됐거나 더 이상 같은 현장 매입 계산서가 아닌 매입 */
+  brokenLinkCount: number
+  invoiceCount: number
+  invoiceSupplyAmount: number
+  invoiceTotalAmount: number
+  invoiceWithoutPurchaseCount: number
+  supplyDifference: number
+  totalDifference: number
+  invoices: PurchaseInvoiceEvidence[]
 }
 
 export interface PurchaseCreateRequest {

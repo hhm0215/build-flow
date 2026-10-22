@@ -10,6 +10,10 @@ spring:
           purchaseSiteReferenceClient:
             connect-timeout: 2000
             read-timeout: 3000
+          # 증빙 연결 검증·대조 요약용 tax-service 조회. 실패 시 503(fail-closed)
+          purchaseTaxInvoiceReferenceClient:
+            connect-timeout: 2000
+            read-timeout: 3000
   application:
     name: purchase-service
   jackson:

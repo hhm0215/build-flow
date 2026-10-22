@@ -35,6 +35,7 @@ import { calculateDocumentProfit } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
+import PurchaseEvidenceSummaryCard from './PurchaseEvidenceSummaryCard'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   BIDDING: '수주 전',
@@ -477,7 +478,9 @@ export default function SiteDetailPage() {
             {
               key: 'purchases',
               label: tabLabel('매입', purchases.length, purchasesLoading, purchasesError),
-              children: purchasesError ? (
+              children: <>
+                <PurchaseEvidenceSummaryCard siteId={siteId} />
+                {purchasesError ? (
                 <ErrorState message="매입 내역을 불러오지 못했습니다." onRetry={purchasesRefetch} />
               ) : purchasesLoading ? (
                 <ListSkeleton />
@@ -529,7 +532,8 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 연결된 매입 내역이 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
             {
               key: 'taxes',

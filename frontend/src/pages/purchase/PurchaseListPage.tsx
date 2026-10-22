@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { ShoppingBag, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ShoppingBag, Pencil, Plus, Trash2, FileCheck } from 'lucide-react'
 import { Alert, Button, Modal, Form, Input, InputNumber, DatePicker } from 'antd'
 import SiteSelect from '../../components/SiteSelect'
 import dayjs from 'dayjs'
@@ -15,6 +15,7 @@ import { useListFilters } from '../../hooks/useListFilters'
 import { usePurchases, useCreatePurchase } from '../../api/purchases.api'
 import PurchaseEditModal from './PurchaseEditModal'
 import PurchaseDeleteModal from './PurchaseDeleteModal'
+import PurchaseEvidenceModal from './PurchaseEvidenceModal'
 import type { Purchase, PurchaseCreateRequest } from '../../types'
 import { validatePurchaseAmount } from '../../utils/purchase'
 
@@ -63,6 +64,7 @@ export default function PurchaseListPage() {
   const [open, setOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Purchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null)
+  const [evidenceTarget, setEvidenceTarget] = useState<Purchase | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const createInFlight = useRef(false)
   const [form] = Form.useForm()
@@ -135,6 +137,7 @@ export default function PurchaseListPage() {
 
       {editTarget && <PurchaseEditModal purchase={editTarget} onClose={() => setEditTarget(null)} />}
       {deleteTarget && <PurchaseDeleteModal purchase={deleteTarget} onClose={() => setDeleteTarget(null)} />}
+      {evidenceTarget && <PurchaseEvidenceModal purchase={evidenceTarget} onClose={() => setEvidenceTarget(null)} />}
 
       <Modal
         title="매입 등록"
@@ -277,7 +280,7 @@ export default function PurchaseListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['품목명', '수량', '단가', '금액', '거래처', '매입일', '처리'].map((h) => (
+                {['품목명', '수량', '단가', '금액', '거래처', '매입일', '증빙', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -315,8 +318,16 @@ export default function PurchaseListPage() {
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)' }}>
                     {p.purchaseDate || '-'}
                   </td>
+                  <td style={{ padding: '14px 20px', fontSize: 12 }}>
+                    {p.evidenceTaxInvoiceId != null ? (
+                      <span style={{ color: '#22c55e', fontWeight: 600 }}>계산서 #{p.evidenceTaxInvoiceId}</span>
+                    ) : (
+                      <span style={{ color: '#f59e0b' }}>미연결</span>
+                    )}
+                  </td>
                   <td style={{ padding: '14px 20px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
+                      <Button size="small" icon={<FileCheck size={12} />} onClick={() => setEvidenceTarget(p)}>증빙</Button>
                       <Button size="small" icon={<Pencil size={12} />} onClick={() => setEditTarget(p)}>수정</Button>
                       <Button size="small" danger icon={<Trash2 size={12} />} onClick={() => setDeleteTarget(p)}>삭제</Button>
                     </div>
