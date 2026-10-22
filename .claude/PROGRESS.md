@@ -7,7 +7,7 @@
 
 ## 완료된 작업 — 컨테이너 JVM 시간대 KST 통일 (2026-10-22)
 
-- 앱 이미지 두 Dockerfile 런타임 단계에 `ENV TZ=Asia/Seoul`을 넣어 `@CreatedDate`·`now()` 저장 기준을 명시적 KST 기록·브라우저 해석과 맞췄다(알림 "9시간 전" 표시 원인). `scripts/ci/test_container_timezone.py`로 고정. Docker 실측·VPS 반영 PENDING(BACKLOG P1 항목에 전환 주의 기록). V1 **40/100** 변동 없음.
+- 앱 이미지 두 Dockerfile 런타임 단계에 `ENV TZ=Asia/Seoul`을 넣어 `@CreatedDate`·`now()` 저장 기준을 명시적 KST 기록·브라우저 해석과 맞췄다(알림 "9시간 전" 표시 원인). `scripts/ci/test_container_timezone.py`로 고정. 2026-10-22 기반 이미지 실측: `TZ` 지정 시 JVM `Asia/Seoul`, 미지정 시 `Etc/UTC`. 풀 스택 새 행 원시값·VPS 반영 PENDING(BACKLOG P1 항목에 전환 주의 기록). V1 **40/100** 변동 없음.
 
 ## 완료된 작업 — 공내역서 파싱 견적의 길이 초과 사전 표시 (2026-10-22)
 
