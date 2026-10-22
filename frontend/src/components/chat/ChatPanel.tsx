@@ -74,9 +74,13 @@ export default function ChatPanel() {
     } catch (error) {
       if (!controller.signal.aborted) {
         const message = error instanceof Error ? error.message : '답변 생성에 실패했습니다.'
-        updateAssistant(assistantId, (current) => ({ ...current, content: current.content || message, status: 'error' }))
+        updateAssistant(assistantId, (current) => current.content
+          ? { ...current, status: 'error', errorNote: message }
+          : { ...current, content: message, status: 'error' })
       } else {
-        updateAssistant(assistantId, (current) => ({ ...current, content: current.content || '답변 생성을 중단했습니다.', status: 'error' }))
+        updateAssistant(assistantId, (current) => current.content
+          ? { ...current, status: 'error', errorNote: '답변 생성을 중단했습니다.' }
+          : { ...current, content: '답변 생성을 중단했습니다.', status: 'error' })
       }
     } finally {
       setStreaming(false)
