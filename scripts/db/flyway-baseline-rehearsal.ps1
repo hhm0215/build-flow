@@ -4,7 +4,11 @@ param(
     [string]$OutputDirectory = '',
     [ValidateRange(1, 7)][int]$MaxParallel = 3,
     [ValidateRange(60, 900)][int]$StartupTimeoutSeconds = 300,
-    [switch]$BuildJars
+    [switch]$BuildJars,
+    # Optional: `sudo buildflow-release schema` output saved on the PC; compared with the V1 schemas.
+    [string]$ProdDdlPath = '',
+    # Optional with -ProdDdlPath: a previous rehearsal output directory (<service>-v1.sql). Skips Docker.
+    [string]$V1DdlDirectory = ''
 )
 
 # Isolated rehearsal: does a schema created the production way (Hibernate ddl-auto update,
@@ -16,6 +20,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
+. (Join-Path $PSScriptRoot 'flyway-ddl-compare.ps1')
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $nonce = [Guid]::NewGuid().ToString('N')
@@ -37,6 +42,31 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 
 foreach ($service in $Services) {
     if ($service -notin @('auth', 'chat', 'estimate', 'purchase', 'tax', 'site', 'notification')) { throw "Unknown service: $service" }
+}
+
+$prodDdl = $null
+if (-not [string]::IsNullOrWhiteSpace($ProdDdlPath)) {
+    # ReadAllText honours a BOM, so a UTF-16 file from a PowerShell 5.1 `>` redirect also works.
+    $prodText = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $ProdDdlPath).ProviderPath)
+    if ($prodText -notmatch '(?m)^-- schema: ') { throw "Not a buildflow-release schema dump: $ProdDdlPath" }
+    $prodDdl = ConvertFrom-DdlDump -Text $prodText
+}
+if (-not [string]::IsNullOrWhiteSpace($V1DdlDirectory)) {
+    # Offline compare: prod dump vs normalized V1 DDL saved by an earlier rehearsal run. No Docker.
+    if ($null -eq $prodDdl) { throw '-V1DdlDirectory requires -ProdDdlPath.' }
+    $v1Maps = [ordered]@{}
+    foreach ($service in $Services) {
+        $file = Join-Path $V1DdlDirectory "$service-v1.sql"
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing V1 DDL file: $file" }
+        $parsed = ConvertFrom-DdlDump -Text ([IO.File]::ReadAllText($file))
+        $v1Maps[$service] = if ($parsed.ContainsKey('')) { $parsed[''] } else { [ordered]@{} }
+    }
+    $prodRows = Compare-ProdDdl -Prod $prodDdl -V1ByService $v1Maps
+    Format-ProdDdlReport -Rows $prodRows | ForEach-Object { Write-Host $_ }
+    $bad = @($Services | Where-Object { -not $prodRows[$_].SchemaPresent -or $prodRows[$_].Differences.Count -gt 0 })
+    if ($bad.Count -gt 0) { Write-Host "PROD DDL DIFF: $($bad -join ', ')"; exit 1 }
+    Write-Host 'PROD DDL MATCHES V1'
+    exit 0
 }
 
 function Invoke-Docker {
@@ -162,13 +192,11 @@ function Get-NormalizedCreateTables {
     foreach ($table in $tables) {
         Assert-MySqlIdentifier -Value $table
         $row = @(Invoke-Sql -Sql "SHOW CREATE TABLE ``$Schema``.``$table``")[0]
-        $ddl = ($row -split "`t", 2)[1] -replace ' AUTO_INCREMENT=\d+', ''
-        # Columns created from SQL with an explicit COLLATE are printed with a redundant
-        # "CHARACTER SET utf8mb4" (data-dictionary notation only); information_schema facts
-        # are compared separately, so normalize this notation and count it.
-        $script:explicitCharset[$Schema] = [int]$script:explicitCharset[$Schema] + ([regex]::Matches($ddl, ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')).Count
-        $ddl = $ddl -replace ' CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', ' COLLATE utf8mb4_unicode_ci'
-        $map[$table] = @($ddl -split '\\n' | ForEach-Object { $_.Trim().TrimEnd(',') })
+        $ddl = ConvertFrom-MySqlBatchEscape -Text ($row -split "`t", 2)[1]
+        # The charset notation is normalized in flyway-ddl-compare.ps1; information_schema facts
+        # are compared separately, so only count it here.
+        $script:explicitCharset[$Schema] = [int]$script:explicitCharset[$Schema] + (Get-CharsetNotationCount -Ddl $ddl)
+        $map[$table] = ConvertTo-NormalizedDdlLines -Ddl $ddl
     }
     return $map
 }
@@ -186,13 +214,6 @@ function Get-SchemaFacts {
     $facts += Invoke-Sql -Sql "SELECT CONCAT_WS('|','CHECK',t.TABLE_NAME,c.CONSTRAINT_NAME,c.CHECK_CLAUSE) FROM information_schema.TABLE_CONSTRAINTS t JOIN information_schema.CHECK_CONSTRAINTS c ON c.CONSTRAINT_SCHEMA=t.TABLE_SCHEMA AND c.CONSTRAINT_NAME=t.CONSTRAINT_NAME WHERE $ft AND t.CONSTRAINT_TYPE='CHECK'"
     $order = Invoke-Sql -Sql "SELECT CONCAT_WS('|','ORDER',TABLE_NAME,ORDINAL_POSITION,COLUMN_NAME) FROM information_schema.COLUMNS WHERE $f"
     return [pscustomobject]@{ Facts = @($facts | Sort-Object -Unique); Order = @($order | Sort-Object -Unique) }
-}
-
-function Compare-Lines {
-    param([string[]]$Left = @(), [string[]]$Right = @())
-    $onlyLeft = @($Left | Where-Object { $_ -cnotin $Right })
-    $onlyRight = @($Right | Where-Object { $_ -cnotin $Left })
-    return [pscustomobject]@{ OnlyLeft = $onlyLeft; OnlyRight = $onlyRight }
 }
 
 function Get-HistoryRows {
@@ -249,6 +270,7 @@ try {
 
     # 3) Compare.
     $summary = [ordered]@{}
+    $v1Maps = [ordered]@{}
     $eligible = @()
     foreach ($service in $Services) {
         $a = "buildflow_${service}_legacy"; $b = "buildflow_${service}_v1"
@@ -261,6 +283,7 @@ try {
         }
         $ddlA = Get-NormalizedCreateTables -Schema $a
         $ddlB = Get-NormalizedCreateTables -Schema $b
+        $v1Maps[$service] = $ddlB
         $writer = New-Object System.Text.UTF8Encoding($false)
         [IO.File]::WriteAllText((Join-Path $OutputDirectory "$service-legacy.sql"), (($ddlA.Keys | ForEach-Object { ($ddlA[$_] -join "`n") + ";`n" }) -join "`n"), $writer)
         [IO.File]::WriteAllText((Join-Path $OutputDirectory "$service-v1.sql"), (($ddlB.Keys | ForEach-Object { ($ddlB[$_] -join "`n") + ";`n" }) -join "`n"), $writer)
@@ -317,10 +340,18 @@ try {
         $r = $summary[$service]
         foreach ($l in @($r.semanticDiff) + @($r.ddlTextDiff)) { Add-Report "  [$service] $l" }
     }
+    $prodFailed = @()
+    if ($null -ne $prodDdl) {
+        Add-Report ''
+        Add-Report "Production DDL ($ProdDdlPath) vs V1:"
+        $prodRows = Compare-ProdDdl -Prod $prodDdl -V1ByService $v1Maps
+        Format-ProdDdlReport -Rows $prodRows | ForEach-Object { Add-Report $_ }
+        $prodFailed = @($Services | Where-Object { -not $v1Maps.Contains($_) -or -not $prodRows[$_].SchemaPresent -or $prodRows[$_].Differences.Count -gt 0 } | ForEach-Object { "$_(prod)" })
+    }
     $encoding = New-Object System.Text.UTF8Encoding($false)
     [IO.File]::WriteAllLines((Join-Path $OutputDirectory 'report.txt'), $report, $encoding)
     Write-JsonUtf8 -Path (Join-Path $OutputDirectory 'summary.json') -Value $summary
-    $failed = @($Services | Where-Object { $summary[$_].verify -ne 'PASS' })
+    $failed = @($Services | Where-Object { $summary[$_].verify -ne 'PASS' }) + $prodFailed
     if ($failed.Count -gt 0) { Write-Host "NOT PASSED: $($failed -join ', ')"; $script:exitCode = 1 } else { Write-Host 'ALL PASSED'; $script:exitCode = 0 }
 }
 finally {
