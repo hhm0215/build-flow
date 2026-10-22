@@ -43,6 +43,14 @@ class PublicComposeVerifierTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "site-service:8083 must stay on the internal network"):
             verify(config)
 
+    def test_rejects_loopback_redis_and_kafka(self):
+        for name, port in (("redis", "6379"), ("kafka", "9094"), ("zipkin", "9411")):
+            with self.subTest(name=name):
+                config = valid_config()
+                config["services"][name] = {"ports": [{"published": port, "host_ip": "127.0.0.1"}]}
+                with self.assertRaisesRegex(ValueError, f"{name}:{port} must stay on the internal network"):
+                    verify(config)
+
     def test_accepts_business_service_without_ports(self):
         config = valid_config()
         config["services"]["site-service"] = {"ports": []}
