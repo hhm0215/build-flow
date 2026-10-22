@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bot, MessageCircle, RotateCcw, Send, Square, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import ReactMarkdown from 'react-markdown'
 import { getChatAvailability, streamChat } from '../../api/chat.api'
 import type { ChatMessage, ChatStreamEvent } from '../../types/chat.types'
+import ChatMessageItem from './ChatMessageItem'
 
 const SESSION_KEY = 'buildflow-chat-session'
 
@@ -117,13 +117,7 @@ export default function ChatPanel() {
               </div>
             )}
             {!messages.length && <div className="chat-empty"><Bot size={28} /><p>현장 손익, 미수금, 진행 상태를 물어보세요.</p></div>}
-            {messages.map((message) => (
-              <div key={message.id} className={`chat-message ${message.role} ${message.status}`}>
-                {message.role === 'assistant' && message.status === 'complete'
-                  ? <ReactMarkdown>{message.content}</ReactMarkdown>
-                  : <span>{message.content || (message.status === 'streaming' ? '...' : '')}</span>}
-              </div>
-            ))}
+            {messages.map((message) => <ChatMessageItem key={message.id} message={message} />)}
             {phase && <div className="chat-phase">{phase}</div>}
             <div ref={bottomRef} />
           </div>
