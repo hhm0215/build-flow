@@ -27,4 +27,5 @@
 
 ## 결과
 - 렌더 실측: 새 구성은 9개 서비스 게시 0, 기존 구성은 새 검증기가 `auth-service:8081`로 거부.
-- `test_verify_*_compose.py` 21개 PASS. VPS 반영·실측은 PROGRESS 참조.
+- `test_verify_*_compose.py` 21개 PASS.
+- CI 러너 Compose v2.38.2는 앵커 별칭 경유 `!reset`을 무시해 첫 실행이 검증기에서 실패 → 서비스별 명시로 바꿔 통과(RETROSPECTIVE 2026-10-22). VPS 반영·실측은 PROGRESS 참조.
