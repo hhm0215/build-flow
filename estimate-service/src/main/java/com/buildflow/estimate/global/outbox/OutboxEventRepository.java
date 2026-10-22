@@ -6,9 +6,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String> {
+
+    /** 손익 원천 조회용: 주어진 견적들의 손익 이벤트(상태 무관, record_key = estimateId). */
+    @Query("select o from OutboxEvent o where o.topic in :topics and o.recordKey in :recordKeys"
+            + " order by o.createdAt, o.eventId")
+    List<OutboxEvent> findByTopicInAndRecordKeyIn(@Param("topics") Collection<String> topics,
+                                                  @Param("recordKeys") Collection<String> recordKeys);
 
     @Query(value = """
             SELECT * FROM outbox_events

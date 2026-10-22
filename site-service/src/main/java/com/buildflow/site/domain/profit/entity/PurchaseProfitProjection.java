@@ -58,6 +58,16 @@ public class PurchaseProfitProjection {
                 && deleted == candidateDeleted;
     }
 
+    /**
+     * 손익 재계산에서 원천에 행이 없는(삭제된) 매입. 원천은 삭제 revision을 남기지 않으므로 최대 revision으로
+     * 고정해 늦게 도착하는 같은 매입의 모든 이벤트가 "지연 도착"으로 무시되게 한다(매입 id는 재사용되지 않음).
+     */
+    public static final long RECONCILED_TOMBSTONE_REVISION = Long.MAX_VALUE;
+
+    public void markReconciledDeleted(String reconcileId) {
+        replace(RECONCILED_TOMBSTONE_REVISION, currentAmount, true, reconcileId);
+    }
+
     public void replace(long revision, BigDecimal amount, boolean deleted, String eventId) {
         this.lastRevision = revision;
         this.currentAmount = amount;

@@ -14,6 +14,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findBySiteIdOrderByCreatedAtDesc(Long siteId);
 
+    List<Purchase> findBySiteIdOrderByIdAsc(Long siteId);
+
     List<Purchase> findAllByOrderByCreatedAtDesc();
 
     long countByEvidenceTaxInvoiceId(Long evidenceTaxInvoiceId);
