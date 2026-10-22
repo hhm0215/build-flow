@@ -117,6 +117,47 @@ CI의 `인증 DB (Flyway · MySQL 8)` job은 임시 MySQL 8의 빈 `buildflow_au
 
 기존 데이터가 있는 스키마는 V1을 그대로 실행하거나 자동 baseline하지 않는다. Phase B의 관리자 로그인 검증과 원본/복원 DB의 실제 `SHOW CREATE TABLE` 대조가 끝난 뒤, **격리 복원 환경**에서 일회성 `baseline(version=1)`·`migrate`·로그인/로그아웃·행/제약 불변을 먼저 검증한다. 그 전에는 운영 프로파일 전환, `schema.sql` 제거 또는 VPS 배포를 하지 않는다. MySQL DDL 실패는 전체 트랜잭션 롤백으로 복구된다고 가정하지 않는다.
 
+### 기존 DB baseline 리허설 (ddl-auto 스키마 ↔ V1 정합)
+
+`scripts/db/flyway-baseline-rehearsal.ps1`은 "운영과 같은 방식으로 만든 스키마"에 `baseline(version=1)`을 걸어도 안전한지 격리 환경에서 확인한다. Windows PowerShell 5.1에서 실행하며 pwsh 전용 문법은 쓰지 않는다.
+
+```powershell
+.\gradlew.bat :auth-service:bootJar :chat-service:bootJar :estimate-service:bootJar :purchase-service:bootJar :tax-service:bootJar :site-service:bootJar :notification-service:bootJar -x test
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-rehearsal.ps1   # -BuildJars, -Services tax 등 선택
+```
+
+절차:
+
+1. 무작위 Compose project `bfbase<난수>`에 MySQL 8 하나만 띄운다(`flyway-baseline-rehearsal.compose.yml`). 호스트 포트를 게시하지 않고 데이터는 tmpfs라 named/anonymous volume이 생기지 않으며, 컨테이너·네트워크에 실행별 nonce label을 붙인다. 기존 `buildflow` project·볼륨·이미지는 건드리지 않는다.
+2. 스키마 A(`buildflow_<svc>_legacy`): 로컬 bootJar를 `eclipse-temurin:17-jre-jammy` 컨테이너에 읽기 전용으로 마운트해 **기본 프로파일**(ddl-auto `update`, auth는 `schema.sql` + `validate`)로 기동한다. Eureka·Config·Kafka 리스너·토픽 생성은 끄고 DB만 실제로 쓴다.
+3. 스키마 B(`buildflow_<svc>_v1`): `<svc>-flyway` 프로파일로 기동해 V1 적용 + Hibernate `validate`.
+4. 비교: 정규화한 `SHOW CREATE TABLE`(`AUTO_INCREMENT=n` 제거, 아래 charset 표기 정규화)의 줄 단위 비교와 `information_schema`의 테이블 엔진·collation, 컬럼(타입·NULL·기본값·extra·collation), 인덱스, FK(참조·규칙), CHECK 제약 집합 비교. 컬럼 순서만 다른 테이블은 무해로 따로 표시한다.
+5. 차이가 0인 서비스만 A에 일회성 `--spring.flyway.baseline-on-migrate=true --spring.flyway.baseline-version=1`을 **명령행 인자로 한 번만** 주어 baseline하고, 이어서 일반 `<svc>-flyway` 프로파일(상시 `baseline-on-migrate=false`)로 재기동해 "up to date / No migration necessary"·기동 성공·history가 정확히 `1|1|BASELINE|1`(B는 `1|1|SQL|1`)인지 확인한다.
+6. 종료 시 nonce label을 재확인한 앱 컨테이너만 `stop`·`rm`하고, project 이름(`^bfbase\d+$`)과 label이 맞을 때만 `docker compose down`(`-v` 없음)한 뒤 남은 컨테이너·네트워크·볼륨 0개를 확인한다. 로그·정규화 DDL·`report.txt`·`summary.json`은 `%TEMP%\buildflow-flyway-rehearsal-<nonce>`에 남는다.
+
+**2026-10-23 결과 (develop `ade9577`, MySQL 8.0.46) — 7개 서비스 ALL PASSED**
+
+| 서비스 | 테이블 | 의미 차이 | DDL 줄 차이 | 컬럼 순서만 다름 | baseline → migrate 0 + validate |
+|---|---|---|---|---|---|
+| auth | 1 | 0 | 0 | - | PASS |
+| chat | 2 | 0 | 0 | - | PASS |
+| estimate | 3 | 0 | 0 | - | PASS |
+| purchase | 2 | 0 | 0 | - | PASS |
+| tax | 2 | 0 | 0 | - | PASS |
+| site | 5 | 0 | 0 | `clients`, `sites` | PASS |
+| notification | 6 | 0 | 0 | `defect_warranties`, `outbox_events` | PASS |
+
+무해로 판정한 정규화 차이:
+
+- **charset 표기**: V1처럼 컬럼에 `COLLATE`를 명시해 만든 테이블은 `SHOW CREATE TABLE`이 `CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`로 출력하고, Hibernate가 만든 테이블은 `COLLATE utf8mb4_unicode_ci`만 출력한다(B쪽 74개 컬럼). `information_schema`의 charset·collation은 동일하므로 데이터 사전 표기 차이다.
+- **컬럼 순서**: 빈 DB에서 Hibernate는 `id` 뒤 알파벳 순으로 만들지만, V1은 나중에 `ddl-auto update`가 끝에 덧붙인 컬럼(`clients/sites.archived_at`, `defect_warranties.expiry_confirmed_at`, `outbox_events.suppressed_at`)이 마지막에 있는 로컬 DB에서 떠 왔다. 운영 DB도 같은 이력이라면 V1 순서가 더 가깝다. 컬럼 순서는 Flyway baseline·Hibernate validate에 영향이 없다.
+
+한계와 남은 위험:
+
+- 이 리허설의 A는 **현재 코드로 빈 DB에서 새로 만든** ddl-auto 스키마다. 운영 VPS 스키마는 과거 엔티티 이력 위에 `update`가 누적된 결과이며, `update`는 컬럼 타입 변경·NOT NULL/UNIQUE 추가·컬럼 삭제를 반영하지 않으므로 운영에만 남은 오래된 컬럼·제약이 있을 수 있다. 에이전트는 VPS DB 접근 권한이 없어 **운영 실제 `SHOW CREATE TABLE`과는 대조하지 못했다.** (2026-10-22 배포 전 백업 덤프는 19개 테이블, 현재 코드 기준은 21개 — 배포 후 `update`로 생긴 테이블이 있는지 미확인.)
+- 따라서 운영 baseline 전 필수 게이트: 운영 백업(no-data 포함) → 격리 복원 → 복원 스키마와 V1 스키마를 같은 기준(정규화 `SHOW CREATE TABLE` + `information_schema` 집합)으로 비교. 차이가 나오면 V1을 운영에 맞춰 고치지 않고(V1은 이미 신규 DB 기준으로 통합됨), **추천안: baseline 전에 운영 쪽을 V1과 같게 만드는 수동 정렬 SQL을 격리 복원본에서 먼저 검증한 뒤 운영에 적용하고 baseline(version=1)** 한다. V2 정합 마이그레이션은 신규 DB(V1)에도 같은 변경을 강제해 V1·V2 의미가 꼬이므로 운영 전용 잔여물 정리에는 쓰지 않는다. 운영 백업 복원과 이 비교는 사용자 승인된 VPS 작업 경로로만 수행한다.
+- CI 미추가: 7개 bootJar 빌드와 JVM 28회 기동이 필요해 무겁고, 서비스별 빈 DB V1+validate는 기존 `*-flyway` CI job이 이미 검증한다. 이 리허설은 엔티티·V1 변경 시와 운영 baseline 직전에 수동으로 다시 돌리는 일회성 게이트로 둔다.
+
 ## 참고
 
 - [Flyway baselines](https://documentation.red-gate.com/fd/baselines-273973441.html)

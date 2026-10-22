@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — Flyway 기존 DB baseline 격리 리허설 (2026-10-23)
+
+- 2026-10-23 `scripts/db/flyway-baseline-rehearsal.ps1`(+ compose): 무작위 `bfbase<난수>` project의 포트 비게시·tmpfs MySQL 8에서 7개 DB 서비스를 운영 방식(ddl-auto update, auth schema.sql)으로 `*_legacy`, Flyway V1로 `*_v1`에 만들어 정규화 `SHOW CREATE TABLE`과 `information_schema`(컬럼·인덱스·FK·CHECK)를 비교했다. 의미 차이 0 — charset 표기(`CHARACTER SET` 중복 출력)와 site·notification 컬럼 순서만 무해 차이. legacy에 일회성 baseline(1) 후 일반 flyway 프로파일 재기동에서 migrate 0·Hibernate validate·history `1|1|BASELINE|1` 7/7 PASS, 정리 후 잔여 리소스 0. 운영 VPS 실제 DDL은 접근 권한이 없어 미대조(배포 전 덤프 19개 vs 현재 21개 테이블) — 운영 백업 격리 복원본 비교가 남은 게이트. CI는 무거워 미추가(`docs/DATABASE_OPERATIONS.md`). V1 **40/100** 유지.
+
 ## 완료된 작업 — AI 채팅 모델 실시간 토큰 스트리밍 (2026-10-23)
 
 - 2026-10-23 chat Phase 3 이관 항목: `OllamaToolService`가 도구 없이 새로 생성하는 최종 답변(규칙 폴백 후 재답변, 도구 라운드 상한 후 강제 답변)을 Ollama `stream:true`(NDJSON)로 받아 `message.content` 조각이 도착하는 대로 SSE token으로 넘기고 전체 연결 문자열을 반환한다. 바이트를 누적해 개행에서만 줄을 잘라 청크 경계·한글 중간 분할에 안전하고, 앞쪽 공백만 온 조각은 보류해 빈 답변이면 기존 안내 문구를 흘린다. 오류 줄·HTTP 오류·timeout(조각 간·전체 경과)은 `CHAT_LLM_FAILED`, 조각 소비자 예외(SSE 끊김)는 호출 스레드에서 그대로 전파. 도구 선택 라운드는 stream:false 유지, 첫 라운드 무도구 답변은 재생성 없이 기존 조각 relay(LLM 1회). 단위 테스트 7건 추가(chat 39개 중 38 PASS·Flyway 통합 1 skip). 실제 Ollama 스트리밍 실측은 PENDING. V1 **40/100** 유지.
