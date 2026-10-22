@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-22 14:50 KST |
-| 브랜치 | 없음 (`claude/local-crud-qa`는 PR로 병합) |
-| PR | 로컬 실동선 기록 PR 병합 대상. #99(develop→main, 승인 대기) |
-| 현재 단계 | 로컬 풀 Docker CRUD 삭제·재집계·시간대 실측 18/18 PASS |
-| 다음 첫 행동 | BACKLOG P0 남은 로컬 검증 항목(보증 PDF 업로드·OCR 실측 등) 또는 P1 항목 |
+| 갱신 | 2026-10-22 15:05 KST |
+| 브랜치 | 없음 (`claude/site-flyway-v1`은 PR로 병합) |
+| PR | site Flyway PR 병합 대상. #99(develop→main, 승인 대기) |
+| 현재 단계 | 현장 DB opt-in Flyway V1 |
+| 다음 첫 행동 | notification V1(6개 테이블) 로컬 MySQL DDL로 작성·격리 DB 검증 |
 
 ## 공통 사용자 지시
 

@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 현장 DB opt-in Flyway 파일럿 (2026-10-22)
+
+- 로컬 MySQL 8 실제 DDL 5개 테이블 기준 신규 격리 DB 전용 site V1을 작성했다. 기본 Flyway disabled·`site-flyway` 프로파일 `ddl-auto=validate`, 기존 DB baseline/전환은 하지 않는다. 로컬 격리 DB에서 통합 테스트 PASS(테스트 DB 삭제), `site-service:test` 44건 통과, CI에 `site-flyway` 필수 작업·릴리스 증거 매핑 추가. V1 **40/100**·실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — 로컬 풀 Docker CRUD 삭제·재집계·시간대 실측 (2026-10-22)
 
 - 최신 `develop`으로 전체 이미지를 순차 재빌드(기존 볼륨 유지)하고 합성 `[QA]` 자료로 견적 초안 삭제, 매입 삭제 후 손익 재집계, 미입금 세금계산서 삭제·입금 확인 건 삭제 409, 입력 길이 400, 새 알림·DB 원시값 KST 일치 18/18 PASS(서비스 포트 직접 호출). Gateway·화면·공개 VPS는 PENDING. V1 **40/100** 변동 없음.
