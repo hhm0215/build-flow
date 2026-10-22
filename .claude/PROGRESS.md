@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — AI 채팅 모델 실시간 토큰 스트리밍 (2026-10-23)
+
+- 2026-10-23 chat Phase 3 이관 항목: `OllamaToolService`가 도구 없이 새로 생성하는 최종 답변(규칙 폴백 후 재답변, 도구 라운드 상한 후 강제 답변)을 Ollama `stream:true`(NDJSON)로 받아 `message.content` 조각이 도착하는 대로 SSE token으로 넘기고 전체 연결 문자열을 반환한다. 바이트를 누적해 개행에서만 줄을 잘라 청크 경계·한글 중간 분할에 안전하고, 앞쪽 공백만 온 조각은 보류해 빈 답변이면 기존 안내 문구를 흘린다. 오류 줄·HTTP 오류·timeout(조각 간·전체 경과)은 `CHAT_LLM_FAILED`, 조각 소비자 예외(SSE 끊김)는 호출 스레드에서 그대로 전파. 도구 선택 라운드는 stream:false 유지, 첫 라운드 무도구 답변은 재생성 없이 기존 조각 relay(LLM 1회). 단위 테스트 7건 추가(chat 39개 중 38 PASS·Flyway 통합 1 skip). 실제 Ollama 스트리밍 실측은 PENDING. V1 **40/100** 유지.
+
 ## 완료된 작업 — 릴리스 보안 검토 후속 (2026-10-23)
 
 - 2026-10-23 security-reviewer 독립 검토(`1d2497e..da012cd`)에서 Critical/High 코드 결함 없음. 후속: `buildflow-release`가 저장소·`.git` root 소유와 group/other 쓰기 불가를 확인하고 git을 `core.hooksPath=/dev/null`·`core.fsmonitor=false`로 실행, 런북 래퍼 설치 원본을 `origin/main`으로 변경. chat `ToolExecutor` 오류 JSON을 직렬화기로 감싸고(도구 이름 따옴표 회귀) 실패 로그는 예외 종류만 남긴다. 서버 비root 실측: 저장소 root 소유·쓰기 가능 파일 0·deploy 계정 docker 그룹 없음. 새 래퍼는 root 재설치 전 미적용. V1 **40/100** 유지.

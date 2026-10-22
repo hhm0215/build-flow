@@ -119,7 +119,7 @@
 
 ### chat-service Phase 3 (Phase 1·2 완료, 견고화/확장)
 - **Phase 3**: 도구 확장·tool_call_id 견고화·C 폴백 라우터 2026-10-22 모두 완료(`IntentRouter`: 첫 라운드에 도구를 고르지 않은 업무 질문을 키워드·현장 이름으로 도구에 매핑해 근거를 넣고 다시 답함). 실제 7b 모델로 폴백 효과 실측은 Ollama 기동 환경에서 PENDING
-- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay). ~~프론트 per-token 전체 리스트 리렌더 최적화~~ 2026-10-22 완료(`ChatMessageItem` memo — 조각마다 마지막 답변만 다시 그림)
+- **추가(Phase 2 리뷰/검증에서 이관)**: ~~모델 실시간 토큰 스트리밍~~ 2026-10-23 완료(도구 없이 새로 생성하는 답변 — 폴백 재답변·라운드 상한 강제 답변 — 은 Ollama stream:true NDJSON 조각을 도착 즉시 전달. 도구 선택 라운드는 stream:false 유지, 첫 라운드 무도구 답변은 재생성 없이 조각 relay). 실제 Ollama 스트리밍 실측은 PENDING. ~~프론트 per-token 전체 리스트 리렌더 최적화~~ 2026-10-22 완료(`ChatMessageItem` memo — 조각마다 마지막 답변만 다시 그림)
 - 2026-10-22: 대화 이력은 최근 `chat.history-limit`개만 DB에서 조회(시각·id 역순 Pageable 후 시간순 복원)하도록 변경 완료
 - 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
 
