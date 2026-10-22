@@ -23,7 +23,7 @@
 
 - `buildflow_tax`에 새 테이블 `tax_payments`가 `ddl-auto=update`로 생기고, tax-service 기동 시 `LegacyPaymentLedgerBackfill`이 기존 `payment_confirmed=1`·총액>0 매출 계산서마다 총액 1건(메모 "기존 입금 확인 이관")을 이관한다. 수동 DDL·SQL 불필요. 2026-10-23 업그레이드 리허설(`scripts/db/upgrade-rehearsal-tax-site.ps1`)에서 이관 1건·재기동 중복 0건을 확인했다.
 - 반영 후 읽기 전용 확인(값 출력 없음, 새 입금 기록 전): `SELECT COUNT(*) FROM buildflow_tax.tax_invoices WHERE payment_confirmed=1 AND total_amount>0;`와 `SELECT COUNT(DISTINCT tax_invoice_id) FROM buildflow_tax.tax_payments;`가 같은지.
-- **되돌리기 주의**: 이전 코드는 `tax_payments`를 무시하므로 부분 입금이 미수금에 반영되지 않는다. 되돌린 상태에서 부분 입금된 계산서에 "입금 확인"을 누른 뒤 재반영하면 그 계산서는 `PAID`로 보이지만 입금액은 부분 합계만 잡힌다(이관은 입금 행이 이미 있는 계산서를 건너뜀, 리허설 WARN). 되돌림 기간에는 부분 입금 계산서의 입금 확인을 피하고, 발생했다면 재반영 후 잔액을 입금 기록으로 추가하면 정상화된다(실측).
+- **되돌리기 주의**: 이전 코드는 `tax_payments`를 무시하므로 부분 입금이 미수금에 반영되지 않는다. 되돌린 상태에서 부분 입금된 계산서에 "입금 확인"을 누른 뒤 재반영하면 그 계산서는 `PAID`로 보이지만 입금액은 부분 합계만 잡힌다(이관은 입금 행이 이미 있는 계산서를 건너뜀, 리허설 WARN). 되돌림 기간에는 부분 입금 계산서의 입금 확인을 피하고, 발생했다면 재반영 후 잔액을 입금 기록으로 추가하면 정상화된다(실측). **2026-10-23 수정**: 재반영 시 기동 이관이 "입금 확인인데 유효 입금 합계 < 총액"인 계산서의 잔액을 `기존 입금 확인 이관` 1건으로 채우고, 이관 전에도 입금 확인 건은 총액 입금으로 표시한다(단위 회귀 추가). 되돌린 동안의 입금 확인도 재반영 후 정합하다.
 
 ## SSH 배포 경로 (일회성 root 설정 후)
 

@@ -168,7 +168,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-r
 - 업그레이드: 이전 코드로 만든 스키마(`status` enum 4값, `tax_payments` 없음)에서 새 코드가 기동해 `tax_payments`(V2와 같은 컬럼·`idx_tax_payments_invoice`)를 만들고 enum에 `BIDDING`을 추가했다. 합성 매출 3건(미입금 110만·입금 확인 55만·0원) 중 입금 확인 건만 이관 1건, 재기동 중복 0.
 - API: 미수금 110만 → 30만 입금 201 → 80만, 잔액+1·0원 계산서 입금 400, 취소 200 → 110만, 이관 행 취소 후 `confirm-payment`로 재완료. BIDDING 생성 201 → IN_PROGRESS 200, BIDDING 복귀·SETTLING 생성 400.
 - 되돌리기: 이전 코드는 넓어진 enum·새 테이블에서 정상 기동. BIDDING 행이 있으면 현장 목록 500 → `IN_PROGRESS`로 낮추면 200. 이전 tax API 정상(부분 입금은 무시).
-- WARN(되돌리기 경로 한정): 되돌린 상태에서 부분 입금 계산서를 `confirm-payment`하고 재반영하면 `paymentConfirmed=true`·`paymentStatus=PAID`인데 `paidAmount`는 부분 합계(30만/110만)로 남는다. 잔액 입금 기록으로 정상화된다. 운영 대응은 `docs/RELEASE_RUNBOOK.md` 분할 입금 되돌리기 주의.
+- WARN(되돌리기 경로 한정): 되돌린 상태에서 부분 입금 계산서를 `confirm-payment`하고 재반영하면 `paymentConfirmed=true`·`paymentStatus=PAID`인데 `paidAmount`는 부분 합계(30만/110만)로 남는다. 잔액 입금 기록으로 정상화된다. 운영 대응은 `docs/RELEASE_RUNBOOK.md` 분할 입금 되돌리기 주의. **2026-10-23 수정**: 재반영 시 기동 이관이 "입금 확인인데 유효 입금 합계 < 총액"인 계산서의 잔액을 `기존 입금 확인 이관` 1건으로 채우고, 이관 전에도 입금 확인 건은 총액 입금으로 표시한다(단위 회귀 추가). 되돌린 동안의 입금 확인도 재반영 후 정합하다.
 
 ## Phase E1: 서비스별 runtime DB 계정 (opt-in)
 

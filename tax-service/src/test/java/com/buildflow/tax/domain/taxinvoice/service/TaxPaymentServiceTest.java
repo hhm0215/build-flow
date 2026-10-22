@@ -252,7 +252,7 @@ class TaxPaymentServiceTest {
 
         assertThat(service.paidAmount(invoice)).isEqualByComparingTo("1100000");
 
-        when(invoiceRepository.findLegacyConfirmedIdsWithoutPayments()).thenReturn(List.of(INVOICE_ID));
+        when(invoiceRepository.findConfirmedIdsWithUnrecordedBalance()).thenReturn(List.of(INVOICE_ID));
         assertThat(service.backfillLegacyConfirmed()).isEqualTo(1);
         assertThat(service.backfillLegacyConfirmed()).isZero(); // 멱등
 
@@ -264,6 +264,25 @@ class TaxPaymentServiceTest {
         service.cancel(INVOICE_ID, ledger.get(0).getId(), cancelRequest("오입금"));
         assertThat(invoice.isPaymentConfirmed()).isFalse();
         assertThat(service.paidAmount(invoice)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void 되돌린_동안_부분입금_뒤_입금확인된_계산서는_잔액을_한_건으로_채운다() {
+        // 새 코드로 30만 입금 → 이전 코드로 되돌린 동안 입금 확인 → 다시 올림 (2026-10-23 운영형 리허설 WARN)
+        service.record(INVOICE_ID, request("300000", LocalDate.of(2026, 10, 2)));
+        ReflectionTestUtils.setField(invoice, "paymentConfirmed", true);
+        ReflectionTestUtils.setField(invoice, "paymentDate", LocalDate.of(2026, 10, 5));
+
+        assertThat(service.paidAmount(invoice)).isEqualByComparingTo("1100000");
+
+        when(invoiceRepository.findConfirmedIdsWithUnrecordedBalance()).thenReturn(List.of(INVOICE_ID));
+        assertThat(service.backfillLegacyConfirmed()).isEqualTo(1);
+        assertThat(service.backfillLegacyConfirmed()).isZero();
+
+        assertThat(ledger).hasSize(2);
+        assertThat(ledger.get(1).getAmount()).isEqualByComparingTo("800000");
+        assertThat(ledger.get(1).getMemo()).isEqualTo(TaxPaymentService.LEGACY_MEMO);
+        assertThat(service.paidAmount(invoice)).isEqualByComparingTo("1100000");
     }
 
     private TaxInvoice invoice(TaxInvoiceType type, String supply, String tax) {
