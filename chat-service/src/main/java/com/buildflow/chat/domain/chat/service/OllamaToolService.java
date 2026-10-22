@@ -10,18 +10,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Ollama 툴-콜링 에이전트 루프.
@@ -93,8 +99,10 @@ public class OllamaToolService {
 
     /**
      * run()과 동일한 에이전트 루프에 진행 상태·답변 조각 콜백을 얹은 버전.
-     * 최종 답변은 툴 선택 라운드가 이미 생성한 내용을 그대로 조각내 전달한다 —
-     * 별도 재생성 없음(동기 경로와 항상 같은 답변, LLM 호출 1회 절약).
+     * 도구 선택 라운드(tools 포함)는 도구 호출 판정을 위해 stream:false로 받는다. 그 라운드가 도구 없이
+     * 바로 답했으면 이미 생성된 답변을 그대로 조각내 전달한다(재생성 없음, LLM 1회).
+     * 폴백 후 재답변·라운드 상한 후 강제 답변처럼 도구 없이 새로 생성하는 답변은 stream:true로
+     * 모델 토큰이 도착하는 대로 전달한다. 어느 경우든 전달한 조각을 이으면 반환값과 같다.
      */
     public String runStreaming(List<Object> messages, Consumer<String> statusConsumer,
                                Consumer<String> tokenConsumer) {
@@ -106,7 +114,7 @@ public class OllamaToolService {
             if (toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) {
                 if (round == 0 && applyFallback(messages, statusConsumer)) {
                     // 데이터 질문인데 도구 없이 답하려 했다 → 규칙으로 고른 도구 결과를 넣고 다시 답하게 한다.
-                    return emitAnswer(textOrFallback(callOllama(messages, null)), statusConsumer, tokenConsumer);
+                    return streamAnswer(messages, statusConsumer, tokenConsumer);
                 }
                 return emitAnswer(textOrFallback(message), statusConsumer, tokenConsumer);
             }
@@ -120,7 +128,32 @@ public class OllamaToolService {
         }
 
         // 도구 라운드 상한 초과 → 도구 없이 최종 답변을 강제한다.
-        return emitAnswer(textOrFallback(callOllama(messages, null)), statusConsumer, tokenConsumer);
+        return streamAnswer(messages, statusConsumer, tokenConsumer);
+    }
+
+    /**
+     * 도구 없이 최종 답변만 생성하는 호출 — Ollama stream:true(NDJSON)로 받아 조각이 도착하는 대로
+     * tokenConsumer에 넘기고 전체 연결 문자열을 반환한다. 공백만 온 앞부분은 실제 글자가 올 때까지 모아
+     * 빈 답변이면 안내 문구 하나만 흘린다(조각 연결 = 반환값 유지).
+     */
+    private String streamAnswer(List<Object> messages, Consumer<String> statusConsumer,
+                                Consumer<String> tokenConsumer) {
+        StringBuilder full = new StringBuilder();
+        boolean[] started = {false};
+        streamOllama(messages, piece -> {
+            full.append(piece);
+            if (started[0]) {
+                tokenConsumer.accept(piece);
+            } else if (!full.toString().isBlank()) {
+                started[0] = true;
+                statusConsumer.accept("answering");
+                tokenConsumer.accept(full.toString());
+            }
+        });
+        if (!started[0]) {
+            return emitAnswer(textOrFallback(null), statusConsumer, tokenConsumer);
+        }
+        return full.toString();
     }
 
     private String emitAnswer(String answer, Consumer<String> statusConsumer, Consumer<String> tokenConsumer) {
@@ -271,6 +304,105 @@ public class OllamaToolService {
         } catch (Exception e) {
             log.error("Ollama 호출 실패", e);
             throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
+        }
+    }
+
+    /**
+     * 도구 없이 stream:true로 호출해 NDJSON 각 줄의 message.content를 pieceConsumer에 넘긴다.
+     * 네트워크 청크는 줄·UTF-8 문자 경계와 무관하게 잘리므로 바이트를 누적해 개행(0x0A)에서만 자른다
+     * — 0x0A는 UTF-8 다중 바이트 문자 안에 나타나지 않는다.
+     * 조각 소비(SSE 전송)는 호출 스레드에서 하므로 소비자 예외(연결 끊김 등)는 변환 없이 그대로 전파된다.
+     * timeout: 조각 사이 대기와 응답 전체 경과를 각각 timeoutSeconds로 제한한다.
+     */
+    private void streamOllama(List<Object> messages, Consumer<String> pieceConsumer) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", model);
+        body.put("stream", true);
+        body.put("messages", messages);
+        Duration timeout = Duration.ofSeconds(timeoutSeconds);
+        long deadline = System.nanoTime() + timeout.toNanos();
+        List<String> lines = new ArrayList<>();
+        ByteArrayOutputStream pending = new ByteArrayOutputStream();
+        Stream<byte[]> chunks;
+        try {
+            chunks = ollamaWebClient.post()
+                    .uri("/api/chat")
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToFlux(DataBuffer.class)
+                    .map(OllamaToolService::drain)
+                    .timeout(timeout)
+                    .toStream(1);
+        } catch (Exception e) {
+            log.error("Ollama 스트리밍 호출 실패", e);
+            throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
+        }
+        try (chunks) {
+            Iterator<byte[]> iterator = chunks.iterator();
+            while (nextChunk(iterator, deadline)) {
+                splitLines(iterator.next(), pending, lines);
+                for (String line : lines) {
+                    handleStreamLine(line, pieceConsumer);
+                }
+                lines.clear();
+            }
+        }
+        handleStreamLine(pending.toString(StandardCharsets.UTF_8), pieceConsumer);
+    }
+
+    private static boolean nextChunk(Iterator<byte[]> iterator, long deadline) {
+        try {
+            if (System.nanoTime() > deadline) {
+                throw new IllegalStateException("Ollama 스트리밍 응답 전체 시간 초과");
+            }
+            return iterator.hasNext();
+        } catch (Exception e) {
+            log.error("Ollama 스트리밍 호출 실패", e);
+            throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
+        }
+    }
+
+    private static byte[] drain(DataBuffer buffer) {
+        try {
+            byte[] bytes = new byte[buffer.readableByteCount()];
+            buffer.read(bytes);
+            return bytes;
+        } finally {
+            DataBufferUtils.release(buffer);
+        }
+    }
+
+    /** 개행 앞까지 누적된 바이트를 완성된 줄로 꺼낸다. 개행 뒤 잔여분은 pending에 남는다. */
+    static void splitLines(byte[] bytes, ByteArrayOutputStream pending, List<String> lines) {
+        for (byte b : bytes) {
+            if (b == '\n') {
+                lines.add(pending.toString(StandardCharsets.UTF_8));
+                pending.reset();
+            } else {
+                pending.write(b);
+            }
+        }
+    }
+
+    private void handleStreamLine(String rawLine, Consumer<String> pieceConsumer) {
+        String line = rawLine.trim();
+        if (line.isEmpty()) {
+            return;
+        }
+        JsonNode node;
+        try {
+            node = objectMapper.readTree(line);
+        } catch (Exception e) {
+            log.error("Ollama 스트리밍 응답 줄 해석 실패");
+            throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
+        }
+        if (node.hasNonNull("error")) {
+            log.error("Ollama 스트리밍 오류 응답: {}", node.get("error").asText());
+            throw new BusinessException(ErrorCode.CHAT_LLM_FAILED);
+        }
+        JsonNode content = node.path("message").path("content");
+        if (content.isTextual() && !content.asText().isEmpty()) {
+            pieceConsumer.accept(content.asText());
         }
     }
 
