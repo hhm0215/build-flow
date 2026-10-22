@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공개 스택 업무 서비스 포트 비게시 (2026-10-22)
+
+- 2026-10-22 Gateway 우회 차단: 공개 VPS override에서 auth·estimate·site·purchase·tax·notification·chat·Eureka·Config 포트를 호스트에 게시하지 않고(`ports: !reset []`, VPS Compose v5.5.1 실측), CI 검증기가 frontend·gateway·DB/메시징 외 게시를 거부한다(회귀 2건, 21개 PASS). `buildflow-release status`에 컨테이너 내부 health 점검을 추가했다(설치본은 root 갱신 전 미적용). 계획 `.claude/plans/2026-10-22-vps-internal-ports.md`. V1 **40/100** 유지 — 보안 게이트 보강이며 새 체크포인트 통과는 아니다.
+
 ## 완료된 작업 — 공개 VPS를 main `1d2497e`로 반영 (2026-10-22)
 
 - 2026-10-22 VPS 반영: 사용자가 Web Console root로 `buildflow-release` 래퍼·`/etc/buildflow/public_host`·sudoers 1줄을 설치했고, 에이전트가 PC에서 `buildflow-deploy` SSH(IP, 호스트 키 일치)로 `sudo buildflow-release deploy 1d2497e…`를 실행했다. 처리 중 작업 0건 → 기존 이미지 `pre-4e565968db0b` 보존 → 11개 이미지 순차 빌드 → 앱 정지 → `predeploy_backup.sh`(테이블 19개 덤프, 보증 업로드 0개, 임시 MySQL 복원 행 수 일치, 서버 `/root/buildflow-backups/20261022T081904Z`) → 기동 순으로 성공(EXIT 0). HEAD `1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1`, 앱 컨테이너 전부 Up, 외부 HTTPS `/` 200·무인증 API 401. DB 새 컬럼·테이블과 컨테이너 TZ의 서버 내부 실측은 deploy 계정 권한 밖이라 UNVERIFIED(앱 정상 기동으로 간접 확인), 로그인 후 화면·합성 CRUD는 PENDING. 되돌리기: `sudo buildflow-release rollback 4e565968db0b2600238f0e05add9891277d2f2fd`. V1 **40/100** — 운영 반영 체크포인트의 일부(고정 SHA·순차 배포·health/401·되돌리기 경로)를 통과했으나 실패 롤백 실측·운영 알림은 남아 점수는 유지한다.
