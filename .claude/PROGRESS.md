@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 서비스별 DB 계정 E1 준비 (2026-10-23)
+
+- 2026-10-23 DB 마이그레이션 Phase E1: 7개 DB 서비스가 공유하던 root 대신 `buildflow_<svc>`@'%' 계정에 자기 스키마 ALL(DDL 포함, `ddl-auto: update` 유지 때문)만 주는 `scripts/db/service-accounts.ps1`(비밀번호는 환경변수/`-EnvFile`→stdin, 재실행 시 권한 drift 제거)과 `docker-compose.app.yml`의 `<SVC>_DB_USERNAME/PASSWORD` opt-in(미설정 시 기존 root 경로)을 추가했다. 무작위 격리 project MySQL 8에서 7계정 생성·자기 스키마 DDL/DML·타 스키마/`mysql.user`/CREATE DATABASE/CREATE USER 거부·재실행 idempotent·site-service를 `buildflow_site`로 기동해 health UP까지 PASS, CI `db-service-accounts` job 추가. 기존 로컬·VPS DB에는 적용하지 않았다. E2(DML 전용)는 Flyway 운영 전환 후. V1 **40/100** 유지.
+
 ## 완료된 작업 — AI 채팅 모델 실시간 토큰 스트리밍 (2026-10-23)
 
 - 2026-10-23 chat Phase 3 이관 항목: `OllamaToolService`가 도구 없이 새로 생성하는 최종 답변(규칙 폴백 후 재답변, 도구 라운드 상한 후 강제 답변)을 Ollama `stream:true`(NDJSON)로 받아 `message.content` 조각이 도착하는 대로 SSE token으로 넘기고 전체 연결 문자열을 반환한다. 바이트를 누적해 개행에서만 줄을 잘라 청크 경계·한글 중간 분할에 안전하고, 앞쪽 공백만 온 조각은 보류해 빈 답변이면 기존 안내 문구를 흘린다. 오류 줄·HTTP 오류·timeout(조각 간·전체 경과)은 `CHAT_LLM_FAILED`, 조각 소비자 예외(SSE 끊김)는 호출 스레드에서 그대로 전파. 도구 선택 라운드는 stream:false 유지, 첫 라운드 무도구 답변은 재생성 없이 기존 조각 relay(LLM 1회). 단위 테스트 7건 추가(chat 39개 중 38 PASS·Flyway 통합 1 skip). 실제 Ollama 스트리밍 실측은 PENDING. V1 **40/100** 유지.
