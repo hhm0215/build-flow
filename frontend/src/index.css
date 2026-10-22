@@ -245,6 +245,7 @@ button {
 .chat-message.user { align-self: flex-end; background: var(--accent); color: white; }
 .chat-message.assistant { align-self: flex-start; background: rgba(255,255,255,0.06); color: var(--text-primary); }
 .chat-message.error { border: 1px solid var(--danger-border); color: #fca5a5; }
+.chat-error-note { margin: 6px 0 0; font-size: 12px; color: #fca5a5; }
 .chat-message p { margin: 0 0 6px; }
 .chat-message p:last-child { margin-bottom: 0; }
 .chat-phase { font-size: 12px; color: var(--text-muted); padding-left: 4px; }

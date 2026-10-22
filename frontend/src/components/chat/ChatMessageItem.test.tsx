@@ -20,4 +20,12 @@ describe('ChatMessageItem', () => {
     rerender(<ChatMessageItem message={{ id: 'a', role: 'assistant', content: '', status: 'streaming' }} />)
     expect(container.textContent).toBe('...')
   })
+
+  it('일부 답변 뒤 실패하면 받은 부분과 끊김 사유를 함께 보인다', () => {
+    const { container, getByRole } = render(
+      <ChatMessageItem message={{ id: 'a', role: 'assistant', content: '마진은 12', status: 'error', errorNote: '응답 시간이 초과되었습니다.' }} />,
+    )
+    expect(container.textContent).toContain('마진은 12')
+    expect(getByRole('alert').textContent).toBe('답변이 중간에 끊겼습니다. 응답 시간이 초과되었습니다.')
+  })
 })

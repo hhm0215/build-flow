@@ -9,6 +9,10 @@
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-tax-site.ps1`: 격리 MySQL 8(`bfupg<난수>`, 포트 비게시·tmpfs)에서 운영 main `d8f3b3d` 코드로 스키마·합성 행을 만들고 develop `6ccb3e5`를 `ddl-auto update`로 올렸다. `tax_payments` 생성·입금 확인 건만 이관 1건·재기동 중복 0·미수금/부분 입금/초과 400/취소, enum `BIDDING`·생성·IN_PROGRESS 전환, 이전 코드 되돌리기(BIDDING 낮춘 뒤 정상) PASS 23. WARN 1: 되돌림 중 부분 입금 계산서를 입금 확인 후 재반영하면 PAID인데 입금액이 부분 합계(잔액 기록으로 정상화) → `docs/RELEASE_RUNBOOK.md` 되돌리기 주의. 잔여 리소스 0. **VPS 미반영**. V1 **40/100** 유지.
 
+## 완료된 작업 — AI 채팅 부분 답변 실패 표시 (2026-10-23)
+
+- 2026-10-23 토큰 스트리밍(PR #186) 리뷰 잔여 위험 처리: 답변 조각을 일부 받은 뒤 오류·중단이 나면 받은 부분을 남기고 "답변이 중간에 끊겼습니다" 사유를 함께 표시한다(이전엔 부분 답변만 남아 완결 답변처럼 보였다). `ChatMessage.errorNote`, 테스트 1건, lint·build PASS. V1 **40/100** 유지.
+
 ## 완료된 작업 — 공개 VPS를 main `da012cd`·`d8f3b3d`로 반영 (2026-10-23)
 
 - 2026-10-23 PC에서 `sudo buildflow-release deploy`로 두 번 반영했다. 두 번 모두 처리 중 작업 0건, 백업·격리 복원 확인, EXIT 0이었다.
