@@ -254,11 +254,23 @@ RelationProposal 1 ── N ReviewDecision
 | total_amount | DECIMAL(15,2) | 합계 (공급가액 + 세액) |
 | counterparty | VARCHAR(200) NULL | 거래처명 |
 | issue_date | DATE NULL | 발행일 |
-| payment_confirmed | BOOLEAN | 입금 확인 여부 |
-| payment_date | DATE NULL | 입금 확인일 |
+| payment_confirmed | BOOLEAN | 전액 입금 완료 여부(유효 입금 합계 = total_amount) |
+| payment_date | DATE NULL | 완료 시 마지막 유효 입금일 |
 | memo | TEXT NULL | 메모 |
 | created_at | DATETIME | |
 | updated_at | DATETIME NULL | |
+
+### tax_payments (매출 입금 내역, 2026-10-23)
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | BIGINT PK | |
+| tax_invoice_id | BIGINT NOT NULL (IDX) | 매출 세금계산서 ID |
+| amount | DECIMAL(15,2) | 입금액(0 초과, 반올림 없음) |
+| payment_date | DATE | 실제 입금일 |
+| memo | VARCHAR(500) NULL | 메모 |
+| created_at | DATETIME(6) | |
+| canceled_at | DATETIME(6) NULL | 오입금 취소 시각(삭제 대신, 합계에서 제외) |
+| cancel_reason | VARCHAR(500) NULL | 취소 사유 |
 
 ---
 
