@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공개 스택 프록시 네트워크 분리 (2026-10-23)
+
+- 2026-10-23 독립 보안 검토 후속(Low): 공개 override에서만 `buildflow-edge` 네트워크를 만들어 caddy·frontend는 edge에만, gateway-server는 edge와 `buildflow-net` 둘 다 붙였다(서비스마다 `networks: !override`, 별칭 없음). 로컬(app.yml)·LAN 구성은 불변. `verify_public_compose.py`가 caddy/frontend의 내부 서비스 네트워크 공유·`network_mode`·기본 네트워크와 gateway 양쪽 연결 누락을 거부한다(회귀 6건, 27개 PASS, 이전 구성은 거부 확인). 무작위 이름 네트워크 실측에서 edge 쪽은 `gateway-server`만 해석·HTTP 성공, `site-service`·`redis`는 해석 불가. VPS 미반영(배포 시 caddy·frontend·gateway 재생성). V1 **40/100** 유지.
+
 ## 완료된 작업 — 릴리스 보안 검토 후속 (2026-10-23)
 
 - 2026-10-23 security-reviewer 독립 검토(`1d2497e..da012cd`)에서 Critical/High 코드 결함 없음. 후속: `buildflow-release`가 저장소·`.git` root 소유와 group/other 쓰기 불가를 확인하고 git을 `core.hooksPath=/dev/null`·`core.fsmonitor=false`로 실행, 런북 래퍼 설치 원본을 `origin/main`으로 변경. chat `ToolExecutor` 오류 JSON을 직렬화기로 감싸고(도구 이름 따옴표 회귀) 실패 로그는 예외 종류만 남긴다. 서버 비root 실측: 저장소 root 소유·쓰기 가능 파일 0·deploy 계정 docker 그룹 없음. 새 래퍼는 root 재설치 전 미적용. V1 **40/100** 유지.

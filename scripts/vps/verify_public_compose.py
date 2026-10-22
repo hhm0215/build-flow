@@ -9,6 +9,43 @@ import sys
 # Redis has no password and Kafka accepts any producer, so only these may
 # publish a port, and only on loopback.
 LOOPBACK_ALLOWED = {"frontend", "gateway-server", "mysql"}
+# Proxy tier: Caddy and frontend may only share networks with each other and the
+# Gateway, so a compromised proxy cannot call header-trusting business services.
+EDGE_SERVICES = {"caddy", "frontend", "gateway-server"}
+
+
+def service_networks(service_name: str, service: dict) -> set:
+    if "network_mode" in service:
+        # host/service:/container: modes share another namespace and bypass the split.
+        raise ValueError(f"{service_name} must use Compose networks, not network_mode")
+    networks = service.get("networks")
+    if networks is None:
+        return {"default"}
+    return set(networks)
+
+
+def verify_network_split(services: dict) -> None:
+    members = {}
+    for service_name, service in services.items():
+        if service_name in EDGE_SERVICES or "network_mode" not in service:
+            for network in service_networks(service_name, service):
+                members.setdefault(network, set()).add(service_name)
+
+    for proxy in ("caddy", "frontend"):
+        for network in service_networks(proxy, services[proxy]):
+            outsiders = members[network] - EDGE_SERVICES
+            if outsiders:
+                raise ValueError(
+                    f"{proxy} shares network {network} with internal services: {sorted(outsiders)}"
+                )
+
+    gateway_networks = service_networks("gateway-server", services["gateway-server"])
+    edge = [n for n in gateway_networks if {"caddy", "frontend"} <= members[n]]
+    internal = [n for n in gateway_networks if members[n] - EDGE_SERVICES]
+    if not edge:
+        raise ValueError("gateway-server must share an edge network with caddy and frontend")
+    if not internal:
+        raise ValueError("gateway-server must also join the internal service network")
 
 
 def verify_service_isolation(service_name: str, service: dict, volumes: dict) -> None:
@@ -55,6 +92,7 @@ def verify(config: dict) -> None:
 
     if public_ports != {"80", "443"}:
         raise ValueError(f"unexpected public ports: {sorted(public_ports)}")
+    verify_network_split(services)
 
     public_host = services["caddy"]["environment"].get("PUBLIC_HOST")
     if not isinstance(public_host, str) or len(public_host) > 253 or public_host != public_host.lower():
@@ -82,4 +120,4 @@ def verify(config: dict) -> None:
 
 if __name__ == "__main__":
     verify(json.load(sys.stdin))
-    print("public Compose isolation, internal-only services, ports, CORS, and Caddy persistence verified")
+    print("public Compose isolation, proxy network split, internal-only services, ports, CORS, and Caddy persistence verified")
