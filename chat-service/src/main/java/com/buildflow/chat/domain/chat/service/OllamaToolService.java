@@ -110,13 +110,7 @@ public class OllamaToolService {
             messages.add(objectMapper.convertValue(message, Map.class));
 
             for (JsonNode call : toolCalls) {
-                JsonNode fn = call.get("function");
-                if (fn == null || fn.get("name") == null) {
-                    continue;
-                }
-                statusConsumer.accept("tool");
-                String result = toolExecutor.execute(fn.get("name").asText(), normalizeArgs(fn.get("arguments")));
-                messages.add(Map.of("role", "tool", "content", result));
+                messages.add(toolResultMessage(call, statusConsumer));
             }
         }
 
@@ -148,6 +142,30 @@ public class OllamaToolService {
             chunks.add(buffer.toString());
         }
         return chunks;
+    }
+
+    /**
+     * 도구 호출 1건마다 결과 메시지 1건을 돌려준다 — 형식이 깨진 호출도 오류 결과로 응답해
+     * 호출 수와 결과 수가 어긋나지 않게 한다. 모델이 호출 id를 주면 tool_call_id로,
+     * 도구명은 Ollama 기본 필드 tool_name으로 함께 넣어 여러 호출의 결과를 섞지 않게 한다.
+     */
+    Map<String, Object> toolResultMessage(JsonNode call, Consumer<String> statusConsumer) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("role", "tool");
+        JsonNode id = call == null ? null : call.get("id");
+        if (id != null && id.isTextual() && !id.asText().isBlank()) {
+            result.put("tool_call_id", id.asText());
+        }
+        JsonNode fn = call == null ? null : call.get("function");
+        JsonNode name = fn == null ? null : fn.get("name");
+        if (name == null || !name.isTextual() || name.asText().isBlank()) {
+            result.put("content", "{\"error\":\"도구 이름이 없는 호출은 실행하지 않았습니다\"}");
+            return result;
+        }
+        statusConsumer.accept("tool");
+        result.put("tool_name", name.asText());
+        result.put("content", toolExecutor.execute(name.asText(), normalizeArgs(fn.get("arguments"))));
+        return result;
     }
 
     private JsonNode normalizeArgs(JsonNode arguments) {
