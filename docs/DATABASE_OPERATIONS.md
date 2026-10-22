@@ -158,6 +158,40 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-r
 - 따라서 운영 baseline 전 필수 게이트: 운영 백업(no-data 포함) → 격리 복원 → 복원 스키마와 V1 스키마를 같은 기준(정규화 `SHOW CREATE TABLE` + `information_schema` 집합)으로 비교. 차이가 나오면 V1을 운영에 맞춰 고치지 않고(V1은 이미 신규 DB 기준으로 통합됨), **추천안: baseline 전에 운영 쪽을 V1과 같게 만드는 수동 정렬 SQL을 격리 복원본에서 먼저 검증한 뒤 운영에 적용하고 baseline(version=1)** 한다. V2 정합 마이그레이션은 신규 DB(V1)에도 같은 변경을 강제해 V1·V2 의미가 꼬이므로 운영 전용 잔여물 정리에는 쓰지 않는다. 운영 백업 복원과 이 비교는 사용자 승인된 VPS 작업 경로로만 수행한다.
 - CI 미추가: 7개 bootJar 빌드와 JVM 28회 기동이 필요해 무겁고, 서비스별 빈 DB V1+validate는 기존 `*-flyway` CI job이 이미 검증한다. 이 리허설은 엔티티·V1 변경 시와 운영 baseline 직전에 수동으로 다시 돌리는 일회성 게이트로 둔다.
 
+## Phase E1: 서비스별 runtime DB 계정 (opt-in)
+
+**결정 (2026-10-23, 위임된 에이전트 결정)**: 7개 DB 서비스가 공유하던 MySQL root 대신 서비스마다 `buildflow_<svc>`@`'%'` 계정을 두고, 자기 스키마 `buildflow_<svc>.*`에만 `ALL PRIVILEGES`(DDL 포함)를 준다. 다른 스키마·`mysql` 시스템 스키마·전역 권한(`CREATE USER`, `PROCESS` 등)·`GRANT OPTION`은 없다. 한 서비스의 자격 증명이나 SQL 주입이 다른 서비스 데이터와 계정 관리로 번지는 범위를 줄이는 것이 목적이다.
+
+- **대안 — 처음부터 DML 전용**: 운영은 아직 Hibernate `ddl-auto: update`(auth는 `schema.sql`)라서 기동 시 `CREATE/ALTER TABLE` 권한이 필요하다. DML만 주면 Entity 변경 후 기동이 실패하므로 Flyway 운영 전환 전에는 채택하지 않는다.
+- **E2(후속)**: 서비스별 Flyway 운영 전환이 끝나면 runtime 계정은 `SELECT/INSERT/UPDATE/DELETE`만 두고, 마이그레이션은 별도 계정이나 배포 단계에서 수행한다.
+- **기본값 불변**: `docker-compose.app.yml`은 `<SVC>_DB_USERNAME`/`<SVC>_DB_PASSWORD`가 없으면 기존 `DB_USERNAME`(기본 root)/`DB_PASSWORD`를 그대로 쓴다. 앱 `application.yml`의 `DB_USERNAME`/`DB_PASSWORD` 키는 바꾸지 않았다.
+
+### 계정 생성·갱신
+
+비밀번호는 파일·명령행에 남기지 않는다. 현재 PowerShell 프로세스 환경변수 `<SVC>_DB_PASSWORD`(예: `SITE_DB_PASSWORD`, 16자 이상) 또는 `-EnvFile .env`의 `*_DB_PASSWORD` 줄에서 읽어 `docker exec -i` stdin으로 mysql에 전달한다. root 비밀번호는 대상 컨테이너의 `MYSQL_ROOT_PASSWORD`를 컨테이너 안에서만 사용한다.
+
+```powershell
+.\scripts\db\service-accounts.ps1 -EnvFile .\.env          # 7개 전체, 기본 대상 buildflow-mysql
+.\scripts\db\service-accounts.ps1 -Service site -EnvFile .\.env
+```
+
+스크립트는 하나라도 비밀번호가 없거나 짧으면 아무 계정도 바꾸지 않고 중단한다. 재실행은 안전하다: `CREATE USER IF NOT EXISTS` → 비밀번호를 입력값으로 재설정 → `REVOKE ALL PRIVILEGES, GRANT OPTION` → 자기 스키마 `GRANT ALL`을 다시 적용하므로 손으로 붙인 추가 권한(drift)도 제거된다. `docker/mysql/init`은 새 volume에서만 실행되므로 계정·비밀번호를 넣지 않는다.
+
+적용 순서: 백업 → 스크립트 실행 → `.env`에 `<SVC>_DB_USERNAME=buildflow_<svc>`와 같은 비밀번호를 **쌍으로** 추가 → 해당 서비스만 재생성 → health·로그 확인. USERNAME만 넣고 PASSWORD를 빠뜨리면 root 비밀번호로 접속을 시도해 인증 실패로 기동이 멈춘다(안전 실패). 되돌리기는 두 키를 지우고 서비스를 재생성하면 root 경로로 복귀한다.
+
+### 검증
+
+`scripts/db/test-service-accounts-docker.ps1`은 무작위 Compose project(`bfacct<난수>`, 호스트 DB 포트 없음)의 MySQL 8에서 다음을 확인하고 그 project의 컨테이너와 이름·label을 재확인한 자기 volume만 제거한다. CI `db-service-accounts` job이 같은 스크립트를 실행한다.
+
+- 비밀번호 1개 누락 시 거부·계정 0개, 7계정 생성 시 출력에 비밀번호 미노출
+- 각 계정 `SHOW GRANTS`가 정확히 `USAGE ON *.*` + 자기 스키마 `ALL`
+- 자기 스키마 `CREATE/ALTER/INDEX/INSERT/UPDATE/SELECT/DELETE/DROP` 허용, `CREATE DATABASE IF NOT EXISTS <자기 스키마>`(chat/notification JDBC `createDatabaseIfNotExist`) 허용
+- 다른 스키마 SELECT/INSERT(1142), `mysql.user`(1142), 새 DB 생성(1044), `CREATE USER`(1227) 거부, `SHOW DATABASES`에 자기 BuildFlow 스키마만 노출
+- 교차 스키마 SELECT·전역 `PROCESS`를 주입한 뒤 재실행하면 제거되고 계정 수 7 유지
+- `-ValidateSiteService`: site-service 이미지를 `buildflow_site`로 기동해 `/actuator/health` UP, Hibernate `update`가 테이블 생성
+
+2026-10-23 로컬 Windows Docker에서 전 항목 PASS(site 테이블 5개). **기존 로컬·VPS DB에는 계정을 만들지 않았고 VPS에 적용하지 않았다.** 운영 적용은 백업·서비스별 전환 확인을 거친 별도 작업이다.
+
 ## 참고
 
 - [Flyway baselines](https://documentation.red-gate.com/fd/baselines-273973441.html)
