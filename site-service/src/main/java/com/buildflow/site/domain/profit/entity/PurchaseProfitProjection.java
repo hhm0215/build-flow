@@ -60,9 +60,15 @@ public class PurchaseProfitProjection {
 
     /**
      * 손익 재계산에서 원천에 행이 없는(삭제된) 매입. 원천은 삭제 revision을 남기지 않으므로 최대 revision으로
-     * 고정해 늦게 도착하는 같은 매입의 모든 이벤트가 "지연 도착"으로 무시되게 한다(매입 id는 재사용되지 않음).
+     * 고정해 늦게 도착하는 같은 매입의 삭제 이벤트는 무시한다. 매입 id는 정상 운영에서는 재사용되지 않지만
+     * DB 복원 후 purchase AUTO_INCREMENT가 덤프 시점으로 돌아가면 재사용될 수 있으므로, 묘비에 삭제가 아닌
+     * 이벤트가 오면 소비자가 생략하지 않고 실패시킨다(ProfitService.applyPurchaseEvent).
      */
     public static final long RECONCILED_TOMBSTONE_REVISION = Long.MAX_VALUE;
+
+    public boolean isReconciledTombstone() {
+        return deleted && lastRevision == RECONCILED_TOMBSTONE_REVISION;
+    }
 
     public void markReconciledDeleted(String reconcileId) {
         replace(RECONCILED_TOMBSTONE_REVISION, currentAmount, true, reconcileId);

@@ -81,6 +81,13 @@ public class ProfitReconcileService {
         ProjectionPlan plan = planProjections(siteId, purchase.purchases());
 
         boolean matched = before.sameAs(source) && eventsToMark.isEmpty() && plan.size() == 0;
+        int orphanEvents = estimate.orphanProfitEventCount();
+        if (apply && !matched && orphanEvents > 0) {
+            // 견적 행이 사라진 손익 이벤트(과거 확정 삭제 등)는 eventId 목록에 없어 늦게 도착하면 이중 반영될 수 있다
+            log.warn("견적 행 없는 손익 이벤트가 있어 재계산 반영 거부: reconcileId={}, siteId={}, orphanEvents={}",
+                    reconcileId, siteId, orphanEvents);
+            throw new BusinessException(ErrorCode.PROFIT_RECONCILE_CONFLICT);
+        }
         boolean applied = apply && !matched;
         if (applied) {
             processedEventRepository.saveAll(eventsToMark.stream()
@@ -96,13 +103,13 @@ public class ProfitReconcileService {
         log.info("손익 재계산: reconcileId={}, siteId={}, apply={}, applied={}, matched={}, "
                         + "before=[estimate={}, purchase={}, margin={}, marginRate={}], "
                         + "source=[estimate={}, purchase={}, margin={}, marginRate={}], "
-                        + "estimateEventsToMark={}, purchaseProjectionsToRewrite={}",
+                        + "estimateEventsToMark={}, purchaseProjectionsToRewrite={}, orphanEstimateEvents={}",
                 reconcileId, siteId, apply, applied, matched,
                 before.getTotalEstimateAmount(), before.getTotalPurchaseAmount(),
                 before.getMargin(), before.getMarginRate(),
                 source.getTotalEstimateAmount(), source.getTotalPurchaseAmount(),
                 source.getMargin(), source.getMarginRate(),
-                eventsToMark.size(), plan.size());
+                eventsToMark.size(), plan.size(), orphanEvents);
 
         return ProfitReconcileResponse.builder()
                 .siteId(siteId)
@@ -114,6 +121,7 @@ public class ProfitReconcileService {
                 .source(source)
                 .estimateEventsToMark(eventsToMark.size())
                 .purchaseProjectionsToRewrite(plan.size())
+                .orphanEstimateEvents(orphanEvents)
                 .build();
     }
 
@@ -135,6 +143,7 @@ public class ProfitReconcileService {
 
     private EstimateProfitSource validEstimate(Long siteId, EstimateProfitSource source) {
         if (!siteId.equals(source.siteId()) || source.profitEvents() == null
+                || source.orphanProfitEventCount() == null || source.orphanProfitEventCount() < 0
                 || !validAmount(source.confirmedTotalAmount())) {
             throw invalidSource("estimate", siteId);
         }

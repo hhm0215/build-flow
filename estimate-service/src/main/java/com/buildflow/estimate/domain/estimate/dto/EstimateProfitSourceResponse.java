@@ -20,6 +20,11 @@ public class EstimateProfitSourceResponse {
     private int confirmedEstimateCount;
     /** 이 현장 견적의 estimate.parsed/estimate.deleted outbox 이벤트(발행 상태 무관). */
     private List<ProfitEvent> profitEvents;
+    /**
+     * 견적 행이 없어 위 목록에 넣을 수 없는 이 현장(또는 payload를 읽을 수 없는) 손익 이벤트 수.
+     * 0보다 크면 합계·목록이 완전하다고 보장할 수 없으므로 site 재계산 반영이 409로 막힌다.
+     */
+    private int orphanProfitEventCount;
 
     @Getter
     @Builder

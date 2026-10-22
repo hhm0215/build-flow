@@ -27,6 +27,8 @@ public class ProfitReconcileResponse {
     private int estimateEventsToMark;
     /** 원천 기준으로 다시 쓸 매입 projection 수(누락·금액·revision 차이 + 원천에 없는 활성 projection). */
     private int purchaseProjectionsToRewrite;
+    /** 견적 행이 없어 원천 eventId 목록에 없는 이 현장 손익 이벤트 수. 0보다 크면 apply는 409로 막힌다. */
+    private int orphanEstimateEvents;
 
     @Getter
     @Builder

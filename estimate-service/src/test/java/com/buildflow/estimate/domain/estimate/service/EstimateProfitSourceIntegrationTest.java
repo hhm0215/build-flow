@@ -91,6 +91,32 @@ class EstimateProfitSourceIntegrationTest {
                 .collect(Collectors.toSet());
         assertEquals(1, otherEventIds.size());
         assertTrue(siteEventIds.stream().noneMatch(otherEventIds::contains));
+        assertEquals(0, source.getOrphanProfitEventCount());
+    }
+
+    @Test
+    void eventsWhoseEstimateRowIsGoneAreCountedPerSite() throws Exception {
+        Long kept = create(SITE, null, null, "300");
+        estimateService.confirm(kept);
+        // 확정 삭제가 허용되던 기간: 견적 행은 지워지고 estimate.deleted만 남은 경우
+        outboxRepository.save(com.buildflow.estimate.global.outbox.OutboxEvent.pending(
+                java.util.UUID.randomUUID().toString(), "estimate.deleted", "999999",
+                "{\"eventType\":\"ESTIMATE_DELETED\",\"payload\":{\"estimateId\":999999,\"siteId\":" + SITE
+                        + ",\"totalAmount\":100.00}}", java.time.Instant.now()));
+        outboxRepository.save(com.buildflow.estimate.global.outbox.OutboxEvent.pending(
+                java.util.UUID.randomUUID().toString(), "estimate.deleted", "888888",
+                "{\"eventType\":\"ESTIMATE_DELETED\",\"payload\":{\"estimateId\":888888,\"siteId\":" + OTHER_SITE
+                        + ",\"totalAmount\":100.00}}", java.time.Instant.now()));
+        outboxRepository.save(com.buildflow.estimate.global.outbox.OutboxEvent.pending(
+                java.util.UUID.randomUUID().toString(), "estimate.parsed", "777777", "not-json",
+                java.time.Instant.now()));
+
+        EstimateProfitSourceResponse source = sourceService.snapshot(SITE);
+
+        assertEquals(2, source.getOrphanProfitEventCount());   // 이 현장 1 + 읽을 수 없는 payload 1
+        assertEquals(1, source.getProfitEvents().size());
+        assertEquals(2, sourceService.snapshot(OTHER_SITE).getOrphanProfitEventCount());
+        assertEquals(1, sourceService.snapshot(99L).getOrphanProfitEventCount());   // 읽을 수 없는 payload만
     }
 
     @Test

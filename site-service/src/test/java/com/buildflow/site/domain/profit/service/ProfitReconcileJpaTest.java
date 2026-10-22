@@ -163,9 +163,14 @@ class ProfitReconcileJpaTest {
         assertFalse(profitService.applyPurchaseEvent(UUID.randomUUID().toString(),
                 ProfitEventType.PURCHASE_UPDATED, 11L, siteId, 2L, amount("400.00")));
         assertFalse(profitService.applyPurchaseEvent(UUID.randomUUID().toString(),
-                ProfitEventType.PURCHASE_UPDATED, 99L, siteId, 2L, amount("70.00")));
-        assertFalse(profitService.applyPurchaseEvent(UUID.randomUUID().toString(),
                 ProfitEventType.PURCHASE_DELETED, 99L, siteId, 3L, amount("70.00")));
+        // 묘비 id에 삭제 아닌 이벤트(복원 후 AUTO_INCREMENT 재사용 가능성)는 조용히 생략하지 않고 실패한다
+        String reusedId = UUID.randomUUID().toString();
+        assertThrows(IllegalStateException.class, () -> profitService.applyPurchaseEvent(reusedId,
+                ProfitEventType.PURCHASE_REGISTERED, 99L, siteId, 1L, amount("70.00")));
+        assertThrows(IllegalStateException.class, () -> profitService.applyPurchaseEvent(
+                UUID.randomUUID().toString(), ProfitEventType.PURCHASE_UPDATED, 99L, siteId, 2L, amount("70.00")));
+        assertFalse(processedRepository.existsById(reusedId));
         assertAmount("1200.00", profit().getTotalEstimateAmount());
         assertAmount("400.00", profit().getTotalPurchaseAmount());
 
@@ -253,14 +258,42 @@ class ProfitReconcileJpaTest {
     }
 
     @Test
+    void orphanEstimateEventsAreReportedInDryRunAndBlockApply() {
+        profitService.applyEvent(UUID.randomUUID().toString(), ProfitEventType.ESTIMATE_PARSED,
+                siteId, amount("500.00"), null);
+        String lost = UUID.randomUUID().toString();
+        stubEstimateWithOrphans(1, "800.00", event(lost, "ESTIMATE_PARSED"));
+        stubPurchase("0");
+
+        ProfitReconcileResponse dryRun = reconcileService.reconcile(siteId, false);
+        assertEquals(1, dryRun.getOrphanEstimateEvents());
+        assertFalse(dryRun.isApplied());
+
+        assertEquals(ErrorCode.PROFIT_RECONCILE_CONFLICT, assertThrows(BusinessException.class,
+                () -> reconcileService.reconcile(siteId, true)).getErrorCode());
+        assertAmount("500.00", profit().getTotalEstimateAmount());
+        assertFalse(processedRepository.existsById(lost));
+
+        // 원천 응답에 건수가 없으면(구버전 estimate-service) 형식 이상으로 503
+        when(estimateClient.snapshot(anyLong())).thenReturn(new ProfitSourceResponse<>(true,
+                new EstimateProfitSource(siteId, amount("800.00"), List.of(), null)));
+        assertEquals(ErrorCode.PROFIT_SOURCE_UNAVAILABLE, assertThrows(BusinessException.class,
+                () -> reconcileService.reconcile(siteId, false)).getErrorCode());
+    }
+
+    @Test
     void unknownSiteIsNotFound() {
         assertEquals(ErrorCode.SITE_NOT_FOUND, assertThrows(BusinessException.class,
                 () -> reconcileService.reconcile(siteId + 1000, false)).getErrorCode());
     }
 
     private void stubEstimate(String total, EstimateProfitSource.Event... events) {
+        stubEstimateWithOrphans(0, total, events);
+    }
+
+    private void stubEstimateWithOrphans(int orphans, String total, EstimateProfitSource.Event... events) {
         when(estimateClient.snapshot(anyLong())).thenReturn(new ProfitSourceResponse<>(true,
-                new EstimateProfitSource(siteId, amount(total), List.of(events))));
+                new EstimateProfitSource(siteId, amount(total), List.of(events), orphans)));
     }
 
     private void stubPurchase(String total, PurchaseProfitSource.Item... items) {

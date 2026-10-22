@@ -7,6 +7,8 @@ import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
 import com.buildflow.estimate.global.exception.BusinessException;
 import com.buildflow.estimate.global.exception.ErrorCode;
 import com.buildflow.estimate.global.outbox.OutboxEventRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -31,6 +33,7 @@ public class EstimateProfitSourceService {
 
     private final EstimateRepository estimateRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public EstimateProfitSourceResponse snapshot(Long siteId) {
@@ -57,11 +60,27 @@ public class EstimateProfitSourceService {
                                 .build())
                         .toList();
 
+        // 2026-09-21~09-24에는 확정 견적 삭제가 허용돼 행 없이 estimate.deleted만 남았을 수 있다.
+        int orphanCount = (int) outboxEventRepository.findOrphanProfitEvents(PROFIT_TOPICS.keySet()).stream()
+                .filter(event -> belongsToSiteOrUnknown(event.getPayloadJson(), siteId))
+                .count();
+
         return EstimateProfitSourceResponse.builder()
                 .siteId(siteId)
                 .confirmedTotalAmount(total)
                 .confirmedEstimateCount(confirmed.size())
                 .profitEvents(events)
+                .orphanProfitEventCount(orphanCount)
                 .build();
+    }
+
+    /** payload를 읽을 수 없으면 보수적으로 이 현장 것으로 센다(재계산을 막는 쪽). */
+    private boolean belongsToSiteOrUnknown(String payloadJson, Long siteId) {
+        try {
+            JsonNode site = objectMapper.readTree(payloadJson).path("payload").path("siteId");
+            return !site.canConvertToLong() || site.asLong() == siteId;
+        } catch (Exception e) {
+            return true;
+        }
     }
 }

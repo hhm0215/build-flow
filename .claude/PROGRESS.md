@@ -7,7 +7,7 @@
 
 ## 완료된 작업 — 현장 손익 재계산 API (복원 후 UNEXPLAINED 조치, 2026-10-23)
 
-- 2026-10-23 site-service `POST /api/v1/sites/{id}/profit/reconcile`(기본 dry-run, `?apply=true`만 반영, 프론트 미노출): 손익 소비자와 같은 현장 행 비관적 잠금 아래 estimate `GET /estimates/profit-source`(CONFIRMED 합계 + 그 현장 견적의 손익 outbox eventId, SUPERSEDED 제외)·purchase `GET /purchases/profit-source`(현재 매입 금액·revision)를 Feign(2s/5s) 조회해 `site_profits`를 원천으로 덮어쓰고, 미수신 견적 eventId를 수신기록에 남기고 매입 projection을 원천 revision으로 재작성(원천에 없는 활성 projection은 최대 revision 삭제 고정)해 늦게 온 이벤트 이중 반영을 막는다. 원천 실패·형식 이상 503, 범위 초과·projection 현장 충돌 409, 일치 시 무변경. site 68(2 skip)·estimate 56(1 skip)·purchase 45(1 skip) PASS. `docs/DATABASE_OPERATIONS.md`·`docs/API_SPEC.md` 갱신. 풀 Docker·실제 복원본 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+- 2026-10-23 site-service `POST /api/v1/sites/{id}/profit/reconcile`(기본 dry-run, `?apply=true`만 반영, 프론트 미노출): 손익 소비자와 같은 현장 행 비관적 잠금 아래 estimate `GET /estimates/profit-source`(CONFIRMED 합계 + 그 현장 견적의 손익 outbox eventId, SUPERSEDED 제외)·purchase `GET /purchases/profit-source`(현재 매입 금액·revision)를 Feign(2s/5s) 조회해 `site_profits`를 원천으로 덮어쓰고, 미수신 견적 eventId를 수신기록에 남기고 매입 projection을 원천 revision으로 재작성(원천에 없는 활성 projection은 최대 revision 삭제 고정)해 늦게 온 이벤트 이중 반영을 막는다. 원천 실패·형식 이상 503, 범위 초과·projection 현장 충돌·견적 행 없는 손익 이벤트(과거 확정 삭제) 409, 일치 시 무변경. PR #203 리뷰 반영: 묘비 id에 삭제 아닌 매입 이벤트는 생략 대신 실패(복원 후 AUTO_INCREMENT 재사용 감지, 런북 사전 확인 SQL 추가). site 69(2 skip)·estimate 57(1 skip)·purchase 45(1 skip) PASS. `docs/DATABASE_OPERATIONS.md`·`docs/API_SPEC.md` 갱신. 풀 Docker·실제 복원본 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
 
 ## 완료된 작업 — 견적 수정본 업그레이드·되돌리기 리허설 (격리 Kafka, 2026-10-23)
 
