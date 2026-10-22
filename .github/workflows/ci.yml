@@ -419,6 +419,8 @@ jobs:
         run: python3 -m unittest discover -s scripts/agents -p 'test_*.py'
       - name: Test exposure validator
         run: python3 -m unittest discover -s scripts/vps -p 'test_verify_*_compose.py'
+      - name: Validate root release wrapper syntax
+        run: bash -n scripts/vps/root/buildflow-release
       - name: Validate Unix backup privacy gate
         run: |
           pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1
@@ -478,6 +480,7 @@ jobs:
           .\scripts\db\test-warranty-volume-preflight.ps1
           .\scripts\db\test-warranty-snapshot.ps1
           .\scripts\db\test-warranty-restore-volume.ps1
+          .\scripts\db\test-flyway-ddl-compare.ps1
       - name: Validate read-only USB inventory with synthetic files
         shell: powershell
         run: .\scripts\usb\test-inventory-estimates.ps1

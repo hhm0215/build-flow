@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 운영 DDL ↔ V1 대조 경로 준비 (2026-10-23)
+
+- 2026-10-23 root 래퍼 `buildflow-release`에 읽기 전용 `schema` 모드(하드코딩 7개 스키마, `information_schema.TABLES` 목록 → `SHOW CREATE TABLE`, `AUTO_INCREMENT=N` 제거, 데이터·계정·비밀값 미조회)를 추가하고, 리허설에 `-ProdDdlPath`(+Docker 없는 `-V1DdlDirectory`) 서비스별 차이 표를 붙였다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`로 분리, 합성 픽스처(일치·컬럼 타입 차이·테이블 누락·빈 스키마·UTF-16 입력) 테스트를 CI windows-readiness에, 래퍼 `bash -n`을 public-compose에 연결. 직전 리허설 출력으로 오프라인 대조 7/7 MATCH 재현. 운영 실측은 main 병합·root 래퍼 재설치 후 PENDING. V1 **40/100** 유지.
+
 ## 완료된 작업 — Flyway 기존 DB baseline 격리 리허설 (2026-10-23)
 
 - 2026-10-23 `scripts/db/flyway-baseline-rehearsal.ps1`(+ compose): 무작위 `bfbase<난수>` project의 포트 비게시·tmpfs MySQL 8에서 7개 DB 서비스를 운영 방식(ddl-auto update, auth schema.sql)으로 `*_legacy`, Flyway V1로 `*_v1`에 만들어 정규화 `SHOW CREATE TABLE`과 `information_schema`(컬럼·인덱스·FK·CHECK)를 비교했다. 의미 차이 0 — charset 표기(`CHARACTER SET` 중복 출력)와 site·notification 컬럼 순서만 무해 차이. legacy에 일회성 baseline(1) 후 일반 flyway 프로파일 재기동에서 migrate 0·Hibernate validate·history `1|1|BASELINE|1` 7/7 PASS, 정리 후 잔여 리소스 0. 운영 VPS 실제 DDL은 접근 권한이 없어 미대조(배포 전 덤프 19개 vs 현재 21개 테이블) — 운영 백업 격리 복원본 비교가 남은 게이트. CI는 무거워 미추가(`docs/DATABASE_OPERATIONS.md`). V1 **40/100** 유지.
