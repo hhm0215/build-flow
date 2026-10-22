@@ -9,6 +9,10 @@
 
 - 2026-10-23 PILOT_QA 업무 흐름 점검의 수금 2상태 한계 해소(에이전트 결정, 사용자 위임): tax-service에 `tax_payments` 원장(금액 DECIMAL(15,2)·입금일·메모 500자·`canceled_at`/취소 사유)과 `GET/POST /taxes/{id}/payments`, `PATCH /payments/{pid}/cancel`을 추가했다. 미수금 = 총액 − 유효 입금 합계, 합계 = 총액이면 `paymentConfirmed`, 초과 400, 재취소 409, 유효 입금이 있으면 수정·삭제 409. 계산서 행 비관적 잠금으로 동시 입금 초과 방지(H2 4스레드 경합 회귀). 보관 현장은 기록 허용·취소 409. `confirm-payment`는 잔액 전액 1건으로 하위 호환, `tax.payment.confirmed`는 완료 전이 때만 1회(notification 소비자 무변경). 기존 입금 확인 건은 기동 시 총액 1건 이관(+이관 전 조회 대체), Flyway V2는 IF NOT EXISTS·중복 이관 방지. 응답에 `paidAmount`/`remainingAmount`/`paymentStatus`(매입 null). 프론트 입금 관리 모달(기본값 = 잔액)·부분 입금 배지·잔액 기준 미수금, MSW 원장 동기화. tax 67(1 skip)·notification 146(4 skip)·Vitest 184 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
 
+## 완료된 작업 — 운영 DDL ↔ V1 대조 경로 준비 (2026-10-23)
+
+- 2026-10-23 root 래퍼 `buildflow-release`에 읽기 전용 `schema` 모드(하드코딩 7개 스키마, `information_schema.TABLES` 목록 → `SHOW CREATE TABLE`, `AUTO_INCREMENT=N` 제거, 데이터·계정·비밀값 미조회)를 추가하고, 리허설에 `-ProdDdlPath`(+Docker 없는 `-V1DdlDirectory`) 서비스별 차이 표를 붙였다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`로 분리, 합성 픽스처(일치·컬럼 타입 차이·테이블 누락·빈 스키마·UTF-16 입력) 테스트를 CI windows-readiness에, 래퍼 `bash -n`을 public-compose에 연결. 직전 리허설 출력으로 오프라인 대조 7/7 MATCH 재현. 운영 실측은 main 병합·root 래퍼 재설치 후 PENDING. V1 **40/100** 유지.
+
 ## 완료된 작업 — Flyway 기존 DB baseline 격리 리허설 (2026-10-23)
 
 - 2026-10-23 `scripts/db/flyway-baseline-rehearsal.ps1`(+ compose): 무작위 `bfbase<난수>` project의 포트 비게시·tmpfs MySQL 8에서 7개 DB 서비스를 운영 방식(ddl-auto update, auth schema.sql)으로 `*_legacy`, Flyway V1로 `*_v1`에 만들어 정규화 `SHOW CREATE TABLE`과 `information_schema`(컬럼·인덱스·FK·CHECK)를 비교했다. 의미 차이 0 — charset 표기(`CHARACTER SET` 중복 출력)와 site·notification 컬럼 순서만 무해 차이. legacy에 일회성 baseline(1) 후 일반 flyway 프로파일 재기동에서 migrate 0·Hibernate validate·history `1|1|BASELINE|1` 7/7 PASS, 정리 후 잔여 리소스 0. 운영 VPS 실제 DDL은 접근 권한이 없어 미대조(배포 전 덤프 19개 vs 현재 21개 테이블) — 운영 백업 격리 복원본 비교가 남은 게이트. CI는 무거워 미추가(`docs/DATABASE_OPERATIONS.md`). V1 **40/100** 유지.
