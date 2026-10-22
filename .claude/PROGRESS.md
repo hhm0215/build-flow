@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 복원 후 재조정 점검 (OCR PENDING·outbox SENT·손익, 2026-10-23)
+
+- 2026-10-23 `scripts/db/restore-reconcile-check.ps1`(읽기 전용 단일 스냅샷): OCR `PENDING`, 서비스별 outbox 상태 건수, 소비자 수신기록 없는 `SENT`, 원천(확정 견적·매입·revision)과 `site_profits`/projection 불일치 현장을 `PENDING_OUTBOX`/`UNCONSUMED_SENT`/`UNEXPLAINED`로 분류(exit 0/2/3). 코드 실측: OCR은 30분 경과 시 `FAILED` 자동 전환(재실행 없음), outbox `PENDING`/`CLAIMED`는 자동 재전송, `SENT` 미소비는 자동 복구 안 됨, 손익 재계산 경로 없음(제안만). `docs/DATABASE_OPERATIONS.md` "복원 후 재조정" 추가. `test-restore-reconcile-docker.ps1` 합성 격리 MySQL(`bfrecon<난수>`, Flyway 스키마) PASS 12, 잔여 리소스 0. 실제 복원본 실행 PENDING, **VPS 미반영**. V1 **40/100** 유지.
+
 ## 완료된 작업 — 공개 VPS를 main `0fe8c9a`로 반영 (2026-10-23)
 
 - 2026-10-23 `sudo buildflow-release deploy 0fe8c9a…`(PR #198: 분할 입금·수주 전 상태·매입 증빙 연결·채팅 끊김 표시)가 처리 중 작업 0건과 백업·격리 복원 확인을 거쳐 EXIT 0으로 끝났다.
