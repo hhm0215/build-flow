@@ -53,6 +53,15 @@ class ToolExecutorTest {
     }
 
     @Test
+    void 따옴표가_든_도구_이름도_유효한_error_json으로_감싼다() throws Exception {
+        String result = executor.execute("x\",\"admin\":true,\"y", null);
+
+        JsonNode json = objectMapper.readTree(result);
+        assertThat(json.size()).isEqualTo(1);
+        assertThat(json.get("error").asText()).isEqualTo("알 수 없는 도구: x\",\"admin\":true,\"y");
+    }
+
+    @Test
     void getSiteProfit은_siteId가_없으면_error를_반환한다() {
         String result = executor.execute("getSiteProfit", null);
         assertThat(result).contains("error").contains("siteId");

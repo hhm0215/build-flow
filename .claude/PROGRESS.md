@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 릴리스 보안 검토 후속 (2026-10-23)
+
+- 2026-10-23 security-reviewer 독립 검토(`1d2497e..da012cd`)에서 Critical/High 코드 결함 없음. 후속: `buildflow-release`가 저장소·`.git` root 소유와 group/other 쓰기 불가를 확인하고 git을 `core.hooksPath=/dev/null`·`core.fsmonitor=false`로 실행, 런북 래퍼 설치 원본을 `origin/main`으로 변경. chat `ToolExecutor` 오류 JSON을 직렬화기로 감싸고(도구 이름 따옴표 회귀) 실패 로그는 예외 종류만 남긴다. 서버 비root 실측: 저장소 root 소유·쓰기 가능 파일 0·deploy 계정 docker 그룹 없음. 새 래퍼는 root 재설치 전 미적용. V1 **40/100** 유지.
+
 ## 완료된 작업 — AI 채팅 규칙 폴백 라우터 (2026-10-22)
 
 - 2026-10-22 chat Phase 3 마지막 항목: 모델이 첫 라운드에서 도구 없이 답한 질문에 손익·미수·견적·매입·요약·현장 목록 키워드가 있으면 `IntentRouter`가 질문 속 현장 이름(공백 무시, 긴 이름 우선 최대 3개)으로 도구를 골라 실행하고, 그 결과를 넣어 도구 없이 다시 답하게 한다. 현장을 특정하지 못하면 전체 요약·현장 목록을 근거로 넣는다. 업무와 무관한 질문은 기존처럼 첫 답변(LLM 1회). 단위 테스트 9건 추가(chat 32개 PASS). 실제 7b 모델 실측은 PENDING. V1 **40/100** 유지.
