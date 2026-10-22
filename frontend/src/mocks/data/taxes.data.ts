@@ -1,4 +1,4 @@
-import { TaxInvoice } from '../../types/domain.types'
+import { TaxInvoice, TaxPayment } from '../../types/domain.types'
 
 export const mockTaxInvoices: TaxInvoice[] = [
   {
@@ -12,6 +12,9 @@ export const mockTaxInvoices: TaxInvoice[] = [
     issueDate: '2026-02-28',
     paymentConfirmed: true,
     paymentDate: '2026-03-15',
+    paidAmount: 27_500_000,
+    remainingAmount: 0,
+    paymentStatus: 'PAID',
     memo: '',
     createdAt: '2026-02-28T09:00:00',
     updatedAt: '2026-03-15T09:00:00',
@@ -27,6 +30,9 @@ export const mockTaxInvoices: TaxInvoice[] = [
     issueDate: '2026-04-01',
     paymentConfirmed: false,
     paymentDate: null,
+    paidAmount: 0,
+    remainingAmount: 22_000_000,
+    paymentStatus: 'UNPAID',
     memo: '',
     createdAt: '2026-04-01T09:00:00',
     updatedAt: '2026-04-01T09:00:00',
@@ -42,9 +48,12 @@ export const mockTaxInvoices: TaxInvoice[] = [
     issueDate: '2026-03-01',
     paymentConfirmed: false,
     paymentDate: null,
+    paidAmount: 5_500_000,
+    remainingAmount: 11_000_000,
+    paymentStatus: 'PARTIAL',
     memo: '',
     createdAt: '2026-03-01T09:00:00',
-    updatedAt: '2026-03-01T09:00:00',
+    updatedAt: '2026-03-20T09:00:00',
   },
   {
     id: 4,
@@ -57,6 +66,9 @@ export const mockTaxInvoices: TaxInvoice[] = [
     issueDate: '2026-01-20',
     paymentConfirmed: false,
     paymentDate: null,
+    paidAmount: null,
+    remainingAmount: null,
+    paymentStatus: null,
     memo: '',
     createdAt: '2026-01-20T09:00:00',
     updatedAt: '2026-01-20T09:00:00',
@@ -72,8 +84,27 @@ export const mockTaxInvoices: TaxInvoice[] = [
     issueDate: '2026-03-20',
     paymentConfirmed: true,
     paymentDate: '2026-04-05',
+    paidAmount: 68_200_000,
+    remainingAmount: 0,
+    paymentStatus: 'PAID',
     memo: '',
     createdAt: '2026-03-20T09:00:00',
     updatedAt: '2026-04-05T09:00:00',
+  },
+]
+
+/** 입금 내역 원장. 3번은 분할 입금 중(1차 5,500,000원). */
+export const mockTaxPayments: TaxPayment[] = [
+  {
+    id: 1, taxInvoiceId: 1, amount: 27_500_000, paymentDate: '2026-03-15', memo: null,
+    canceled: false, canceledAt: null, cancelReason: null, createdAt: '2026-03-15T09:00:00',
+  },
+  {
+    id: 2, taxInvoiceId: 3, amount: 5_500_000, paymentDate: '2026-03-20', memo: '1차 기성금',
+    canceled: false, canceledAt: null, cancelReason: null, createdAt: '2026-03-20T09:00:00',
+  },
+  {
+    id: 3, taxInvoiceId: 5, amount: 68_200_000, paymentDate: '2026-04-05', memo: null,
+    canceled: false, canceledAt: null, cancelReason: null, createdAt: '2026-04-05T09:00:00',
   },
 ]

@@ -35,14 +35,20 @@ class TaxFlywayIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void freshMysqlRunsV1AndHibernateValidatesWithoutCreatingBusinessData() {
+    void freshMysqlRunsV1V2AndHibernateValidatesWithoutCreatingBusinessData() {
         assertNotNull(flyway.info().current());
-        assertEquals("1", flyway.info().current().getVersion().toString());
+        assertEquals("2", flyway.info().current().getVersion().toString());
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = 1",
                 Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM tax_invoices", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM outbox_events", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM tax_payments", Integer.class));
+        String paymentDdl = jdbc.queryForObject("SHOW CREATE TABLE tax_payments",
+                (resultSet, row) -> resultSet.getString(2));
+        assertNotNull(paymentDdl);
+        assertTrue(paymentDdl.contains("`amount` decimal(15,2) NOT NULL"));
+        assertTrue(paymentDdl.contains("KEY `idx_tax_payments_invoice`"));
 
         String taxDdl = jdbc.queryForObject("SHOW CREATE TABLE tax_invoices",
                 (resultSet, row) -> resultSet.getString(2));

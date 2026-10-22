@@ -58,11 +58,11 @@ public class Site {
 
     @Builder
     public Site(String siteName, Client client, String address,
-                LocalDate startDate, LocalDate endDate, String memo) {
+                LocalDate startDate, LocalDate endDate, String memo, SiteStatus status) {
         this.siteName = siteName;
         this.client = client;
         this.address = address;
-        this.status = SiteStatus.IN_PROGRESS;
+        this.status = status != null ? status : SiteStatus.IN_PROGRESS;
         this.startDate = startDate;
         this.endDate = endDate;
         this.memo = memo;

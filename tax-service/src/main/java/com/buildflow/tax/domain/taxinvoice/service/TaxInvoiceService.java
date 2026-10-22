@@ -13,8 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,7 @@ public class TaxInvoiceService {
     private final TaxInvoiceRepository taxInvoiceRepository;
     private final KafkaProducerService kafkaProducerService;
     private final SiteReferenceValidator siteReferenceValidator;
+    private final TaxPaymentService taxPaymentService;
 
     @Transactional
     public TaxInvoiceResponse create(TaxInvoiceCreateRequest request) {
@@ -50,7 +52,7 @@ public class TaxInvoiceService {
                         .build()
         );
 
-        return TaxInvoiceResponse.from(saved);
+        return TaxInvoiceResponse.from(saved, BigDecimal.ZERO);
     }
 
     public List<TaxInvoiceResponse> findAll(Long siteId, TaxInvoiceType type) {
@@ -64,19 +66,22 @@ public class TaxInvoiceService {
             invoices = taxInvoiceRepository.findAllByOrderByCreatedAtDesc();
         }
 
+        Map<Long, BigDecimal> paid = taxPaymentService.paidAmounts(invoices);
         return invoices.stream()
-                .map(TaxInvoiceResponse::from)
+                .map(invoice -> TaxInvoiceResponse.from(invoice, paid.get(invoice.getId())))
                 .toList();
     }
 
     public TaxInvoiceResponse findById(Long id) {
-        return TaxInvoiceResponse.from(getTaxInvoice(id));
+        TaxInvoice invoice = getTaxInvoice(id);
+        return TaxInvoiceResponse.from(invoice, taxPaymentService.paidAmount(invoice));
     }
 
     @Transactional
     public TaxInvoiceResponse update(Long id, TaxInvoiceUpdateRequest request) {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
+        taxInvoice.validateMutable(taxPaymentService.activePaidAmount(taxInvoice.getId()));
         taxInvoice.update(
                 request.getType(),
                 request.getSupplyAmount(),
@@ -85,54 +90,45 @@ public class TaxInvoiceService {
                 request.getIssueDate(),
                 request.getMemo()
         );
-        return TaxInvoiceResponse.from(taxInvoice);
+        return TaxInvoiceResponse.from(taxInvoice, BigDecimal.ZERO);
     }
 
+    /** 하위 호환: 남은 잔액 전부를 입금 1건으로 기록하고 완료 처리한다. */
     @Transactional
     public TaxInvoiceResponse confirmPayment(Long id, PaymentConfirmRequest request) {
-        TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
-        LocalDate paymentDate = (request.getPaymentDate() != null)
-                ? request.getPaymentDate()
-                : LocalDate.now();
-        taxInvoice.confirmPayment(paymentDate);
-
-        kafkaProducerService.sendTaxPaymentConfirmed(
-                TaxInvoiceRegisteredPayload.builder()
-                        .taxInvoiceId(taxInvoice.getId())
-                        .siteId(taxInvoice.getSiteId())
-                        .type(taxInvoice.getType().name())
-                        .totalAmount(taxInvoice.getTotalAmount())
-                        .counterparty(taxInvoice.getCounterparty())
-                        .build()
-        );
-
-        return TaxInvoiceResponse.from(taxInvoice);
+        TaxInvoice taxInvoice = taxPaymentService.payRemaining(id, request.getPaymentDate());
+        return TaxInvoiceResponse.from(taxInvoice, taxInvoice.getTotalAmount());
     }
 
     @Transactional
     public void delete(Long id) {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
-        taxInvoice.validateMutable();
+        taxInvoice.validateMutable(taxPaymentService.activePaidAmount(taxInvoice.getId()));
+        taxPaymentService.deleteLedger(taxInvoice.getId());
         taxInvoiceRepository.delete(taxInvoice);
     }
 
+    /** 미수금 = Σ(공급가+세액) − Σ(유효 입금). 잔액이 남은 매출 계산서만 미수 건으로 센다. */
     public OutstandingResponse getOutstanding(Long siteId) {
         List<TaxInvoice> allSales = taxInvoiceRepository
                 .findBySiteIdAndTypeOrderByCreatedAtDesc(siteId, TaxInvoiceType.SALES);
+        Map<Long, BigDecimal> paid = taxPaymentService.paidAmounts(allSales);
 
-        BigDecimal totalSalesAmount = allSales.stream()
-                .map(TaxInvoice::getTotalAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalSalesAmount = BigDecimal.ZERO;
+        BigDecimal confirmedAmount = BigDecimal.ZERO;
+        for (TaxInvoice invoice : allSales) {
+            totalSalesAmount = totalSalesAmount.add(invoice.getTotalAmount());
+            confirmedAmount = confirmedAmount.add(paid.getOrDefault(invoice.getId(), BigDecimal.ZERO));
+        }
 
-        BigDecimal confirmedAmount = allSales.stream()
-                .filter(TaxInvoice::isPaymentConfirmed)
-                .map(TaxInvoice::getTotalAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        List<TaxInvoice> unpaid = taxInvoiceRepository
-                .findBySiteIdAndTypeAndPaymentConfirmedFalseOrderByIssueDateAsc(
-                        siteId, TaxInvoiceType.SALES);
+        List<TaxInvoiceResponse> unpaid = allSales.stream()
+                .filter(invoice -> invoice.getTotalAmount()
+                        .compareTo(paid.getOrDefault(invoice.getId(), BigDecimal.ZERO)) > 0)
+                .sorted(Comparator.comparing(TaxInvoice::getIssueDate,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(invoice -> TaxInvoiceResponse.from(invoice, paid.get(invoice.getId())))
+                .toList();
 
         return OutstandingResponse.builder()
                 .siteId(siteId)
@@ -140,7 +136,7 @@ public class TaxInvoiceService {
                 .confirmedAmount(confirmedAmount)
                 .outstandingAmount(totalSalesAmount.subtract(confirmedAmount))
                 .unpaidCount(unpaid.size())
-                .unpaidInvoices(unpaid.stream().map(TaxInvoiceResponse::from).toList())
+                .unpaidInvoices(unpaid)
                 .build();
     }
 

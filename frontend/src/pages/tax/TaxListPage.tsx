@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { Receipt, Plus, CheckCircle, Pencil, Trash2 } from 'lucide-react'
+import { Receipt, Plus, Wallet, Pencil, Trash2 } from 'lucide-react'
 import { Alert, Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd'
 import type { Dayjs } from 'dayjs'
 import SiteSelect from '../../components/SiteSelect'
@@ -14,13 +14,14 @@ import FilterAmountRange from '../../components/filters/FilterAmountRange'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
 import { useTaxes, useCreateTax } from '../../api/taxes.api'
-import type { TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceType } from '../../types'
-import TaxPaymentConfirmModal from './TaxPaymentConfirmModal'
+import type { TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceType, TaxPaymentStatus } from '../../types'
+import TaxPaymentsModal from './TaxPaymentsModal'
 import TaxEditModal from './TaxEditModal'
 import TaxDeleteModal from './TaxDeleteModal'
 import { validateTaxAmounts } from '../../utils/tax'
+import { PAYMENT_STATUS_META, hasActivePayment, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 
-type PaymentStatus = 'PAID' | 'UNPAID'
+type PaymentStatus = TaxPaymentStatus
 
 const TYPE_OPTIONS = [
   { value: 'SALES' as const, label: '매출', color: '#22c55e' },
@@ -28,8 +29,9 @@ const TYPE_OPTIONS = [
 ] as const
 
 const PAYMENT_OPTIONS = [
-  { value: 'PAID' as const, label: '입금 완료', color: '#22c55e' },
-  { value: 'UNPAID' as const, label: '미입금', color: '#f59e0b' },
+  { value: 'PAID' as const, label: PAYMENT_STATUS_META.PAID.label, color: PAYMENT_STATUS_META.PAID.color },
+  { value: 'PARTIAL' as const, label: PAYMENT_STATUS_META.PARTIAL.label, color: PAYMENT_STATUS_META.PARTIAL.color },
+  { value: 'UNPAID' as const, label: PAYMENT_STATUS_META.UNPAID.label, color: PAYMENT_STATUS_META.UNPAID.color },
 ] as const
 
 interface TaxFilters {
@@ -55,7 +57,7 @@ interface TaxCreateFormValues {
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
   type: { type: 'enum', values: ['SALES', 'PURCHASE'] },
-  payment: { type: 'enum', values: ['PAID', 'UNPAID'] },
+  payment: { type: 'enum', values: ['PAID', 'PARTIAL', 'UNPAID'] },
   startDate: { type: 'date' },
   endDate: { type: 'date' },
   minAmount: { type: 'number' },
@@ -66,7 +68,8 @@ export default function TaxListPage() {
   const { data, isLoading, isError, refetch } = useTaxes()
   const createTax = useCreateTax()
   const [modalOpen, setModalOpen] = useState(false)
-  const [confirmingInvoice, setConfirmingInvoice] = useState<TaxInvoice | null>(null)
+  // 입금 기록·취소 뒤 목록이 다시 조회되면 모달도 최신 잔액을 보도록 ID로 보관한다.
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<TaxInvoice | null>(null)
   const [deletingInvoice, setDeletingInvoice] = useState<TaxInvoice | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -86,8 +89,8 @@ export default function TaxListPage() {
         const q = rawQ.trim().toLowerCase()
         if (q && !(inv.counterparty ?? '').toLowerCase().includes(q)) return false
         if (f.type && inv.type !== f.type) return false
-        if (f.payment === 'PAID' && !inv.paymentConfirmed) return false
-        if (f.payment === 'UNPAID' && inv.paymentConfirmed) return false
+        // 입금 상태는 매출만 해당한다(매입은 수금 대상 아님).
+        if (f.payment && paymentStatusOf(inv) !== f.payment) return false
         const dateKey = inv.issueDate?.slice(0, 10) ?? ''
         if (f.startDate && dateKey < f.startDate) return false
         if (f.endDate && dateKey > f.endDate) return false
@@ -136,10 +139,10 @@ export default function TaxListPage() {
     }
   }
 
-  const unpaidTotal = filtered
-    .filter((t) => !t.paymentConfirmed && t.type === 'SALES')
-    .reduce((sum, t) => sum + t.totalAmount, 0)
-  const unpaidCount = filtered.filter((t) => !t.paymentConfirmed && t.type === 'SALES').length
+  const unpaidInvoices = filtered.filter((t) => remainingOf(t) > 0)
+  const unpaidTotal = unpaidInvoices.reduce((sum, t) => sum + remainingOf(t), 0)
+  const unpaidCount = unpaidInvoices.length
+  const paymentInvoice = paymentInvoiceId == null ? null : invoices.find((t) => t.id === paymentInvoiceId) ?? null
 
   return (
     <div>
@@ -298,44 +301,38 @@ export default function TaxListPage() {
                     ₩{inv.totalAmount.toLocaleString('ko-KR')}
                   </td>
                   <td style={{ padding: '14px 20px' }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 600, padding: '3px 8px',
-                      borderRadius: 20,
-                      background: inv.paymentConfirmed ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
-                      color: inv.paymentConfirmed ? '#22c55e' : '#f59e0b',
-                      border: `1px solid ${inv.paymentConfirmed ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                    }}>
-                      {inv.paymentConfirmed ? '입금 완료' : '미입금'}
-                    </span>
+                    <PaymentBadge invoice={inv} />
                   </td>
                   <td style={{ padding: '14px 20px' }}>
-                    {!inv.paymentConfirmed && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {inv.type === 'SALES' && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {inv.type === 'SALES' && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => setPaymentInvoiceId(inv.id)} aria-label={`${inv.id}번 세금계산서 입금 관리`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', cursor: 'pointer' }}
+                        >
+                          <Wallet size={11} strokeWidth={2.5} /> 입금
+                        </motion.button>
+                      )}
+                      {!hasActivePayment(inv) && (
+                        <>
                           <motion.button
                             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            onClick={() => setConfirmingInvoice(inv)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22c55e', cursor: 'pointer' }}
+                            onClick={() => setEditingInvoice(inv)} aria-label={`${inv.id}번 세금계산서 수정`}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', cursor: 'pointer' }}
                           >
-                            <CheckCircle size={11} strokeWidth={2.5} /> 입금 확인
+                            <Pencil size={11} /> 수정
                           </motion.button>
-                        )}
-                        <motion.button
-                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                          onClick={() => setEditingInvoice(inv)} aria-label={`${inv.id}번 세금계산서 수정`}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', cursor: 'pointer' }}
-                        >
-                          <Pencil size={11} /> 수정
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                          onClick={() => setDeletingInvoice(inv)} aria-label={`${inv.id}번 세금계산서 삭제`}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', cursor: 'pointer' }}
-                        >
-                          <Trash2 size={11} /> 삭제
-                        </motion.button>
-                      </div>
-                    )}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={() => setDeletingInvoice(inv)} aria-label={`${inv.id}번 세금계산서 삭제`}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={11} /> 삭제
+                          </motion.button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </motion.tr>
               ))}
@@ -406,10 +403,10 @@ export default function TaxListPage() {
           </Form.Item>
         </Form>
       </Modal>
-      {confirmingInvoice && (
-        <TaxPaymentConfirmModal
-          invoice={confirmingInvoice}
-          onClose={() => setConfirmingInvoice(null)}
+      {paymentInvoice && (
+        <TaxPaymentsModal
+          invoice={paymentInvoice}
+          onClose={() => setPaymentInvoiceId(null)}
         />
       )}
       {editingInvoice && (
@@ -417,6 +414,32 @@ export default function TaxListPage() {
       )}
       {deletingInvoice && (
         <TaxDeleteModal invoice={deletingInvoice} onClose={() => setDeletingInvoice(null)} />
+      )}
+    </div>
+  )
+}
+
+function PaymentBadge({ invoice }: { invoice: TaxInvoice }) {
+  const status = paymentStatusOf(invoice)
+  if (status == null) {
+    return <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>-</span>
+  }
+  const meta = PAYMENT_STATUS_META[status]
+  return (
+    <div>
+      <span style={{
+        fontSize: 11, fontWeight: 600, padding: '3px 8px',
+        borderRadius: 20,
+        background: `${meta.color}1a`,
+        color: meta.color,
+        border: `1px solid ${meta.color}33`,
+      }}>
+        {meta.label}
+      </span>
+      {status === 'PARTIAL' && (
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+          잔액 ₩{remainingOf(invoice).toLocaleString('ko-KR')}
+        </div>
       )}
     </div>
   )

@@ -3,7 +3,7 @@ import { Alert, Button, DatePicker, Form, Input, Modal, Select } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useClients } from '../../api/clients.api'
 import { useCreateSite } from '../../api/sites.api'
-import type { Client, SiteCreateRequest } from '../../types'
+import type { Client, SiteCreateRequest, SiteStatus } from '../../types'
 import ClientCreateModal from './ClientCreateModal'
 
 interface SiteFormValues {
@@ -13,11 +13,13 @@ interface SiteFormValues {
   startDate?: Dayjs
   endDate?: Dayjs
   memo?: string
+  status?: SiteStatus
 }
 
 export function toSiteCreateRequest(values: SiteFormValues): SiteCreateRequest {
   return {
     siteName: values.siteName.trim(),
+    status: values.status,
     clientId: values.clientId,
     address: values.address?.trim() || undefined,
     startDate: values.startDate?.format('YYYY-MM-DD'),
@@ -95,6 +97,19 @@ export default function SiteCreateModal({ open, onClose, onCreated }: Props) {
           {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
           <Form.Item name="siteName" label="현장명" rules={[{ required: true, whitespace: true, message: '현장명을 입력하세요' }]}>
             <Input placeholder="현장명" maxLength={200} />
+          </Form.Item>
+          <Form.Item
+            name="status"
+            label="진행 단계"
+            initialValue="IN_PROGRESS"
+            extra="계약 전 견적부터 쓰는 일은 '수주 전'으로 만들고, 수주하면 현장 화면에서 '시공 중'으로 바꿉니다."
+          >
+            <Select
+              options={[
+                { value: 'IN_PROGRESS', label: '시공 중 (수주 완료)' },
+                { value: 'BIDDING', label: '수주 전 (견적 중)' },
+              ]}
+            />
           </Form.Item>
           <Form.Item
             name="clientId"

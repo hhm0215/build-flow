@@ -6,6 +6,7 @@ import com.buildflow.site.domain.dashboard.dto.DashboardSummaryResponse;
 import com.buildflow.site.domain.profit.entity.SiteProfit;
 import com.buildflow.site.domain.profit.repository.SiteProfitRepository;
 import com.buildflow.site.domain.site.entity.Site;
+import com.buildflow.site.domain.site.entity.SiteStatus;
 import com.buildflow.site.domain.site.repository.SiteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,15 @@ public class DashboardService {
                 })
                 .toList();
 
+        // 수주 전(BIDDING) 현장의 견적은 계약 전 금액이라 전체 손익 합계에 넣지 않는다. 현장별 목록에는 그대로 보인다.
+        Set<Long> biddingSiteIds = sites.stream()
+                .filter(site -> site.getStatus() == SiteStatus.BIDDING)
+                .map(Site::getId)
+                .collect(Collectors.toSet());
         for (SiteProfit profit : profits) {
+            if (biddingSiteIds.contains(profit.getSiteId())) {
+                continue;
+            }
             totalEstimate = totalEstimate.add(profit.getTotalEstimateAmount());
             totalPurchase = totalPurchase.add(profit.getTotalPurchaseAmount());
         }

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { setupServer } from 'msw/node'
-import type { ApiResponse, TaxInvoice } from '../../types'
+import type { ApiResponse, TaxInvoice, TaxPayment } from '../../types'
 import { taxesHandlers } from './taxes.handlers'
 
 const server = setupServer(...taxesHandlers)
@@ -146,5 +146,67 @@ describe('세금계산서 수정·삭제 MSW 계약', () => {
     expect((await fetch(itemUrl, { method: 'DELETE' })).status).toBe(200)
     expect((await fetch(itemUrl)).status).toBe(404)
     expect((await fetch(itemUrl, { method: 'DELETE' })).status).toBe(404)
+  })
+})
+
+describe('세금계산서 분할 입금 MSW 계약', () => {
+  it('분할 입금→완료, 초과 400, 취소 후 잔액 복구, 재취소 409, 미수금 반영', async () => {
+    const createdResponse = await fetch(collectionUrl, {
+      method: 'POST', headers,
+      body: JSON.stringify({ siteId: 88, type: 'SALES', supplyAmount: 100, taxAmount: 10 }),
+    })
+    const created = (await createdResponse.json() as ApiResponse<TaxInvoice>).data
+    expect(created).toMatchObject({ paidAmount: 0, remainingAmount: 110, paymentStatus: 'UNPAID' })
+    const paymentsUrl = new URL(`/api/v1/taxes/${created.id}/payments`, document.baseURI)
+    const itemUrl = new URL(`/api/v1/taxes/${created.id}`, document.baseURI)
+    const outstandingUrl = new URL('/api/v1/taxes/outstanding?siteId=88', document.baseURI)
+    const pay = (amount: unknown, paymentDate: unknown = '2026-10-20') => fetch(paymentsUrl, {
+      method: 'POST', headers, body: JSON.stringify({ amount, paymentDate }),
+    })
+
+    for (const invalid of [0, -1, 1.001]) expect((await pay(invalid)).status).toBe(400)
+    expect((await pay(10, '2026-02-31')).status).toBe(400)
+
+    const first = await pay(40.5)
+    expect(first.status).toBe(201)
+    const firstPayment = (await first.json() as ApiResponse<TaxPayment>).data
+    expect((await fetch(itemUrl).then((r) => r.json()) as ApiResponse<TaxInvoice>).data)
+      .toMatchObject({ paidAmount: 40.5, remainingAmount: 69.5, paymentStatus: 'PARTIAL', paymentConfirmed: false })
+    expect((await fetch(itemUrl, { method: 'DELETE' })).status).toBe(409)
+
+    const over = await pay(69.51)
+    expect(over.status).toBe(400)
+    expect((await over.json() as ApiResponse<null>).error).toBe('입금액이 남은 미수금을 초과합니다.')
+
+    expect((await pay(69.5, '2026-10-22')).status).toBe(201)
+    expect((await fetch(itemUrl).then((r) => r.json()) as ApiResponse<TaxInvoice>).data)
+      .toMatchObject({ paymentStatus: 'PAID', paymentConfirmed: true, paymentDate: '2026-10-22', remainingAmount: 0 })
+    expect((await fetch(outstandingUrl).then((r) => r.json()) as ApiResponse<{ outstandingAmount: number }>)
+      .data.outstandingAmount).toBe(0)
+
+    const cancelUrl = new URL(`/api/v1/taxes/${created.id}/payments/${firstPayment.id}/cancel`, document.baseURI)
+    const canceled = await fetch(cancelUrl, { method: 'PATCH', headers, body: JSON.stringify({ reason: '오입금' }) })
+    expect(canceled.status).toBe(200)
+    expect((await canceled.json() as ApiResponse<TaxPayment>).data)
+      .toMatchObject({ canceled: true, cancelReason: '오입금' })
+    expect((await fetch(cancelUrl, { method: 'PATCH', headers, body: '{}' })).status).toBe(409)
+    expect((await fetch(itemUrl).then((r) => r.json()) as ApiResponse<TaxInvoice>).data)
+      .toMatchObject({ paidAmount: 69.5, remainingAmount: 40.5, paymentStatus: 'PARTIAL', paymentDate: null })
+    expect((await fetch(outstandingUrl).then((r) => r.json()) as ApiResponse<{ outstandingAmount: number }>)
+      .data.outstandingAmount).toBe(40.5)
+
+    const history = (await fetch(paymentsUrl).then((r) => r.json()) as ApiResponse<TaxPayment[]>).data
+    expect(history).toHaveLength(2)
+    expect(history.filter((p) => p.canceled)).toHaveLength(1)
+  })
+
+  it('매입 세금계산서는 입금을 기록할 수 없고 수금 필드가 null이다', async () => {
+    const purchase = (await fetch(new URL('/api/v1/taxes/4', document.baseURI))
+      .then((r) => r.json()) as ApiResponse<TaxInvoice>).data
+    expect(purchase).toMatchObject({ paidAmount: null, remainingAmount: null, paymentStatus: null })
+    const response = await fetch(new URL('/api/v1/taxes/4/payments', document.baseURI), {
+      method: 'POST', headers, body: JSON.stringify({ amount: 1, paymentDate: '2026-10-20' }),
+    })
+    expect(response.status).toBe(409)
   })
 })

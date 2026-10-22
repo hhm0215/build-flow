@@ -3,6 +3,7 @@ package com.buildflow.tax.domain.taxinvoice.controller;
 import com.buildflow.tax.domain.taxinvoice.dto.*;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoiceType;
 import com.buildflow.tax.domain.taxinvoice.service.TaxInvoiceService;
+import com.buildflow.tax.domain.taxinvoice.service.TaxPaymentService;
 import com.buildflow.tax.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.List;
 public class TaxInvoiceController {
 
     private final TaxInvoiceService taxInvoiceService;
+    private final TaxPaymentService taxPaymentService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<TaxInvoiceResponse>> create(
@@ -51,6 +53,28 @@ public class TaxInvoiceController {
             @PathVariable Long id,
             @RequestBody PaymentConfirmRequest request) {
         return ResponseEntity.ok(ApiResponse.success(taxInvoiceService.confirmPayment(id, request)));
+    }
+
+    @GetMapping("/{id}/payments")
+    public ResponseEntity<ApiResponse<List<TaxPaymentResponse>>> findPayments(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(taxPaymentService.findPayments(id)));
+    }
+
+    @PostMapping("/{id}/payments")
+    public ResponseEntity<ApiResponse<TaxPaymentResponse>> recordPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody TaxPaymentCreateRequest request) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success(taxPaymentService.record(id, request)));
+    }
+
+    @PatchMapping("/{id}/payments/{paymentId}/cancel")
+    public ResponseEntity<ApiResponse<TaxPaymentResponse>> cancelPayment(
+            @PathVariable Long id,
+            @PathVariable Long paymentId,
+            @Valid @RequestBody(required = false) TaxPaymentCancelRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(taxPaymentService.cancel(id, paymentId, request)));
     }
 
     @DeleteMapping("/{id}")

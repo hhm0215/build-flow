@@ -52,6 +52,13 @@ describe('SiteCreateModal', () => {
     })
   })
 
+  it('수주 전 단계를 고르면 BIDDING으로 보낸다', () => {
+    expect(toSiteCreateRequest({ siteName: '입찰 현장', status: 'BIDDING' })).toMatchObject({
+      siteName: '입찰 현장',
+      status: 'BIDDING',
+    })
+  })
+
   it('현장명 없이 요청하지 않는다', async () => {
     render(<SiteCreateModal open onClose={vi.fn()} onCreated={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
@@ -69,6 +76,7 @@ describe('SiteCreateModal', () => {
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
       siteName: '새 현장',
+      status: 'IN_PROGRESS',
       clientId: undefined,
       address: undefined,
       startDate: undefined,

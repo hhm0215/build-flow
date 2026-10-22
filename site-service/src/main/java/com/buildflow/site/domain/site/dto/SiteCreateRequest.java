@@ -1,5 +1,6 @@
 package com.buildflow.site.domain.site.dto;
 
+import com.buildflow.site.domain.site.entity.SiteStatus;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -24,6 +25,8 @@ public class SiteCreateRequest {
     // Java UTF-16 16,000 code units는 utf8mb4 최악에도 64,000 bytes로 MySQL TEXT 한도 이내다.
     @Size(max = 16000, message = "메모는 16000자 이하여야 합니다.")
     private String memo;
+    /** 선택. 비우면 IN_PROGRESS. 견적이 계약보다 먼저인 일은 BIDDING으로 등록한다. */
+    private SiteStatus status;
 
     @AssertTrue(message = "종료일은 시작일보다 빠를 수 없습니다.")
     public boolean isDateRangeValid() {

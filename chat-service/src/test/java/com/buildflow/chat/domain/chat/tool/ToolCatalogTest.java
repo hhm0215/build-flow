@@ -31,6 +31,19 @@ class ToolCatalogTest {
     }
 
     @Test
+    void listSites_설명은_수주_전을_포함한_현장_상태_라벨을_알려준다() {
+        String description = ToolCatalog.tools().stream()
+                .map(this::functionOf)
+                .filter(f -> "listSites".equals(f.get("name")))
+                .map(f -> (String) f.get("description"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(description).contains("BIDDING=수주 전", "IN_PROGRESS=시공 중", "SETTLING=정산 중",
+                "WARRANTY=하자보증", "COMPLETED=완료");
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void siteId_도구는_siteId를_required로_선언한다() {
         List<Map<String, Object>> tools = ToolCatalog.tools();

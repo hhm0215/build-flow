@@ -2,6 +2,7 @@ package com.buildflow.site.domain.dashboard.service;
 
 import com.buildflow.site.domain.dashboard.dto.DashboardStatsResponse;
 import com.buildflow.site.domain.dashboard.dto.DashboardStatsResponse.SiteProfitSummary;
+import com.buildflow.site.domain.site.entity.SiteStatus;
 import com.buildflow.site.global.exception.BusinessException;
 import com.buildflow.site.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +15,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,7 +30,7 @@ public class OllamaService {
             "당신은 건설 현장 관리 전문가입니다. " +
             "주어진 현장 데이터를 분석하여 한국어로 간결한 경영 요약을 작성하세요. " +
             "포함할 내용: " +
-            "1. 전체 현황 요약 (현장 수, 진행 상태) " +
+            "1. 전체 현황 요약 (현장 수, 진행 상태. '수주 전'은 아직 계약 전인 견적 단계라 손익 평가에서 구분한다) " +
             "2. 손익 분석 (총 마진, 마진율, 수익성 평가) " +
             "3. 주의 현장 (마진율 10% 미만 또는 적자 현장 경고) " +
             "4. 액션 아이템 (구체적 개선 제안 1~3개) " +
@@ -61,7 +64,7 @@ public class OllamaService {
         StringBuilder sb = new StringBuilder();
         sb.append("## 현장 데이터\n\n");
         sb.append(String.format("- 전체 현장 수: %d개\n", stats.getTotalSites()));
-        sb.append(String.format("- 상태별: %s\n", stats.getSitesByStatus()));
+        sb.append(String.format("- 상태별: %s\n", statusCounts(stats.getSitesByStatus())));
         sb.append(String.format("- 총 견적액: %s원\n", stats.getTotalEstimateAmount().toPlainString()));
         sb.append(String.format("- 총 매입액: %s원\n", stats.getTotalPurchaseAmount().toPlainString()));
         sb.append(String.format("- 총 마진: %s원\n", stats.getTotalMargin().toPlainString()));
@@ -72,7 +75,7 @@ public class OllamaService {
             for (SiteProfitSummary site : stats.getSiteProfits()) {
                 sb.append(String.format("- %s (%s): 견적 %s원, 매입 %s원, 마진 %s원 (마진율 %s%%)\n",
                         site.getSiteName(),
-                        site.getStatus(),
+                        SiteStatus.labelOf(site.getStatus()),
                         site.getEstimateAmount().toPlainString(),
                         site.getPurchaseAmount().toPlainString(),
                         site.getMargin().toPlainString(),
@@ -83,6 +86,25 @@ public class OllamaService {
 
         sb.append("\n위 데이터를 분석하여 경영 요약을 작성해주세요.");
         return sb.toString();
+    }
+
+    /** 상태별 건수를 enum 순서(수주 전→완료)의 한국어 라벨로 적는다. */
+    static String statusCounts(Map<String, Integer> byStatus) {
+        if (byStatus == null || byStatus.isEmpty()) {
+            return "없음";
+        }
+        List<String> parts = new ArrayList<>();
+        for (SiteStatus status : SiteStatus.values()) {
+            Integer count = byStatus.get(status.name());
+            if (count != null) {
+                parts.add(status.getLabel() + " " + count + "개");
+            }
+        }
+        byStatus.keySet().stream()
+                .filter(name -> Arrays.stream(SiteStatus.values()).noneMatch(s -> s.name().equals(name)))
+                .sorted()
+                .forEach(name -> parts.add(name + " " + byStatus.get(name) + "개"));
+        return String.join(", ", parts);
     }
 
     private String callOllama(Map<String, Object> requestBody) {

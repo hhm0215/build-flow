@@ -83,7 +83,15 @@ class OllamaServiceTest {
 
         assertThat(prompt)
                 .contains("총 견적액: 10000000원")
-                .contains("- [QA] 현장 (IN_PROGRESS): 견적 10000000원, 매입 4000000.00원, 마진 6000000.00원 (마진율 60.00%)")
+                .contains("- [QA] 현장 (시공 중): 견적 10000000원, 매입 4000000.00원, 마진 6000000.00원 (마진율 60.00%)")
+                .contains("- 상태별: 시공 중 1개")
                 .doesNotContain("E+");
+    }
+
+    @Test
+    void 상태별_건수는_수주_전부터_한국어_라벨로_적고_모르는_값은_원문을_남긴다() {
+        assertThat(OllamaService.statusCounts(Map.of("COMPLETED", 1, "BIDDING", 2, "IN_PROGRESS", 3, "LEGACY", 4)))
+                .isEqualTo("수주 전 2개, 시공 중 3개, 완료 1개, LEGACY 4개");
+        assertThat(OllamaService.statusCounts(Map.of())).isEqualTo("없음");
     }
 }

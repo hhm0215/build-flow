@@ -30,26 +30,34 @@ import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
+import { SITE_STATUSES, canTransitionSiteStatus } from '../../utils/siteStatus'
 import { calculateDocumentProfit } from '../../utils/estimate'
+import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
+  BIDDING: '수주 전',
   IN_PROGRESS: '시공 중',
   SETTLING: '정산 중',
   WARRANTY: '하자보증',
   COMPLETED: '완료',
 }
 const STATUS_COLOR: Record<SiteStatus, string> = {
+  BIDDING: '#06b6d4',
   IN_PROGRESS: '#3b82f6',
   SETTLING: '#f59e0b',
   WARRANTY: '#8b5cf6',
   COMPLETED: '#52525b',
 }
-const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SiteStatus[]).map((s) => ({
-  value: s,
-  label: STATUS_LABEL[s],
-}))
+/** 서버 전환 규칙과 같게, 현재 상태에서 갈 수 없는 상태는 비활성화한다 (수주 전 ↔ 수주 이후 단방향) */
+function statusOptions(current: SiteStatus) {
+  return SITE_STATUSES.map((s) => ({
+    value: s,
+    label: STATUS_LABEL[s],
+    disabled: !canTransitionSiteStatus(current, s),
+  }))
+}
 
 const ESTIMATE_STATUS_LABEL: Record<string, string> = {
   DRAFT: '작성 중',
@@ -263,9 +271,7 @@ export default function SiteDetailPage() {
     margin,
     marginRate,
   } = calculateDocumentProfit(estimates, purchases)
-  const unpaidTotal = taxes
-    .filter((t) => t.type === 'SALES' && !t.paymentConfirmed)
-    .reduce((sum, t) => sum + t.totalAmount, 0)
+  const unpaidTotal = taxes.reduce((sum, t) => sum + remainingOf(t), 0)
   const estimateReady = !estimatesLoading && !estimatesError && !!estimatesData
   const purchaseReady = !purchasesLoading && !purchasesError && !!purchasesData
   const taxReady = !taxesLoading && !taxesError && !!taxesData
@@ -558,9 +564,11 @@ export default function SiteDetailPage() {
                           <InfoBadge color={invoice.type === 'SALES' ? '#22c55e' : '#ef4444'}>
                             {invoice.type === 'SALES' ? '매출' : '매입'}
                           </InfoBadge>
-                          <InfoBadge color={invoice.paymentConfirmed ? '#22c55e' : '#f59e0b'}>
-                            {invoice.paymentConfirmed ? '입금 완료' : '미입금'}
-                          </InfoBadge>
+                          {paymentStatusOf(invoice) && (
+                            <InfoBadge color={PAYMENT_STATUS_META[paymentStatusOf(invoice)!].color}>
+                              {PAYMENT_STATUS_META[paymentStatusOf(invoice)!].label}
+                            </InfoBadge>
+                          )}
                         </div>
                       </div>
                       <div
@@ -588,12 +596,14 @@ export default function SiteDetailPage() {
                             style={{
                               fontSize: 13,
                               fontWeight: 700,
-                              color: invoice.paymentConfirmed ? 'var(--text-secondary)' : '#ef4444',
+                              color: remainingOf(invoice) > 0 ? '#ef4444' : 'var(--text-secondary)',
                             }}
                           >
-                            {invoice.paymentConfirmed
-                              ? `입금일 ${formatDate(invoice.paymentDate)}`
-                              : '미입금'}
+                            {invoice.type !== 'SALES'
+                              ? '-'
+                              : invoice.paymentConfirmed
+                                ? `입금일 ${formatDate(invoice.paymentDate)}`
+                                : `잔액 ${formatKRW(remainingOf(invoice))}`}
                           </div>
                         </div>
                       </div>
@@ -797,7 +807,7 @@ function SiteHeaderHero({
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>현장 상태</div>
           <Select
             value={site.status}
-            options={STATUS_OPTIONS}
+            options={statusOptions(site.status)}
             onChange={onStatusChange}
             disabled={statusChanging || archived}
             loading={statusChanging}
