@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: site-service
+  cloud:
+    openfeign:
+      client:
+        config:
+          # 손익 재계산은 현장 행 잠금을 잡은 채 원천을 조회하므로 기본 10s/60s 대신 짧게 제한하고 실패 시 503
+          siteEstimateProfitSourceClient:
+            connect-timeout: 2000
+            read-timeout: 5000
+          sitePurchaseProfitSourceClient:
+            connect-timeout: 2000
+            read-timeout: 5000
   config:
     # Docker는 CONFIG_SERVER_URL=http://config-server:8888, 로컬 기본은 localhost (import는 이 한 곳에서만 선언)
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}

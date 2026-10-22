@@ -73,6 +73,19 @@ public class SiteProfit {
         recalculate();
     }
 
+    /**
+     * 손익 재계산: 원천 합계로 덮어쓰고 마진·마진율은 이벤트 경로와 같은 규칙으로 다시 계산한다.
+     */
+    public void overwriteTotals(BigDecimal estimateAmount, BigDecimal purchaseAmount) {
+        if (estimateAmount == null || purchaseAmount == null
+                || estimateAmount.signum() < 0 || purchaseAmount.signum() < 0) {
+            throw new IllegalArgumentException("손익 원천 합계는 0 이상이어야 합니다.");
+        }
+        this.totalEstimateAmount = estimateAmount;
+        this.totalPurchaseAmount = purchaseAmount;
+        recalculate();
+    }
+
     private void recalculate() {
         this.margin = this.totalEstimateAmount.subtract(this.totalPurchaseAmount);
         if (this.totalEstimateAmount.compareTo(BigDecimal.ZERO) > 0) {

@@ -106,7 +106,7 @@ DB 복원은 메모리 OCR 큐와 Kafka(복원 대상 아님)를 되돌리지 �
 | `defect_warranties.ocr_status=PENDING` | notification-service `WarrantyOcrRecoveryService`가 기동 60초 후·10분마다 생성 30분 경과 건을 `FAILED`로 전환 | OCR 재실행 없음. `FAILED` 건은 사용자가 수동 보정(PDF 원본은 유지) |
 | outbox `PENDING`/`CLAIMED`(lease 만료) | 각 서비스 dispatcher가 같은 eventId로 재전송, 소비자는 eventId 수신기록으로 중복 무시 | — |
 | outbox `SENT` | 재전송하지 않음(`FAILED` 상태는 없음 — 실패는 `PENDING`+`attempts`/`last_error`) | broker 수락만 기록된 미소비 이벤트는 새/빈 Kafka에서 유실. 손익 소비자 수신기록(`processed_profit_events`)이 없으면 `site_profits`가 원천보다 모자람 |
-| `site_profits`·`purchase_profit_projections` | 백업은 `--single-transaction --databases` 한 스냅샷이라 원천과 같은 시점으로 함께 되돌아감 | 관리용 "현장 손익 재계산" 경로 **없음**(`GET /sites/{id}/profit` 조회만) |
+| `site_profits`·`purchase_profit_projections` | 백업은 `--single-transaction --databases` 한 스냅샷이라 원천과 같은 시점으로 함께 되돌아감 | 자동 재계산 없음. 운영자가 현장별로 `POST /sites/{id}/profit/reconcile`(아래 "손익 재계산") 실행 |
 
 **절차** (격리 복원 검증과 실제 복원 모두, 서비스 기동 전후 각 1회):
 
@@ -121,11 +121,37 @@ DB 복원은 메모리 OCR 큐와 Kafka(복원 대상 아님)를 되돌리지 �
 3. 현장별 분류에 따라 처리한다.
    - `PENDING_OUTBOX`: 아직 재전송 대기. 재실행 시 사라져야 한다.
    - `UNCONSUMED_SENT`: 그 현장의 "requeue candidate" eventId만 백업 후 원천 서비스 outbox에서 `status='PENDING', claim_token=NULL, lease_until=NULL`로 되돌려 같은 eventId로 재전송한다(소비자 eventId 멱등·매입 revision 가드로 안전). 손익 불일치가 없는 현장의 미소비 `SENT`(수신기록 도입 전 이력일 수 있음)는 재전송하지 않는다 — 수신기록 없는 과거 견적 이벤트가 이중 반영된다.
-   - `UNEXPLAINED`: 멈춘다. 수동 SQL로 손익을 고치지 않는다. 아래 재계산 기능이 생기기 전까지 전체 업무 복구 판정은 `PENDING`.
+   - `UNEXPLAINED`: 수동 SQL로 손익을 고치지 않는다. 서비스 전체 기동 상태에서 아래 "손익 재계산"을 그 현장에 dry-run → 차이 확인 → `apply=true` 순서로 실행하고 점검을 다시 돌린다. 재계산이 503/409면 멈추고 원인을 조사한다(그 동안 업무 복구 판정은 `PENDING`).
    - notification 미소비 `SENT`: 알림 유실(정보용). 재전송하지 않는다.
 4. 최종 판정이 `OK`(또는 OCR `FAILED` 수동 보정 목록만 남은 상태)일 때만 재조정 통과로 기록한다.
 
-**제안(미구현)**: site-service 관리용 `POST /api/v1/sites/{id}/profit/reconcile` — 현장 행 비관적 잠금 아래 estimate-service(확정 견적 합)·purchase-service(현장 매입 목록·revision)를 Feign으로 조회해 `site_profits`와 projection을 원천 스냅샷으로 재작성하고 감사 기록을 남긴다. 손익 소비자와 같은 잠금·projection 규칙을 공유해야 하므로 손익 소비자 변경 작업과 합쳐 별도 사이클로 진행한다.
+#### 손익 재계산 (`POST /api/v1/sites/{id}/profit/reconcile`, 2026-10-23)
+
+Gateway 인증(관리자 JWT)을 거쳐 호출한다. 프론트에는 노출하지 않는다.
+
+**사전 확인(복원본에서 실행 전 필수)**: 매입 id는 정상 운영에서는 재사용되지 않지만, 복원으로 purchase `AUTO_INCREMENT`가 덤프 시점으로 돌아가면 site projection이 이미 아는 id가 새 매입에 다시 쓰일 수 있다. 재계산은 원천에 없는 projection을 삭제 묘비로 고정하므로, 같은 id의 새 매입 이벤트가 오면 소비자가 실패시킨다(조용히 누락하지 않음). 그 전에 다음이 참인지 확인하고, 거짓이면 purchase `AUTO_INCREMENT`를 그 값보다 크게 올린 뒤 진행한다.
+
+```sql
+-- purchase AUTO_INCREMENT ≥ site projection의 최대 purchase_id + 1
+SELECT (SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA='buildflow_purchase' AND TABLE_NAME='purchases')
+       > (SELECT COALESCE(MAX(purchase_id), 0) FROM buildflow_site.purchase_profit_projections) AS ok;
+```
+
+```powershell
+# 1) dry-run(기본): 변경 없이 before/source 차이와 처리할 건수만 본다
+curl.exe -s -X POST -H "Authorization: Bearer <token>" "http://localhost:8080/api/v1/sites/<id>/profit/reconcile"
+# 2) 차이가 원천 기준으로 타당할 때만 반영
+curl.exe -s -X POST -H "Authorization: Bearer <token>" "http://localhost:8080/api/v1/sites/<id>/profit/reconcile?apply=true"
+```
+
+- 동작: 현장 행 비관적 잠금(손익 소비자와 같은 잠금)을 잡은 채 estimate-service `GET /estimates/profit-source`(CONFIRMED 합계, DRAFT·SUPERSEDED 제외 + 그 현장 견적의 `estimate.parsed`/`estimate.deleted` outbox eventId 전체)와 purchase-service `GET /purchases/profit-source`(현재 매입 금액·`event_revision`)를 조회한다. 각 원천은 한 REPEATABLE READ 읽기 트랜잭션이라 "합계에 반영된 이벤트 = 목록의 이벤트"다.
+- 반영(`apply=true`이고 차이가 있을 때만): `site_profits`를 원천 합계로 덮어쓰고 마진·마진율을 이벤트 경로와 같은 규칙으로 계산(−999.99 하한), 원천 스냅샷의 미수신 견적 eventId를 `processed_profit_events`에 기록, 매입 projection을 원천 revision·금액으로 다시 쓰고 원천에 없는 활성 projection은 최대 revision 삭제 상태로 고정한다. 일치하면 아무것도 쓰지 않는다(`matched=true`).
+- 경합: 잠금 덕분에 원천 조회~반영 사이에 그 현장 이벤트가 처리되지 않는다. 재계산 뒤 늦게 도착한 스냅샷 이전 이벤트는 견적은 eventId 수신기록, 매입은 revision 규칙으로 무시되고, 스냅샷 이후 이벤트만 평소처럼 증분 반영된다.
+- 묘비 id에 삭제가 아닌 매입 이벤트가 오면 소비자가 `IllegalStateException`으로 실패한다(경고 로그·재시도 후 DLT). 위 AUTO_INCREMENT 재사용을 의심하고 조사한다.
+- 견적 행 없는 손익 이벤트: 확정 견적 삭제가 허용되던 2026-09-21~09-24의 `estimate.deleted`처럼 견적 행이 지워진 이벤트는 eventId 목록에 넣을 수 없다. 원천이 그 건수를 `orphanProfitEventCount`(payload를 읽을 수 없는 건 포함)로 보내고, dry-run 응답 `orphanEstimateEvents`에 표시하며, 0보다 크면 `apply=true`는 409로 거부된다. 해당 이벤트의 소비 여부를 수동으로 확인한 뒤 판단한다.
+- 실패-닫힘: 원천 조회 실패·형식 이상 503, 저장 범위(DECIMAL(15,2)) 초과·projection 현장 충돌·견적 행 없는 이벤트 409, 없는 현장 404 — 모두 변경 없음. 로그에는 reconcileId·금액·건수만 남는다.
+- 주의: 원천 서비스가 Kafka 재생 없이 정상 기동된 뒤 실행한다. outbox 도입 전 직접 발행된 과거 견적 이벤트는 목록에 없으므로 과거 토픽 재생 금지 원칙은 그대로다. 잠금 보유 중 원천 조회(각 connect 2s/read 5s)만큼 그 현장의 손익 이벤트 처리가 잠시 대기한다.
 
 합성 회귀(무작위 Compose 프로젝트 `bfrecon<난수>`, tmpfs, 포트 비게시, 서비스 Flyway V1/V2 스키마): `.\scripts\db\test-restore-reconcile-docker.ps1` — 불일치 상태(DRIFT, exit 3) 정확 보고 후 수렴 상태 OK(exit 0)까지 확인한다.
 

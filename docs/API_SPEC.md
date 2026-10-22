@@ -47,6 +47,7 @@
 | PUT | /api/v1/estimates/{id} | JSON `EstimateUpdateRequest` → `EstimateResponse`; DRAFT만 수정(CONFIRMED·SUPERSEDED 409) | O |
 | PATCH | /api/v1/estimates/{id}/confirm | 본문 없음 → `EstimateResponse`; 확정 후 집계 이벤트 발행. 같은 수정 체인의 기존 확정본은 SUPERSEDED | O |
 | DELETE | /api/v1/estimates/{id} | DRAFT만 삭제; CONFIRMED·SUPERSEDED는 409 | O |
+| GET | /api/v1/estimates/profit-source?siteId={id} | 손익 재계산 원천(운영용, 프론트 미사용) → `{siteId, confirmedTotalAmount, confirmedEstimateCount, profitEvents[{eventId, eventType}], orphanProfitEventCount}` (견적 행이 없는 이 현장 손익 이벤트 수) | O |
 
 생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`, 선택적 관계 `kind`(`ORIGINAL`/`REVISION`/`ADDITIONAL`, 생략 시 ORIGINAL)·`revisionOfId`이다. 수정은 `siteId`·관계를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`/`SUPERSEDED`), `estimateDate`, `totalAmount`, `memo`, `kind`, `revisionOfId`(nullable), `chainRootId`(수정 체인 루트, 원본·추가공사는 자기 id), `supersededById`(nullable), `items[]`, 생성·수정 시각이 포함된다.
 
@@ -69,8 +70,11 @@
 | PATCH | /api/v1/sites/{id}/restore | 본문 없음 → `SiteResponse`; 복원(`archivedAt=null`) | O |
 | DELETE | /api/v1/sites/{id} | 물리 삭제 차단(기존 ID 409, 없는 ID 404); 정리는 보관을 사용 | O |
 | GET | /api/v1/sites/{id}/profit | `ProfitResponse` | O |
+| POST | /api/v1/sites/{id}/profit/reconcile?apply={false\|true} | 운영 절차용 손익 재계산(프론트 미노출) → `ProfitReconcileResponse`; 기본 dry-run, `apply=true`일 때만 반영 | O |
 
 생성·수정 본문은 필수 `siteName`과 선택적 `clientId`, `address`, `startDate`, `endDate`, `memo`이다. 상태 값은 `IN_PROGRESS`, `SETTLING`, `WARRANTY`, `COMPLETED`. `SiteResponse`는 `id`, `siteName`, 내장 `client`(미지정 시 null), `address`, `status`, 시작·종료일, `memo`, 생성·수정 시각을 담는다. `ProfitResponse`는 `siteId`, `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`이다. `marginRate`는 소수 2자리 %이며 저장 범위(DECIMAL(5,2)) 때문에 −999.99에서 하한 처리된다(매입이 견적의 약 11배 이상인 손실 현장). 정확한 손실은 `margin` 금액으로 본다. 프론트의 현장명 검색은 현재 내려받은 목록에서 처리한다. `SiteResponse.archivedAt`은 보관 시각(KST, 미보관 null)이며 업무 단계 `status`와 별개다. 보관된 현장은 수정·상태 변경이 409이고, 매입·견적·세금계산서·보증 생성은 해당 서비스에서 400으로 거부된다. 보관 현장 소속 기존 문서의 수정·삭제(견적 확정, 보증 수정 포함)는 각 서비스에서 409이며, 매출 세금계산서 입금 확인만 허용한다. 현장 검증 도입 전 생긴 고아 문서(현장 404)는 정정할 수 있도록 막지 않는다. 보관해도 기존 자료·손익 조회는 유지된다(ADR-021).
+
+**손익 재계산(2026-10-23)**: `POST /sites/{id}/profit/reconcile`은 `docs/DATABASE_OPERATIONS.md` "복원 후 재조정"의 `UNEXPLAINED` 조치다. 현장 행 비관적 잠금(손익 소비자와 같은 잠금)을 잡은 채 estimate-service `GET /estimates/profit-source`(CONFIRMED 합계 — DRAFT·SUPERSEDED 제외 — 와 그 견적들의 손익 outbox eventId)와 purchase-service `GET /purchases/profit-source`(현재 매입의 금액·revision)를 Feign으로 조회한다(각 connect 2s/read 5s). 응답 `ProfitReconcileResponse`는 `siteId`, `applyRequested`, `applied`, `matched`, `reconcileId`, `before`/`source`(각 `totalEstimateAmount`, `totalPurchaseAmount`, `margin`, `marginRate`), `estimateEventsToMark`, `purchaseProjectionsToRewrite`, `orphanEstimateEvents`이다. `apply=true`이고 차이가 있을 때만 ① 원천 합계로 `site_profits`를 덮어쓰고(마진·마진율은 이벤트 경로와 같은 규칙, 마진율 −999.99 하한) ② 원천 스냅샷의 미수신 견적 eventId를 `processed_profit_events`에 기록해 늦게 도착해도 무시되게 하며 ③ 매입 projection을 원천 revision·금액으로 다시 쓰고, 원천에 없는(삭제된) 활성 projection은 최대 revision 삭제 묘비로 고정한다(묘비 id에 삭제 아닌 매입 이벤트가 오면 소비자가 실패 — 복원 후 AUTO_INCREMENT 재사용 감지). 일치하면 아무것도 쓰지 않는다. 원천 조회 실패·`success=false`·형식 이상(현장 불일치, eventId 형식, 매입 합계≠항목 합)은 503, 원천 합계가 DECIMAL(15,2)를 넘거나 같은 매입 id의 projection이 다른 현장에 있거나 `orphanEstimateEvents`>0인데 apply를 요청하면 409(`orphanProfitEventCount` 누락은 503), 없는 현장은 404이며 모두 변경 없음. 실행마다 금액·건수만 로그로 남긴다.
 
 ### 거래처 (clients)
 
@@ -107,6 +111,7 @@
 | DELETE | /api/v1/purchases/{id}/evidence | 증빙 연결 해제 → `PurchaseResponse` | O |
 | GET | /api/v1/purchases/evidence-summary?siteId={id} | 필수 `siteId` → `PurchaseEvidenceSummaryResponse`(매입 ↔ 매입 계산서 대조) | O |
 | GET | /api/v1/purchases/evidence-links?taxInvoiceId={id} | `{taxInvoiceId, linkedPurchaseCount}`; tax-service의 삭제·유형 변경 전 확인용 | O |
+| GET | /api/v1/purchases/profit-source?siteId={id} | 손익 재계산 원천(운영용, 프론트 미사용) → `{siteId, totalAmount, purchases[{purchaseId, revision, totalAmount}]}` (삭제된 매입 제외) | O |
 
 생성 본문은 필수 `siteId`, `itemName`, `quantity`(1 이상 정수), `unitPrice`(0 이상·정수 10자리/소수 2자리 이하)와 선택적 `supplier`, `purchaseDate`, `memo`이다. 수정에서는 `siteId`가 없다. 응답에는 `id`, `siteId`, 요청 필드, 계산된 `totalAmount`, 생성·수정 시각이 포함된다. 총액은 DECIMAL(15,2) 범위이며 검증 실패는 JSON 오류 래퍼의 400이다. 매입 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 매입/outbox를 저장하지 않는다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
 
@@ -195,3 +200,4 @@
 | v1.0 | 2026-04-04 | 초안 |
 | v1.1 | 2026-10-03 | Controller·DTO·Gateway·프론트 기준 구현 경로/요청/응답/인증 동기화; 미구현 제안 분리 |
 | v1.2 | 2026-10-23 | 견적 수정본·추가공사 관계(`kind`·`revisionOfId`·`chainRootId`·`supersededById`)와 SUPERSEDED 상태 |
+| v1.3 | 2026-10-23 | 운영용 손익 재계산 `POST /sites/{id}/profit/reconcile`과 원천 조회 `GET /estimates/profit-source`·`GET /purchases/profit-source` |
