@@ -144,3 +144,5 @@ finally {
 }
 
 Write-Host 'flyway DDL compare tests passed.'
+# 마지막 하위 실행은 의도적으로 exit 1을 남기므로, CI 스텝이 그 값을 실패로 넘기지 않게 성공을 명시한다.
+exit 0
