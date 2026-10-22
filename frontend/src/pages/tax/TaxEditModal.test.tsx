@@ -13,7 +13,7 @@ vi.mock('../../api/taxes.api', () => ({
 const invoice = {
   id: 9, siteId: 3, type: 'SALES', supplyAmount: 1000, taxAmount: 100,
   totalAmount: 1100, counterparty: null, issueDate: null,
-  paymentConfirmed: false, paymentDate: null, memo: null,
+  paymentConfirmed: false, paymentDate: null, paidAmount: 0, remainingAmount: 1100, paymentStatus: 'UNPAID', memo: null,
   createdAt: '', updatedAt: '',
 } satisfies TaxInvoice
 

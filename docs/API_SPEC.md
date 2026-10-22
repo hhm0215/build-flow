@@ -115,12 +115,17 @@
 | POST | /api/v1/taxes | JSON `TaxInvoiceCreateRequest` → `TaxInvoiceResponse` (201) | O |
 | GET | /api/v1/taxes?siteId={id}&type={SALES\|PURCHASE} | 두 필터 모두 선택적 → `TaxInvoiceResponse[]` | O |
 | GET | /api/v1/taxes/{id} | `TaxInvoiceResponse` | O |
-| PUT | /api/v1/taxes/{id} | JSON `TaxInvoiceUpdateRequest` → `TaxInvoiceResponse`; 현장 연결 유지, 입금 확인 건 수정 불가 | O |
-| PATCH | /api/v1/taxes/{id}/confirm-payment | JSON `{paymentDate?}` → `TaxInvoiceResponse`; 매출 건만 가능 | O |
-| DELETE | /api/v1/taxes/{id} | 삭제; 입금 확인 건 불가 | O |
+| PUT | /api/v1/taxes/{id} | JSON `TaxInvoiceUpdateRequest` → `TaxInvoiceResponse`; 현장 연결 유지, 유효 입금이 있으면 409 | O |
+| PATCH | /api/v1/taxes/{id}/confirm-payment | 하위 호환. JSON `{paymentDate?}` → `TaxInvoiceResponse`; 남은 잔액 전부를 입금 1건으로 기록, 매출 건만 | O |
+| GET | /api/v1/taxes/{id}/payments | 입금 내역(취소 포함, 입금일·ID 오름차순) → `TaxPaymentResponse[]` | O |
+| POST | /api/v1/taxes/{id}/payments | JSON `{amount, paymentDate, memo?}` → `TaxPaymentResponse` (201); 잔액 초과 400 | O |
+| PATCH | /api/v1/taxes/{id}/payments/{paymentId}/cancel | JSON `{reason?}`(본문 생략 가능) → `TaxPaymentResponse`; 삭제 아닌 취소 | O |
+| DELETE | /api/v1/taxes/{id} | 삭제; 유효 입금이 있으면 409(취소된 입금 행은 함께 삭제) | O |
 | GET | /api/v1/taxes/outstanding?siteId={id} | 필수 `siteId` → `OutstandingResponse` | O |
 
-생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`, `paymentDate`, 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`, `outstandingAmount`, `unpaidCount`, `unpaidInvoices[]`이다. 입금 확인 불가 상태는 충돌 오류다. 세금계산서 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 세금계산서/outbox를 저장하지 않는다.
+생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`(유효 입금 합계 = 총액), `paymentDate`(완료 시 마지막 유효 입금일, 아니면 null), `paidAmount`·`remainingAmount`(매출만, 매입은 null), `paymentStatus`(`UNPAID`/`PARTIAL`/`PAID`, 매입은 null), 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`(유효 입금 합계), `outstandingAmount`(= 총액 − 유효 입금), `unpaidCount`·`unpaidInvoices[]`(잔액이 남은 매출 건, 발행일 오름차순)이다.
+
+**분할 입금(2026-10-23)**: 입금 `amount`는 0 초과·정수 13자리/소수 2자리 이하(DECIMAL(15,2), 반올림 없음), `paymentDate` 필수, `memo`·취소 `reason`은 500자 이하다. 계산서 행 비관적 잠금 아래에서 유효 입금 합계를 다시 읽어 잔액 초과(완료 건 추가 입금 포함)는 400, 매입 계산서는 409, 이미 취소된 입금 재취소는 409, 다른 계산서의 입금 ID는 404다. `TaxPaymentResponse`는 `id`, `taxInvoiceId`, `amount`, `paymentDate`, `memo`, `canceled`, `canceledAt`, `cancelReason`, `createdAt`이다. 보관 현장의 계산서는 입금 기록·`confirm-payment`는 허용, 입금 취소는 409(복원 후 정정). `tax.payment.confirmed`는 입금 합계가 총액에 도달해 완료 상태로 바뀔 때만 발행한다(분할 입금 건별 이벤트 없음, 취소 후 재완료 시 다시 1회). 입금 원장 도입 전 입금 확인된 계산서는 기동 시 총액 1건으로 이관되며, 이관 전에도 조회는 총액 입금으로 계산한다. 세금계산서 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 세금계산서/outbox를 저장하지 않는다.
 
 ---
 

@@ -24,7 +24,7 @@ class GlobalExceptionHandlerTest {
         doThrow(new BusinessException(ErrorCode.PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE))
                 .when(service).delete(42L);
         MockMvc mockMvc = MockMvcBuilders
-                .standaloneSetup(new TaxInvoiceController(service))
+                .standaloneSetup(new TaxInvoiceController(service, org.mockito.Mockito.mock(com.buildflow.tax.domain.taxinvoice.service.TaxPaymentService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
 
@@ -32,7 +32,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error")
-                        .value("입금 확인된 세금계산서는 수정하거나 삭제할 수 없습니다."));
+                        .value("입금 내역이 있는 세금계산서는 수정하거나 삭제할 수 없습니다. 입금을 취소한 뒤 다시 시도해 주세요."));
     }
 
     @Test
@@ -42,7 +42,7 @@ class GlobalExceptionHandlerTest {
                 .when(service).confirmPayment(org.mockito.ArgumentMatchers.eq(42L),
                         org.mockito.ArgumentMatchers.any());
         MockMvc mockMvc = MockMvcBuilders
-                .standaloneSetup(new TaxInvoiceController(service))
+                .standaloneSetup(new TaxInvoiceController(service, org.mockito.Mockito.mock(com.buildflow.tax.domain.taxinvoice.service.TaxPaymentService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
 
