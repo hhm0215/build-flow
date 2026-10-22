@@ -119,7 +119,8 @@
 
 ### chat-service Phase 3 (Phase 1·2 완료, 견고화/확장)
 - **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
-- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화, buildMessages 이력 tail 쿼리(LIMIT)
+- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화
+- 2026-10-22: 대화 이력은 최근 `chat.history-limit`개만 DB에서 조회(시각·id 역순 Pageable 후 시간순 복원)하도록 변경 완료
 - 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
 
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
