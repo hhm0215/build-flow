@@ -5,6 +5,18 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공개 VPS를 main `842fe82`로 반영 (2026-10-23)
+
+- 2026-10-23 `sudo buildflow-release deploy 842fe82…`(PR #202: 견적 수정본·추가공사 체인, 복원 후 재조정 점검)를 실행해 EXIT 0을 확인했다.
+- 사전 운영형 리허설(구 `0fe8c9a` → 신, 실제 Kafka)에서 status enum의 SUPERSEDED 자동 확장, 수정본 확정 200, 손익 수렴을 실측했다.
+- 반영 후 실측:
+  - 공개 `/` 200, 무인증 API 401
+  - loopback 프론트→Gateway 견적 API 401
+  - 리스닝 포트 변화 없음
+- UNVERIFIED(root 필요): DB 안의 status 정의.
+- 되돌리기: `sudo buildflow-release rollback 0fe8c9a07197d9594b257853d6a9d38abddce5ca`. SUPERSEDED 행이 있으면 먼저 런북의 보관 절차를 따른다.
+- V1 **40/100** 유지.
+
 ## 완료된 작업 — 견적 수정본 업그레이드·되돌리기 리허설 (격리 Kafka, 2026-10-23)
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-estimate.ps1`(+compose: 격리 MySQL + KRaft Kafka, `bfupgest<난수>`, 포트 비게시·tmpfs): 이전 `0fe8c9a` → 새 `c2416ef`(PR #201) `ddl-auto update`에서 status enum `SUPERSEDED` 확장(SHOW CREATE 확인)·새 컬럼 4종·인덱스, 기존 행 kind NULL→ORIGINAL, 실제 Kafka로 손익 100만→120만(수정본)→150만(추가공사) 수렴, 같은 eventId 재전송 중복 0, 역순 이벤트 수렴, 대체됨 수정 409. PASS 24·WARN 1(이전 코드는 SUPERSEDED 행이 있으면 견적 목록 500 → 보관 테이블 절차를 `docs/RELEASE_RUNBOOK.md`에 기록, 재반영 복원 후 160만 수렴 확인). 잔여 리소스 0. 결함 없음(코드 무변경). **main·VPS 미반영**. V1 **40/100** 유지.
