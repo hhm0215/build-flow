@@ -27,6 +27,23 @@ class KafkaConsumerServiceTest {
     }
 
     @Test
+    void supersededEstimateDeletionUsesReplacementMessage() {
+        consumer.consumeEstimateDeleted(event("ESTIMATE_DELETED",
+                "\"siteId\":7,\"estimateId\":11,\"totalAmount\":1000"));
+        consumer.consumeEstimateDeleted(event("ESTIMATE_DELETED",
+                "\"siteId\":7,\"estimateId\":11,\"totalAmount\":1000,"
+                        + "\"reason\":\"SUPERSEDED\",\"supersededById\":12"));
+
+        verify(notificationService).createNotification(EVENT_ID, "ESTIMATE_DELETED",
+                "견적서(ID: 11)가 삭제되었습니다.", 7L);
+        verify(notificationService).createNotification(EVENT_ID, "ESTIMATE_DELETED",
+                "견적서(ID: 11)가 수정본(ID: 12) 확정으로 대체되었습니다.", 7L);
+        assertThatThrownBy(() -> consumer.consumeEstimateDeleted(event("ESTIMATE_DELETED",
+                "\"siteId\":7,\"estimateId\":11,\"reason\":\"SUPERSEDED\"")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void malformedAndMissingIdEventsPropagateInsteadOfBeingAcked() {
         assertThatThrownBy(() -> consumer.consumeEstimateParsed("not-json"))
                 .isInstanceOf(IllegalArgumentException.class);

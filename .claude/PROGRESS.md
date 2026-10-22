@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 견적 수정본·추가공사와 회계 유효 버전 0..1 (2026-10-23)
+
+- 2026-10-23 PILOT_QA "견적 확정·추가공사" 행(에이전트 결정, 사용자 위임): 같은 공사의 수정본을 또 확정하면 손익에 이중 합산되던 문제를 견적 도메인 최소판으로 해소. estimate-service에 nullable `kind`·`revision_of_id`·`chain_root_id`(+인덱스)·`superseded_by_id`, status `SUPERSEDED`(Flyway V2 멱등). 수정본 확정 시 같은 체인의 기존 확정본을 SUPERSEDED로 남기고 `estimate.deleted`(reason=SUPERSEDED)+`estimate.parsed`를 한 트랜잭션 outbox로 발행(site 소비자 무변경, notification은 "대체되었습니다" 문구). 체인 루트 비관적 잠금으로 동시 확정 직렬화. 다른 현장·초안·없는 원 견적 400, 대체됨 수정·확정·삭제 409. 프론트 수정본(항목 복사)/추가공사 작성, 관계 열·대체됨 취소선, 이력 모달, 확정 경고, MSW 동기화. estimate 54(1 skip)·site 59(2 skip)·notification 147(4 skip)·Vitest 205 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+
 ## 완료된 작업 — tax 분할 입금·site BIDDING 업그레이드 리허설 (2026-10-23)
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-tax-site.ps1`: 격리 MySQL 8(`bfupg<난수>`, 포트 비게시·tmpfs)에서 운영 main `d8f3b3d` 코드로 스키마·합성 행을 만들고 develop `6ccb3e5`를 `ddl-auto update`로 올렸다. `tax_payments` 생성·입금 확인 건만 이관 1건·재기동 중복 0·미수금/부분 입금/초과 400/취소, enum `BIDDING`·생성·IN_PROGRESS 전환, 이전 코드 되돌리기(BIDDING 낮춘 뒤 정상) PASS 23. WARN 1: 되돌림 중 부분 입금 계산서를 입금 확인 후 재반영하면 PAID인데 입금액이 부분 합계(잔액 기록으로 정상화) → `docs/RELEASE_RUNBOOK.md` 되돌리기 주의. 잔여 리소스 0. **VPS 미반영**. V1 **40/100** 유지.

@@ -13,6 +13,7 @@ vi.mock('../../api/estimates.api', () => ({
 const estimate = {
   id: 9, siteId: 3, title: '기존 초안', status: 'DRAFT', estimateDate: '2026-09-19',
   totalAmount: 2000, memo: '기존 메모',
+  kind: 'ORIGINAL', revisionOfId: null, chainRootId: 1, supersededById: null,
   items: [{ id: 1, itemName: '자재', unit: 'EA', quantity: 2, unitPrice: 1000, amount: 2000 }],
   createdAt: '', updatedAt: '',
 } satisfies Estimate

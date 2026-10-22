@@ -32,6 +32,7 @@
 - **2026-10-23 분할 입금**: 에이전트 결정(위임)으로 매출 세금계산서 입금 내역 다건 기록·취소(삭제 아님)·잔액 기준 미수금, 초과 400, 보관 현장 기록 허용/취소 409를 `claude/tax-partial-payments`에 구현(단위·H2·MSW PASS). 남은 것: PR·CI, 로컬 풀 Docker에서 `tax_payments` 자동 생성·기존 입금 확인 이관 실측, VPS 반영. **main·VPS 미반영**.
 - **2026-10-23 수주 전 현장(BIDDING)**: 업무 순서(견적→계약→현장) 해소를 위해 현장 상태 `BIDDING`을 추가했다(에이전트 결정, `docs/PILOT_QA.md`). 브랜치 `claude/site-bidding-status` 푸시, PR·`main`·VPS 미반영. 남은 것: PR/CI, 공개 VPS 반영 후 `sites.status` enum 확인(`docs/RELEASE_RUNBOOK.md`)과 BIDDING 현장 생성→견적→수주 전환 실동선 실측.
 - **2026-10-23 매입↔증빙 세금계산서 연결**: 에이전트 결정(위임)으로 원가는 매입 항목만, 매입 계산서는 증빙 연결(`evidence_tax_invoice_id`)·현장별 대조 요약, 연결된 계산서 삭제/매출 전환 409를 `claude/purchase-evidence-link`에 구현(단위·MSW PASS). 남은 것: PR·CI, 풀 Docker에서 컬럼 자동 추가·Feign 양방향 실측, VPS 반영 후 운영 DDL이 Flyway V1과 달라지는 점 반영. **main·VPS 미반영**.
+- **2026-10-23 견적 수정본·추가공사(유효 버전 0..1 최소판)**: 에이전트 결정(위임)으로 `kind`·`revisionOfId`·`chainRootId`·SUPERSEDED, 수정본 확정 시 기존 확정본 대체(`estimate.deleted` reason=SUPERSEDED + `estimate.parsed`), 체인 루트 잠금, 수정본/추가공사 작성·이력 UI를 `claude/estimate-revisions`에 구현(단위·H2·MSW PASS). 남은 것: PR·CI, 풀 Docker에서 컬럼·enum 자동 확장과 실제 Kafka 손익 수렴 실측, 기존 이중 확정 데이터 사람 판단. 문서 코어 Stage 1 전면 구현은 선행조건 미충족으로 유지. **main·VPS 미반영**.
 - **관련 파일**: `docs/PILOT_QA.md`, `frontend/src/pages/`, `chat-service`, 각 업무 서비스
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS

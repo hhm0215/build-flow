@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { Estimate, Purchase } from '../types'
 import {
+  additionsOfChain,
   calculateDocumentProfit,
+  estimateChain,
+  estimateSupersededByConfirming,
   estimateTitleFromFileName,
   sumConfirmedEstimateAmount,
   truncateUtf16,
@@ -17,6 +20,31 @@ describe('sumConfirmedEstimateAmount', () => {
     ] as Estimate[]
 
     expect(sumConfirmedEstimateAmount(estimates)).toBe(200000)
+  })
+})
+
+describe('견적 수정 체인', () => {
+  const est = (id: number, status: Estimate['status'], kind: Estimate['kind'],
+    revisionOfId: number | null, chainRootId: number, totalAmount: number, siteId = 1) =>
+    ({ id, siteId, status, kind, revisionOfId, chainRootId, totalAmount, supersededById: null }) as Estimate
+  const estimates = [
+    est(1, 'SUPERSEDED', 'ORIGINAL', null, 1, 1000),
+    est(2, 'CONFIRMED', 'REVISION', 1, 1, 1200),
+    est(3, 'DRAFT', 'REVISION', 2, 1, 900),
+    est(4, 'CONFIRMED', 'ADDITIONAL', 1, 4, 300),
+    est(5, 'CONFIRMED', 'ORIGINAL', null, 5, 700, 2),
+  ]
+
+  it('대체된 견적은 손익 합계에서 빠지고 추가공사는 합산된다', () => {
+    expect(sumConfirmedEstimateAmount(estimates.filter((e) => e.siteId === 1))).toBe(1500)
+  })
+
+  it('체인 이력·추가공사·확정 시 대체될 견적을 계산한다', () => {
+    const chain = estimateChain(estimates, estimates[2])
+    expect(chain.map((e) => e.id)).toEqual([1, 2, 3])
+    expect(additionsOfChain(estimates, chain).map((e) => e.id)).toEqual([4])
+    expect(estimateSupersededByConfirming(estimates, estimates[2])?.id).toBe(2)
+    expect(estimateSupersededByConfirming(estimates, estimates[3])).toBeNull()
   })
 })
 

@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,6 +78,8 @@ class EstimateServiceAmountTest {
         EstimateCreateRequest request = mock(EstimateCreateRequest.class);
         EstimateItemRequest item = mock(EstimateItemRequest.class);
         when(request.getItems()).thenReturn(List.of(item));
+        // Mockito는 Long 반환에 0L을 주므로 관계 없는 원본 견적(null)으로 고정한다.
+        lenient().when(request.getRevisionOfId()).thenReturn(null);
         when(item.getQuantity()).thenReturn(new BigDecimal(quantity));
         when(item.getUnitPrice()).thenReturn(new BigDecimal(price));
         return request;

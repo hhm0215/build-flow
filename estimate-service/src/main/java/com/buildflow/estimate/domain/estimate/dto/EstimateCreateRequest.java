@@ -1,6 +1,8 @@
 package com.buildflow.estimate.domain.estimate.dto;
 
+import com.buildflow.estimate.domain.estimate.entity.EstimateKind;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -31,4 +33,11 @@ public class EstimateCreateRequest {
 
     @Size(max = 1000, message = "메모는 1000자 이하여야 합니다.")
     private String memo;
+
+    /** 생략하면 ORIGINAL. REVISION·ADDITIONAL은 revisionOfId가 필수. */
+    private EstimateKind kind;
+
+    /** 같은 현장의 확정(또는 대체된) 원 견적 id. */
+    @Positive(message = "원 견적 ID는 양수여야 합니다.")
+    private Long revisionOfId;
 }

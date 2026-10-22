@@ -44,11 +44,13 @@
 | POST | /api/v1/estimates | JSON `EstimateCreateRequest` → `EstimateResponse` (201) | O |
 | GET | /api/v1/estimates?siteId={id} | 선택적 현장 필터 → `EstimateResponse[]` | O |
 | GET | /api/v1/estimates/{id} | `EstimateResponse` | O |
-| PUT | /api/v1/estimates/{id} | JSON `EstimateUpdateRequest` → `EstimateResponse`; 확정 건 수정 불가 | O |
-| PATCH | /api/v1/estimates/{id}/confirm | 본문 없음 → `EstimateResponse`; 확정 후 집계 이벤트 발행 | O |
-| DELETE | /api/v1/estimates/{id} | DRAFT만 삭제; CONFIRMED는 충돌 오류 | O |
+| PUT | /api/v1/estimates/{id} | JSON `EstimateUpdateRequest` → `EstimateResponse`; DRAFT만 수정(CONFIRMED·SUPERSEDED 409) | O |
+| PATCH | /api/v1/estimates/{id}/confirm | 본문 없음 → `EstimateResponse`; 확정 후 집계 이벤트 발행. 같은 수정 체인의 기존 확정본은 SUPERSEDED | O |
+| DELETE | /api/v1/estimates/{id} | DRAFT만 삭제; CONFIRMED·SUPERSEDED는 409 | O |
 
-생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`이다. 수정은 `siteId`를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`), `estimateDate`, `totalAmount`, `memo`, `items[]`, 생성·수정 시각이 포함된다. 금액은 서버가 항목으로 계산한다. 견적 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 견적을 저장하지 않는다. 파일을 업로드하거나 다운로드하는 견적 CRUD 경로는 없다.
+생성 요청은 `siteId`, `title`, `estimateDate`(ISO 날짜), `items[]`(1개 이상), 선택적 `memo`, 선택적 관계 `kind`(`ORIGINAL`/`REVISION`/`ADDITIONAL`, 생략 시 ORIGINAL)·`revisionOfId`이다. 수정은 `siteId`·관계를 제외한 동일 필드다. 각 항목은 `itemName`, `unit`, `quantity`(0 초과, 정수 8자리·소수 2자리), `unitPrice`(0 이상, 정수 13자리·소수 2자리)이다. 응답에는 `id`, `siteId`, `title`, `status`(`DRAFT`/`CONFIRMED`/`SUPERSEDED`), `estimateDate`, `totalAmount`, `memo`, `kind`, `revisionOfId`(nullable), `chainRootId`(수정 체인 루트, 원본·추가공사는 자기 id), `supersededById`(nullable), `items[]`, 생성·수정 시각이 포함된다.
+
+수정본·추가공사(2026-10-23): `REVISION`·`ADDITIONAL`은 `revisionOfId`가 같은 현장의 CONFIRMED 또는 SUPERSEDED 견적이어야 한다(없음·다른 현장·초안·`ORIGINAL`에 `revisionOfId`·`kind` 없이 `revisionOfId`만 지정은 400). 수정본은 원 견적의 체인에 들어가고 추가공사는 새 체인을 시작한다. 확정 시 같은 체인의 기존 CONFIRMED를 SUPERSEDED로 바꾸고(`supersededById` 기록) `estimate.deleted`(payload `reason: "SUPERSEDED"`, `supersededById`, 대체되는 견적의 `totalAmount`)와 새 견적의 `estimate.parsed`를 한 트랜잭션 outbox로 발행한다. 한 체인에서 손익에 반영되는 확정본은 최대 1개이며 추가공사는 별도 합산된다. 체인 확정은 루트 행 비관적 잠금으로 직렬화한다. 기존 행(`kind` NULL)은 ORIGINAL로 응답한다. 항목 복사는 프론트가 원 견적 항목으로 생성 요청을 채우는 방식이며 별도 복제 API는 없다. 금액은 서버가 항목으로 계산한다. 견적 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 견적을 저장하지 않는다. 파일을 업로드하거나 다운로드하는 견적 CRUD 경로는 없다.
 
 ---
 
@@ -192,3 +194,4 @@
 |------|------|------|
 | v1.0 | 2026-04-04 | 초안 |
 | v1.1 | 2026-10-03 | Controller·DTO·Gateway·프론트 기준 구현 경로/요청/응답/인증 동기화; 미구현 제안 분리 |
+| v1.2 | 2026-10-23 | 견적 수정본·추가공사 관계(`kind`·`revisionOfId`·`chainRootId`·`supersededById`)와 SUPERSEDED 상태 |

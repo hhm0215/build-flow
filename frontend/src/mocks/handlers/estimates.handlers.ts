@@ -6,6 +6,11 @@ import { validateEstimateAmounts } from '../../utils/estimate'
 
 let estimates = [...mockEstimates]
 
+const SUPERSEDED_ERROR = '수정본으로 대체된 견적서는 이력으로 보존되어 수정·확정·삭제할 수 없습니다.'
+const RELATION_ERROR = '수정본·추가공사는 같은 현장의 확정(또는 대체된) 원 견적을 선택해야 합니다.'
+const conflict = (error: string) =>
+  HttpResponse.json<ApiResponse<null>>({ success: false, data: null, error }, { status: 409 })
+
 export const estimatesHandlers = [
   http.get('/api/v1/estimates', ({ request }) => {
     const url = new URL(request.url)
@@ -45,20 +50,37 @@ export const estimatesHandlers = [
         { status: 400 },
       )
     }
+    // 서버 EstimateService.resolveRelationSource와 같은 관계 규칙
+    const kind = body.kind ?? (body.revisionOfId == null ? 'ORIGINAL' : undefined)
+    const source = body.revisionOfId == null ? undefined : estimates.find((e) => e.id === body.revisionOfId)
+    const validRelation = kind === 'ORIGINAL'
+      ? body.revisionOfId == null
+      : kind != null && source != null && source.siteId === body.siteId && source.status !== 'DRAFT'
+    if (!kind || !validRelation) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: RELATION_ERROR },
+        { status: 400 },
+      )
+    }
     const items = (body.items || []).map((item, idx) => ({
       id: Date.now() + idx,
       ...item,
     }))
     const totalAmount = items.reduce((sum, item) => sum + item.amount, 0)
 
+    const id = Math.max(...estimates.map((e) => e.id)) + 1
     const newEstimate: Estimate = {
-      id: Math.max(...estimates.map((e) => e.id)) + 1,
+      id,
       siteId: body.siteId,
       title: body.title,
       status: 'DRAFT',
       estimateDate: body.estimateDate,
       totalAmount,
       memo: body.memo || '',
+      kind,
+      revisionOfId: source?.id ?? null,
+      chainRootId: kind === 'REVISION' && source ? source.chainRootId : id,
+      supersededById: null,
       items,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -80,12 +102,8 @@ export const estimatesHandlers = [
     }
     const locked = archivedSiteLockError(estimates[index].siteId)
     if (locked) return locked
-    if (estimates[index].status === 'CONFIRMED') {
-      return HttpResponse.json<ApiResponse<null>>(
-        { success: false, data: null, error: '이미 확정된 견적서입니다.' },
-        { status: 409 },
-      )
-    }
+    if (estimates[index].status === 'CONFIRMED') return conflict('이미 확정된 견적서입니다.')
+    if (estimates[index].status === 'SUPERSEDED') return conflict(SUPERSEDED_ERROR)
     const body = await request.json()
     const amountError = validateEstimateAmounts(body.items ?? [])
     if (!body.title?.trim() || !body.estimateDate || amountError) {
@@ -122,12 +140,8 @@ export const estimatesHandlers = [
     }
     const deleteLocked = archivedSiteLockError(estimate.siteId)
     if (deleteLocked) return deleteLocked
-    if (estimate.status === 'CONFIRMED') {
-      return HttpResponse.json<ApiResponse<null>>(
-        { success: false, data: null, error: '확정된 견적서는 삭제할 수 없습니다.' },
-        { status: 409 },
-      )
-    }
+    if (estimate.status === 'CONFIRMED') return conflict('확정된 견적서는 삭제할 수 없습니다.')
+    if (estimate.status === 'SUPERSEDED') return conflict(SUPERSEDED_ERROR)
     estimates = estimates.filter((e) => e.id !== Number(params.id))
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
   }),
@@ -142,7 +156,16 @@ export const estimatesHandlers = [
     }
     const locked = archivedSiteLockError(estimates[index].siteId)
     if (locked) return locked
-    estimates[index] = { ...estimates[index], status: 'CONFIRMED', updatedAt: new Date().toISOString() }
+    const target = estimates[index]
+    if (target.status === 'CONFIRMED') return conflict('이미 확정된 견적서입니다.')
+    if (target.status === 'SUPERSEDED') return conflict(SUPERSEDED_ERROR)
+    const now = new Date().toISOString()
+    // 같은 수정 체인의 기존 확정본은 대체됨으로 남기고 손익에서 뺀다(서버: estimate.deleted reason=SUPERSEDED).
+    estimates = estimates.map((e): Estimate => (
+      e.id !== target.id && e.chainRootId === target.chainRootId && e.status === 'CONFIRMED'
+        ? { ...e, status: 'SUPERSEDED', supersededById: target.id, updatedAt: now }
+        : e))
+    estimates[index] = { ...target, status: 'CONFIRMED', updatedAt: now }
     return HttpResponse.json<ApiResponse<Estimate>>({ success: true, data: estimates[index], error: null })
   }),
 

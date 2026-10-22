@@ -3,6 +3,7 @@ package com.buildflow.estimate.domain.estimate.service;
 import com.buildflow.estimate.domain.estimate.dto.EstimateItemRequest;
 import com.buildflow.estimate.domain.estimate.dto.EstimateUpdateRequest;
 import com.buildflow.estimate.domain.estimate.entity.Estimate;
+import com.buildflow.estimate.domain.estimate.entity.EstimateStatus;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
 import com.buildflow.estimate.global.exception.BusinessException;
 import com.buildflow.estimate.global.exception.ErrorCode;
@@ -42,6 +43,10 @@ class EstimateServiceLockTest {
                 .getMethod("findByIdForUpdate", Long.class)
                 .getAnnotation(Lock.class);
         assertEquals(LockModeType.PESSIMISTIC_WRITE, lock.value());
+        Lock chainLock = EstimateRepository.class
+                .getMethod("findChainMembersByStatusForUpdate", Long.class, EstimateStatus.class)
+                .getAnnotation(Lock.class);
+        assertEquals(LockModeType.PESSIMISTIC_WRITE, chainLock.value());
     }
 
     @Test
@@ -68,11 +73,13 @@ class EstimateServiceLockTest {
     @Test
     void confirmReadsLockedEstimateBeforePublishing() {
         Estimate estimate = draft();
+        when(estimateRepository.findChainRootId(7L)).thenReturn(Optional.of(7L));
         when(estimateRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(estimate));
 
         estimateService.confirm(7L);
 
         verify(estimateRepository).findByIdForUpdate(7L);
+        verify(estimateRepository).findChainMembersByStatusForUpdate(7L, EstimateStatus.CONFIRMED);
         verify(estimateRepository, never()).findById(7L);
         verify(kafkaProducerService).sendEstimateParsed(any());
     }

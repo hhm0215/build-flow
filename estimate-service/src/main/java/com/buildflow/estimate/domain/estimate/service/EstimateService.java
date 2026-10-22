@@ -3,6 +3,7 @@ package com.buildflow.estimate.domain.estimate.service;
 import com.buildflow.estimate.domain.estimate.dto.*;
 import com.buildflow.estimate.domain.estimate.entity.Estimate;
 import com.buildflow.estimate.domain.estimate.entity.EstimateItem;
+import com.buildflow.estimate.domain.estimate.entity.EstimateKind;
 import com.buildflow.estimate.domain.estimate.entity.EstimateStatus;
 import com.buildflow.estimate.domain.estimate.event.EstimateParsedPayload;
 import com.buildflow.estimate.domain.estimate.repository.EstimateRepository;
@@ -32,14 +33,22 @@ public class EstimateService {
     @Transactional
     public EstimateResponse create(EstimateCreateRequest request) {
         BigDecimal totalAmount = calculateTotal(request.getItems());
+        EstimateKind kind = request.getKind() == null && request.getRevisionOfId() == null
+                ? EstimateKind.ORIGINAL : request.getKind();
+        Estimate source = resolveRelationSource(request.getSiteId(), kind, request.getRevisionOfId());
         siteReferenceValidator.requireExistingSite(request.getSiteId());
 
+        // 수정본은 원 견적의 체인에 들어가고, 원본·추가공사는 자기 자신이 루트(NULL)다.
+        Long chainRootId = kind == EstimateKind.REVISION ? source.effectiveChainRootId() : null;
         Estimate estimate = Estimate.builder()
                 .siteId(request.getSiteId())
                 .title(request.getTitle())
                 .estimateDate(request.getEstimateDate())
                 .totalAmount(totalAmount)
                 .memo(request.getMemo())
+                .kind(kind)
+                .revisionOfId(source == null ? null : source.getId())
+                .chainRootId(chainRootId)
                 .build();
 
         addItems(estimate, request.getItems());
@@ -71,10 +80,7 @@ public class EstimateService {
     public EstimateResponse update(Long id, EstimateUpdateRequest request) {
         Estimate estimate = getEstimateForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(estimate.getSiteId());
-
-        if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
-            throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);
-        }
+        requireDraft(estimate);
 
         BigDecimal totalAmount = calculateTotal(request.getItems());
 
@@ -93,17 +99,41 @@ public class EstimateService {
         if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
             throw new BusinessException(ErrorCode.CONFIRMED_ESTIMATE_DELETE_NOT_ALLOWED);
         }
-
+        if (estimate.getStatus() == EstimateStatus.SUPERSEDED) {
+            throw new BusinessException(ErrorCode.ESTIMATE_SUPERSEDED);
+        }
+        // 초안은 관계의 원 견적이 될 수 없으므로(resolveRelationSource) 초안 삭제가 체인을 끊지 않는다.
         estimateRepository.delete(estimate);
     }
 
+    /**
+     * 수정 체인 단위로 잠근 뒤 확정한다. 같은 체인에서 손익에 반영되는 확정본은 최대 1개이며,
+     * 기존 확정본은 SUPERSEDED로 남기고 estimate.deleted(reason=SUPERSEDED)로 손익에서 뺀다.
+     * 잠금 순서는 항상 체인 루트 → 대상 → 체인의 확정본이라 같은 체인의 동시 확정이 직렬화된다.
+     */
     @Transactional
     public EstimateResponse confirm(Long id) {
-        Estimate estimate = getEstimateForUpdate(id);
+        Long chainRootId = estimateRepository.findChainRootId(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ESTIMATE_NOT_FOUND));
+        Estimate root = getEstimateForUpdate(chainRootId);
+        Estimate estimate = chainRootId.equals(id) ? root : getEstimateForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(estimate.getSiteId());
+        requireDraft(estimate);
 
-        if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
-            throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);
+        List<Estimate> effective = estimateRepository
+                .findChainMembersByStatusForUpdate(chainRootId, EstimateStatus.CONFIRMED);
+        for (Estimate previous : effective) {
+            if (previous == estimate) {
+                continue;
+            }
+            previous.supersede(estimate.getId());
+            kafkaProducerService.sendEstimateDeleted(EstimateParsedPayload.builder()
+                    .estimateId(previous.getId())
+                    .siteId(previous.getSiteId())
+                    .totalAmount(previous.getTotalAmount())
+                    .reason(EstimateParsedPayload.REASON_SUPERSEDED)
+                    .supersededById(estimate.getId())
+                    .build());
         }
 
         estimate.confirm();
@@ -115,6 +145,40 @@ public class EstimateService {
                 .build());
 
         return EstimateResponse.from(estimate);
+    }
+
+    private void requireDraft(Estimate estimate) {
+        if (estimate.getStatus() == EstimateStatus.CONFIRMED) {
+            throw new BusinessException(ErrorCode.ESTIMATE_ALREADY_CONFIRMED);
+        }
+        if (estimate.getStatus() == EstimateStatus.SUPERSEDED) {
+            throw new BusinessException(ErrorCode.ESTIMATE_SUPERSEDED);
+        }
+    }
+
+    /**
+     * 관계 견적의 원 견적을 검증한다. 원 견적은 같은 현장의 확정 또는 대체된 견적이어야 한다.
+     * 초안을 원 견적으로 허용하지 않아 초안 삭제·수정이 다른 견적의 관계를 깨지 않는다.
+     */
+    private Estimate resolveRelationSource(Long siteId, EstimateKind kind, Long revisionOfId) {
+        if (kind == null) {
+            throw new BusinessException(ErrorCode.INVALID_ESTIMATE_RELATION);
+        }
+        if (kind == EstimateKind.ORIGINAL) {
+            if (revisionOfId != null) {
+                throw new BusinessException(ErrorCode.INVALID_ESTIMATE_RELATION);
+            }
+            return null;
+        }
+        if (revisionOfId == null) {
+            throw new BusinessException(ErrorCode.INVALID_ESTIMATE_RELATION);
+        }
+        Estimate source = estimateRepository.findById(revisionOfId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_ESTIMATE_RELATION));
+        if (!source.getSiteId().equals(siteId) || source.getStatus() == EstimateStatus.DRAFT) {
+            throw new BusinessException(ErrorCode.INVALID_ESTIMATE_RELATION);
+        }
+        return source;
     }
 
     private Estimate getEstimate(Long id) {

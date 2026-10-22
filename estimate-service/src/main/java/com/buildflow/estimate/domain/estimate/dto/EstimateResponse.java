@@ -1,6 +1,7 @@
 package com.buildflow.estimate.domain.estimate.dto;
 
 import com.buildflow.estimate.domain.estimate.entity.Estimate;
+import com.buildflow.estimate.domain.estimate.entity.EstimateKind;
 import com.buildflow.estimate.domain.estimate.entity.EstimateStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,6 +22,10 @@ public class EstimateResponse {
     private LocalDate estimateDate;
     private BigDecimal totalAmount;
     private String memo;
+    private EstimateKind kind;
+    private Long revisionOfId;
+    private Long chainRootId;
+    private Long supersededById;
     private List<EstimateItemResponse> items;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -34,6 +39,10 @@ public class EstimateResponse {
                 .estimateDate(estimate.getEstimateDate())
                 .totalAmount(estimate.getTotalAmount())
                 .memo(estimate.getMemo())
+                .kind(estimate.effectiveKind())
+                .revisionOfId(estimate.getRevisionOfId())
+                .chainRootId(estimate.effectiveChainRootId())
+                .supersededById(estimate.getSupersededById())
                 .items(estimate.getItems().stream()
                         .map(EstimateItemResponse::from)
                         .toList())
