@@ -44,7 +44,7 @@
   - 2026-10-22 진행: 원인은 컨테이너 JVM 기본 시간대 UTC다. `@CreatedDate`·`LocalDateTime.now()`(알림·견적 작성일·outbox·대시보드 생성 시각 등)가 UTC 벽시계로 저장되고, API가 시간대 없는 값을 내려 브라우저가 KST로 해석한다 → 새 알림이 "9시간 전", 00~09시 작성일이 전날로 보일 수 있다(코드 대조, 화면 실측 PENDING). **에이전트 결정(추천안, 사용자 위임)**: 앱 이미지에 `ENV TZ=Asia/Seoul`을 넣어 모든 JVM(docker exec 포함)을 KST로 통일하고 CI 정적 테스트로 고정했다. 대안: 응답에 오프셋 포함(Instant/OffsetDateTime) — 변경 범위가 커서 보류.
   - 2026-10-22 실측: 같은 기반 이미지(`eclipse-temurin:17` jammy)에서 `TZ=Asia/Seoul`이면 JVM 기본 시간대 `Asia/Seoul`·`now()` KST, 없으면 `Etc/UTC`(원인 재현). OS zoneinfo도 포함됨.
   - 2026-10-22 로컬 풀 Docker 실측 PASS: 컨테이너 `TZ=Asia/Seoul`, 새 행 `created_at`·`archived_at` 원시값 동일 KST 기준, 새 알림 `createdAt` 현재 KST와 1분 이내(`docs/PILOT_QA.md`).
-  - 남은 것: VPS 반영(아래 전환 주의 확인 후). 전환 시점 주의 — 기존 테스트 행의 UTC 값은 9시간 이르게 보이며 보정하지 않는다(실데이터 없음). 배포 순간 처리 중인 outbox의 lease/재시도 시각이 9시간 지난 것으로 보여 즉시 재시도될 수 있고(eventId 멱등), 30분 넘은 것으로 보이는 OCR `PENDING`은 `FAILED`로 전환되어 수동 보정이 필요할 수 있다. VPS 반영 전 처리 중 작업이 없는지 확인한다.
+  - 2026-10-22 VPS `1d2497e` 반영 완료(처리 중 작업 0건 확인 후 배포). 남은 것: 서버 내부 컨테이너 TZ·새 행 원시값 실측(root 권한 필요). 전환 시점 주의 — 기존 테스트 행의 UTC 값은 9시간 이르게 보이며 보정하지 않는다(실데이터 없음). 배포 순간 처리 중인 outbox의 lease/재시도 시각이 9시간 지난 것으로 보여 즉시 재시도될 수 있고(eventId 멱등), 30분 넘은 것으로 보이는 OCR `PENDING`은 `FAILED`로 전환되어 수동 보정이 필요할 수 있다. VPS 반영 전 처리 중 작업이 없는지 확인한다.
 
 ### VPS 비공개 파일럿 배포
 - **배경**: 기존 OpenClaw 템플릿 VPS를 초기화하고 BuildFlow를 올리되, 2 vCPU/8 GiB 용량과 주간 백업만으로 공개 실사용을 가정할 수 없다. 사용자가 현재 VPS에 보존할 데이터·서비스가 없다고 확인했다.
@@ -79,7 +79,7 @@
 - **배경**: 사용자가 공개 전 체크리스트와 역할별 반복 유지보수를 요청했다. UI 로그아웃 토큰 미폐기와 Compose 검증 우회는 수정·비공개 실측했다. SSH 비밀번호·keyboard-interactive를 차단하고 커널 패치/재부팅 복구를 검증했으며 root 키·외부 22는 터널·복구 경로 때문에 유지한다.
 - **산출물**: `AGENTS.md` 하네스·역할 지침·`docs/SECURITY_OPERATIONS.md`, 코드/CI 회귀, 사용자 프롬프트마다 마지막 단계의 읽기 전용 보안·인프라 점검과 변화 시 보고. 기존 일일 예약 heartbeat 2건은 2026-10-09 사용자 요청으로 삭제했다. SSH 정책 변경·패치/재부팅은 Web Console 및 별도 키 재접속 복구 확인 후 수행.
 - **경계**: 모니터가 서버 변경·백업 복원·포트 개방·운영 배포를 무인 실행하지 않는다. 이메일/Discord 연동은 수신 채널·secret 설정 후 별도 실측.
-- **2026-10-22 발견(Gateway 우회 신뢰 경계)**: 로컬 풀 Docker에서 site·estimate·purchase·tax·notification 서비스 포트(`127.0.0.1:8082~8086`)를 토큰 없이 직접 호출해도 생성·삭제가 성공했다. 외부 공개 포트는 없고(VPS도 127.0.0.1 바인딩) 인증은 Gateway에서만 한다. 서버 안의 다른 프로세스·SSH 터널 사용자가 인증과 감사 기록(`X-User-Id` 임의 지정)을 우회할 수 있다. 추천: 실데이터 전 VPS에서 서비스 포트 게시 제거(내부 네트워크만) 또는 서비스 측 토큰 재검증. 대안: 현 상태 유지(단일 관리자·호스트 신뢰 전제를 문서화).
+- **2026-10-22 발견(Gateway 우회 신뢰 경계)**: 로컬 풀 Docker에서 site·estimate·purchase·tax·notification 서비스 포트(`127.0.0.1:8082~8086`)를 토큰 없이 직접 호출해도 생성·삭제가 성공했다. 외부 공개 포트는 없고(VPS도 127.0.0.1 바인딩) 인증은 Gateway에서만 한다. 서버 안의 다른 프로세스·SSH 터널 사용자가 인증과 감사 기록(`X-User-Id` 임의 지정)을 우회할 수 있다. 추천: 실데이터 전 VPS에서 서비스 포트 게시 제거(내부 네트워크만) 또는 서비스 측 토큰 재검증. 대안: 현 상태 유지(단일 관리자·호스트 신뢰 전제를 문서화). **2026-10-22 에이전트 결정·구현**: 공개 스택에서 업무 서비스·Eureka·Config 포트 비게시(`ports: !reset []`)와 CI 검증기 허용 목록. 이어서 Redis(비밀번호 없음·토큰 블랙리스트)·Kafka(임의 이벤트 주입)·Zipkin도 비게시. 남은 것: MySQL loopback(비밀번호 보호, 운영 접속 경로)은 유지, 서비스 측 토큰 재검증은 보류, `buildflow-release` 설치본 갱신(root, status 내부 health).
 - **관련 파일**: `AGENTS.md`, `.claude/agents/`, `frontend`, `scripts/vps/`, `docs/SECURITY_OPERATIONS.md`
 - **예상 규모**: M
 - **상태**: IN_PROGRESS
@@ -118,8 +118,8 @@
 ## P2 — 인프라/툴링
 
 ### chat-service Phase 3 (Phase 1·2 완료, 견고화/확장)
-- **Phase 3**: 도구 확장(estimate/purchase by site) + C 폴백 라우터 + tool_call_id 견고화 — 예상 M
-- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay), 프론트 per-token 전체 리스트 리렌더 최적화
+- **Phase 3**: 도구 확장·tool_call_id 견고화·C 폴백 라우터 2026-10-22 모두 완료(`IntentRouter`: 첫 라운드에 도구를 고르지 않은 업무 질문을 키워드·현장 이름으로 도구에 매핑해 근거를 넣고 다시 답함). 실제 7b 모델로 폴백 효과 실측은 Ollama 기동 환경에서 PENDING
+- **추가(Phase 2 리뷰/검증에서 이관)**: 모델 실시간 토큰 스트리밍(Ollama stream:true+tools 단일 콜 — 현재는 선택 라운드 답변 조각 relay). ~~프론트 per-token 전체 리스트 리렌더 최적화~~ 2026-10-22 완료(`ChatMessageItem` memo — 조각마다 마지막 답변만 다시 그림)
 - 2026-10-22: 대화 이력은 최근 `chat.history-limit`개만 DB에서 조회(시각·id 역순 Pageable 후 시간순 복원)하도록 변경 완료
 - 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
 
@@ -128,7 +128,9 @@
 - 2026-10-17: 현장 마진·마진율과 tax 미수금 계산 테스트 추가(마진율 DECIMAL(5,2) 초과 저장 실패 결함 발견·수정)
 - 2026-10-17: estimate Ollama 응답 JSON 추출 테스트 추가(대괄호 설명 앞붙임 파싱 실패·빈 응답 NPE 결함 발견·수정)
 - 2026-10-22: `useFilterParams`(타입별 파싱·잘못된 값 URL 정리·비운 값 삭제)·`useDebouncedValue` 테스트 추가 — 프론트 훅 3개 모두 테스트 보유
-- 남은 후보: 백엔드 서비스 순수 로직 중 테스트 없는 계산·변환
+- 2026-10-22: 보증 만료 알림 발행 직전 판정(`WarrantyOutboxEligibility`)·대시보드 손익 집계(`DashboardService`) 테스트 추가
+- 2026-10-22: site `OllamaService`(응답 content 반환, 빈 본문·5xx·연결 오류의 OLLAMA_API_FAILED 수렴, 프롬프트 금액 지수 표기 금지) 테스트 추가
+- 남은 후보: 없음(신규 순수 로직 추가 시 동반)
 - **예상 규모**: S~M (점진적)
 
 ---

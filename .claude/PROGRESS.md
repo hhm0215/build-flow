@@ -5,6 +5,38 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — AI 채팅 규칙 폴백 라우터 (2026-10-22)
+
+- 2026-10-22 chat Phase 3 마지막 항목: 모델이 첫 라운드에서 도구 없이 답한 질문에 손익·미수·견적·매입·요약·현장 목록 키워드가 있으면 `IntentRouter`가 질문 속 현장 이름(공백 무시, 긴 이름 우선 최대 3개)으로 도구를 골라 실행하고, 그 결과를 넣어 도구 없이 다시 답하게 한다. 현장을 특정하지 못하면 전체 요약·현장 목록을 근거로 넣는다. 업무와 무관한 질문은 기존처럼 첫 답변(LLM 1회). 단위 테스트 9건 추가(chat 32개 PASS). 실제 7b 모델 실측은 PENDING. V1 **40/100** 유지.
+
+## 완료된 작업 — AI 채팅 도구 결과 상관·스트리밍 리렌더 축소 (2026-10-22)
+
+- 2026-10-22 chat Phase 3 일부: 도구 결과 메시지에 모델이 준 호출 `id`를 `tool_call_id`로, 도구명을 Ollama `tool_name`으로 넣어 다중 호출 결과가 섞이지 않게 했고, 이름 없는 호출도 실행 없이 오류 결과를 돌려 호출·결과 수를 맞춘다(단위 테스트 3건, chat 23개 PASS). 프론트는 `ChatMessageItem`을 memo로 분리해 스트리밍 조각마다 완료된 이전 메시지의 Markdown을 다시 그리지 않는다(테스트 2건, lint·174+2 테스트·build PASS). 실제 Ollama 답변은 VPS 모델 미기동으로 PENDING. V1 **40/100** 유지.
+
+## 완료된 작업 — 공개 스택 업무 서비스 포트 비게시 (2026-10-22)
+
+- 2026-10-22 Gateway 우회 차단: 공개 VPS override에서 auth·estimate·site·purchase·tax·notification·chat·Eureka·Config 포트를 호스트에 게시하지 않고(`ports: !reset []`, VPS Compose v5.5.1 실측), CI 검증기가 frontend·gateway·DB/메시징 외 게시를 거부한다(회귀 2건, 21개 PASS). `buildflow-release status`에 컨테이너 내부 health 점검을 추가했다(설치본은 root 갱신 전 미적용). 계획 `.claude/plans/2026-10-22-vps-internal-ports.md`. 후속으로 Redis·Kafka·Zipkin 포트도 비게시(호스트 게시는 Caddy 80/443 외 loopback frontend·gateway·mysql만). V1 **40/100** 유지 — 보안 게이트 보강이며 새 체크포인트 통과는 아니다.
+
+## 완료된 작업 — 공개 VPS를 main `1d2497e`로 반영 (2026-10-22)
+
+- 2026-10-22 VPS 반영: 사용자가 Web Console root로 `buildflow-release` 래퍼·`/etc/buildflow/public_host`·sudoers 1줄을 설치했고, 에이전트가 PC에서 `buildflow-deploy` SSH(IP, 호스트 키 일치)로 `sudo buildflow-release deploy 1d2497e…`를 실행했다. 처리 중 작업 0건 → 기존 이미지 `pre-4e565968db0b` 보존 → 11개 이미지 순차 빌드 → 앱 정지 → `predeploy_backup.sh`(테이블 19개 덤프, 보증 업로드 0개, 임시 MySQL 복원 행 수 일치, 서버 `/root/buildflow-backups/20261022T081904Z`) → 기동 순으로 성공(EXIT 0). HEAD `1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1`, 앱 컨테이너 전부 Up, 외부 HTTPS `/` 200·무인증 API 401. DB 새 컬럼·테이블과 컨테이너 TZ의 서버 내부 실측은 deploy 계정 권한 밖이라 UNVERIFIED(앱 정상 기동으로 간접 확인), 로그인 후 화면·합성 CRUD는 PENDING. 되돌리기: `sudo buildflow-release rollback 4e565968db0b2600238f0e05add9891277d2f2fd`. V1 **40/100** — 운영 반영 체크포인트의 일부(고정 SHA·순차 배포·health/401·되돌리기 경로)를 통과했으나 실패 롤백 실측·운영 알림은 남아 점수는 유지한다.
+
+## 완료된 작업 — AI 채팅 현장별 견적·매입 조회 도구 (2026-10-22)
+
+- chat-service에 estimate·purchase Feign 클라이언트와 `listEstimatesBySite`·`listPurchasesBySite` 도구를 추가했다. 목록은 요약 필드만 받고 30건까지만 모델에 넘기며 전체 건수·안내를 함께 준다. 도구 카탈로그·실행 테스트 갱신·추가, `chat-service:test` 21건 통과. 실제 모델 응답 품질은 VPS 모델 미기동으로 미검증. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 대시보드 AI 요약 서비스 테스트 (2026-10-22)
+
+- site `OllamaService` 3건: 모델 응답 content 반환, 빈 message·5xx·연결 오류를 모두 `OLLAMA_API_FAILED`로 수렴, 프롬프트 금액이 `1E+7` 같은 지수 표기 없이 원 단위로 들어감. WebClient 교환 함수 스텁 사용, 코드 변경 없음. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — 대시보드 손익 집계 테스트 (2026-10-22)
+
+- `DashboardService` 3건: 현장별 손익 합산·상태별 개수·생성순 유지, 손익 기록 없는 현장 0 표시, 평균 마진율이 단순 평균이 아닌 총마진/총견적(가중)임을 고정, 현장 없음·견적 0일 때 마진율 0, 요약 생성 시각. 코드 변경 없음. V1 **40/100** 변동 없음.
+
+## 완료된 작업 — develop → main 통합 (2026-10-22)
+
+- 사용자 승인으로 [PR #99](https://github.com/hhm0215/build-flow/pull/99)(PR #100~#172, 커밋 175개)를 SHA 전체 대조(API 페이지네이션, 175/175 일치)·필수 CI 12개 통과 후 merge commit `1d2497ee85bb498fbfbe5e165f3f1fced0e9c3b1`로 `main`에 병합했다. 병합 `main` push CI 성공, `develop`을 같은 SHA로 fast-forward 동기화했다. **공개 VPS는 아직 `4e56596`** — `docs/RELEASE_RUNBOOK.md` 순서(처리 중 작업 0건 → 순차 빌드 → 앱 정지·`predeploy_backup.sh` → 기동 → 확인)로 서버 Web Console에서 적용해야 한다. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — VPS 반영 준비: 스키마 리허설·배포 직전 백업 스크립트·런북 (2026-10-22)
 
 - VPS 실행 코드(`4e56596`) 대비 엔티티 변경은 site·notification뿐임을 확인했다. 구버전 notification 스키마를 격리 DB에 재현하고 새 이미지를 기동해 `ddl-auto=update`가 enum `SUPPRESSED`·nullable 컬럼·새 테이블 2개를 자동 반영하고 기존 행을 보존함을 실측했다(리허설 DB 삭제). `scripts/vps/predeploy_backup.sh`(앱 정지 확인→7개 스키마 덤프·행 수→보증 volume tar→체크섬→임시 MySQL 격리 복원 행 수 대조→임시 자원만 정리)를 로컬 스택에서 21개 테이블 PASS, 앱 실행 중 거부를 확인했다. `docs/RELEASE_RUNBOOK.md`에 사전 점검·빌드·백업·기동·확인·되돌리기 명령을 정리했다. VPS 실행은 사용자 승인 대기. V1 **40/100** 변동 없음.

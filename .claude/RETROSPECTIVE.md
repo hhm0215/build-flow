@@ -12,6 +12,19 @@
 
 ---
 
+## 2026-10-22 — Compose `!reset`이 YAML 앵커 별칭 경유로는 CI에서 무시됨
+
+- **무슨 일**: PR #180에서 업무 서비스 포트 비게시를 `x-internal-only: &internal-only { ports: !reset [] }` 별칭으로 9개 서비스에 적용했다. 로컬 Compose v5.5.1 렌더는 게시 0이었지만 CI 러너 Compose v2.38.2에서는 리셋이 적용되지 않아 새 검증기가 `auth-service:8081`로 실패했다.
+- **원인**: Compose 버전마다 YAML 태그(`!reset`)와 앵커/별칭 처리 순서가 달라, 한 버전의 렌더 결과만 보고 동작을 일반화했다. 검증기가 실제 렌더 결과를 검사하고 있어서 병합 전에 막혔다.
+- **재발 방지**: Compose 병합 태그(`!reset`/`!override`)는 별칭 없이 서비스마다 명시한다. CI 공개 Compose 단계는 `docker compose version`을 먼저 출력하고 렌더 결과를 검증기로 검사한다.
+- **반영 위치**: `.github/workflows/ci.yml`(버전 출력 + 기존 렌더 검증기), `docker-compose.public.yml` 주석 없이 서비스별 명시, 계획 `.claude/plans/2026-10-22-vps-internal-ports.md` 결과.
+
+## 2026-10-22 — 릴리스 PR SHA 대조가 100개 상한 때문에 거짓 불일치
+
+- **무슨 일**: develop→main PR #99(커밋 175개)의 병합 전 SHA 대조에서 `gh pr view --json commits`가 100개만 돌려줘 `SHA_MISMATCH`가 나왔다. 페이지네이션 API로 다시 대조하니 175/175 일치였다.
+- **원인**: 규칙의 대조 명령이 소규모 PR 기준으로 작성돼 응답 상한을 고려하지 않았다. 안전한 방향(병합 중단)으로 실패해 사고는 없었다.
+- **재발 방지**: CLAUDE.md 개발 워크플로우 7단계와 `docs/DECISIONS.md`의 대조 명령을 `gh api --paginate .../pulls/<num>/commits`로 바꾸고 API 상한(250개) 초과 시 PR 분할을 명시했다.
+
 ## 2026-10-21 — 공통 작업공간 자동 체크포인트가 사용자 파일·비밀값을 올릴 수 있었음
 
 - **무슨 일**: PR #159에서 Claude Stop 훅이 응답마다 `claude/*` 작업 폴더를 `git add -A`로 커밋·푸시하도록 했다. `.gitignore` 밖의 사용자 파일(`output/` 등)이나 새 유형의 비밀 파일이 사람의 검토 없이 원격에 올라갈 수 있었다. Codex가 이어받아 발견했다.

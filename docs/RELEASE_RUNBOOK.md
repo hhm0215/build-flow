@@ -12,6 +12,23 @@
 - 컨테이너: 앱 이미지 `TZ=Asia/Seoul`(업무 시각 KST 통일), notification `mem_limit` 640m→896m, notification에 `JWT_SECRET`·`REDIS_HOST` 환경변수 추가, 설정 서버 주소 변수 `CONFIG_SERVER_URL`로 변경
 - 시간대 전환 주의: 기존 행의 시각 값은 보정하지 않는다. 적용 순간 처리 중인 outbox·OCR `PENDING`이 있으면 재시도·`FAILED` 전환될 수 있으므로 아래 사전 점검에서 0건을 확인한다
 
+## SSH 배포 경로 (일회성 root 설정 후)
+
+PC의 `buildflow-deploy` SSH 키로 접속한 에이전트가 배포할 수 있도록, root 소유 래퍼 하나만 sudo로 허용한다. 래퍼는 CI 검증된 `origin/main`과 정확히 같은 40자리 SHA만 배포하고, 아래 0~5단계(처리 중 작업 0건, 이미지 보존, 순차 빌드, 백업·격리 복원 확인, 기동)를 그대로 실행한다. 임의 명령은 받지 않는다. 일회성 설정은 Web Console root에서 한다.
+
+```bash
+cd /opt/buildflow && git fetch origin
+git show origin/develop:scripts/vps/root/buildflow-release > /usr/local/sbin/buildflow-release
+chown root:root /usr/local/sbin/buildflow-release && chmod 755 /usr/local/sbin/buildflow-release
+install -d -m 700 /etc/buildflow && printf '%s
+' "실제-공개-호스트명" > /etc/buildflow/public_host && chmod 600 /etc/buildflow/public_host
+printf '%s
+' 'buildflow-deploy ALL=(root) NOPASSWD: /usr/local/sbin/buildflow-release' > /etc/sudoers.d/buildflow-release
+chmod 440 /etc/sudoers.d/buildflow-release && visudo -cf /etc/sudoers.d/buildflow-release
+```
+
+이후 PC에서: `ssh buildflow-deploy@<서버> sudo buildflow-release status | deploy <main SHA> | rollback <이전 SHA>`. 접속 시 호스트 키는 2026-10-22 확인한 ED25519 `SHA256:7bqzBJZH/AYX6h8HYLuhDR/0+vUjcFqqo8fUWLJ2zCs`와 일치해야 한다(PC `known_hosts`의 호스트명 항목은 재설치 전 키라 IP 항목으로 접속한다).
+
 ## 0. 사전 조건
 
 - `develop`→`main` PR(#99) 필수 CI 통과·SHA 대조 후 **사용자 승인으로 병합**된 `main` SHA

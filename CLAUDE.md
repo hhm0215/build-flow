@@ -68,7 +68,7 @@ bun run preview         # 빌드 결과 미리보기
 
 - Java 17, Spring Boot 3.3.4, Spring Cloud 2023.0.3, Gradle (Groovy)
 - React 18 + TypeScript + Vite + Ant Design (dark theme) + Zustand + TanStack Query
-- 서비스 간 통신: 동기 = OpenFeign(chat→site/tax 조회, 매입·견적·세금계산서·보증 생성 시 site 현장 참조 검증), 비동기 = Kafka (KRaft)
+- 서비스 간 통신: 동기 = OpenFeign(chat→site/tax/estimate/purchase 조회, 매입·견적·세금계산서·보증 생성 시 site 현장 참조 검증), 비동기 = Kafka (KRaft)
 - Database per Service — MySQL 1인스턴스, 서비스별 스키마 분리
 
 ### 서비스 포트 & DB 스키마
@@ -217,7 +217,7 @@ bun run preview         # 빌드 결과 미리보기
    - 반환된 PR URL을 사용자에게 전달
 
 7. **PR 자동 머지** (Commits SHA 검증 통과 시):
-   - 머지 직전 `gh pr view <num> --json commits --jq '.commits[].oid' | sort` ↔ `git log --format='%H' origin/main..origin/develop | sort` 비교
+   - 머지 직전 `gh api --paginate repos/hhm0215/build-flow/pulls/<num>/commits --jq '.[].sha' | sort` ↔ `git log --format='%H' origin/main..origin/develop | sort` 비교 (`gh pr view --json commits`는 100개까지만 반환해 큰 릴리스 PR에서 거짓 불일치가 난다. GitHub API도 PR당 250개가 상한이므로 그 이상이면 PR을 나눈다)
    - PR CI 필수 체크 통과 및 SHA 일치 시 `gh pr merge <num> --merge` (Create a merge commit 방식). 실패·미완료 체크는 기다리거나 멈추고, 우회 옵션은 사용하지 않는다
    - **SHA 불일치 시 머지 중단** + 사용자에게 보고 (PR 생성 후 develop에 추가 push가 들어간 경우 — PR 본문 갱신 후 재검증 또는 PR 닫고 새로 생성)
    - 머지 성공 후 `git fetch origin`으로 로컬 origin/main 최신화

@@ -5,6 +5,11 @@ import posixpath
 import re
 import sys
 
+# Business services trust Gateway headers (X-User-Id) without re-checking JWTs,
+# Redis has no password and Kafka accepts any producer, so only these may
+# publish a port, and only on loopback.
+LOOPBACK_ALLOWED = {"frontend", "gateway-server", "mysql"}
+
 
 def verify_service_isolation(service_name: str, service: dict, volumes: dict) -> None:
     if service.get("network_mode") == "host":
@@ -43,6 +48,8 @@ def verify(config: dict) -> None:
                 if host_ip not in ("", "0.0.0.0", "::"):
                     raise ValueError(f"Caddy port {published} is not publicly bound")
                 public_ports.add(published)
+            elif service_name not in LOOPBACK_ALLOWED:
+                raise ValueError(f"{service_name}:{published} must stay on the internal network")
             elif host_ip != "127.0.0.1":
                 raise ValueError(f"{service_name}:{published} is exposed on {host_ip or 'all interfaces'}")
 
@@ -75,4 +82,4 @@ def verify(config: dict) -> None:
 
 if __name__ == "__main__":
     verify(json.load(sys.stdin))
-    print("public Compose isolation, ports, CORS, and Caddy persistence verified")
+    print("public Compose isolation, internal-only services, ports, CORS, and Caddy persistence verified")
