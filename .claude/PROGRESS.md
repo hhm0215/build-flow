@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — AI 채팅 도구 결과 상관·스트리밍 리렌더 축소 (2026-10-22)
+
+- 2026-10-22 chat Phase 3 일부: 도구 결과 메시지에 모델이 준 호출 `id`를 `tool_call_id`로, 도구명을 Ollama `tool_name`으로 넣어 다중 호출 결과가 섞이지 않게 했고, 이름 없는 호출도 실행 없이 오류 결과를 돌려 호출·결과 수를 맞춘다(단위 테스트 3건, chat 23개 PASS). 프론트는 `ChatMessageItem`을 memo로 분리해 스트리밍 조각마다 완료된 이전 메시지의 Markdown을 다시 그리지 않는다(테스트 2건, lint·174+2 테스트·build PASS). 실제 Ollama 답변은 VPS 모델 미기동으로 PENDING. V1 **40/100** 유지.
+
 ## 완료된 작업 — 공개 스택 업무 서비스 포트 비게시 (2026-10-22)
 
 - 2026-10-22 Gateway 우회 차단: 공개 VPS override에서 auth·estimate·site·purchase·tax·notification·chat·Eureka·Config 포트를 호스트에 게시하지 않고(`ports: !reset []`, VPS Compose v5.5.1 실측), CI 검증기가 frontend·gateway·DB/메시징 외 게시를 거부한다(회귀 2건, 21개 PASS). `buildflow-release status`에 컨테이너 내부 health 점검을 추가했다(설치본은 root 갱신 전 미적용). 계획 `.claude/plans/2026-10-22-vps-internal-ports.md`. V1 **40/100** 유지 — 보안 게이트 보강이며 새 체크포인트 통과는 아니다.
