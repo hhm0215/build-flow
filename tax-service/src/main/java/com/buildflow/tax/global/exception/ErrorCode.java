@@ -21,6 +21,10 @@ public enum ErrorCode {
     PAYMENT_CONFIRMED_TAX_INVOICE_IMMUTABLE(
             HttpStatus.CONFLICT, "입금 내역이 있는 세금계산서는 수정하거나 삭제할 수 없습니다. 입금을 취소한 뒤 다시 시도해 주세요."),
 
+    TAX_INVOICE_LINKED_TO_PURCHASES(
+            HttpStatus.CONFLICT, "매입 항목의 증빙으로 연결된 세금계산서입니다. 매입 화면에서 연결을 해제한 뒤 삭제하거나 구분을 바꿔 주세요."),
+    PURCHASE_REFERENCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "매입 증빙 연결 확인 서비스를 사용할 수 없습니다."),
+
     // TaxPayment
     TAX_PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "입금 내역을 찾을 수 없습니다."),
     INVALID_TAX_PAYMENT_AMOUNT(HttpStatus.BAD_REQUEST, "입금액은 0보다 크고 정수 13자리·소수 2자리 이하여야 합니다."),

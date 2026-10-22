@@ -6,6 +6,7 @@ import com.buildflow.tax.domain.taxinvoice.dto.TaxInvoiceUpdateRequest;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoice;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoiceType;
 import com.buildflow.tax.domain.taxinvoice.repository.TaxInvoiceRepository;
+import com.buildflow.tax.domain.taxinvoice.service.PurchaseEvidenceGuard;
 import com.buildflow.tax.domain.taxinvoice.service.SiteReferenceValidator;
 import com.buildflow.tax.domain.taxinvoice.service.TaxInvoiceService;
 import com.buildflow.tax.domain.taxinvoice.service.TaxPaymentService;
@@ -67,6 +68,7 @@ class TaxOutboxIntegrationTest {
     private final TaxPaymentRepository paymentRepository;
 
     @MockBean private SiteReferenceValidator siteReferenceValidator;
+    @MockBean private PurchaseEvidenceGuard purchaseEvidenceGuard;
 
     TaxOutboxIntegrationTest(TaxInvoiceService taxService, TaxInvoiceRepository taxRepository,
                              OutboxEventRepository outboxRepository, OutboxClaimService claimService,

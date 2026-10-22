@@ -16,6 +16,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findAllByOrderByCreatedAtDesc();
 
+    long countByEvidenceTaxInvoiceId(Long evidenceTaxInvoiceId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Purchase p where p.id = :id")
     Optional<Purchase> findByIdForUpdate(@Param("id") Long id);

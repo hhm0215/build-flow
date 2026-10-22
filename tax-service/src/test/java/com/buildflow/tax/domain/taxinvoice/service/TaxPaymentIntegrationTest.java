@@ -56,6 +56,7 @@ class TaxPaymentIntegrationTest {
     private final OutboxEventRepository outboxRepository;
 
     @MockBean private SiteReferenceValidator siteReferenceValidator;
+    @MockBean private PurchaseEvidenceGuard purchaseEvidenceGuard;
 
     TaxPaymentIntegrationTest(TaxInvoiceService taxService, TaxPaymentService paymentService,
                               TaxInvoiceRepository taxRepository, TaxPaymentRepository paymentRepository,

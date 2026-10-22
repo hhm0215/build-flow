@@ -101,8 +101,14 @@
 | GET | /api/v1/purchases/{id} | `PurchaseResponse` | O |
 | PUT | /api/v1/purchases/{id} | JSON `PurchaseUpdateRequest` → `PurchaseResponse`; 현장 ID 변경 불가 | O |
 | DELETE | /api/v1/purchases/{id} | 삭제 | O |
+| PUT | /api/v1/purchases/{id}/evidence | JSON `{taxInvoiceId}` → `PurchaseResponse`; 같은 현장 매입 세금계산서를 증빙으로 연결(재연결 시 교체) | O |
+| DELETE | /api/v1/purchases/{id}/evidence | 증빙 연결 해제 → `PurchaseResponse` | O |
+| GET | /api/v1/purchases/evidence-summary?siteId={id} | 필수 `siteId` → `PurchaseEvidenceSummaryResponse`(매입 ↔ 매입 계산서 대조) | O |
+| GET | /api/v1/purchases/evidence-links?taxInvoiceId={id} | `{taxInvoiceId, linkedPurchaseCount}`; tax-service의 삭제·유형 변경 전 확인용 | O |
 
 생성 본문은 필수 `siteId`, `itemName`, `quantity`(1 이상 정수), `unitPrice`(0 이상·정수 10자리/소수 2자리 이하)와 선택적 `supplier`, `purchaseDate`, `memo`이다. 수정에서는 `siteId`가 없다. 응답에는 `id`, `siteId`, 요청 필드, 계산된 `totalAmount`, 생성·수정 시각이 포함된다. 총액은 DECIMAL(15,2) 범위이며 검증 실패는 JSON 오류 래퍼의 400이다. 매입 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 매입/outbox를 저장하지 않는다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
+
+**증빙 세금계산서 연결(2026-10-23)**: 원가의 단일 진실원은 매입 항목이며 매입 세금계산서는 원가에 더하지 않고 증빙으로만 연결한다. `PurchaseResponse.evidenceTaxInvoiceId`(nullable)로 매입 1건은 계산서 최대 1건, 계산서 1건은 같은 현장 매입 0..N건과 연결된다. 연결 시 purchase-service가 tax-service `GET /taxes/{id}`로 확인해 없는 계산서·매출 계산서·다른 현장 계산서는 400, tax-service 장애·불일치 응답은 503(fail-closed)이다. 보관 현장의 매입은 연결·해제 409. 연결·해제는 손익 이벤트를 만들지 않는다. `PurchaseEvidenceSummaryResponse`는 `purchaseCount/Amount`, `linkedPurchaseCount/Amount`, `unlinkedPurchaseCount/Amount`(끊어진 연결 포함), `brokenLinkCount`(연결 계산서가 삭제·유형 변경된 경합 잔여), `invoiceCount`, `invoiceSupplyAmount`, `invoiceTotalAmount`, `invoiceWithoutPurchaseCount`, `supplyDifference`/`totalDifference`(= 계산서 공급가/합계 − 연결 매입 합계), 계산서별 `invoices[]`이다. 요약은 tax-service `GET /taxes?siteId&type=PURCHASE`를 읽으며 장애 시 503.
 
 ---
 
@@ -120,12 +126,14 @@
 | GET | /api/v1/taxes/{id}/payments | 입금 내역(취소 포함, 입금일·ID 오름차순) → `TaxPaymentResponse[]` | O |
 | POST | /api/v1/taxes/{id}/payments | JSON `{amount, paymentDate, memo?}` → `TaxPaymentResponse` (201); 잔액 초과 400 | O |
 | PATCH | /api/v1/taxes/{id}/payments/{paymentId}/cancel | JSON `{reason?}`(본문 생략 가능) → `TaxPaymentResponse`; 삭제 아닌 취소 | O |
-| DELETE | /api/v1/taxes/{id} | 삭제; 유효 입금이 있으면 409(취소된 입금 행은 함께 삭제) | O |
+| DELETE | /api/v1/taxes/{id} | 삭제; 유효 입금이 있으면 409(취소된 입금 행은 함께 삭제), 매입 증빙으로 연결된 매입 계산서는 409 | O |
 | GET | /api/v1/taxes/outstanding?siteId={id} | 필수 `siteId` → `OutstandingResponse` | O |
 
 생성 본문은 필수 `siteId`, `type`(`SALES`/`PURCHASE`), `supplyAmount`, `taxAmount`와 선택적 `counterparty`, `issueDate`, `memo`이다. 수정에서 `siteId`는 없고 나머지 금액·유형 필드는 필수다. 두 금액은 각각 0 이상·정수 13자리/소수 2자리 이하, 합계는 DECIMAL(15,2) 범위다. 응답에는 `totalAmount`, `paymentConfirmed`(유효 입금 합계 = 총액), `paymentDate`(완료 시 마지막 유효 입금일, 아니면 null), `paidAmount`·`remainingAmount`(매출만, 매입은 null), `paymentStatus`(`UNPAID`/`PARTIAL`/`PAID`, 매입은 null), 생성·수정 시각이 추가된다. `OutstandingResponse`는 `siteId`, `totalSalesAmount`, `confirmedAmount`(유효 입금 합계), `outstandingAmount`(= 총액 − 유효 입금), `unpaidCount`·`unpaidInvoices[]`(잔액이 남은 매출 건, 발행일 오름차순)이다.
 
 **분할 입금(2026-10-23)**: 입금 `amount`는 0 초과·정수 13자리/소수 2자리 이하(DECIMAL(15,2), 반올림 없음), `paymentDate` 필수, `memo`·취소 `reason`은 500자 이하다. 계산서 행 비관적 잠금 아래에서 유효 입금 합계를 다시 읽어 잔액 초과(완료 건 추가 입금 포함)는 400, 매입 계산서는 409, 이미 취소된 입금 재취소는 409, 다른 계산서의 입금 ID는 404다. `TaxPaymentResponse`는 `id`, `taxInvoiceId`, `amount`, `paymentDate`, `memo`, `canceled`, `canceledAt`, `cancelReason`, `createdAt`이다. 보관 현장의 계산서는 입금 기록·`confirm-payment`는 허용, 입금 취소는 409(복원 후 정정). `tax.payment.confirmed`는 입금 합계가 총액에 도달해 완료 상태로 바뀔 때만 발행한다(분할 입금 건별 이벤트 없음, 취소 후 재완료 시 다시 1회). 입금 원장 도입 전 입금 확인된 계산서는 기동 시 총액 1건으로 이관되며, 이관 전에도 조회는 총액 입금으로 계산한다. 세금계산서 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 세금계산서/outbox를 저장하지 않는다.
+
+**매입 증빙 연결 보호(2026-10-23)**: 매입 계산서 삭제와 `PURCHASE`→`SALES` 유형 변경 전 purchase-service `GET /purchases/evidence-links`로 연결 매입 건수를 확인해 1건 이상이면 409(매입 화면에서 연결 해제 후 가능), purchase-service 장애·불일치 응답은 503(fail-closed)이다. 금액만 바꾸는 수정은 막지 않으며 차이는 대조 요약에 드러난다.
 
 ---
 

@@ -87,7 +87,7 @@ const populateRelations = () => {
   }]
   query.purchases = [{
     id: 11, siteId: 4, itemName: '합성 매입', quantity: 1, unitPrice: 800, totalAmount: 800,
-    supplier: null, purchaseDate: '2026-10-19', memo: null, createdAt: '2026-10-19T00:00:00', updatedAt: '2026-10-19T00:00:00',
+    supplier: null, purchaseDate: '2026-10-19', memo: null, evidenceTaxInvoiceId: null, createdAt: '2026-10-19T00:00:00', updatedAt: '2026-10-19T00:00:00',
   }]
   query.taxes = [{
     id: 12, siteId: 4, type: 'SALES', supplyAmount: 1000, taxAmount: 100, totalAmount: 1100,

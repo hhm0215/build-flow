@@ -26,6 +26,7 @@ public class TaxInvoiceService {
     private final KafkaProducerService kafkaProducerService;
     private final SiteReferenceValidator siteReferenceValidator;
     private final TaxPaymentService taxPaymentService;
+    private final PurchaseEvidenceGuard purchaseEvidenceGuard;
 
     @Transactional
     public TaxInvoiceResponse create(TaxInvoiceCreateRequest request) {
@@ -82,6 +83,9 @@ public class TaxInvoiceService {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
         taxInvoice.validateMutable(taxPaymentService.activePaidAmount(taxInvoice.getId()));
+        if (taxInvoice.getType() == TaxInvoiceType.PURCHASE && request.getType() != TaxInvoiceType.PURCHASE) {
+            purchaseEvidenceGuard.requireNoLinkedPurchases(taxInvoice.getId());
+        }
         taxInvoice.update(
                 request.getType(),
                 request.getSupplyAmount(),
@@ -105,6 +109,9 @@ public class TaxInvoiceService {
         TaxInvoice taxInvoice = getTaxInvoiceForUpdate(id);
         siteReferenceValidator.requireSiteNotArchived(taxInvoice.getSiteId());
         taxInvoice.validateMutable(taxPaymentService.activePaidAmount(taxInvoice.getId()));
+        if (taxInvoice.getType() == TaxInvoiceType.PURCHASE) {
+            purchaseEvidenceGuard.requireNoLinkedPurchases(taxInvoice.getId());
+        }
         taxPaymentService.deleteLedger(taxInvoice.getId());
         taxInvoiceRepository.delete(taxInvoice);
     }

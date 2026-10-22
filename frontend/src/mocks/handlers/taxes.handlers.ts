@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import { archivedSiteCreateError, archivedSiteLockError } from './sites.handlers'
+import { countMockEvidenceLinks } from './purchases.handlers'
 import dayjs from 'dayjs'
 import { mockTaxInvoices, mockTaxPayments } from '../data/taxes.data'
 import {
@@ -11,6 +12,8 @@ let taxPayments = [...mockTaxPayments]
 
 const MAX_AMOUNT_CENTS = 999_999_999_999_999n
 const PAYMENT_TEXT_MAX = 500
+const LINKED_EVIDENCE_MESSAGE =
+  '매입 항목의 증빙으로 연결된 세금계산서입니다. 매입 화면에서 연결을 해제한 뒤 삭제하거나 구분을 바꿔 주세요.'
 const IMMUTABLE_MESSAGE = '입금 내역이 있는 세금계산서는 수정하거나 삭제할 수 없습니다. 입금을 취소한 뒤 다시 시도해 주세요.'
 
 function toCents(value: number): bigint | null {
@@ -106,6 +109,15 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
   }
 }
 
+/** 매입 증빙 연결 검증·대조용(서버의 purchase→tax Feign 조회에 해당). */
+export function findMockTaxInvoice(id: number): TaxInvoice | undefined {
+  return taxInvoices.find((invoice) => invoice.id === id)
+}
+
+export function listMockTaxInvoices(): TaxInvoice[] {
+  return taxInvoices
+}
+
 export const taxesHandlers = [
   http.get('/api/v1/taxes', ({ request }) => {
     const url = new URL(request.url)
@@ -187,6 +199,10 @@ export const taxesHandlers = [
     if (locked) return locked
     if (hasActivePayment(taxInvoices[index])) return fail(409, IMMUTABLE_MESSAGE)
     const body = await request.json()
+    if (taxInvoices[index].type === 'PURCHASE' && body.type !== 'PURCHASE' &&
+        countMockEvidenceLinks(id) > 0) {
+      return fail(409, LINKED_EVIDENCE_MESSAGE)
+    }
     const amountError = taxAmountError(body.supplyAmount, body.taxAmount)
     if (amountError) return fail(400, amountError)
     taxInvoices[index] = withPaymentSummary({
@@ -322,6 +338,9 @@ export const taxesHandlers = [
     if (locked) return locked
     if (hasActivePayment(taxInvoices[index])) return fail(409, IMMUTABLE_MESSAGE)
     const id = Number(params.id)
+    if (taxInvoices[index].type === 'PURCHASE' && countMockEvidenceLinks(id) > 0) {
+      return fail(409, LINKED_EVIDENCE_MESSAGE)
+    }
     taxPayments = taxPayments.filter((p) => p.taxInvoiceId !== id)
     taxInvoices = taxInvoices.filter((t) => t.id !== id)
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })

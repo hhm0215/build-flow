@@ -4,6 +4,7 @@ import {
   ApiResponse, PaymentConfirmRequest, TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceUpdateRequest,
   TaxPayment, TaxPaymentCancelRequest, TaxPaymentCreateRequest,
 } from '../types'
+import { PURCHASES_KEY } from './purchases.api'
 
 export const TAXES_KEY = {
   all: ['taxes'] as const,
@@ -68,6 +69,14 @@ const fetchOutstanding = async (siteId?: number) => {
   return res.data.data
 }
 
+/** 매입 계산서 생성·수정·삭제는 매입 증빙 대조 요약도 바꾼다. */
+async function invalidateTaxAndEvidence(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: TAXES_KEY.all }),
+    queryClient.invalidateQueries({ queryKey: PURCHASES_KEY.evidenceSummaryAll }),
+  ])
+}
+
 export function useTaxes(params?: Record<string, string>) {
   return useQuery({
     queryKey: TAXES_KEY.list(params),
@@ -79,7 +88,7 @@ export function useCreateTax() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createTax,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TAXES_KEY.all }),
+    onSuccess: () => invalidateTaxAndEvidence(queryClient),
   })
 }
 
@@ -87,7 +96,7 @@ export function useUpdateTax() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateTax,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TAXES_KEY.all }),
+    onSuccess: () => invalidateTaxAndEvidence(queryClient),
   })
 }
 
@@ -95,7 +104,7 @@ export function useDeleteTax() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: deleteTax,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: TAXES_KEY.all }),
+    onSuccess: () => invalidateTaxAndEvidence(queryClient),
   })
 }
 

@@ -1,5 +1,6 @@
 package com.buildflow.purchase.domain.purchase.controller;
 
+import com.buildflow.purchase.domain.purchase.service.PurchaseEvidenceService;
 import com.buildflow.purchase.domain.purchase.service.PurchaseService;
 import com.buildflow.purchase.global.exception.GlobalExceptionHandler;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -23,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PurchaseControllerValidationTest {
 
     private final PurchaseService service = mock(PurchaseService.class);
+    private final PurchaseEvidenceService evidenceService = mock(PurchaseEvidenceService.class);
     private final LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
     private MockMvc mockMvc;
 
@@ -32,7 +34,7 @@ class PurchaseControllerValidationTest {
         ObjectMapper objectMapper = new ObjectMapper()
                 .findAndRegisterModules()
                 .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT);
-        mockMvc = MockMvcBuilders.standaloneSetup(new PurchaseController(service))
+        mockMvc = MockMvcBuilders.standaloneSetup(new PurchaseController(service, evidenceService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
@@ -42,6 +44,21 @@ class PurchaseControllerValidationTest {
     @AfterEach
     void tearDown() {
         validator.close();
+    }
+
+    @Test
+    void evidenceLinkWithoutOrNonPositiveTaxInvoiceIdIsRejectedWithHttp400() throws Exception {
+        mockMvc.perform(put("/api/v1/purchases/{id}/evidence", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+        mockMvc.perform(put("/api/v1/purchases/{id}/evidence", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"taxInvoiceId\":0}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(evidenceService);
     }
 
     @Test

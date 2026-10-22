@@ -9,6 +9,10 @@
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-tax-site.ps1`: 격리 MySQL 8(`bfupg<난수>`, 포트 비게시·tmpfs)에서 운영 main `d8f3b3d` 코드로 스키마·합성 행을 만들고 develop `6ccb3e5`를 `ddl-auto update`로 올렸다. `tax_payments` 생성·입금 확인 건만 이관 1건·재기동 중복 0·미수금/부분 입금/초과 400/취소, enum `BIDDING`·생성·IN_PROGRESS 전환, 이전 코드 되돌리기(BIDDING 낮춘 뒤 정상) PASS 23. WARN 1: 되돌림 중 부분 입금 계산서를 입금 확인 후 재반영하면 PAID인데 입금액이 부분 합계(잔액 기록으로 정상화) → `docs/RELEASE_RUNBOOK.md` 되돌리기 주의. 잔여 리소스 0. **VPS 미반영**. V1 **40/100** 유지.
 
+## 완료된 작업 — 매입 항목 ↔ 증빙 매입 세금계산서 연결 (2026-10-23)
+
+- 2026-10-23 PILOT_QA 원가·세금계산서 행 해소(에이전트 결정, 사용자 위임): 원가 단일 진실원은 매입 항목 유지, 매입 계산서는 증빙으로만 연결. purchase-service에 nullable `evidence_tax_invoice_id`(+인덱스, Flyway V2 멱등)와 `PUT/DELETE /purchases/{id}/evidence`, `GET /purchases/evidence-summary?siteId`, `GET /purchases/evidence-links?taxInvoiceId`를 추가했다. 연결은 tax-service Feign 조회로 없는/매출/다른 현장 계산서 400, 장애 503, 보관 현장 409이며 손익 이벤트 없음. tax-service는 연결된 매입 계산서 삭제·매출 전환 409(purchase Feign, 장애 503). 프론트 매입 목록 증빙 열·연결 모달, 현장 상세 매입 탭 대조 요약(미연결 금액, 계산서−연결 매입 차이 공급가/합계 기준, 끊어진 연결·매입 없는 계산서 경고), MSW 동기화. purchase 43(1 skip)·tax 72(1 skip)·Vitest 199 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+
 ## 완료된 작업 — AI 채팅 부분 답변 실패 표시 (2026-10-23)
 
 - 2026-10-23 토큰 스트리밍(PR #186) 리뷰 잔여 위험 처리: 답변 조각을 일부 받은 뒤 오류·중단이 나면 받은 부분을 남기고 "답변이 중간에 끊겼습니다" 사유를 함께 표시한다(이전엔 부분 답변만 남아 완결 답변처럼 보였다). `ChatMessage.errorNote`, 테스트 1건, lint·build PASS. V1 **40/100** 유지.

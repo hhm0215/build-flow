@@ -30,6 +30,7 @@ class TaxInvoiceServiceLockTest {
     @Mock KafkaProducerService kafkaProducerService;
     @Mock SiteReferenceValidator siteReferenceValidator;
     @Mock TaxPaymentService taxPaymentService;
+    @Mock PurchaseEvidenceGuard purchaseEvidenceGuard;
     @InjectMocks TaxInvoiceService taxInvoiceService;
 
     @Test
