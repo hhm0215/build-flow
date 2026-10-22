@@ -36,6 +36,18 @@ class PublicComposeVerifierTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "mysql:3306"):
             verify(config)
 
+    def test_rejects_loopback_business_service_port(self):
+        # Gateway-only auth: a host process must not reach a service directly.
+        config = valid_config()
+        config["services"]["site-service"] = {"ports": [{"published": "8083", "host_ip": "127.0.0.1"}]}
+        with self.assertRaisesRegex(ValueError, "site-service:8083 must stay on the internal network"):
+            verify(config)
+
+    def test_accepts_business_service_without_ports(self):
+        config = valid_config()
+        config["services"]["site-service"] = {"ports": []}
+        verify(config)
+
     def test_rejects_host_networking_without_published_ports(self):
         config = valid_config()
         config["services"]["mysql"] = {"network_mode": "host"}

@@ -415,6 +415,7 @@ jobs:
           sh -c 'umask 077; exec pwsh -NoProfile -File scripts/db/test-private-backup-path.ps1 -CheckActiveUmask'
       - name: Validate Compose exposure and CORS
         run: |
+          docker compose version
           docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.vps.yml -f docker-compose.public.yml config --format json \
             | python3 scripts/vps/verify_public_compose.py
       - name: Validate LAN Compose exposure and CORS

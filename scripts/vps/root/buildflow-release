@@ -34,6 +34,14 @@ status() {
   "${C[@]}" ps --format 'table {{.Name}}\t{{.Status}}'
   echo "공개 / → $(curl -s -o /dev/null -m 10 -w '%{http_code}' "https://$PUBLIC_HOST/")"
   echo "무인증 API → $(curl -s -o /dev/null -m 10 -w '%{http_code}' "https://$PUBLIC_HOST/api/v1/sites")"
+  # 업무 서비스 포트는 호스트에 게시하지 않으므로 컨테이너 안에서 health를 본다.
+  for target in eureka:8761 config:8888 gateway:8080 auth:8081 estimate:8082 site:8083                 purchase:8084 tax:8085 notification:8086 chat:8087; do
+    if docker exec "buildflow-${target%%:*}" wget -qO- -T 5 "http://localhost:${target##*:}/actuator/health" 2>/dev/null | grep -q '"UP"'; then
+      echo "health ${target} UP"
+    else
+      echo "health ${target} 실패"
+    fi
+  done
 }
 
 pending_work() {
