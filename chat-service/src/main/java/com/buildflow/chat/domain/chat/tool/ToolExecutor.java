@@ -1,5 +1,7 @@
 package com.buildflow.chat.domain.chat.tool;
 
+import com.buildflow.chat.infra.feign.EstimateClient;
+import com.buildflow.chat.infra.feign.PurchaseClient;
 import com.buildflow.chat.infra.feign.SiteClient;
 import com.buildflow.chat.infra.feign.TaxClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -20,11 +25,15 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ToolExecutor {
 
-    private static final Set<String> KNOWN =
-            Set.of("listSites", "getSiteProfit", "getOutstandingTax", "getDashboardSummary");
+    private static final Set<String> KNOWN = Set.of("listSites", "getSiteProfit", "getOutstandingTax",
+            "getDashboardSummary", "listEstimatesBySite", "listPurchasesBySite");
+    /** 모델 컨텍스트를 넘치지 않게 목록 도구는 앞쪽 일부만 넘기고 전체 건수를 함께 알린다. */
+    static final int LIST_LIMIT = 30;
 
     private final SiteClient siteClient;
     private final TaxClient taxClient;
+    private final EstimateClient estimateClient;
+    private final PurchaseClient purchaseClient;
     private final ObjectMapper objectMapper;
 
     public String execute(String name, JsonNode args) {
@@ -37,6 +46,8 @@ public class ToolExecutor {
                 case "getSiteProfit" -> siteClient.getProfit(requireSiteId(args)).getData();
                 case "getOutstandingTax" -> taxClient.getOutstanding(requireSiteId(args)).getData();
                 case "getDashboardSummary" -> siteClient.getSummary().getData();
+                case "listEstimatesBySite" -> limited(estimateClient.listBySite(requireSiteId(args)).getData());
+                case "listPurchasesBySite" -> limited(purchaseClient.listBySite(requireSiteId(args)).getData());
                 default -> null;
             };
             return objectMapper.writeValueAsString(data);
@@ -46,6 +57,17 @@ public class ToolExecutor {
             log.warn("도구 실행 실패 name={}: {}", name, e.getMessage());
             return "{\"error\":\"도구 실행에 실패했습니다: " + name + "\"}";
         }
+    }
+
+    private static Map<String, Object> limited(List<?> items) {
+        List<?> all = items == null ? List.of() : items;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalCount", all.size());
+        result.put("items", all.subList(0, Math.min(all.size(), LIST_LIMIT)));
+        if (all.size() > LIST_LIMIT) {
+            result.put("note", "앞쪽 " + LIST_LIMIT + "건만 포함했다. 전체 건수는 totalCount다.");
+        }
+        return result;
     }
 
     private Long requireSiteId(JsonNode args) {

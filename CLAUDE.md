@@ -68,7 +68,7 @@ bun run preview         # 빌드 결과 미리보기
 
 - Java 17, Spring Boot 3.3.4, Spring Cloud 2023.0.3, Gradle (Groovy)
 - React 18 + TypeScript + Vite + Ant Design (dark theme) + Zustand + TanStack Query
-- 서비스 간 통신: 동기 = OpenFeign(chat→site/tax 조회, 매입·견적·세금계산서·보증 생성 시 site 현장 참조 검증), 비동기 = Kafka (KRaft)
+- 서비스 간 통신: 동기 = OpenFeign(chat→site/tax/estimate/purchase 조회, 매입·견적·세금계산서·보증 생성 시 site 현장 참조 검증), 비동기 = Kafka (KRaft)
 - Database per Service — MySQL 1인스턴스, 서비스별 스키마 분리
 
 ### 서비스 포트 & DB 스키마

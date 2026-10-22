@@ -17,16 +17,17 @@ class ToolCatalogTest {
     }
 
     @Test
-    void 도구_4종이_기대한_이름으로_노출된다() {
+    void 도구_6종이_기대한_이름으로_노출된다() {
         List<Map<String, Object>> tools = ToolCatalog.tools();
 
         Set<String> names = tools.stream()
                 .map(t -> (String) functionOf(t).get("name"))
                 .collect(Collectors.toSet());
 
-        assertThat(tools).hasSize(4);
+        assertThat(tools).hasSize(6);
         assertThat(names).containsExactlyInAnyOrder(
-                "listSites", "getSiteProfit", "getOutstandingTax", "getDashboardSummary");
+                "listSites", "getSiteProfit", "getOutstandingTax", "getDashboardSummary",
+                "listEstimatesBySite", "listPurchasesBySite");
     }
 
     @Test

@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — AI 채팅 현장별 견적·매입 조회 도구 (2026-10-22)
+
+- chat-service에 estimate·purchase Feign 클라이언트와 `listEstimatesBySite`·`listPurchasesBySite` 도구를 추가했다. 목록은 요약 필드만 받고 30건까지만 모델에 넘기며 전체 건수·안내를 함께 준다. 도구 카탈로그·실행 테스트 갱신·추가, `chat-service:test` 21건 통과. 실제 모델 응답 품질은 VPS 모델 미기동으로 미검증. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 대시보드 AI 요약 서비스 테스트 (2026-10-22)
 
 - site `OllamaService` 3건: 모델 응답 content 반환, 빈 message·5xx·연결 오류를 모두 `OLLAMA_API_FAILED`로 수렴, 프롬프트 금액이 `1E+7` 같은 지수 표기 없이 원 단위로 들어감. WebClient 교환 함수 스텁 사용, 코드 변경 없음. V1 **40/100** 변동 없음.
