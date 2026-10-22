@@ -5,6 +5,22 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공개 VPS를 main `da012cd`·`d8f3b3d`로 반영 (2026-10-23)
+
+- 2026-10-23 PC에서 `sudo buildflow-release deploy`로 두 번 반영했다. 두 번 모두 처리 중 작업 0건, 백업·격리 복원 확인, EXIT 0이었다.
+  - `1d2497e → da012cd`(PR #184): 업무 서비스·Eureka·Config·Redis·Kafka·Zipkin 포트 비게시, AI 채팅 Phase 3.
+  - `da012cd → d8f3b3d`(PR #191): 프록시 네트워크 분리, 채팅 토큰 스트리밍, 보안 후속, DB 계정 E1(env 미설정이라 root 유지).
+- 실측(비root) 결과:
+  - 호스트 리스닝은 22/80/443과 loopback 3000·3306·8080뿐이다.
+  - 호스트 loopback 8081~8087·8761·8888·6379·9094·9411은 연결 불가다.
+  - 외부망에서 3000·3306·8080·8081·8083·6379·9094는 연결 불가, IP 직접 HTTP는 421이다.
+  - 공개 `/` 200, 무인증 API 401, loopback 프론트→Gateway 경로 401.
+- 독립 검토: security-reviewer·infrastructure-reviewer 모두 FAIL 0. 배포 전 비root로 `/opt/buildflow`·`.git` root 소유, deploy 계정 쓰기 가능 파일 0, docker 그룹 없음을 확인했다.
+- UNVERIFIED: 컨테이너 네트워크 소속(docker 권한 필요).
+- 롤백 훈련(`rollback da012cd`)은 자동 권한 분류기가 운영 배포로 판단해 차단했고, 실측하지 않았다.
+- 되돌리기: `sudo buildflow-release rollback da012cd62bd7f4447ea3d900cfe1b3e444494e6c`.
+- V1 **40/100** 유지. 운영 반영 체크포인트의 롤백 실측·알림이 남아 있다.
+
 ## 완료된 작업 — 운영 DDL ↔ V1 대조 경로 준비 (2026-10-23)
 
 - 2026-10-23 root 래퍼 `buildflow-release`에 읽기 전용 `schema` 모드(하드코딩 7개 스키마, `information_schema.TABLES` 목록 → `SHOW CREATE TABLE`, `AUTO_INCREMENT=N` 제거, 데이터·계정·비밀값 미조회)를 추가하고, 리허설에 `-ProdDdlPath`(+Docker 없는 `-V1DdlDirectory`) 서비스별 차이 표를 붙였다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`로 분리, 합성 픽스처(일치·컬럼 타입 차이·테이블 누락·빈 스키마·UTF-16 입력) 테스트를 CI windows-readiness에, 래퍼 `bash -n`을 public-compose에 연결. 직전 리허설 출력으로 오프라인 대조 7/7 MATCH 재현. 운영 실측은 main 병합·root 래퍼 재설치 후 PENDING. V1 **40/100** 유지.
