@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -181,10 +182,11 @@ public class ChatService {
         List<Object> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
 
-        List<ChatMessage> history = messageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-        int start = Math.max(0, history.size() - historyLimit);
-        for (int i = start; i < history.size(); i++) {
-            ChatMessage m = history.get(i);
+        // 긴 대화도 전체 이력을 메모리로 올리지 않고 최근 historyLimit개만 조회한 뒤 시간순으로 되돌린다.
+        List<ChatMessage> recent = historyLimit <= 0 ? List.of()
+                : messageRepository.findBySessionIdOrderByCreatedAtDescIdDesc(sessionId, PageRequest.of(0, historyLimit));
+        for (int i = recent.size() - 1; i >= 0; i--) {
+            ChatMessage m = recent.get(i);
             String role = m.getRole() == ChatRole.USER ? "user" : "assistant";
             messages.add(Map.of("role", role, "content", m.getContent()));
         }

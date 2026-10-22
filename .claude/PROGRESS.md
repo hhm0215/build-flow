@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 채팅 이력 최근 N개만 조회 (2026-10-22)
+
+- `buildMessages`가 세션 전체 이력을 읽고 메모리에서 자르던 것을 `findBySessionIdOrderByCreatedAtDescIdDesc(Pageable)`로 최근 `history-limit`개만 조회하도록 바꿨다(같은 시각은 id로 순서 고정, 0이면 조회 생략). 단위 테스트 2건 추가, `chat-service:test` 통과. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 알림·보증 DB opt-in Flyway 파일럿 (2026-10-22)
 
 - 로컬 MySQL 8 실제 DDL 6개 테이블(알림·처리 이벤트·outbox·보증·감사·원본 보존) 기준 신규 격리 DB 전용 notification V1을 작성했다. 기본 Flyway disabled·`notification-flyway` 프로파일 `ddl-auto=validate`. 로컬 격리 DB 통합 테스트 PASS(테스트 DB 삭제), CI `notification-flyway` 필수 작업 추가. 이로써 7개 DB 서비스 모두 신규 DB V1 보유, 기존 DB baseline·운영 전환은 미실시. V1 **40/100**·실데이터 **NO-GO** 유지.
