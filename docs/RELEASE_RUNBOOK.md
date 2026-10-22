@@ -17,8 +17,10 @@
 PC의 `buildflow-deploy` SSH 키로 접속한 에이전트가 배포할 수 있도록, root 소유 래퍼 하나만 sudo로 허용한다. 래퍼는 CI 검증된 `origin/main`과 정확히 같은 40자리 SHA만 배포하고, 아래 0~5단계(처리 중 작업 0건, 이미지 보존, 순차 빌드, 백업·격리 복원 확인, 기동)를 그대로 실행한다. 임의 명령은 받지 않는다. 일회성 설정은 Web Console root에서 한다.
 
 ```bash
-cd /opt/buildflow && git fetch origin
-git show origin/develop:scripts/vps/root/buildflow-release > /usr/local/sbin/buildflow-release
+cd /opt/buildflow && git fetch origin main:refs/remotes/origin/main
+chown -R root:root /opt/buildflow && chmod -R go-w /opt/buildflow   # 래퍼가 소유권·쓰기 권한을 검사한다
+id buildflow-deploy   # docker 그룹이 없어야 한다(있으면 sudo 제한이 무의미)
+git show origin/main:scripts/vps/root/buildflow-release > /usr/local/sbin/buildflow-release   # CI 검증된 main 기준
 chown root:root /usr/local/sbin/buildflow-release && chmod 755 /usr/local/sbin/buildflow-release
 install -d -m 700 /etc/buildflow && printf '%s
 ' "실제-공개-호스트명" > /etc/buildflow/public_host && chmod 600 /etc/buildflow/public_host
@@ -26,6 +28,8 @@ printf '%s
 ' 'buildflow-deploy ALL=(root) NOPASSWD: /usr/local/sbin/buildflow-release' > /etc/sudoers.d/buildflow-release
 chmod 440 /etc/sudoers.d/buildflow-release && visudo -cf /etc/sudoers.d/buildflow-release
 ```
+
+래퍼를 갱신할 때도 같은 명령으로 `origin/main`에서 다시 설치한다(2026-10-23 보안 검토: 설치 원본을 develop에서 main으로, 저장소 root 소유·git 훅 비활성 검사 추가). 2026-10-23 비root 실측: `/opt/buildflow`·`.git`·`.git/config`·`.git/hooks` 모두 `root:root`, deploy 계정 쓰기 가능 파일 0, deploy 계정 그룹에 docker 없음.
 
 이후 PC에서: `ssh buildflow-deploy@<서버> sudo buildflow-release status | deploy <main SHA> | rollback <이전 SHA>`. 접속 시 호스트 키는 2026-10-22 확인한 ED25519 `SHA256:7bqzBJZH/AYX6h8HYLuhDR/0+vUjcFqqo8fUWLJ2zCs`와 일치해야 한다(PC `known_hosts`의 호스트명 항목은 재설치 전 키라 IP 항목으로 접속한다).
 
