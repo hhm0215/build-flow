@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 현장 상태 BIDDING(수주 전) 추가 (2026-10-23)
+
+- 2026-10-23 PILOT_QA 업무 흐름 첫 행(견적이 현장보다 먼저): 에이전트 결정(사용자 위임)으로 `SiteStatus.BIDDING`을 추가했다. 생성 기본값 IN_PROGRESS 유지·BIDDING 선택 가능(그 밖의 시작 상태 400), BIDDING→IN_PROGRESS만 허용·수주 이후→BIDDING 400, AI 요약 프롬프트는 한국어 상태 라벨·상태별 건수, chat `listSites` 설명에 상태 라벨, 프론트 라벨·색·필터·생성 폼 단계 선택·상세 전환 옵션 비활성·대시보드 수주 전 건수, MSW 동기화. 격리 MySQL 8 실측: V1 enum 컬럼에 새 코드 `ddl-auto=update` 기동 시 Hibernate가 enum을 넓혀 BIDDING 저장 PASS(수동 ALTER 불필요) → Flyway 일관성을 위해 `V2__site_status_bidding.sql`·리허설 기대 history 계산·`SiteFlywayIntegrationTest` 갱신, 이전 코드는 BIDDING 행 조회 실패를 확인해 런북에 되돌리기 절차 추가. site 57(2 skip)·chat 42(1 skip) PASS, 프론트 lint·181 테스트·build PASS. 브랜치 `claude/site-bidding-status` 푸시, PR·`main`·VPS 미반영. V1 **40/100** 유지.
+
 ## 완료된 작업 — Flyway 기존 DB baseline 격리 리허설 (2026-10-23)
 
 - 2026-10-23 `scripts/db/flyway-baseline-rehearsal.ps1`(+ compose): 무작위 `bfbase<난수>` project의 포트 비게시·tmpfs MySQL 8에서 7개 DB 서비스를 운영 방식(ddl-auto update, auth schema.sql)으로 `*_legacy`, Flyway V1로 `*_v1`에 만들어 정규화 `SHOW CREATE TABLE`과 `information_schema`(컬럼·인덱스·FK·CHECK)를 비교했다. 의미 차이 0 — charset 표기(`CHARACTER SET` 중복 출력)와 site·notification 컬럼 순서만 무해 차이. legacy에 일회성 baseline(1) 후 일반 flyway 프로파일 재기동에서 migrate 0·Hibernate validate·history `1|1|BASELINE|1` 7/7 PASS, 정리 후 잔여 리소스 0. 운영 VPS 실제 DDL은 접근 권한이 없어 미대조(배포 전 덤프 19개 vs 현재 21개 테이블) — 운영 백업 격리 복원본 비교가 남은 게이트. CI는 무거워 미추가(`docs/DATABASE_OPERATIONS.md`). V1 **40/100** 유지.

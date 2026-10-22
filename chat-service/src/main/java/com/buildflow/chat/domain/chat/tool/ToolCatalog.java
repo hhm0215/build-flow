@@ -40,7 +40,9 @@ public final class ToolCatalog {
     public static List<Map<String, Object>> tools() {
         return List.of(
                 tool("listSites",
-                        "등록된 모든 현장 목록(id, 이름, 상태)을 조회한다. 현장 이름으로 siteId를 찾을 때 먼저 호출한다.",
+                        "등록된 모든 현장 목록(id, 이름, 상태)을 조회한다. 현장 이름으로 siteId를 찾을 때 먼저 호출한다. "
+                                + "상태: BIDDING=수주 전(계약 전 견적 단계), IN_PROGRESS=시공 중, SETTLING=정산 중, "
+                                + "WARRANTY=하자보증, COMPLETED=완료. 답변에는 한국어 상태명을 쓴다.",
                         noParams()),
                 tool("getSiteProfit",
                         "특정 현장의 마진, 마진율, 총견적액, 총매입액을 조회한다.",

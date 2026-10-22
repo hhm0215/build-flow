@@ -17,10 +17,12 @@ import ReactMarkdown from 'react-markdown'
 import ErrorState from '../../components/ErrorState'
 import { useDashboardStats, useDashboardSummary } from '../../api/dashboard.api'
 import type { SiteProfitSummary } from '../../types'
+import { siteCountCaption } from '../../utils/siteStatus'
 
 // ── Helpers ──────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = {
+  BIDDING: '수주 전',
   IN_PROGRESS: '시공 중',
   SETTLING: '정산 중',
   WARRANTY: '하자보증',
@@ -28,6 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_COLOR: Record<string, string> = {
+  BIDDING: '#06b6d4',
   IN_PROGRESS: '#3b82f6',
   SETTLING: '#f59e0b',
   WARRANTY: '#8b5cf6',
@@ -199,7 +202,7 @@ function buildStatCards(stats: {
     {
       title: '진행 중인 현장',
       value: `${inProgress}`,
-      change: `전체 ${stats.totalSites}개 현장`,
+      change: siteCountCaption(stats.sitesByStatus, stats.totalSites),
       changeType: 'neutral',
       icon: HardHat,
       accentColor: '#3b82f6',
