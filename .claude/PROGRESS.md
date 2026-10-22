@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 프론트 필터·디바운스 훅 테스트 (2026-10-22)
+
+- `useFilterParams` 4건(스키마 타입 파싱, 잘못된 값 버림·URL 정리·스키마 밖 파라미터 유지, 빈 문자열 무시, setFilters 쓰기·삭제)과 `useDebouncedValue` 2건을 추가했다. 프론트 테스트 174건·lint 통과. V1 **40/100** 변동 없음.
+
 ## 완료된 작업 — 채팅 이력 최근 N개만 조회 (2026-10-22)
 
 - `buildMessages`가 세션 전체 이력을 읽고 메모리에서 자르던 것을 `findBySessionIdOrderByCreatedAtDescIdDesc(Pageable)`로 최근 `history-limit`개만 조회하도록 바꿨다(같은 시각은 id로 순서 고정, 0이면 조회 생략). 단위 테스트 2건 추가, `chat-service:test` 통과. V1 **40/100** 변동 없음.
