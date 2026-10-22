@@ -1,0 +1,23 @@
+# Flyway baseline rehearsal: isolated MySQL 8 only. No host ports, no named or
+# anonymous volumes (tmpfs data dir), every resource labelled with the run nonce.
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${REHEARSAL_DB_PASSWORD:?Synthetic password required}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    labels:
+      com.buildflow.flyway-rehearsal: ${REHEARSAL_NONCE:?Synthetic nonce required}
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysql --user=root --host=127.0.0.1 --protocol=TCP --batch --skip-column-names --execute='SELECT 1' | grep -qx 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+networks:
+  default:
+    labels:
+      com.buildflow.flyway-rehearsal: ${REHEARSAL_NONCE:?Synthetic nonce required}

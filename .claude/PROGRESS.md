@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — Flyway 기존 DB baseline 격리 리허설 (2026-10-23)
+
+- 2026-10-23 `scripts/db/flyway-baseline-rehearsal.ps1`(+ compose): 무작위 `bfbase<난수>` project의 포트 비게시·tmpfs MySQL 8에서 7개 DB 서비스를 운영 방식(ddl-auto update, auth schema.sql)으로 `*_legacy`, Flyway V1로 `*_v1`에 만들어 정규화 `SHOW CREATE TABLE`과 `information_schema`(컬럼·인덱스·FK·CHECK)를 비교했다. 의미 차이 0 — charset 표기(`CHARACTER SET` 중복 출력)와 site·notification 컬럼 순서만 무해 차이. legacy에 일회성 baseline(1) 후 일반 flyway 프로파일 재기동에서 migrate 0·Hibernate validate·history `1|1|BASELINE|1` 7/7 PASS, 정리 후 잔여 리소스 0. 운영 VPS 실제 DDL은 접근 권한이 없어 미대조(배포 전 덤프 19개 vs 현재 21개 테이블) — 운영 백업 격리 복원본 비교가 남은 게이트. CI는 무거워 미추가(`docs/DATABASE_OPERATIONS.md`). V1 **40/100** 유지.
+
 ## 완료된 작업 — 공개 스택 프록시 네트워크 분리 (2026-10-23)
 
 - 2026-10-23 독립 보안 검토 후속(Low): 공개 override에서만 `buildflow-edge` 네트워크를 만들어 caddy·frontend는 edge에만, gateway-server는 edge와 `buildflow-net` 둘 다 붙였다(서비스마다 `networks: !override`, 별칭 없음). 로컬(app.yml)·LAN 구성은 불변. `verify_public_compose.py`가 caddy/frontend의 내부 서비스 네트워크 공유·`network_mode`·기본 네트워크와 gateway 양쪽 연결 누락을 거부한다(회귀 6건, 27개 PASS, 이전 구성은 거부 확인). 무작위 이름 네트워크 실측에서 edge 쪽은 `gateway-server`만 해석·HTTP 성공, `site-service`·`redis`는 해석 불가. VPS 미반영(배포 시 caddy·frontend·gateway 재생성). V1 **40/100** 유지.
