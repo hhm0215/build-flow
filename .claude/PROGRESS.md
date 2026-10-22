@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 공개 스택 프록시 네트워크 분리 (2026-10-23)
+
+- 2026-10-23 독립 보안 검토 후속(Low): 공개 override에서만 `buildflow-edge` 네트워크를 만들어 caddy·frontend는 edge에만, gateway-server는 edge와 `buildflow-net` 둘 다 붙였다(서비스마다 `networks: !override`, 별칭 없음). 로컬(app.yml)·LAN 구성은 불변. `verify_public_compose.py`가 caddy/frontend의 내부 서비스 네트워크 공유·`network_mode`·기본 네트워크와 gateway 양쪽 연결 누락을 거부한다(회귀 6건, 27개 PASS, 이전 구성은 거부 확인). 무작위 이름 네트워크 실측에서 edge 쪽은 `gateway-server`만 해석·HTTP 성공, `site-service`·`redis`는 해석 불가. VPS 미반영(배포 시 caddy·frontend·gateway 재생성). V1 **40/100** 유지.
+
 ## 완료된 작업 — 서비스별 DB 계정 E1 준비 (2026-10-23)
 
 - 2026-10-23 DB 마이그레이션 Phase E1: 7개 DB 서비스가 공유하던 root 대신 `buildflow_<svc>`@'%' 계정에 자기 스키마 ALL(DDL 포함, `ddl-auto: update` 유지 때문)만 주는 `scripts/db/service-accounts.ps1`(비밀번호는 환경변수/`-EnvFile`→stdin, 재실행 시 권한 drift 제거)과 `docker-compose.app.yml`의 `<SVC>_DB_USERNAME/PASSWORD` opt-in(미설정 시 기존 root 경로)을 추가했다. 무작위 격리 project MySQL 8에서 7계정 생성·자기 스키마 DDL/DML·타 스키마/`mysql.user`/CREATE DATABASE/CREATE USER 거부·재실행 idempotent·site-service를 `buildflow_site`로 기동해 health UP까지 PASS, CI `db-service-accounts` job 추가. 기존 로컬·VPS DB에는 적용하지 않았다. E2(DML 전용)는 Flyway 운영 전환 후. V1 **40/100** 유지.
