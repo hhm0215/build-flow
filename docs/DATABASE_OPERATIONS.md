@@ -202,6 +202,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-r
 - 되돌리기: 이전 코드는 넓어진 enum·새 테이블에서 정상 기동. BIDDING 행이 있으면 현장 목록 500 → `IN_PROGRESS`로 낮추면 200. 이전 tax API 정상(부분 입금은 무시).
 - WARN(되돌리기 경로 한정): 되돌린 상태에서 부분 입금 계산서를 `confirm-payment`하고 재반영하면 `paymentConfirmed=true`·`paymentStatus=PAID`인데 `paidAmount`는 부분 합계(30만/110만)로 남는다. 잔액 입금 기록으로 정상화된다. 운영 대응은 `docs/RELEASE_RUNBOOK.md` 분할 입금 되돌리기 주의. **2026-10-23 수정**: 재반영 시 기동 이관이 "입금 확인인데 유효 입금 합계 < 총액"인 계산서의 잔액을 `기존 입금 확인 이관` 1건으로 채우고, 이관 전에도 입금 확인 건은 총액 입금으로 표시한다(단위 회귀 추가). 되돌린 동안의 입금 확인도 재반영 후 정합하다.
 
+### 업그레이드·되돌리기 리허설 (견적 수정본·추가공사, 2026-10-23)
+
+`scripts/db/upgrade-rehearsal-estimate.ps1 -OldRoot <운영 SHA 체크아웃>`은 같은 방식(무작위 `bfupgest<난수>` project, 포트 비게시·tmpfs, nonce label, 정리 전 이름·label 재확인)에 단일 노드 KRaft Kafka(`upgrade-rehearsal-estimate.compose.yml`)를 더해 estimate → outbox → Kafka → site 손익 경로를 실제로 태운다. 이전 코드 → 새 코드 → 재기동 → 이전 코드(되돌리기) → 새 코드(재반영) 순서다. 재전송·순서 검증은 브로커 컨테이너의 console producer로 같은 eventId/역순 이벤트를 넣는다.
+
+2026-10-23 실측(이전 `0fe8c9a`, 새 `c2416ef`): 25개 검사 중 PASS 24·WARN 1, 정리 후 잔여 0.
+- 업그레이드: 이전 코드 스키마 `status enum('CONFIRMED','DRAFT')`·`kind` 없음 → 새 코드 `ddl-auto update` 후 `SHOW CREATE TABLE`이 `` `status` enum('CONFIRMED','DRAFT','SUPERSEDED') COLLATE utf8mb4_unicode_ci NOT NULL ``, `kind enum('ADDITIONAL','ORIGINAL','REVISION')`·`revision_of_id`·`chain_root_id`·`superseded_by_id` 모두 nullable, `idx_estimates_chain_root(chain_root_id)`. Hibernate update가 enum을 넓히지 않아 1265 Data truncated가 난다는 우려는 재현되지 않았다(수정본 확정 200). 기존 행 DB `kind` NULL → API `ORIGINAL`·chainRootId=자기 id.
+- 손익(실제 Kafka): 확정 100만 → 수정본 120만 확정 시 원본 `SUPERSEDED`(supersededById=수정본) + outbox `estimate.deleted`(reason=SUPERSEDED)·`estimate.parsed` SENT, `site_profits` 120만 수렴 → 추가공사 30만 확정 150만. 같은 eventId 3건 재전송 후 lag 0·손익 150만·처리 기록 4→4. 별도 현장에 deleted(100만)을 parsed보다 먼저 넣으면 일시적으로 -100만이 됐다가 120만으로 수렴(순서 무관, 중간값 음수 노출은 의도된 산술).
+- 거부: 초안·다른 현장을 원 견적으로 한 수정본 400, 대체된 견적 수정·확정·삭제 409. 재기동 후 목록 5건 그대로.
+- 되돌리기(WARN): 이전 코드는 넓어진 enum에서 기동하지만 `SUPERSEDED` 행이 있으면 견적 전체·현장별 목록과 해당 조회가 500(확정 REVISION 조회는 200). `docs/RELEASE_RUNBOOK.md`의 보관 테이블 절차(SUPERSEDED + 초안 REVISION 행·항목 이동)로 목록 200·손익 150만 유지, 이전 코드 초안 생성·수정 정상. 재반영 전 보관 행 복원 → 새 코드 6건 조회, 보관했던 초안 수정본(130만) 확정으로 이전 수정본 SUPERSEDED·손익 160만 수렴.
+
 ## Phase E1: 서비스별 runtime DB 계정 (opt-in)
 
 **결정 (2026-10-23, 위임된 에이전트 결정)**: 7개 DB 서비스가 공유하던 MySQL root 대신 서비스마다 `buildflow_<svc>`@`'%'` 계정을 두고, 자기 스키마 `buildflow_<svc>.*`에만 `ALL PRIVILEGES`(DDL 포함)를 준다. 다른 스키마·`mysql` 시스템 스키마·전역 권한(`CREATE USER`, `PROCESS` 등)·`GRANT OPTION`은 없다. 한 서비스의 자격 증명이나 SQL 주입이 다른 서비스 데이터와 계정 관리로 번지는 범위를 줄이는 것이 목적이다.

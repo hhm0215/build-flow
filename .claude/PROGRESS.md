@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 견적 수정본 업그레이드·되돌리기 리허설 (격리 Kafka, 2026-10-23)
+
+- 2026-10-23 `scripts/db/upgrade-rehearsal-estimate.ps1`(+compose: 격리 MySQL + KRaft Kafka, `bfupgest<난수>`, 포트 비게시·tmpfs): 이전 `0fe8c9a` → 새 `c2416ef`(PR #201) `ddl-auto update`에서 status enum `SUPERSEDED` 확장(SHOW CREATE 확인)·새 컬럼 4종·인덱스, 기존 행 kind NULL→ORIGINAL, 실제 Kafka로 손익 100만→120만(수정본)→150만(추가공사) 수렴, 같은 eventId 재전송 중복 0, 역순 이벤트 수렴, 대체됨 수정 409. PASS 24·WARN 1(이전 코드는 SUPERSEDED 행이 있으면 견적 목록 500 → 보관 테이블 절차를 `docs/RELEASE_RUNBOOK.md`에 기록, 재반영 복원 후 160만 수렴 확인). 잔여 리소스 0. 결함 없음(코드 무변경). **main·VPS 미반영**. V1 **40/100** 유지.
+
 ## 완료된 작업 — 견적 수정본·추가공사와 회계 유효 버전 0..1 (2026-10-23)
 
 - 2026-10-23 PILOT_QA "견적 확정·추가공사" 행(에이전트 결정, 사용자 위임): 같은 공사의 수정본을 또 확정하면 손익에 이중 합산되던 문제를 견적 도메인 최소판으로 해소. estimate-service에 nullable `kind`·`revision_of_id`·`chain_root_id`(+인덱스)·`superseded_by_id`, status `SUPERSEDED`(Flyway V2 멱등). 수정본 확정 시 같은 체인의 기존 확정본을 SUPERSEDED로 남기고 `estimate.deleted`(reason=SUPERSEDED)+`estimate.parsed`를 한 트랜잭션 outbox로 발행(site 소비자 무변경, notification은 "대체되었습니다" 문구). 체인 루트 비관적 잠금으로 동시 확정 직렬화. 다른 현장·초안·없는 원 견적 400, 대체됨 수정·확정·삭제 409. 프론트 수정본(항목 복사)/추가공사 작성, 관계 열·대체됨 취소선, 이력 모달, 확정 경고, MSW 동기화. estimate 54(1 skip)·site 59(2 skip)·notification 147(4 skip)·Vitest 205 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.

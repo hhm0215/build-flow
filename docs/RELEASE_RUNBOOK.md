@@ -25,6 +25,26 @@
 - 반영 후 읽기 전용 확인(값 출력 없음, 새 입금 기록 전): `SELECT COUNT(*) FROM buildflow_tax.tax_invoices WHERE payment_confirmed=1 AND total_amount>0;`와 `SELECT COUNT(DISTINCT tax_invoice_id) FROM buildflow_tax.tax_payments;`가 같은지.
 - **되돌리기 주의**: 이전 코드는 `tax_payments`를 무시하므로 부분 입금이 미수금에 반영되지 않는다. 되돌린 상태에서 부분 입금된 계산서에 "입금 확인"을 누른 뒤 재반영하면 그 계산서는 `PAID`로 보이지만 입금액은 부분 합계만 잡힌다(이관은 입금 행이 이미 있는 계산서를 건너뜀, 리허설 WARN). 되돌림 기간에는 부분 입금 계산서의 입금 확인을 피하고, 발생했다면 재반영 후 잔액을 입금 기록으로 추가하면 정상화된다(실측). **2026-10-23 수정**: 재반영 시 기동 이관이 "입금 확인인데 유효 입금 합계 < 총액"인 계산서의 잔액을 `기존 입금 확인 이관` 1건으로 채우고, 이관 전에도 입금 확인 건은 총액 입금으로 표시한다(단위 회귀 추가). 되돌린 동안의 입금 확인도 재반영 후 정합하다.
 
+## 다음 반영 추가 항목 — 견적 수정본·추가공사 (PR #201, 2026-10-23)
+
+- `buildflow_estimate.estimates`에 nullable `kind`·`revision_of_id`·`chain_root_id`(+`idx_estimates_chain_root`)·`superseded_by_id`가 생기고 `status` enum에 `SUPERSEDED`가 추가된다. 2026-10-23 업그레이드 리허설(`scripts/db/upgrade-rehearsal-estimate.ps1`, 이전 `0fe8c9a`·새 `c2416ef`, 격리 Kafka 포함)에서 이전 코드가 만든 `enum('CONFIRMED','DRAFT')`를 새 코드 `ddl-auto=update`가 `SHOW CREATE TABLE` 기준 `enum('CONFIRMED','DRAFT','SUPERSEDED') ... NOT NULL`로 넓혔고 수정본 확정 200(1265 Data truncated 없음)을 확인했다. 운영 기본 경로는 **수동 ALTER 불필요**.
+- 반영 후 읽기 전용 확인(값 출력 없음): `SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='buildflow_estimate' AND TABLE_NAME='estimates' AND COLUMN_NAME='status';`에 `'SUPERSEDED'`가 없으면 수정본 확정이 실패하므로 estimate-service 로그를 확인하고, 사용자 승인·백업 후 V2와 같은 정의 `ALTER TABLE estimates MODIFY COLUMN status enum('CONFIRMED','DRAFT','SUPERSEDED') COLLATE utf8mb4_unicode_ci NOT NULL;`를 적용한다.
+- **되돌리기 주의**: 이전 코드는 넓어진 스키마에서 기동하지만(enum을 줄이지 않음) `SUPERSEDED` 행이 하나라도 있으면 견적 전체 목록·현장별 목록·그 견적 조회가 500이다(확정된 `REVISION`·`ADDITIONAL` 행은 이전 코드가 일반 확정 견적으로 읽음, 리허설 실측). 또 초안 `REVISION`을 이전 코드로 확정하면 기존 확정본을 대체하지 않고 손익에 이중 합산된다. 되돌리기 전에 앱 정지 상태에서 사용자 승인 후 아래로 두 종류 행을 보관 테이블로 옮긴다(손익 `site_profits`는 건드리지 않음 — 대체된 행은 이미 손익에서 빠져 있음):
+
+```sql
+USE buildflow_estimate;
+START TRANSACTION;
+CREATE TABLE rollback_hold_estimates LIKE estimates;
+CREATE TABLE rollback_hold_estimate_items LIKE estimate_items;
+INSERT INTO rollback_hold_estimates SELECT * FROM estimates WHERE status='SUPERSEDED' OR (kind='REVISION' AND status='DRAFT');
+INSERT INTO rollback_hold_estimate_items SELECT i.* FROM estimate_items i JOIN rollback_hold_estimates h ON h.id = i.estimate_id;
+DELETE i FROM estimate_items i JOIN rollback_hold_estimates h ON h.id = i.estimate_id;
+DELETE e FROM estimates e JOIN rollback_hold_estimates h ON h.id = e.id;
+COMMIT;
+```
+
+  재반영 시 새 코드 기동 **전에** 되돌린다: `INSERT INTO estimates SELECT * FROM rollback_hold_estimates; INSERT INTO estimate_items SELECT * FROM rollback_hold_estimate_items;` 후 두 보관 테이블을 `DROP`. AUTO_INCREMENT는 줄지 않으므로 되돌림 기간에 생긴 견적과 id가 겹치지 않는다(리허설: 보관 2건 → 이전 코드 목록 200·손익 150만 유지, 재반영 후 6건 조회·보관했던 초안 수정본 확정으로 160만 수렴).
+
 ## SSH 배포 경로 (일회성 root 설정 후)
 
 PC의 `buildflow-deploy` SSH 키로 접속한 에이전트가 배포할 수 있도록, root 소유 래퍼 하나만 sudo로 허용한다. 래퍼는 CI 검증된 `origin/main`과 정확히 같은 40자리 SHA만 배포하고, 아래 0~5단계(처리 중 작업 0건, 이미지 보존, 순차 빌드, 백업·격리 복원 확인, 기동)를 그대로 실행한다. 임의 명령은 받지 않는다. 일회성 설정은 Web Console root에서 한다.
@@ -137,7 +157,7 @@ curl -s -o /dev/null -w '%{http_code}\n' "https://$PUBLIC_HOST/api/v1/sites"    
 
 ## 되돌리기
 
-스키마 변경은 모두 추가(nullable 컬럼·새 테이블·enum 값 추가)라 이전 코드가 그대로 읽는다. 일반적으로 DB 복원 없이 코드·이미지만 되돌린다. 단, 새 enum 값을 쓴 행이 있으면 이전 코드가 그 행을 읽지 못한다 — 현장 `BIDDING`은 위 "다음 반영 추가 항목"의 되돌리기 주의를 먼저 수행하고, 세금계산서 분할 입금은 같은 절의 되돌리기 주의를 따른다.
+스키마 변경은 모두 추가(nullable 컬럼·새 테이블·enum 값 추가)라 이전 코드가 그대로 읽는다. 일반적으로 DB 복원 없이 코드·이미지만 되돌린다. 단, 새 enum 값을 쓴 행이 있으면 이전 코드가 그 행을 읽지 못한다 — 현장 `BIDDING`은 위 "다음 반영 추가 항목"의 되돌리기 주의를 먼저 수행하고, 세금계산서 분할 입금은 같은 절의 되돌리기 주의를 따른다. 견적 `SUPERSEDED`·초안 `REVISION` 행은 "견적 수정본·추가공사" 절의 보관 테이블 절차를 먼저 수행한다.
 
 ```bash
 git switch --detach "$OLD_SHA"
