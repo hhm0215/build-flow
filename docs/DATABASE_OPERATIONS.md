@@ -97,6 +97,38 @@ SQL 전용 v1 백업의 격리 복원에서는 `-WarrantyRowsExportPath`에 **�
 6. 인증 로그인 및 각 서비스의 `ddl-auto: validate` 기동 확인 후에만 백업을 복구 가능으로 판정한다.
 7. 임시 환경 제거는 대상 project와 volume의 절대 이름을 재확인한 뒤 수행한다. 현재 BuildFlow volume은 삭제하지 않는다.
 
+### 복원 후 재조정 (OCR `PENDING`·outbox `SENT`·손익 projection, 2026-10-23)
+
+DB 복원은 메모리 OCR 큐와 Kafka(복원 대상 아님)를 되돌리지 않는다. 현재 코드 기준 실제 동작:
+
+| 대상 | 복원 후 자동 동작 | 자동으로 안 되는 것 |
+|------|------------------|--------------------|
+| `defect_warranties.ocr_status=PENDING` | notification-service `WarrantyOcrRecoveryService`가 기동 60초 후·10분마다 생성 30분 경과 건을 `FAILED`로 전환 | OCR 재실행 없음. `FAILED` 건은 사용자가 수동 보정(PDF 원본은 유지) |
+| outbox `PENDING`/`CLAIMED`(lease 만료) | 각 서비스 dispatcher가 같은 eventId로 재전송, 소비자는 eventId 수신기록으로 중복 무시 | — |
+| outbox `SENT` | 재전송하지 않음(`FAILED` 상태는 없음 — 실패는 `PENDING`+`attempts`/`last_error`) | broker 수락만 기록된 미소비 이벤트는 새/빈 Kafka에서 유실. 손익 소비자 수신기록(`processed_profit_events`)이 없으면 `site_profits`가 원천보다 모자람 |
+| `site_profits`·`purchase_profit_projections` | 백업은 `--single-transaction --databases` 한 스냅샷이라 원천과 같은 시점으로 함께 되돌아감 | 관리용 "현장 손익 재계산" 경로 **없음**(`GET /sites/{id}/profit` 조회만) |
+
+**절차** (격리 복원 검증과 실제 복원 모두, 서비스 기동 전후 각 1회):
+
+```powershell
+.\scripts\db\restore-reconcile-check.ps1 -ContainerName <복원 MySQL 컨테이너>   # -Json 으로 기계 판독
+```
+
+읽기 전용 단일 스냅샷 트랜잭션으로 다음을 출력한다: OCR `PENDING` 행, 서비스별 outbox 상태 건수(재시도·오류 기록 수), `SENT`인데 site/notification 수신기록이 없는 이벤트, 원천(확정 견적 합·매입 합·매입 revision)과 `site_profits`/projection이 다른 현장. 종료 코드 0=OK, 2=ATTENTION, 3=DRIFT.
+
+1. **서비스 기동 전 실행**해 기준선을 남긴다. Kafka는 새 빈 volume을 쓰고, 기존 consumer offset이 만료된 broker에 `auto-offset-reset: earliest`로 붙이지 않는다 — 과거 토픽 전체 재생은 금지다(복원 시점 이후 이벤트가 되돌아간 DB에 다시 적용됨).
+2. 서비스를 기동하고 OCR 회수·outbox 재전송이 돌 때까지(최소 30분+10분) 기다린 뒤 **다시 실행**한다.
+3. 현장별 분류에 따라 처리한다.
+   - `PENDING_OUTBOX`: 아직 재전송 대기. 재실행 시 사라져야 한다.
+   - `UNCONSUMED_SENT`: 그 현장의 "requeue candidate" eventId만 백업 후 원천 서비스 outbox에서 `status='PENDING', claim_token=NULL, lease_until=NULL`로 되돌려 같은 eventId로 재전송한다(소비자 eventId 멱등·매입 revision 가드로 안전). 손익 불일치가 없는 현장의 미소비 `SENT`(수신기록 도입 전 이력일 수 있음)는 재전송하지 않는다 — 수신기록 없는 과거 견적 이벤트가 이중 반영된다.
+   - `UNEXPLAINED`: 멈춘다. 수동 SQL로 손익을 고치지 않는다. 아래 재계산 기능이 생기기 전까지 전체 업무 복구 판정은 `PENDING`.
+   - notification 미소비 `SENT`: 알림 유실(정보용). 재전송하지 않는다.
+4. 최종 판정이 `OK`(또는 OCR `FAILED` 수동 보정 목록만 남은 상태)일 때만 재조정 통과로 기록한다.
+
+**제안(미구현)**: site-service 관리용 `POST /api/v1/sites/{id}/profit/reconcile` — 현장 행 비관적 잠금 아래 estimate-service(확정 견적 합)·purchase-service(현장 매입 목록·revision)를 Feign으로 조회해 `site_profits`와 projection을 원천 스냅샷으로 재작성하고 감사 기록을 남긴다. 손익 소비자와 같은 잠금·projection 규칙을 공유해야 하므로 손익 소비자 변경 작업과 합쳐 별도 사이클로 진행한다.
+
+합성 회귀(무작위 Compose 프로젝트 `bfrecon<난수>`, tmpfs, 포트 비게시, 서비스 Flyway V1/V2 스키마): `.\scripts\db\test-restore-reconcile-docker.ps1` — 불일치 상태(DRIFT, exit 3) 정확 보고 후 수렴 상태 OK(exit 0)까지 확인한다.
+
 ## Flyway 전환 원칙
 
 - 실제 V1 baseline은 Entity 추정이 아니라 검증된 실 DB의 `SHOW CREATE TABLE`과 no-data dump를 기준으로 만든다.
