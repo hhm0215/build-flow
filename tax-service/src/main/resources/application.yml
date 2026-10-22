@@ -10,6 +10,10 @@ spring:
           taxSiteReferenceClient:
             connect-timeout: 2000
             read-timeout: 3000
+          # 매입 계산서 삭제·유형 변경 전 증빙 연결 확인. 실패 시 503(fail-closed)
+          taxPurchaseEvidenceClient:
+            connect-timeout: 2000
+            read-timeout: 3000
   application:
     name: tax-service
   jackson:

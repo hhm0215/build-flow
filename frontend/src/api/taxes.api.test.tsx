@@ -3,7 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import axiosInstance from './axiosInstance'
-import { TAXES_KEY, useConfirmPayment, useDeleteTax, useUpdateTax } from './taxes.api'
+import {
+  TAXES_KEY, useCancelTaxPayment, useConfirmPayment, useDeleteTax, useRecordTaxPayment, useUpdateTax,
+} from './taxes.api'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -67,5 +69,39 @@ describe('tax mutations', () => {
     expect(remove).toHaveBeenCalledWith('/taxes/7')
     expect(queryClient.getQueryState(TAXES_KEY.list())?.isInvalidated).toBe(true)
     expect(queryClient.getQueryState(TAXES_KEY.outstanding(3))?.isInvalidated).toBe(true)
+  })
+})
+
+describe('tax payment mutations', () => {
+  it('입금 기록은 금액·입금일·메모를 POST하고 입금 내역·미수금을 무효화한다', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 300_000 } } })
+    queryClient.setQueryData(TAXES_KEY.payments(17), [])
+    queryClient.setQueryData(TAXES_KEY.outstanding(3), { outstandingAmount: 110 })
+    const post = vi.spyOn(axiosInstance, 'post').mockResolvedValue({ data: { data: { id: 1 } } })
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    const { result } = renderHook(() => useRecordTaxPayment(), { wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ taxId: 17, amount: 40.5, paymentDate: '2026-10-23', memo: '1차' })
+    })
+
+    expect(post).toHaveBeenCalledWith('/taxes/17/payments', { amount: 40.5, paymentDate: '2026-10-23', memo: '1차' })
+    expect(queryClient.getQueryState(TAXES_KEY.payments(17))?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(TAXES_KEY.outstanding(3))?.isInvalidated).toBe(true)
+  })
+
+  it('입금 취소는 PATCH cancel로 사유를 보내고 빈 사유는 생략한다', async () => {
+    const queryClient = new QueryClient()
+    const patch = vi.spyOn(axiosInstance, 'patch').mockResolvedValue({ data: { data: { id: 5, canceled: true } } })
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
+    const { result } = renderHook(() => useCancelTaxPayment(), { wrapper })
+
+    await act(async () => { await result.current.mutateAsync({ taxId: 17, paymentId: 5, reason: '  ' }) })
+
+    expect(patch).toHaveBeenCalledWith('/taxes/17/payments/5/cancel', { reason: undefined })
   })
 })

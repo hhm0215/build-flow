@@ -29,6 +29,8 @@ class TaxInvoiceServiceLockTest {
     @Mock TaxInvoiceRepository taxInvoiceRepository;
     @Mock KafkaProducerService kafkaProducerService;
     @Mock SiteReferenceValidator siteReferenceValidator;
+    @Mock TaxPaymentService taxPaymentService;
+    @Mock PurchaseEvidenceGuard purchaseEvidenceGuard;
     @InjectMocks TaxInvoiceService taxInvoiceService;
 
     @Test
@@ -49,6 +51,7 @@ class TaxInvoiceServiceLockTest {
         when(request.getSupplyAmount()).thenReturn(new BigDecimal("200.00"));
         when(request.getTaxAmount()).thenReturn(new BigDecimal("20.00"));
         when(request.getIssueDate()).thenReturn(LocalDate.of(2026, 9, 21));
+        when(taxPaymentService.activePaidAmount(org.mockito.ArgumentMatchers.any())).thenReturn(BigDecimal.ZERO);
 
         taxInvoiceService.update(7L, request);
         taxInvoiceService.delete(7L);

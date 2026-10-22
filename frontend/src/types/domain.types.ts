@@ -47,7 +47,8 @@ export interface ClientUpdateRequest {
 }
 
 // ── Site (현장) ───────────────────────────────
-export type SiteStatus = 'IN_PROGRESS' | 'SETTLING' | 'WARRANTY' | 'COMPLETED'
+/** BIDDING = 수주 전·견적 중. 수주하면 IN_PROGRESS로 바꾸고 수주 실패는 보관한다 */
+export type SiteStatus = 'BIDDING' | 'IN_PROGRESS' | 'SETTLING' | 'WARRANTY' | 'COMPLETED'
 
 export interface Site {
   id: number
@@ -71,6 +72,8 @@ export interface SiteCreateRequest {
   startDate?: string
   endDate?: string
   memo?: string
+  /** 생략 시 서버 기본값 IN_PROGRESS. BIDDING/IN_PROGRESS만 허용 */
+  status?: SiteStatus
 }
 
 export interface SiteUpdateRequest {
@@ -157,8 +160,48 @@ export interface Purchase {
   supplier: string | null
   purchaseDate: string | null
   memo: string | null
+  /** 증빙 매입 세금계산서 ID. 미연결이면 null. 원가 계산에는 영향 없음 */
+  evidenceTaxInvoiceId: number | null
   createdAt: string
   updatedAt: string
+}
+
+export interface PurchaseEvidenceLinkRequest {
+  taxInvoiceId: number
+}
+
+/** 매입 계산서 1건 기준 연결 매입 대조. 차이 = 계산서 금액 − 연결 매입 합계 */
+export interface PurchaseInvoiceEvidence {
+  taxInvoiceId: number
+  counterparty: string | null
+  issueDate: string | null
+  supplyAmount: number
+  totalAmount: number
+  linkedPurchaseCount: number
+  linkedPurchaseAmount: number
+  supplyDifference: number
+  totalDifference: number
+}
+
+/** 현장별 매입 항목 ↔ 매입 세금계산서 증빙 대조. 원가는 매입 항목만 사용한다 */
+export interface PurchaseEvidenceSummary {
+  siteId: number
+  purchaseCount: number
+  purchaseAmount: number
+  linkedPurchaseCount: number
+  linkedPurchaseAmount: number
+  /** 증빙 미연결(끊어진 연결 포함) */
+  unlinkedPurchaseCount: number
+  unlinkedPurchaseAmount: number
+  /** 연결된 계산서가 삭제됐거나 더 이상 같은 현장 매입 계산서가 아닌 매입 */
+  brokenLinkCount: number
+  invoiceCount: number
+  invoiceSupplyAmount: number
+  invoiceTotalAmount: number
+  invoiceWithoutPurchaseCount: number
+  supplyDifference: number
+  totalDifference: number
+  invoices: PurchaseInvoiceEvidence[]
 }
 
 export interface PurchaseCreateRequest {
@@ -182,6 +225,8 @@ export interface PurchaseUpdateRequest {
 
 // ── Tax Invoice (세금계산서) ───────────────────
 export type TaxInvoiceType = 'SALES' | 'PURCHASE'
+/** 매출 수금 상태. 매입은 수금 대상이 아니어서 null. */
+export type TaxPaymentStatus = 'UNPAID' | 'PARTIAL' | 'PAID'
 
 export interface TaxInvoice {
   id: number
@@ -192,11 +237,41 @@ export interface TaxInvoice {
   totalAmount: number
   counterparty: string | null
   issueDate: string | null
+  /** 전액 입금 완료(유효 입금 합계 = 총액) */
   paymentConfirmed: boolean
+  /** 완료 시 마지막 유효 입금일 */
   paymentDate: string | null
+  /** 유효 입금 합계(취소 제외). 매입은 null */
+  paidAmount: number | null
+  /** 총액 − 유효 입금 합계. 매입은 null */
+  remainingAmount: number | null
+  paymentStatus: TaxPaymentStatus | null
   memo: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** 매출 세금계산서 입금 1건. 오입금은 삭제하지 않고 취소 시각을 남긴다. */
+export interface TaxPayment {
+  id: number
+  taxInvoiceId: number
+  amount: number
+  paymentDate: string
+  memo: string | null
+  canceled: boolean
+  canceledAt: string | null
+  cancelReason: string | null
+  createdAt: string
+}
+
+export interface TaxPaymentCreateRequest {
+  amount: number
+  paymentDate: string
+  memo?: string
+}
+
+export interface TaxPaymentCancelRequest {
+  reason?: string
 }
 
 export interface TaxInvoiceCreateRequest {

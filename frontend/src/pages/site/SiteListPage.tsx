@@ -25,15 +25,19 @@ import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { Site, SiteStatus } from '../../types'
 import { sumConfirmedEstimateAmount } from '../../utils/estimate'
+import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
+import { SITE_STATUSES } from '../../utils/siteStatus'
 import SiteCreateModal from './SiteCreateModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
+  BIDDING: '수주 전',
   IN_PROGRESS: '시공 중',
   SETTLING: '정산 중',
   WARRANTY: '하자보증',
   COMPLETED: '완료',
 }
 const STATUS_COLOR: Record<SiteStatus, string> = {
+  BIDDING: '#06b6d4',
   IN_PROGRESS: '#3b82f6',
   SETTLING: '#f59e0b',
   WARRANTY: '#8b5cf6',
@@ -62,7 +66,7 @@ interface SiteFilters {
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
-  status: { type: 'enum', values: ['IN_PROGRESS', 'SETTLING', 'WARRANTY', 'COMPLETED'] },
+  status: { type: 'enum', values: SITE_STATUSES },
   archive: { type: 'enum', values: ['ARCHIVED', 'ALL'] },
 }
 
@@ -324,9 +328,7 @@ export default function SiteListPage() {
     const e = sumConfirmedEstimateAmount(siteEstimates)
     const p = sitePurchases.reduce((sum, pp) => sum + pp.totalAmount, 0)
     const t = siteTaxes.reduce((sum, tt) => sum + tt.totalAmount, 0)
-    const u = siteTaxes
-      .filter((tt) => !tt.paymentConfirmed && tt.type === 'SALES')
-      .reduce((sum, tt) => sum + tt.totalAmount, 0)
+    const u = siteTaxes.reduce((sum, tt) => sum + remainingOf(tt), 0)
     return { estimateTotal: e, purchaseTotal: p, taxTotal: t, unpaidTotal: u }
   }, [siteEstimates, sitePurchases, siteTaxes])
 
@@ -771,9 +773,11 @@ export default function SiteListPage() {
                               <InfoBadge color={invoice.type === 'SALES' ? '#22c55e' : '#ef4444'}>
                                 {invoice.type === 'SALES' ? '매출' : '매입'}
                               </InfoBadge>
-                              <InfoBadge color={invoice.paymentConfirmed ? '#22c55e' : '#f59e0b'}>
-                                {invoice.paymentConfirmed ? '입금 완료' : '미입금'}
-                              </InfoBadge>
+                              {paymentStatusOf(invoice) && (
+                                <InfoBadge color={PAYMENT_STATUS_META[paymentStatusOf(invoice)!].color}>
+                                  {PAYMENT_STATUS_META[paymentStatusOf(invoice)!].label}
+                                </InfoBadge>
+                              )}
                             </div>
                           </div>
                           <div
@@ -801,10 +805,14 @@ export default function SiteListPage() {
                                 style={{
                                   fontSize: 13,
                                   fontWeight: 700,
-                                  color: invoice.paymentConfirmed ? 'var(--text-secondary)' : '#ef4444',
+                                  color: remainingOf(invoice) > 0 ? '#ef4444' : 'var(--text-secondary)',
                                 }}
                               >
-                                {invoice.paymentConfirmed ? `입금일 ${invoice.paymentDate}` : '미입금'}
+                                {invoice.type !== 'SALES'
+                                  ? '-'
+                                  : invoice.paymentConfirmed
+                                    ? `입금일 ${invoice.paymentDate}`
+                                    : `잔액 ${formatKRW(remainingOf(invoice))}`}
                               </div>
                             </div>
                           </div>

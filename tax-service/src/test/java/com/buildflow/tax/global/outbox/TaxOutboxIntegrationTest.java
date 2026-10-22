@@ -6,8 +6,11 @@ import com.buildflow.tax.domain.taxinvoice.dto.TaxInvoiceUpdateRequest;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoice;
 import com.buildflow.tax.domain.taxinvoice.entity.TaxInvoiceType;
 import com.buildflow.tax.domain.taxinvoice.repository.TaxInvoiceRepository;
+import com.buildflow.tax.domain.taxinvoice.service.PurchaseEvidenceGuard;
 import com.buildflow.tax.domain.taxinvoice.service.SiteReferenceValidator;
 import com.buildflow.tax.domain.taxinvoice.service.TaxInvoiceService;
+import com.buildflow.tax.domain.taxinvoice.service.TaxPaymentService;
+import com.buildflow.tax.domain.taxinvoice.repository.TaxPaymentRepository;
 import com.buildflow.tax.global.config.JpaAuditingConfig;
 import com.buildflow.tax.global.exception.BusinessException;
 import com.buildflow.tax.global.exception.ErrorCode;
@@ -48,7 +51,7 @@ import static org.mockito.Mockito.doThrow;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({JpaAuditingConfig.class, TaxInvoiceService.class, KafkaProducerService.class,
+@Import({JpaAuditingConfig.class, TaxInvoiceService.class, TaxPaymentService.class, KafkaProducerService.class,
         OutboxWriter.class, OutboxClaimService.class, TaxOutboxIntegrationTest.JsonConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
@@ -62,13 +65,16 @@ class TaxOutboxIntegrationTest {
     private final PlatformTransactionManager transactionManager;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final TaxPaymentRepository paymentRepository;
 
     @MockBean private SiteReferenceValidator siteReferenceValidator;
+    @MockBean private PurchaseEvidenceGuard purchaseEvidenceGuard;
 
     TaxOutboxIntegrationTest(TaxInvoiceService taxService, TaxInvoiceRepository taxRepository,
                              OutboxEventRepository outboxRepository, OutboxClaimService claimService,
                              OutboxWriter outboxWriter, PlatformTransactionManager transactionManager,
-                             ObjectMapper objectMapper, JdbcTemplate jdbcTemplate) {
+                             ObjectMapper objectMapper, JdbcTemplate jdbcTemplate,
+                             TaxPaymentRepository paymentRepository) {
         this.taxService = taxService;
         this.taxRepository = taxRepository;
         this.outboxRepository = outboxRepository;
@@ -77,11 +83,13 @@ class TaxOutboxIntegrationTest {
         this.transactionManager = transactionManager;
         this.objectMapper = objectMapper;
         this.jdbcTemplate = jdbcTemplate;
+        this.paymentRepository = paymentRepository;
     }
 
     @BeforeEach
     void setUp() {
         outboxRepository.deleteAll();
+        paymentRepository.deleteAll();
         taxRepository.deleteAll();
     }
 

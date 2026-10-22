@@ -12,7 +12,7 @@ vi.mock('../../api/purchases.api', () => ({
 
 const purchase = {
   id: 9, siteId: 3, itemName: '기존 자재', quantity: 2, unitPrice: 1000,
-  totalAmount: 2000, supplier: null, purchaseDate: null, memo: null,
+  totalAmount: 2000, supplier: null, purchaseDate: null, memo: null, evidenceTaxInvoiceId: null,
   createdAt: '', updatedAt: '',
 } satisfies Purchase
 

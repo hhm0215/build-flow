@@ -158,6 +158,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db/flyway-baseline-r
 - 따라서 운영 baseline 전 필수 게이트: 운영 백업(no-data 포함) → 격리 복원 → 복원 스키마와 V1 스키마를 같은 기준(정규화 `SHOW CREATE TABLE` + `information_schema` 집합)으로 비교. 차이가 나오면 V1을 운영에 맞춰 고치지 않고(V1은 이미 신규 DB 기준으로 통합됨), **추천안: baseline 전에 운영 쪽을 V1과 같게 만드는 수동 정렬 SQL을 격리 복원본에서 먼저 검증한 뒤 운영에 적용하고 baseline(version=1)** 한다. V2 정합 마이그레이션은 신규 DB(V1)에도 같은 변경을 강제해 V1·V2 의미가 꼬이므로 운영 전용 잔여물 정리에는 쓰지 않는다. 운영 백업 복원과 이 비교는 사용자 승인된 VPS 작업 경로로만 수행한다.
 - **운영 DDL 1차 대조 경로 (2026-10-23 추가)**: root 래퍼의 읽기 전용 `sudo buildflow-release schema`로 운영 7개 스키마의 `SHOW CREATE TABLE`을 PC에 받아 `-ProdDdlPath prod-ddl.sql`(Docker 없이 하려면 `-V1DdlDirectory <리허설 출력 폴더>` 추가)로 V1과 같은 정규화(`AUTO_INCREMENT=n` 제거·charset 표기·`flyway_schema_history` 제외)로 비교한다. 서비스별로 prod/V1 테이블 수, 한쪽에만 있는 테이블, 줄 차이 테이블, 컬럼 순서만 다른 테이블을 표로 내고 차이가 있으면 종료 코드 1이다. 받는 절차와 래퍼 재설치 필요성은 `docs/RELEASE_RUNBOOK.md` "운영 DDL 받기"를 따른다. 이 경로는 DDL 텍스트 비교만 하므로 `information_schema` 집합 비교·격리 복원 baseline 리허설을 대신하지 않는다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`, 합성 픽스처 테스트는 `scripts/db/test-flyway-ddl-compare.ps1`(CI windows-readiness)다.
 - CI 미추가: 7개 bootJar 빌드와 JVM 28회 기동이 필요해 무겁고, 서비스별 빈 DB V1+validate는 기존 `*-flyway` CI job이 이미 검증한다. 이 리허설은 엔티티·V1 변경 시와 운영 baseline 직전에 수동으로 다시 돌리는 일회성 게이트로 둔다.
+- 2026-10-23 site `V2__site_status_bidding.sql`(`sites.status` enum에 `BIDDING`): 엔티티 변경은 V1을 고치지 않고 forward 마이그레이션으로 둔다. 리허설 스크립트의 기대 history는 마이그레이션 파일에서 계산한다(legacy `1|1|BASELINE|1;2|2|SQL|1`, 신규 `1|1|SQL|1;2|2|SQL|1`). 2026-10-23 격리 MySQL에서 신규 V1+V2+validate(`SiteFlywayIntegrationTest`)와 V1 스키마→`ddl-auto=update` enum 확장·BIDDING 저장(`SiteStatusLegacySchemaIntegrationTest`), BIDDING 존재 컬럼에 V2 재적용 무해를 확인했다. 7개 서비스 전체 리허설 스크립트 재실행은 미실시.
+
+### 업그레이드·되돌리기 리허설 (tax 분할 입금 + site BIDDING, 2026-10-23)
+
+`scripts/db/upgrade-rehearsal-tax-site.ps1 -OldRoot <운영 SHA 체크아웃>`은 같은 격리 MySQL 구성(무작위 `bfupg<난수>` project, 포트 비게시·tmpfs, nonce label)에서 운영 경로(`ddl-auto update`)로 이전 코드 → 새 코드 → 새 코드 재기동 → 이전 코드(되돌리기) → 새 코드(재반영)를 차례로 띄우고, API는 앱 컨테이너 안 `curl`로 서비스에 직접 호출한다(서비스 자체는 인증 헤더 불요, Feign tax→site는 simple discovery). 이전 코드 체크아웃은 운영 SHA를 `archive`로 임시 폴더에 풀고 tax·site `bootJar`를 만든다.
+
+2026-10-23 실측(이전 `d8f3b3d`, 새 `6ccb3e5`): 24개 검사 중 PASS 23·WARN 1, 정리 후 잔여 0.
+- 업그레이드: 이전 코드로 만든 스키마(`status` enum 4값, `tax_payments` 없음)에서 새 코드가 기동해 `tax_payments`(V2와 같은 컬럼·`idx_tax_payments_invoice`)를 만들고 enum에 `BIDDING`을 추가했다. 합성 매출 3건(미입금 110만·입금 확인 55만·0원) 중 입금 확인 건만 이관 1건, 재기동 중복 0.
+- API: 미수금 110만 → 30만 입금 201 → 80만, 잔액+1·0원 계산서 입금 400, 취소 200 → 110만, 이관 행 취소 후 `confirm-payment`로 재완료. BIDDING 생성 201 → IN_PROGRESS 200, BIDDING 복귀·SETTLING 생성 400.
+- 되돌리기: 이전 코드는 넓어진 enum·새 테이블에서 정상 기동. BIDDING 행이 있으면 현장 목록 500 → `IN_PROGRESS`로 낮추면 200. 이전 tax API 정상(부분 입금은 무시).
+- WARN(되돌리기 경로 한정): 되돌린 상태에서 부분 입금 계산서를 `confirm-payment`하고 재반영하면 `paymentConfirmed=true`·`paymentStatus=PAID`인데 `paidAmount`는 부분 합계(30만/110만)로 남는다. 잔액 입금 기록으로 정상화된다. 운영 대응은 `docs/RELEASE_RUNBOOK.md` 분할 입금 되돌리기 주의. **2026-10-23 수정**: 재반영 시 기동 이관이 "입금 확인인데 유효 입금 합계 < 총액"인 계산서의 잔액을 `기존 입금 확인 이관` 1건으로 채우고, 이관 전에도 입금 확인 건은 총액 입금으로 표시한다(단위 회귀 추가). 되돌린 동안의 입금 확인도 재반영 후 정합하다.
 
 ## Phase E1: 서비스별 runtime DB 계정 (opt-in)
 

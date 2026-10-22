@@ -223,6 +223,16 @@ function Get-HistoryRows {
     return @(Invoke-Sql -Sql "SELECT CONCAT_WS('|',installed_rank,IFNULL(version,'-'),type,success) FROM ``$Schema``.flyway_schema_history ORDER BY installed_rank")
 }
 
+# Expected history after baseline(1)+migrate: V1 is BASELINE (legacy) or SQL (fresh); later V2.. are SQL in both.
+function Get-ExpectedHistory {
+    param([Parameter(Mandatory = $true)][string]$Service, [Parameter(Mandatory = $true)][string]$FirstType)
+    $dir = Join-Path $repoRoot "$Service-service\src\main\resources\db\migration"
+    $versions = @(Get-ChildItem -Path $dir -Filter 'V*__*.sql' | ForEach-Object { [int]($_.Name -replace '^V(\d+)__.*$', '$1') } | Sort-Object)
+    $rows = @(); $rank = 0
+    foreach ($v in $versions) { $rank++; $rows += "$rank|$v|$(if ($v -eq 1) { $FirstType } else { 'SQL' })|1" }
+    return ($rows -join ';')
+}
+
 $report = New-Object System.Collections.Generic.List[string]
 function Add-Report { param([string]$Line) $report.Add($Line); Write-Host $Line }
 
@@ -313,7 +323,7 @@ try {
                 $history = @(Get-HistoryRows -Schema "buildflow_${service}_legacy")
                 $v1History = @(Get-HistoryRows -Schema "buildflow_${service}_v1")
                 $upToDate = @($phaseD[$service].Flyway | Where-Object { $_ -match 'up to date|No migration necessary' }).Count -gt 0
-                $ok = $phaseD[$service].Outcome -eq 'STARTED' -and $upToDate -and ($history -join ';') -ceq '1|1|BASELINE|1' -and ($v1History -join ';') -ceq '1|1|SQL|1'
+                $ok = $phaseD[$service].Outcome -eq 'STARTED' -and $upToDate -and ($history -join ';') -ceq (Get-ExpectedHistory -Service $service -FirstType 'BASELINE') -and ($v1History -join ';') -ceq (Get-ExpectedHistory -Service $service -FirstType 'SQL')
                 $summary[$service].verify = if ($ok) { 'PASS' } else { "FAIL ($($phaseD[$service].Outcome), upToDate=$upToDate, history=$($history -join ';'), v1=$($v1History -join ';'))" }
                 $summary[$service].history = $history
             }

@@ -91,5 +91,11 @@ describe('현장 보관 MSW 계약', () => {
       method: 'PATCH', headers: json, body: JSON.stringify({ paymentDate: '2026-10-17' }),
     })
     expect(payment.status).toBe(200)
+    // 보관 현장: 입금 취소는 기존 기록 정정이므로 409(복원 후 가능)
+    const history = (await fetch(url(`/api/v1/taxes/${tax.id}/payments`)).then((r) => r.json())).data as { id: number }[]
+    const cancel = await fetch(url(`/api/v1/taxes/${tax.id}/payments/${history[0].id}/cancel`), {
+      method: 'PATCH', headers: json, body: '{}',
+    })
+    expect(cancel.status).toBe(409)
   })
 })

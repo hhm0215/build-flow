@@ -72,7 +72,7 @@
 | purchase.updated | purchase-service | site-service | 증가한 revision의 전체 상태 → projection 교체 |
 | purchase.deleted | purchase-service | site-service | 증가한 revision의 삭제 상태 → tombstone 보존 |
 | tax.registered | tax-service | notification-service | 세금계산서 등록 → 알림 (미수금은 tax-service DB에서 직접 계산) |
-| tax.payment.confirmed | tax-service | notification-service | 입금 확인 → 알림 (미수금은 tax-service DB에서 직접 계산) |
+| tax.payment.confirmed | tax-service | notification-service | 유효 입금 합계가 총액에 도달해 완료될 때 1회 → 알림 (분할 입금 건별 이벤트 없음, 미수금은 tax-service DB에서 직접 계산) |
 | warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 인앱 알림 (스케줄러 매일 09:00, cooldown 7일) |
 
 #### 계획 토픽 (미구현)

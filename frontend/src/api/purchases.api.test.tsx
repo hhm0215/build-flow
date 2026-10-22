@@ -3,7 +3,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import axiosInstance from './axiosInstance'
-import { PURCHASES_KEY, useCreatePurchase, useDeletePurchase, useUpdatePurchase } from './purchases.api'
+import {
+  PURCHASES_KEY, useCreatePurchase, useDeletePurchase, useLinkPurchaseEvidence, useUnlinkPurchaseEvidence,
+  useUpdatePurchase,
+} from './purchases.api'
 import { SITES_KEY } from './sites.api'
 import { DASHBOARD_KEY } from './dashboard.api'
 
@@ -71,5 +74,23 @@ describe('purchase mutations', () => {
 
     expect(axiosInstance.delete).toHaveBeenCalledWith('/purchases/7')
     expectDependentsInvalidated(queryClient)
+  })
+
+  it('증빙 연결·해제는 매입 목록·대조 요약만 갱신하고 손익 캐시는 건드리지 않는다', async () => {
+    vi.spyOn(axiosInstance, 'put').mockResolvedValue({ data: { data: { id: 7, siteId: 3, evidenceTaxInvoiceId: 20 } } })
+    vi.spyOn(axiosInstance, 'delete').mockResolvedValue({ data: { data: { id: 7, siteId: 3, evidenceTaxInvoiceId: null } } })
+    const linkHook = setup(() => useLinkPurchaseEvidence())
+    linkHook.queryClient.setQueryData(PURCHASES_KEY.evidenceSummary(3), { siteId: 3 })
+
+    await act(async () => { await linkHook.result.current.mutateAsync({ id: 7, taxInvoiceId: 20 }) })
+
+    expect(axiosInstance.put).toHaveBeenCalledWith('/purchases/7/evidence', { taxInvoiceId: 20 })
+    expect(linkHook.queryClient.getQueryState(PURCHASES_KEY.evidenceSummary(3))?.isInvalidated).toBe(true)
+    expect(linkHook.queryClient.getQueryState(SITES_KEY.profit(3))?.isInvalidated).toBe(false)
+
+    const unlinkHook = setup(() => useUnlinkPurchaseEvidence())
+    await act(async () => { await unlinkHook.result.current.mutateAsync(7) })
+    expect(axiosInstance.delete).toHaveBeenCalledWith('/purchases/7/evidence')
+    expect(unlinkHook.queryClient.getQueryState(PURCHASES_KEY.list())?.isInvalidated).toBe(true)
   })
 })

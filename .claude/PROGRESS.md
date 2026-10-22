@@ -5,6 +5,42 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — tax 분할 입금·site BIDDING 업그레이드 리허설 (2026-10-23)
+
+- 2026-10-23 `scripts/db/upgrade-rehearsal-tax-site.ps1`: 격리 MySQL 8(`bfupg<난수>`, 포트 비게시·tmpfs)에서 운영 main `d8f3b3d` 코드로 스키마·합성 행을 만들고 develop `6ccb3e5`를 `ddl-auto update`로 올렸다. `tax_payments` 생성·입금 확인 건만 이관 1건·재기동 중복 0·미수금/부분 입금/초과 400/취소, enum `BIDDING`·생성·IN_PROGRESS 전환, 이전 코드 되돌리기(BIDDING 낮춘 뒤 정상) PASS 23. WARN 1: 되돌림 중 부분 입금 계산서를 입금 확인 후 재반영하면 PAID인데 입금액이 부분 합계(잔액 기록으로 정상화) → `docs/RELEASE_RUNBOOK.md` 되돌리기 주의. 잔여 리소스 0. **VPS 미반영**. V1 **40/100** 유지.
+
+## 완료된 작업 — 매입 항목 ↔ 증빙 매입 세금계산서 연결 (2026-10-23)
+
+- 2026-10-23 PILOT_QA 원가·세금계산서 행 해소(에이전트 결정, 사용자 위임): 원가 단일 진실원은 매입 항목 유지, 매입 계산서는 증빙으로만 연결. purchase-service에 nullable `evidence_tax_invoice_id`(+인덱스, Flyway V2 멱등)와 `PUT/DELETE /purchases/{id}/evidence`, `GET /purchases/evidence-summary?siteId`, `GET /purchases/evidence-links?taxInvoiceId`를 추가했다. 연결은 tax-service Feign 조회로 없는/매출/다른 현장 계산서 400, 장애 503, 보관 현장 409이며 손익 이벤트 없음. tax-service는 연결된 매입 계산서 삭제·매출 전환 409(purchase Feign, 장애 503). 프론트 매입 목록 증빙 열·연결 모달, 현장 상세 매입 탭 대조 요약(미연결 금액, 계산서−연결 매입 차이 공급가/합계 기준, 끊어진 연결·매입 없는 계산서 경고), MSW 동기화. purchase 43(1 skip)·tax 72(1 skip)·Vitest 199 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+
+## 완료된 작업 — AI 채팅 부분 답변 실패 표시 (2026-10-23)
+
+- 2026-10-23 토큰 스트리밍(PR #186) 리뷰 잔여 위험 처리: 답변 조각을 일부 받은 뒤 오류·중단이 나면 받은 부분을 남기고 "답변이 중간에 끊겼습니다" 사유를 함께 표시한다(이전엔 부분 답변만 남아 완결 답변처럼 보였다). `ChatMessage.errorNote`, 테스트 1건, lint·build PASS. V1 **40/100** 유지.
+
+## 완료된 작업 — 공개 VPS를 main `da012cd`·`d8f3b3d`로 반영 (2026-10-23)
+
+- 2026-10-23 PC에서 `sudo buildflow-release deploy`로 두 번 반영했다. 두 번 모두 처리 중 작업 0건, 백업·격리 복원 확인, EXIT 0이었다.
+  - `1d2497e → da012cd`(PR #184): 업무 서비스·Eureka·Config·Redis·Kafka·Zipkin 포트 비게시, AI 채팅 Phase 3.
+  - `da012cd → d8f3b3d`(PR #191): 프록시 네트워크 분리, 채팅 토큰 스트리밍, 보안 후속, DB 계정 E1(env 미설정이라 root 유지).
+- 실측(비root) 결과:
+  - 호스트 리스닝은 22/80/443과 loopback 3000·3306·8080뿐이다.
+  - 호스트 loopback 8081~8087·8761·8888·6379·9094·9411은 연결 불가다.
+  - 외부망에서 3000·3306·8080·8081·8083·6379·9094는 연결 불가, IP 직접 HTTP는 421이다.
+  - 공개 `/` 200, 무인증 API 401, loopback 프론트→Gateway 경로 401.
+- 독립 검토: security-reviewer·infrastructure-reviewer 모두 FAIL 0. 배포 전 비root로 `/opt/buildflow`·`.git` root 소유, deploy 계정 쓰기 가능 파일 0, docker 그룹 없음을 확인했다.
+- UNVERIFIED: 컨테이너 네트워크 소속(docker 권한 필요).
+- 롤백 훈련(`rollback da012cd`)은 자동 권한 분류기가 운영 배포로 판단해 차단했고, 실측하지 않았다.
+- 되돌리기: `sudo buildflow-release rollback da012cd62bd7f4447ea3d900cfe1b3e444494e6c`.
+- V1 **40/100** 유지. 운영 반영 체크포인트의 롤백 실측·알림이 남아 있다.
+
+## 완료된 작업 — 매출 세금계산서 분할 입금·입금 취소 (2026-10-23)
+
+- 2026-10-23 PILOT_QA 업무 흐름 점검의 수금 2상태 한계 해소(에이전트 결정, 사용자 위임): tax-service에 `tax_payments` 원장(금액 DECIMAL(15,2)·입금일·메모 500자·`canceled_at`/취소 사유)과 `GET/POST /taxes/{id}/payments`, `PATCH /payments/{pid}/cancel`을 추가했다. 미수금 = 총액 − 유효 입금 합계, 합계 = 총액이면 `paymentConfirmed`, 초과 400, 재취소 409, 유효 입금이 있으면 수정·삭제 409. 계산서 행 비관적 잠금으로 동시 입금 초과 방지(H2 4스레드 경합 회귀). 보관 현장은 기록 허용·취소 409. `confirm-payment`는 잔액 전액 1건으로 하위 호환, `tax.payment.confirmed`는 완료 전이 때만 1회(notification 소비자 무변경). 기존 입금 확인 건은 기동 시 총액 1건 이관(+이관 전 조회 대체), Flyway V2는 IF NOT EXISTS·중복 이관 방지. 응답에 `paidAmount`/`remainingAmount`/`paymentStatus`(매입 null). 프론트 입금 관리 모달(기본값 = 잔액)·부분 입금 배지·잔액 기준 미수금, MSW 원장 동기화. tax 67(1 skip)·notification 146(4 skip)·Vitest 184 PASS, lint/build PASS. 풀 Docker·운영 MySQL 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+
+## 완료된 작업 — 현장 상태 BIDDING(수주 전) 추가 (2026-10-23)
+
+- 2026-10-23 PILOT_QA 업무 흐름 첫 행(견적이 현장보다 먼저): 에이전트 결정(사용자 위임)으로 `SiteStatus.BIDDING`을 추가했다. 생성 기본값 IN_PROGRESS 유지·BIDDING 선택 가능(그 밖의 시작 상태 400), BIDDING→IN_PROGRESS만 허용·수주 이후→BIDDING 400, AI 요약 프롬프트는 한국어 상태 라벨·상태별 건수, chat `listSites` 설명에 상태 라벨, 프론트 라벨·색·필터·생성 폼 단계 선택·상세 전환 옵션 비활성·대시보드 수주 전 건수, MSW 동기화. 격리 MySQL 8 실측: V1 enum 컬럼에 새 코드 `ddl-auto=update` 기동 시 Hibernate가 enum을 넓혀 BIDDING 저장 PASS(수동 ALTER 불필요) → Flyway 일관성을 위해 `V2__site_status_bidding.sql`·리허설 기대 history 계산·`SiteFlywayIntegrationTest` 갱신, 이전 코드는 BIDDING 행 조회 실패를 확인해 런북에 되돌리기 절차 추가. site 57(2 skip)·chat 42(1 skip) PASS, 프론트 lint·181 테스트·build PASS. 브랜치 `claude/site-bidding-status` 푸시, PR·`main`·VPS 미반영. V1 **40/100** 유지.
+
 ## 완료된 작업 — 운영 DDL ↔ V1 대조 경로 준비 (2026-10-23)
 
 - 2026-10-23 root 래퍼 `buildflow-release`에 읽기 전용 `schema` 모드(하드코딩 7개 스키마, `information_schema.TABLES` 목록 → `SHOW CREATE TABLE`, `AUTO_INCREMENT=N` 제거, 데이터·계정·비밀값 미조회)를 추가하고, 리허설에 `-ProdDdlPath`(+Docker 없는 `-V1DdlDirectory`) 서비스별 차이 표를 붙였다. 비교 로직은 `scripts/db/flyway-ddl-compare.ps1`로 분리, 합성 픽스처(일치·컬럼 타입 차이·테이블 누락·빈 스키마·UTF-16 입력) 테스트를 CI windows-readiness에, 래퍼 `bash -n`을 public-compose에 연결. 직전 리허설 출력으로 오프라인 대조 7/7 MATCH 재현. 운영 실측은 main 병합·root 래퍼 재설치 후 PENDING. V1 **40/100** 유지.
