@@ -9,6 +9,18 @@
 
 - 2026-10-23 site-service `POST /api/v1/sites/{id}/profit/reconcile`(기본 dry-run, `?apply=true`만 반영, 프론트 미노출): 손익 소비자와 같은 현장 행 비관적 잠금 아래 estimate `GET /estimates/profit-source`(CONFIRMED 합계 + 그 현장 견적의 손익 outbox eventId, SUPERSEDED 제외)·purchase `GET /purchases/profit-source`(현재 매입 금액·revision)를 Feign(2s/5s) 조회해 `site_profits`를 원천으로 덮어쓰고, 미수신 견적 eventId를 수신기록에 남기고 매입 projection을 원천 revision으로 재작성(원천에 없는 활성 projection은 최대 revision 삭제 고정)해 늦게 온 이벤트 이중 반영을 막는다. 원천 실패·형식 이상 503, 범위 초과·projection 현장 충돌·견적 행 없는 손익 이벤트(과거 확정 삭제) 409, 일치 시 무변경. PR #203 리뷰 반영: 묘비 id에 삭제 아닌 매입 이벤트는 생략 대신 실패(복원 후 AUTO_INCREMENT 재사용 감지, 런북 사전 확인 SQL 추가). site 69(2 skip)·estimate 57(1 skip)·purchase 45(1 skip) PASS. `docs/DATABASE_OPERATIONS.md`·`docs/API_SPEC.md` 갱신. 풀 Docker·실제 복원본 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
 
+## 완료된 작업 — 공개 VPS를 main `842fe82`로 반영 (2026-10-23)
+
+- 2026-10-23 `sudo buildflow-release deploy 842fe82…`(PR #202: 견적 수정본·추가공사 체인, 복원 후 재조정 점검)를 실행해 EXIT 0을 확인했다.
+- 사전 운영형 리허설(구 `0fe8c9a` → 신, 실제 Kafka)에서 status enum의 SUPERSEDED 자동 확장, 수정본 확정 200, 손익 수렴을 실측했다.
+- 반영 후 실측:
+  - 공개 `/` 200, 무인증 API 401
+  - loopback 프론트→Gateway 견적 API 401
+  - 리스닝 포트 변화 없음
+- UNVERIFIED(root 필요): DB 안의 status 정의.
+- 되돌리기: `sudo buildflow-release rollback 0fe8c9a07197d9594b257853d6a9d38abddce5ca`. SUPERSEDED 행이 있으면 먼저 런북의 보관 절차를 따른다.
+- V1 **40/100** 유지.
+
 ## 완료된 작업 — 견적 수정본 업그레이드·되돌리기 리허설 (격리 Kafka, 2026-10-23)
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-estimate.ps1`(+compose: 격리 MySQL + KRaft Kafka, `bfupgest<난수>`, 포트 비게시·tmpfs): 이전 `0fe8c9a` → 새 `c2416ef`(PR #201) `ddl-auto update`에서 status enum `SUPERSEDED` 확장(SHOW CREATE 확인)·새 컬럼 4종·인덱스, 기존 행 kind NULL→ORIGINAL, 실제 Kafka로 손익 100만→120만(수정본)→150만(추가공사) 수렴, 같은 eventId 재전송 중복 0, 역순 이벤트 수렴, 대체됨 수정 409. PASS 24·WARN 1(이전 코드는 SUPERSEDED 행이 있으면 견적 목록 500 → 보관 테이블 절차를 `docs/RELEASE_RUNBOOK.md`에 기록, 재반영 복원 후 160만 수렴 확인). 잔여 리소스 0. 결함 없음(코드 무변경). **main·VPS 미반영**. V1 **40/100** 유지.
