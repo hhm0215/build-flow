@@ -19,8 +19,9 @@ public interface TaxInvoiceRepository extends JpaRepository<TaxInvoice, Long> {
 
     List<TaxInvoice> findAllByOrderByCreatedAtDesc();
 
-    List<TaxInvoice> findBySiteIdAndTypeAndPaymentConfirmedFalseOrderByIssueDateAsc(
-            Long siteId, TaxInvoiceType type);
+    @Query("SELECT t.id FROM TaxInvoice t WHERE t.paymentConfirmed = true AND NOT EXISTS "
+            + "(SELECT p.id FROM TaxPayment p WHERE p.taxInvoiceId = t.id) ORDER BY t.id")
+    List<Long> findLegacyConfirmedIdsWithoutPayments();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT t FROM TaxInvoice t WHERE t.id = :id")
