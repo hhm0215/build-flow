@@ -120,6 +120,7 @@
 ## 사용자 프롬프트 종료 점검 — 인프라 역할
 
 - 매 BuildFlow 관련 사용자 요청의 마지막 단계에서 고정 host key·비root `BatchMode` SSH로 가능한 범위의 Git SHA/작업 트리, `.env` 권한 메타데이터, host 리스닝, frontend 200, Gateway health, 무인증 업무 API 401(2026-10-22부터 공개 스택은 업무 서비스 8081–8087·Eureka·Config 포트를 호스트에 게시하지 않는다. 그 health는 root `buildflow-release status`의 컨테이너 내부 점검으로 보며, 호스트 loopback 8081–8087 응답은 오히려 노출 회귀다), 메모리·디스크·inode를 확인한다. private/public 기대 포트·컨테이너 수를 구분한다. 연결·권한 부족은 `UNVERIFIED`로 남긴다.
+- 2026-10-23부터 공개 스택은 프록시 네트워크를 분리한다: caddy·frontend는 `buildflow-edge`에만, gateway-server는 `buildflow-edge`·`buildflow-net` 둘 다, 업무 서비스·DB·Redis·Kafka는 `buildflow-net`에만 둔다(CI `verify_public_compose.py`가 공유 금지 검사). 권한 있는 점검에서는 `docker network inspect`로 caddy·frontend가 `buildflow-net`에 없는지 확인한다.
 - 권한 있는 점검에서만 Compose 서비스 수·restart/OOM·image ID와 프록시 오류 로그 요약을 조회. 일반 배포 계정의 Docker 권한 부족은 `UNVERIFIED`로 남기며 sudo/docker 그룹을 자동 부여하지 않는다.
 - 백업 최신성·오프사이트 보존·격리 복원 증거, 패치/재부팅 계획, 롤백 이미지·커밋 매핑의 새 증거와 미해결 게이트를 검토한다. 점검 과정에서 복원·재부팅을 자동 실행하지 않는다.
 - 정상·변화 없음은 조용히 유지하고 장애/복구/노출 변화/SHA 불일치/실패한 게이트만 보고한다. 발견 사항은 `.claude/BACKLOG.md`에 우선순위와 근거를 적고, 수정 PR은 기존 CI/SHA/리뷰 규칙을 따른다.

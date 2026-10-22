@@ -10,17 +10,25 @@ def valid_config():
             "caddy": {
                 "ports": [{"published": "80"}, {"published": "443"}],
                 "environment": {"PUBLIC_HOST": "example.org"},
+                "networks": {"buildflow-edge": None},
                 "volumes": [
                     {"target": "/etc/caddy/Caddyfile"},
                     {"target": "/data"},
                     {"target": "/config"},
                 ],
             },
-            "frontend": {"ports": [{"published": "3000", "host_ip": "127.0.0.1"}]},
-            "mysql": {"ports": [{"published": "3306", "host_ip": "127.0.0.1"}]},
+            "frontend": {
+                "ports": [{"published": "3000", "host_ip": "127.0.0.1"}],
+                "networks": {"buildflow-edge": None},
+            },
+            "mysql": {
+                "ports": [{"published": "3306", "host_ip": "127.0.0.1"}],
+                "networks": {"buildflow-net": None},
+            },
             "gateway-server": {
                 "ports": [{"published": "8080", "host_ip": "127.0.0.1"}],
                 "environment": {"CORS_ALLOWED_ORIGINS": "https://example.org,http://localhost:13000,http://127.0.0.1:13000"},
+                "networks": {"buildflow-net": None, "buildflow-edge": None},
             },
         }
     }
@@ -114,6 +122,41 @@ class PublicComposeVerifierTest(unittest.TestCase):
                     {"type": "volume", "source": "host_socket", "target": "/data", "read_only": True}
                 ]
                 with self.assertRaisesRegex(ValueError, "frontend mounts the Docker socket"):
+                    verify(config)
+
+    def test_rejects_proxy_sharing_internal_network(self):
+        for proxy in ("caddy", "frontend"):
+            with self.subTest(proxy=proxy):
+                config = valid_config()
+                config["services"][proxy]["networks"]["buildflow-net"] = None
+                with self.assertRaisesRegex(ValueError, f"{proxy} shares network buildflow-net"):
+                    verify(config)
+
+    def test_rejects_business_service_joining_edge_network(self):
+        config = valid_config()
+        config["services"]["site-service"] = {"ports": [], "networks": {"buildflow-net": None, "buildflow-edge": None}}
+        with self.assertRaisesRegex(ValueError, "shares network buildflow-edge with internal services: \['site-service'\]"):
+            verify(config)
+
+    def test_rejects_proxy_on_implicit_default_network(self):
+        config = valid_config()
+        del config["services"]["frontend"]["networks"]
+        config["services"]["redis"] = {}
+        with self.assertRaisesRegex(ValueError, "frontend shares network default"):
+            verify(config)
+
+    def test_rejects_proxy_network_mode_sharing(self):
+        config = valid_config()
+        config["services"]["frontend"]["network_mode"] = "service:site-service"
+        with self.assertRaisesRegex(ValueError, "frontend must use Compose networks"):
+            verify(config)
+
+    def test_rejects_gateway_missing_edge_or_internal_network(self):
+        for network, message in (("buildflow-edge", "edge network"), ("buildflow-net", "internal service network")):
+            with self.subTest(network=network):
+                config = valid_config()
+                del config["services"]["gateway-server"]["networks"][network]
+                with self.assertRaisesRegex(ValueError, message):
                     verify(config)
 
     def test_rejects_extra_public_port(self):
