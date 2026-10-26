@@ -146,9 +146,14 @@ class Harness:
     def wait_consumed(self, expected):
         until = time.monotonic() + 100
         while time.monotonic() < until:
-            output = self.compose("exec", "-T", "kafka", "kafka-consumer-groups.sh",
-                                  "--bootstrap-server", "localhost:9092", "--group",
-                                  "site-service-group", "--describe", timeout=20)
+            try:
+                output = self.compose("exec", "-T", "kafka", "kafka-consumer-groups.sh",
+                                      "--bootstrap-server", "localhost:9092", "--group",
+                                      "site-service-group", "--describe", timeout=20)
+            except Failure:
+                # The listener can be healthy before its consumer group has joined.
+                time.sleep(2)
+                continue
             offsets = {}
             for row in output.splitlines():
                 fields = row.split()
@@ -209,6 +214,10 @@ class Harness:
                              items=[dict(estimate_body["items"][0], unitPrice=1200)])
         revision = self.api("estimate", "/api/v1/estimates", "POST", revision_body, 201)["id"]
         self.api("estimate", f"/api/v1/estimates/{revision}/confirm", "PATCH")
+        estimate_source = self.api("estimate", f"/api/v1/estimates/profit-source?siteId={site}")
+        require(Decimal(str(estimate_source["confirmedTotalAmount"])) == Decimal("1200")
+                and len(estimate_source["profitEvents"]) == 3,
+                "Estimate revision source snapshot disagrees with committed rows")
         before = self.state()
         path = f"/api/v1/sites/{site}/profit/reconcile"
         dry = self.api("site", path, "POST")
@@ -249,6 +258,20 @@ class Harness:
         require(self.state() == before, "Source outage changed profit or receipts")
         print("[PASS] Unavailable source returned 503 without changing stored state")
 
+    def diagnostics(self):
+        # These applications contain only the generated synthetic fixtures above.
+        # Emit bounded error categories, never config/env dumps or arbitrary output.
+        for service in PORTS:
+            try:
+                logs = self.compose("logs", "--no-color", "--tail", "100", service, cleanup=True)
+                selected = [line for line in logs.splitlines()
+                            if any(marker in line for marker in (" ERROR ", "Caused by:", "손익 원천"))]
+                for line in selected[-10:]:
+                    safe = line.replace(self.env["RECONCILE_DB_PASSWORD"], "[redacted]")
+                    print(f"[DIAG {service}] {safe[:800]}", file=sys.stderr)
+            except Failure:
+                print(f"[DIAG {service}] Bounded diagnostics unavailable", file=sys.stderr)
+
     def cleanup(self):
         if not self.started:
             return
@@ -266,6 +289,10 @@ class Harness:
         self.compose("down", "--timeout", "10", timeout=60, cleanup=True)
         require(not self.compose("ps", "--all", "--quiet", cleanup=True),
                 "Isolated containers remain after cleanup")
+        require(not self.run(["network", "ls", "--filter",
+                              f"label=com.docker.compose.project={self.project}",
+                              "--format", "{{.ID}}"], cleanup=True),
+                "Isolated network remains after cleanup")
 
 
 def main():
@@ -283,6 +310,8 @@ def main():
             print("[FAIL] Isolated reconciliation integration did not pass; subprocess output withheld", file=sys.stderr)
         finally:
             if harness is not None:
+                if failed and harness.started:
+                    harness.diagnostics()
                 try:
                     harness.cleanup()
                 except (Failure, ValueError, KeyError, TypeError):
