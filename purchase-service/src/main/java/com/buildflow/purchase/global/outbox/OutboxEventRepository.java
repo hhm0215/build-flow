@@ -7,9 +7,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String> {
+
+    /** 손익 재계산용 보존 이벤트. 삭제된 매입과 미발행 이벤트도 스냅샷에 포함한다. */
+    @Query("select e from OutboxEvent e where e.topic in :topics order by e.createdAt, e.eventId")
+    List<OutboxEvent> findProfitEvents(@Param("topics") Collection<String> topics);
 
     @Query(value = """
             SELECT * FROM outbox_events

@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-26 15:13 KST |
+| 갱신 | 2026-10-26 15:22 KST |
 | 브랜치 | `codex/profit-reconcile-validation` (체크포인트, 드래프트 PR로 노출) |
 | PR | `codex/profit-reconcile-validation`의 드래프트 PR (`gh pr list --head codex/profit-reconcile-validation`) |
-| 현재 단계 | PR 203 independent review and delayed deleted-purchase fix |
-| 다음 첫 행동 | Regression and isolated integration verification |
+| 현재 단계 | Fix deleted purchase replay and verify isolated MySQL Feign Kafka |
+| 다음 첫 행동 | Review final head CI then integrate into develop |
 
 ## 공통 사용자 지시
 

@@ -34,6 +34,7 @@
 - **2026-10-23 매입↔증빙 세금계산서 연결**: 에이전트 결정(위임)으로 원가는 매입 항목만, 매입 계산서는 증빙 연결(`evidence_tax_invoice_id`)·현장별 대조 요약, 연결된 계산서 삭제/매출 전환 409를 `claude/purchase-evidence-link`에 구현(단위·MSW PASS). 남은 것: PR·CI, 풀 Docker에서 컬럼 자동 추가·Feign 양방향 실측, VPS 반영 후 운영 DDL이 Flyway V1과 달라지는 점 반영. **main·VPS 미반영**.
 - **2026-10-23 견적 수정본·추가공사(유효 버전 0..1 최소판)**: 에이전트 결정(위임)으로 `kind`·`revisionOfId`·`chainRootId`·SUPERSEDED, 수정본 확정 시 기존 확정본 대체(`estimate.deleted` reason=SUPERSEDED + `estimate.parsed`), 체인 루트 잠금, 수정본/추가공사 작성·이력 UI를 `claude/estimate-revisions`에 구현(단위·H2·MSW PASS). 남은 것: PR·CI, 풀 Docker에서 컬럼·enum 자동 확장과 실제 Kafka 손익 수렴 실측, 기존 이중 확정 데이터 사람 판단. 문서 코어 Stage 1 전면 구현은 선행조건 미충족으로 유지. **main·VPS 미반영**.
 - **관련 파일**: `docs/PILOT_QA.md`, `frontend/src/pages/`, `chat-service`, 각 업무 서비스
+- **2026-10-26 복원 후 손익 수리(PR #205)**: PR #203 독립 검토에서 삭제 매입의 등록/삭제가 모두 미소비이면 재계산 후 지연 등록으로 원가가 부활하는 결함을 찾아, 삭제 행을 포함한 원천 outbox eventId를 손익과 함께 수신기록에 반영하도록 보강했다. 로컬 전체 Gradle·독립 보안 재검토 PASS. 실제 MySQL·Feign·Kafka는 새 격리 CI에서 검증하며 최종 SHA CI/develop 통합 PENDING. 실제 복원본·main·VPS 검증은 후속 게이트로 유지한다.
 - **예상 규모**: M~L
 - **상태**: IN_PROGRESS
 

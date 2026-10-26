@@ -25,6 +25,8 @@ public class ProfitReconcileResponse {
     private Totals source;
     /** 원천 합계에 이미 반영됐지만 수신기록이 없는 견적 손익 이벤트 수(apply 시 처리 완료로 기록). */
     private int estimateEventsToMark;
+    /** 삭제된 매입을 포함해 원천에 반영됐지만 수신기록이 없는 매입 이벤트 수. */
+    private int purchaseEventsToMark;
     /** 원천 기준으로 다시 쓸 매입 projection 수(누락·금액·revision 차이 + 원천에 없는 활성 projection). */
     private int purchaseProjectionsToRewrite;
     /** 견적 행이 없어 원천 eventId 목록에 없는 이 현장 손익 이벤트 수. 0보다 크면 apply는 409로 막힌다. */

@@ -1,6 +1,7 @@
 package com.buildflow.site.domain.profit.service;
 
 import com.buildflow.site.domain.profit.dto.ProfitReconcileResponse;
+import com.buildflow.site.domain.profit.entity.ProcessedProfitEvent;
 import com.buildflow.site.domain.profit.entity.PurchaseProfitProjection;
 import com.buildflow.site.domain.profit.entity.SiteProfit;
 import com.buildflow.site.domain.profit.event.ProfitEventType;
@@ -282,6 +283,86 @@ class ProfitReconcileJpaTest {
     }
 
     @Test
+    void deletedPurchaseWithNoProjectionCannotReturnThroughLateEventsAfterReconcile() {
+        String registered = UUID.randomUUID().toString();
+        String deleted = UUID.randomUUID().toString();
+        stubEstimate("0");
+        when(purchaseClient.snapshot(anyLong())).thenReturn(new ProfitSourceResponse<>(true,
+                new PurchaseProfitSource(siteId, BigDecimal.ZERO, List.of(), List.of(
+                        new PurchaseProfitSource.Event(registered, "PURCHASE_REGISTERED"),
+                        new PurchaseProfitSource.Event(deleted, "PURCHASE_DELETED")))));
+
+        ProfitReconcileResponse dryRun = reconcileService.reconcile(siteId, false);
+        assertFalse(dryRun.isMatched());
+        assertEquals(2, dryRun.getPurchaseEventsToMark());
+        assertEquals(0, dryRun.getPurchaseProjectionsToRewrite());
+        assertEquals(0, processedRepository.count());
+        assertEquals(0, profitRepository.count());
+
+        ProfitReconcileResponse applied = reconcileService.reconcile(siteId, true);
+        assertTrue(applied.isApplied());
+        assertEquals(2, applied.getPurchaseEventsToMark());
+        assertFalse(profitService.applyPurchaseEvent(registered, ProfitEventType.PURCHASE_REGISTERED,
+                77L, siteId, 1L, amount("100.00")));
+        assertAmount("0", profit().getTotalPurchaseAmount());
+        assertEquals(0, projectionRepository.count());
+        // DELETE가 복구된 Kafka에 다시 오지 않아도 REGISTERED만으로 원가가 부활하지 않는다.
+        assertTrue(reconcileService.reconcile(siteId, false).isMatched());
+        assertFalse(profitService.applyPurchaseEvent(deleted, ProfitEventType.PURCHASE_DELETED,
+                77L, siteId, 2L, amount("100.00")));
+        // 스냅샷 이후의 새 매입은 정상 반영된다.
+        assertTrue(profitService.applyPurchaseEvent(UUID.randomUUID().toString(),
+                ProfitEventType.PURCHASE_REGISTERED, 78L, siteId, 1L, amount("200.00")));
+        assertAmount("200.00", profit().getTotalPurchaseAmount());
+    }
+
+    @Test
+    void oldOrMalformedPurchaseEventSourceFailsClosedWithoutWrites() {
+        stubEstimate("0");
+        when(purchaseClient.snapshot(anyLong())).thenReturn(new ProfitSourceResponse<>(true,
+                new PurchaseProfitSource(siteId, BigDecimal.ZERO, List.of(), null)));
+        assertEquals(ErrorCode.PROFIT_SOURCE_UNAVAILABLE, assertThrows(BusinessException.class,
+                () -> reconcileService.reconcile(siteId, true)).getErrorCode());
+        for (PurchaseProfitSource.Event event : List.of(
+                new PurchaseProfitSource.Event("invalid", "PURCHASE_DELETED"),
+                new PurchaseProfitSource.Event(UUID.randomUUID().toString(), "ESTIMATE_PARSED"))) {
+            when(purchaseClient.snapshot(anyLong())).thenReturn(new ProfitSourceResponse<>(true,
+                    new PurchaseProfitSource(siteId, BigDecimal.ZERO, List.of(), List.of(event))));
+            assertEquals(ErrorCode.PROFIT_SOURCE_UNAVAILABLE, assertThrows(BusinessException.class,
+                    () -> reconcileService.reconcile(siteId, true)).getErrorCode());
+        }
+        assertEquals(0, processedRepository.count());
+        assertEquals(0, profitRepository.count());
+    }
+
+    @Test
+    void eventIdAlreadyAttributedToAnotherSiteOrTypeBlocksApply() {
+        String conflicting = UUID.randomUUID().toString();
+        stubEstimate("100.00", event(conflicting, "ESTIMATE_PARSED"));
+        stubPurchase("0");
+        processedRepository.saveAndFlush(new ProcessedProfitEvent(
+                conflicting, siteId + 1, "ESTIMATE_PARSED"));
+        assertEquals(ErrorCode.PROFIT_RECONCILE_CONFLICT, assertThrows(BusinessException.class,
+                () -> reconcileService.reconcile(siteId, true)).getErrorCode());
+        processedRepository.deleteAll();
+        processedRepository.saveAndFlush(new ProcessedProfitEvent(
+                conflicting, siteId, "PURCHASE_DELETED"));
+        assertEquals(ErrorCode.PROFIT_RECONCILE_CONFLICT, assertThrows(BusinessException.class,
+                () -> reconcileService.reconcile(siteId, true)).getErrorCode());
+        assertEquals(0, profitRepository.count());
+    }
+
+    @Test
+    void matchingTotalsStillCannotApproveUnattributableEstimateEvents() {
+        stubEstimateWithOrphans(1, "0");
+        stubPurchase("0");
+        assertEquals(1, reconcileService.reconcile(siteId, false).getOrphanEstimateEvents());
+        assertEquals(ErrorCode.PROFIT_RECONCILE_CONFLICT, assertThrows(BusinessException.class,
+                () -> reconcileService.reconcile(siteId, true)).getErrorCode());
+        assertEquals(0, profitRepository.count());
+    }
+
+    @Test
     void unknownSiteIsNotFound() {
         assertEquals(ErrorCode.SITE_NOT_FOUND, assertThrows(BusinessException.class,
                 () -> reconcileService.reconcile(siteId + 1000, false)).getErrorCode());
@@ -298,7 +379,7 @@ class ProfitReconcileJpaTest {
 
     private void stubPurchase(String total, PurchaseProfitSource.Item... items) {
         when(purchaseClient.snapshot(anyLong())).thenReturn(new ProfitSourceResponse<>(true,
-                new PurchaseProfitSource(siteId, amount(total), List.of(items))));
+                new PurchaseProfitSource(siteId, amount(total), List.of(items), List.of())));
     }
 
     private EstimateProfitSource.Event event(String eventId, String type) {

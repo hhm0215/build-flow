@@ -40,7 +40,8 @@ import java.util.function.Supplier;
  * <p>경합 처리: 손익 소비자와 같은 현장 행 비관적 잠금을 먼저 잡은 뒤 원천을 조회하므로, 원천 스냅샷과
  * 반영 사이에 이 현장의 이벤트가 처리되지 않는다. 원천 스냅샷에 보이는 견적 손익 이벤트는 이미 합계에
  * 포함되어 있으므로 수신기록(processed_profit_events)에 함께 기록해 늦게 도착해도 eventId 멱등으로 무시되게 하고,
- * 매입은 projection을 원천 revision으로 다시 써서 같거나 낮은 revision 이벤트가 revision 규칙으로 무시되게 한다.
+ * 매입은 삭제된 매입을 포함한 원천 outbox eventId도 함께 수신기록에 넣고 projection을 원천 revision으로 다시 쓴다.
+ * site에 한 번도 도착하지 않은 삭제 매입도 과거 생성 이벤트만으로 원가가 부활하지 않는다.
  * 스냅샷 이후 생긴 이벤트는 목록·합계 어디에도 없으므로 평소처럼 증분 반영된다.
  */
 @Slf4j
@@ -77,12 +78,15 @@ public class ProfitReconcileService {
         Totals before = Totals.of(current == null ? SiteProfit.builder().siteId(siteId).build() : current);
         Totals source = Totals.of(expected);
 
-        List<EstimateProfitSource.Event> eventsToMark = unprocessedEvents(estimate.profitEvents());
+        List<ProcessedProfitEvent> eventsToMark = unprocessedEvents(siteId, estimate, purchase);
+        int estimateEventsToMark = (int) eventsToMark.stream()
+                .filter(event -> event.getEventType().startsWith("ESTIMATE_")).count();
+        int purchaseEventsToMark = eventsToMark.size() - estimateEventsToMark;
         ProjectionPlan plan = planProjections(siteId, purchase.purchases());
 
         boolean matched = before.sameAs(source) && eventsToMark.isEmpty() && plan.size() == 0;
         int orphanEvents = estimate.orphanProfitEventCount();
-        if (apply && !matched && orphanEvents > 0) {
+        if (apply && orphanEvents > 0) {
             // 견적 행이 사라진 손익 이벤트(과거 확정 삭제 등)는 eventId 목록에 없어 늦게 도착하면 이중 반영될 수 있다
             log.warn("견적 행 없는 손익 이벤트가 있어 재계산 반영 거부: reconcileId={}, siteId={}, orphanEvents={}",
                     reconcileId, siteId, orphanEvents);
@@ -90,9 +94,7 @@ public class ProfitReconcileService {
         }
         boolean applied = apply && !matched;
         if (applied) {
-            processedEventRepository.saveAll(eventsToMark.stream()
-                    .map(event -> new ProcessedProfitEvent(event.eventId(), siteId, event.eventType()))
-                    .toList());
+            processedEventRepository.saveAll(eventsToMark);
             plan.apply(siteId, reconcileId, projectionRepository);
             SiteProfit target = current != null ? current
                     : siteProfitRepository.save(SiteProfit.builder().siteId(siteId).build());
@@ -103,13 +105,13 @@ public class ProfitReconcileService {
         log.info("손익 재계산: reconcileId={}, siteId={}, apply={}, applied={}, matched={}, "
                         + "before=[estimate={}, purchase={}, margin={}, marginRate={}], "
                         + "source=[estimate={}, purchase={}, margin={}, marginRate={}], "
-                        + "estimateEventsToMark={}, purchaseProjectionsToRewrite={}, orphanEstimateEvents={}",
+                        + "estimateEventsToMark={}, purchaseEventsToMark={}, purchaseProjectionsToRewrite={}, orphanEstimateEvents={}",
                 reconcileId, siteId, apply, applied, matched,
                 before.getTotalEstimateAmount(), before.getTotalPurchaseAmount(),
                 before.getMargin(), before.getMarginRate(),
                 source.getTotalEstimateAmount(), source.getTotalPurchaseAmount(),
                 source.getMargin(), source.getMarginRate(),
-                eventsToMark.size(), plan.size(), orphanEvents);
+                estimateEventsToMark, purchaseEventsToMark, plan.size(), orphanEvents);
 
         return ProfitReconcileResponse.builder()
                 .siteId(siteId)
@@ -119,7 +121,8 @@ public class ProfitReconcileService {
                 .reconcileId(reconcileId)
                 .before(before)
                 .source(source)
-                .estimateEventsToMark(eventsToMark.size())
+                .estimateEventsToMark(estimateEventsToMark)
+                .purchaseEventsToMark(purchaseEventsToMark)
                 .purchaseProjectionsToRewrite(plan.size())
                 .orphanEstimateEvents(orphanEvents)
                 .build();
@@ -160,9 +163,18 @@ public class ProfitReconcileService {
     }
 
     private PurchaseProfitSource validPurchase(Long siteId, PurchaseProfitSource source) {
-        if (!siteId.equals(source.siteId()) || source.purchases() == null
+        if (!siteId.equals(source.siteId()) || source.purchases() == null || source.profitEvents() == null
                 || !validAmount(source.totalAmount())) {
             throw invalidSource("purchase", siteId);
+        }
+        Set<String> eventIds = new HashSet<>();
+        for (PurchaseProfitSource.Event event : source.profitEvents()) {
+            if (event == null || !validEventId(event.eventId()) || !eventIds.add(event.eventId())
+                    || !(ProfitEventType.PURCHASE_REGISTERED.name().equals(event.eventType())
+                    || ProfitEventType.PURCHASE_UPDATED.name().equals(event.eventType())
+                    || ProfitEventType.PURCHASE_DELETED.name().equals(event.eventType()))) {
+                throw invalidSource("purchase", siteId);
+            }
         }
         Set<Long> seen = new HashSet<>();
         BigDecimal sum = BigDecimal.ZERO;
@@ -207,14 +219,27 @@ public class ProfitReconcileService {
         return new BusinessException(ErrorCode.PROFIT_SOURCE_UNAVAILABLE);
     }
 
-    private List<EstimateProfitSource.Event> unprocessedEvents(List<EstimateProfitSource.Event> events) {
+    private List<ProcessedProfitEvent> unprocessedEvents(Long siteId, EstimateProfitSource estimate,
+                                                        PurchaseProfitSource purchase) {
+        Map<String, String> events = new LinkedHashMap<>();
+        estimate.profitEvents().forEach(event -> events.put(event.eventId(), event.eventType()));
+        for (PurchaseProfitSource.Event event : purchase.profitEvents()) {
+            if (events.putIfAbsent(event.eventId(), event.eventType()) != null) {
+                throw invalidSource("duplicate eventId", siteId);
+            }
+        }
         if (events.isEmpty()) {
             return List.of();
         }
         Set<String> processed = new HashSet<>();
-        processedEventRepository.findAllById(events.stream().map(EstimateProfitSource.Event::eventId).toList())
-                .forEach(event -> processed.add(event.getEventId()));
-        return events.stream().filter(event -> !processed.contains(event.eventId())).toList();
+        processedEventRepository.findAllById(events.keySet()).forEach(event -> {
+            if (!siteId.equals(event.getSiteId()) || !events.get(event.getEventId()).equals(event.getEventType())) {
+                throw new BusinessException(ErrorCode.PROFIT_RECONCILE_CONFLICT);
+            }
+            processed.add(event.getEventId());
+        });
+        return events.entrySet().stream().filter(event -> !processed.contains(event.getKey()))
+                .map(event -> new ProcessedProfitEvent(event.getKey(), siteId, event.getValue())).toList();
     }
 
     private ProjectionPlan planProjections(Long siteId, List<PurchaseProfitSource.Item> items) {

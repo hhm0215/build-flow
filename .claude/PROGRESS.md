@@ -5,6 +5,14 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 진행 중 — 손익 재계산 삭제 매입 지연 이벤트 수리 (2026-10-26, PR #205)
+
+- PR #203 head `588bdc1`/base `b6be146`와 CI 성공을 원격 재확인하고 별도 `codex/profit-reconcile-validation` worktree에서 검토했다. Claude 원본 브랜치·기존 checkout·`output/`·업무 원본은 보존했다.
+- 독립 security/infrastructure 리뷰에서 매입 생성·삭제 이벤트가 모두 미소비이고 projection이 없으면 재계산 후 늦은 등록 이벤트만으로 원가가 부활하는 P1 결함을 확인했다. purchase 원천이 삭제 매입까지 포함한 보존 outbox eventId를 동일 REPEATABLE READ로 반환하고, site가 원천 합계·projection과 함께 미처리 견적·매입 eventId를 기록하도록 수리했다. 구버전/판별 불가 원천은 503, 수신기록 현장·유형 충돌과 고아 견적 apply는 409다.
+- 로컬 전체 Gradle `test` 및 관련 bootJar PASS: 총 457 tests, 446 통과·11 조건부 skip, 실패 0. 체크포인트 합성 20·릴리스 후보 9·Compose 정적 회귀 27 PASS. 독립 보안 재검토 신규 Critical/High/P1 없음.
+- 로컬 Docker는 시작 중 ingest socket 접근 오류로 엔진 연결 FAIL(초기화/볼륨 변경 없음). 별도 CI에서 무작위 프로젝트·tmpfs·비게시 포트로 실제 MySQL·Feign·Kafka API/지연 이벤트 회귀를 실행하도록 준비 중이다. 최종 SHA CI·develop 통합은 이 기록 시점 PENDING이며 PR에서 대조한다.
+- main/VPS/실데이터 변경 없음. 실제 복원본·외부 암호화 복원·운영 DDL/최소 권한 게이트는 남아 있고 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
 ## 완료된 작업 — 현장 손익 재계산 API (복원 후 UNEXPLAINED 조치, 2026-10-23)
 
 - 2026-10-23 site-service `POST /api/v1/sites/{id}/profit/reconcile`(기본 dry-run, `?apply=true`만 반영, 프론트 미노출): 손익 소비자와 같은 현장 행 비관적 잠금 아래 estimate `GET /estimates/profit-source`(CONFIRMED 합계 + 그 현장 견적의 손익 outbox eventId, SUPERSEDED 제외)·purchase `GET /purchases/profit-source`(현재 매입 금액·revision)를 Feign(2s/5s) 조회해 `site_profits`를 원천으로 덮어쓰고, 미수신 견적 eventId를 수신기록에 남기고 매입 projection을 원천 revision으로 재작성(원천에 없는 활성 projection은 최대 revision 삭제 고정)해 늦게 온 이벤트 이중 반영을 막는다. 원천 실패·형식 이상 503, 범위 초과·projection 현장 충돌·견적 행 없는 손익 이벤트(과거 확정 삭제) 409, 일치 시 무변경. PR #203 리뷰 반영: 묘비 id에 삭제 아닌 매입 이벤트는 생략 대신 실패(복원 후 AUTO_INCREMENT 재사용 감지, 런북 사전 확인 SQL 추가). site 69(2 skip)·estimate 57(1 skip)·purchase 45(1 skip) PASS. `docs/DATABASE_OPERATIONS.md`·`docs/API_SPEC.md` 갱신. 풀 Docker·실제 복원본 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
