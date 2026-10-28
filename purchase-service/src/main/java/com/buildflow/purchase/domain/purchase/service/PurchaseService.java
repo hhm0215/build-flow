@@ -50,6 +50,9 @@ public class PurchaseService {
                         .totalAmount(saved.getTotalAmount())
                         .build()
         );
+        purchaseRepository.flush();
+        // 첫 검증 후 저장 사이에 현장이 보관됐으면 매입·outbox 이벤트를 함께 롤백한다
+        siteReferenceValidator.recheckBeforeCommit(saved.getSiteId());
 
         return PurchaseResponse.from(saved);
     }

@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -72,6 +75,34 @@ class EstimateServiceAmountTest {
 
         assertEquals(ErrorCode.INVALID_SITE_REFERENCE, error.getErrorCode());
         verify(estimateRepository, never()).save(any());
+    }
+
+    @Test
+    void createRechecksSiteAfterSaveBeforeCommit() {
+        EstimateCreateRequest request = request("1", "1000");
+        when(request.getSiteId()).thenReturn(7L);
+
+        estimateService.create(request);
+
+        InOrder order = inOrder(siteReferenceValidator, estimateRepository);
+        order.verify(siteReferenceValidator).requireExistingSite(7L);
+        order.verify(estimateRepository).save(any());
+        order.verify(estimateRepository).flush();
+        order.verify(siteReferenceValidator).recheckBeforeCommit(7L);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ErrorCode.class, names = {"SITE_ARCHIVED", "INVALID_SITE_REFERENCE", "SITE_REFERENCE_UNAVAILABLE"})
+    void siteRecheckFailureAfterSavePropagatesForRollback(ErrorCode code) {
+        EstimateCreateRequest request = request("1", "1000");
+        when(request.getSiteId()).thenReturn(7L);
+        doThrow(new BusinessException(code)).when(siteReferenceValidator).recheckBeforeCommit(7L);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> estimateService.create(request));
+
+        assertEquals(code, error.getErrorCode());
+        verify(siteReferenceValidator).requireExistingSite(7L);
+        verify(estimateRepository).save(any());
     }
 
     private EstimateCreateRequest request(String quantity, String price) {

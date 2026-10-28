@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,6 +50,7 @@ public class DefectWarrantyService {
     private final SiteReferenceValidator siteReferenceValidator;
     private final WarrantyAuditRecorder auditRecorder;
     private final WarrantyFileRetentionService fileRetention;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${app.upload-dir:./uploads/warranties}")
     private String uploadDir;
@@ -70,6 +72,9 @@ public class DefectWarrantyService {
 
         DefectWarranty saved = warrantyRepository.save(warranty);
         auditRecorder.record(WarrantyAuditAction.CREATED, saved);
+        warrantyRepository.flush();
+        // 첫 검증 후 저장 사이에 현장이 보관됐으면 보증·이력을 함께 롤백한다
+        siteReferenceValidator.recheckBeforeCommit(saved.getSiteId());
         return WarrantyResponse.from(saved);
     }
 
@@ -152,7 +157,9 @@ public class DefectWarrantyService {
      * PDF 업로드 → 파일 저장 → PENDING 레코드 즉시 생성 → 비동기 OCR 트리거.
      * 컨트롤러는 즉시 PENDING WarrantyResponse를 반환 (HTTP 202).
      *
-     * 기존 readOnly 트랜잭션을 중단하고 repository.save 자체 트랜잭션이 커밋된 뒤 OCR을 예약한다.
+     * 기존 readOnly 트랜잭션을 중단하고, PENDING 행·업로드 이력 저장과 커밋 직전 현장 재확인을
+     * 한 트랜잭션으로 커밋한 뒤 OCR을 예약한다. 재확인 실패(보관·삭제·장애)면 행·이력이 롤백되고
+     * 이미 디스크에 쓴 파일도 지운 뒤 예외를 전파하므로 OCR은 예약되지 않는다.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public WarrantyResponse createFromOcr(Long siteId, MultipartFile file) {
@@ -163,8 +170,13 @@ public class DefectWarrantyService {
         Path stored = storeFile(file);
         DefectWarranty pending;
         try {
-            pending = warrantyRepository.save(DefectWarranty.createPending(siteId, stored.toString()));
-            auditRecorder.record(WarrantyAuditAction.UPLOADED, pending);
+            pending = transactionTemplate.execute(status -> {
+                DefectWarranty saved = warrantyRepository.save(DefectWarranty.createPending(siteId, stored.toString()));
+                auditRecorder.record(WarrantyAuditAction.UPLOADED, saved);
+                warrantyRepository.flush();
+                siteReferenceValidator.recheckBeforeCommit(siteId);
+                return saved;
+            });
         } catch (RuntimeException e) {
             deleteFileQuietly(stored.toString());
             throw e;

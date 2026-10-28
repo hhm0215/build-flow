@@ -52,6 +52,9 @@ public class TaxInvoiceService {
                         .counterparty(saved.getCounterparty())
                         .build()
         );
+        taxInvoiceRepository.flush();
+        // 첫 검증 후 저장 사이에 현장이 보관됐으면 세금계산서·outbox 이벤트를 함께 롤백한다
+        siteReferenceValidator.recheckBeforeCommit(saved.getSiteId());
 
         return TaxInvoiceResponse.from(saved, BigDecimal.ZERO);
     }

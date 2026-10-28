@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-28 17:56 KST |
-| 브랜치 | claude/record-vps-98a9dd3 |
-| PR | Codex #205 develop 병합 확인 → 릴리스 #206 병합. main·VPS = `98a9dd3` |
-| 현재 단계 | Codex 손익 재계산 검증 작업(#205) 이어받아 VPS `98a9dd3` 반영 완료(새 API 무인증 401) |
-| 다음 첫 행동 | BACKLOG 다음 항목을 역할별 서브에이전트로 진행. 롤백 실측·root 래퍼 재설치 후 운영 DDL 대조는 사용자 권한 필요 |
+| 갱신 | 2026-10-28 23:05 KST |
+| 브랜치 | claude/self-audit-fix |
+| PR | #215 재채점·#216 자가 점검 병합. main·VPS = `898de04` |
+| 현재 단계 | 진행률 재채점(57/100)과 자가 점검(self-auditor·self_audit.py) 도입 완료 |
+| 다음 첫 행동 | 세션 시작 시 self_audit.py 실행. 로컬 주간 실측(S0~S5)은 사용자 로그인 대기, 롤백 실측·root 래퍼 재설치는 사용자 권한 필요. Codex 소유 병합 완료 작업 폴더 7개는 Codex가 정리 |
 
 ## 공통 사용자 지시
 
