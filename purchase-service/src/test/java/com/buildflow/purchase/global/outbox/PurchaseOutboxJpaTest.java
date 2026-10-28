@@ -103,6 +103,19 @@ class PurchaseOutboxJpaTest {
     }
 
     @Test
+    void siteArchivedBeforeCommitRollsBackPurchaseAndOutbox() {
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED))
+                .when(siteReferenceValidator).recheckBeforeCommit(7L);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> purchaseService.create(request()));
+
+        assertEquals(ErrorCode.SITE_ARCHIVED, error.getErrorCode());
+        assertEquals(0, purchaseRepository.count());
+        assertEquals(0, outboxRepository.count());
+    }
+
+    @Test
     void outboxWriteFailureRollsBackPurchase() {
         doThrow(new IllegalStateException("outbox unavailable"))
                 .when(outboxRepository).save(any(OutboxEvent.class));

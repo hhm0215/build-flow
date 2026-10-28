@@ -220,6 +220,25 @@ class EstimateRevisionIntegrationTest {
         assertEquals(new BigDecimal("1300.00"), projectedEstimateTotal(SITE));
     }
 
+    @Test
+    void siteArchivedBetweenValidationAndCommitRollsBackNewRevision() throws Exception {
+        Long original = confirmed(create(SITE, null, null, "1000"));
+        long estimatesBefore = estimateRepository.count();
+        long outboxBefore = outboxRepository.count();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED))
+                .when(siteReferenceValidator).recheckBeforeCommit(SITE);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> create(SITE, EstimateKind.REVISION, original, "1200"));
+
+        assertEquals(ErrorCode.SITE_ARCHIVED, exception.getErrorCode());
+        assertEquals(estimatesBefore, estimateRepository.count());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "select count(*) from estimate_items i join estimates e on e.id = i.estimate_id where e.revision_of_id = ?",
+                Long.class, original));
+        assertEquals(outboxBefore, outboxRepository.count());
+    }
+
     private Long create(long siteId, EstimateKind kind, Long revisionOfId, String unitPrice) throws Exception {
         String json = objectMapper.writeValueAsString(new java.util.LinkedHashMap<String, Object>() {{
             put("siteId", siteId);

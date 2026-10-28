@@ -17,7 +17,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 
 import java.io.ByteArrayOutputStream;
@@ -39,9 +41,10 @@ class WarrantyUploadGuardTest {
     private DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
     private WarrantyOcrService ocr = mock(WarrantyOcrService.class);
     private SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
+    private PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
 
     private DefectWarrantyService service() {
-        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class));
+        DefectWarrantyService service = new DefectWarrantyService(repository, ocr, mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class), new TransactionTemplate(transactionManager));
         ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
         return service;
     }
@@ -191,6 +194,41 @@ class WarrantyUploadGuardTest {
         when(repository.save(any())).thenThrow(new IllegalStateException("DB unavailable"));
         assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
                 .isInstanceOf(IllegalStateException.class);
+        assertThat(files()).isEmpty();
+        verifyNoInteractions(ocr);
+    }
+
+    @Test
+    void 저장_후_커밋_전_현장_재확인은_OCR_예약보다_먼저다() throws Exception {
+        when(repository.save(any())).thenAnswer(invocation -> {
+            DefectWarranty warranty = invocation.getArgument(0);
+            ReflectionTestUtils.setField(warranty, "id", 42L);
+            return warranty;
+        });
+        service().createFromOcr(1L, upload("x.pdf", pdf(1)));
+
+        var order = inOrder(siteReferenceValidator, repository, transactionManager, ocr);
+        order.verify(siteReferenceValidator).requireExistingSite(1L);
+        order.verify(repository).save(any());
+        order.verify(repository).flush();
+        order.verify(siteReferenceValidator).recheckBeforeCommit(1L);
+        order.verify(transactionManager).commit(any());
+        order.verify(ocr).processAsync(eq(42L), any(Path.class));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ErrorCode.class,
+            names = {"SITE_ARCHIVED", "INVALID_SITE_REFERENCE", "SITE_REFERENCE_UNAVAILABLE"})
+    void 저장_후_현장_재확인_실패는_롤백하고_파일과_OCR을_남기지_않는다(ErrorCode code) throws Exception {
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new BusinessException(code)).when(siteReferenceValidator).recheckBeforeCommit(1L);
+
+        assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode()).isEqualTo(code));
+        verify(repository).save(any());
+        verify(transactionManager).rollback(any());
+        verify(transactionManager, never()).commit(any());
         assertThat(files()).isEmpty();
         verifyNoInteractions(ocr);
     }

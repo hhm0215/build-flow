@@ -54,6 +54,9 @@ public class EstimateService {
 
         addItems(estimate, request.getItems());
         estimateRepository.save(estimate);
+        estimateRepository.flush();
+        // 첫 검증 후 저장 사이에 현장이 보관됐으면 커밋 전에 롤백한다 (다른 DB라 잠금으로 직렬화 불가)
+        siteReferenceValidator.recheckBeforeCommit(request.getSiteId());
 
         return EstimateResponse.from(estimate);
     }
