@@ -224,6 +224,7 @@ bun run preview         # 빌드 결과 미리보기
 
 8. **결과 반영 (PR 머지 후)**:
    - PROGRESS.md "다음 세션 진입점"의 git 상태 → main 새 SHA, develop ↔ main 동기화 반영
+   - **자가 점검**: `self-auditor`(`.claude/agents/self-auditor.md`)로 `scripts/agents/self_audit.py` 결정적 점검 + 진행률 재채점·기록 누락·BACKLOG 어긋남 판단 점검을 실행하고 WARN/FAIL을 같은 흐름에서 처리하거나 발의한다. 세션 시작과 위임 루프의 사이클 사이에도 실행한다(예약 heartbeat 대신 작업 흐름 고정 지점에서 반복)
    - 다음 BACKLOG 항목으로 진입 또는 세션 종료
 
 - **IMPORTANT**: BACKLOG.md에 없는 작업은 먼저 BACKLOG.md에 추가 후 진행

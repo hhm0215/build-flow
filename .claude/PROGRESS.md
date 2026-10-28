@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 자가 점검 에이전트·결정적 점검 스크립트 (2026-10-28)
+
+- 사용자 요청("계속 자가 점검하는 에이전트")으로 `.claude/agents/self-auditor.md`(읽기 전용 판단 점검)와 `scripts/agents/self_audit.py`(채점 7일 초과·main VPS 미반영·develop 미릴리스·PR 실패/방치·HANDOFF 방치·병합 후 작업 폴더, `--vps`로 HEAD·컨테이너·200/401)를 추가하고 CLAUDE.md 8단계·AGENTS.md §14에 세션 시작·사이클 종료·루프 사이 실행을 고정했다. 예약 heartbeat는 사용자 취소 결정대로 쓰지 않는다. 첫 실행 PASS 9·WARN 1(병합 후 남은 작업 폴더 24개). 합성 단위 테스트 11건.
+
 ## 완료된 작업 — 채팅 정확도·잘못된 본문 400을 main `898de04`로 VPS 반영 (2026-10-28)
 
 - #210(auth·chat 잘못된 본문 400)·#211(요약 도구 결정적 통계)·#212(금액 사전 문자열화·현장 siteId 힌트·404 안내, 독립 리뷰 권고 반영)을 develop 병합 → 릴리스 PR #213 CI PASS·SHA 일치 → main `898de04` push CI PASS → `buildflow-release deploy` 완료(16개 컨테이너 Up, 공개 / 200, 무인증 API 401). 되돌리기: `rollback 98a9dd3e8d6ecdf108109839d865af81b8d9ba9e`.
