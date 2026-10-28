@@ -24,6 +24,9 @@ public interface DefectWarrantyRepository extends JpaRepository<DefectWarranty, 
 
     List<DefectWarranty> findBySiteIdOrderByEndDateAsc(Long siteId);
 
+    /** 업로드 커밋 결과가 불확실할 때 저장 파일을 가리키는 행이 실제로 커밋됐는지 확인한다. */
+    boolean existsByFilePath(String filePath);
+
     List<DefectWarranty> findAllByOrderByEndDateAsc();
 
     @Query("""

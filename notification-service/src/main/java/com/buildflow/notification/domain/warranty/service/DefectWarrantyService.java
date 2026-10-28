@@ -166,6 +166,8 @@ public class DefectWarrantyService {
      * 기존 readOnly 트랜잭션을 중단하고, PENDING 행·업로드 이력 저장과 커밋 직전 현장 재확인을
      * 한 트랜잭션으로 커밋한 뒤 OCR을 예약한다. 재확인 실패(보관·삭제·장애)면 행·이력이 롤백되고
      * 이미 디스크에 쓴 파일도 지운 뒤 예외를 전파하므로 OCR은 예약되지 않는다.
+     * 콜백은 끝났는데 커밋 단계에서 예외가 나면(연결 끊김 등) 커밋 여부가 불확실하므로, 행 존재를 다시 조회해
+     * 커밋된 행이 있으면 파일을 보존한다.
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public WarrantyResponse createFromOcr(Long siteId, MultipartFile file) {
@@ -175,16 +177,21 @@ public class DefectWarrantyService {
         siteReferenceValidator.requireExistingSite(siteId);
         Path stored = storeFile(file);
         DefectWarranty pending;
+        // 콜백이 끝까지 실행됐는지 기록해, 이후 예외가 커밋 단계(결과 불확실)에서 났는지 구분한다
+        boolean[] callbackCompleted = {false};
         try {
             pending = transactionTemplate.execute(status -> {
                 DefectWarranty saved = warrantyRepository.save(DefectWarranty.createPending(siteId, stored.toString()));
                 auditRecorder.record(WarrantyAuditAction.UPLOADED, saved);
                 warrantyRepository.flush();
                 siteReferenceValidator.recheckBeforeCommit(siteId);
+                callbackCompleted[0] = true;
                 return saved;
             });
         } catch (RuntimeException e) {
-            deleteFileQuietly(stored.toString());
+            if (!callbackCompleted[0] || !pendingRowMayBeCommitted(stored, e)) {
+                deleteFileQuietly(stored.toString());
+            }
             throw e;
         }
         try {
@@ -198,6 +205,29 @@ public class DefectWarrantyService {
         log.info("warranty 업로드 접수 id={} siteId={} status={}",
                 pending.getId(), siteId, pending.getOcrStatus());
         return WarrantyResponse.from(pending);
+    }
+
+    /**
+     * 커밋 단계 예외(콜백 완료 후)는 DB가 실제로 커밋됐는지 알 수 없다. 새 읽기 트랜잭션으로 저장 경로를
+     * 가리키는 행을 확인해, 행이 있으면 원본을 보존한다(true). 행이 없으면 false(기존처럼 삭제).
+     * 확인 자체가 실패하면 원본 보존(true)을 택한다: 커밋된 PENDING 행은 30분 복구 작업이 FAILED로 바꿀 뿐
+     * 행·원본 참조는 남아 원본 다운로드·수동 보정에 쓰이므로, 파일을 지우면 복구 불가능한 깨진 참조가 되지만
+     * 남기면 최악이 디스크의 고아 파일 하나다(원본 보존 우선 — docs/PRODUCT_VISION.md).
+     */
+    private boolean pendingRowMayBeCommitted(Path stored, RuntimeException commitFailure) {
+        TransactionTemplate readOnly = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        readOnly.setReadOnly(true);
+        try {
+            Boolean exists = readOnly.execute(status -> warrantyRepository.existsByFilePath(stored.toString()));
+            boolean committed = Boolean.TRUE.equals(exists);
+            log.warn("보증보험 업로드 커밋 결과 불확실 causeType={} rowCommitted={}",
+                    commitFailure.getClass().getSimpleName(), committed);
+            return committed;
+        } catch (RuntimeException lookupFailure) {
+            log.warn("보증보험 업로드 커밋 결과 확인 실패 — 원본 파일 보존 causeType={} lookupCauseType={}",
+                    commitFailure.getClass().getSimpleName(), lookupFailure.getClass().getSimpleName());
+            return true;
+        }
     }
 
     private Path storeFile(MultipartFile file) {
