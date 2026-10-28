@@ -1,5 +1,6 @@
 package com.buildflow.chat.domain.chat.service;
 
+import com.buildflow.chat.domain.chat.tool.IntentRouter;
 import com.buildflow.chat.domain.chat.tool.ToolExecutor;
 import com.buildflow.chat.global.exception.BusinessException;
 import com.buildflow.chat.global.exception.ErrorCode;
@@ -358,5 +359,32 @@ class OllamaToolServiceTest {
 
         assertThat(lines).containsExactly("가나");
         assertThat(pending.toString(StandardCharsets.UTF_8)).isEqualTo("다");
+    }
+
+    @Test
+    void 현장_이름이_든_질문은_siteId_힌트를_시스템_메시지로_넣는다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        when(executor.execute(eq("listSites"), any()))
+                .thenReturn("[{\"id\":15,\"siteName\":\"[QA] 1022-144647 현장\"},{\"id\":4,\"siteName\":\"부산 창고\"}]");
+        OllamaToolService service = new OllamaToolService(WebClient.builder().build(), new ObjectMapper(), executor);
+        List<Object> messages = new ArrayList<>(List.of(Map.of("role", "user", "content", "[QA] 1022-144647 현장 손익 알려줘")));
+
+        List<IntentRouter.SiteRef> sites = service.addSiteHint(messages);
+
+        assertThat(sites).hasSize(2);
+        assertThat(messages).hasSize(2);
+        assertThat(messages.get(1)).isEqualTo(Map.of("role", "system",
+                "content", "질문에 언급된 현장: '[QA] 1022-144647 현장' siteId=15. 현장별 도구는 이 siteId로 호출한다."));
+    }
+
+    @Test
+    void 현장_도구가_필요_없는_질문은_목록을_조회하지_않는다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        OllamaToolService service = new OllamaToolService(WebClient.builder().build(), new ObjectMapper(), executor);
+        List<Object> messages = new ArrayList<>(List.of(Map.of("role", "user", "content", "안녕")));
+
+        assertThat(service.addSiteHint(messages)).isNull();
+        assertThat(messages).hasSize(1);
+        verify(executor, never()).execute(any(), any());
     }
 }

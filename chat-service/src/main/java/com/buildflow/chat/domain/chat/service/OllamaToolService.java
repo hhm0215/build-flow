@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -106,13 +107,14 @@ public class OllamaToolService {
      */
     public String runStreaming(List<Object> messages, Consumer<String> statusConsumer,
                                Consumer<String> tokenConsumer) {
+        List<IntentRouter.SiteRef> sites = addSiteHint(messages);
         for (int round = 0; round < maxToolRounds; round++) {
             statusConsumer.accept("thinking");
             JsonNode message = callOllama(messages, ToolCatalog.tools());
             JsonNode toolCalls = message.get("tool_calls");
 
             if (toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) {
-                if (round == 0 && applyFallback(messages, statusConsumer)) {
+                if (round == 0 && applyFallback(messages, sites, statusConsumer)) {
                     // 데이터 질문인데 도구 없이 답하려 했다 → 규칙으로 고른 도구 결과를 넣고 다시 답하게 한다.
                     return streamAnswer(messages, statusConsumer, tokenConsumer);
                 }
@@ -184,8 +186,15 @@ public class OllamaToolService {
 
     /** 마지막 사용자 질문을 규칙 라우터에 넣어 도구를 실행하고 그 왕복을 컨텍스트에 추가한다. 실행했으면 true. */
     boolean applyFallback(List<Object> messages, Consumer<String> statusConsumer) {
+        return applyFallback(messages, null, statusConsumer);
+    }
+
+    /** loadedSites가 null이면 필요할 때만 현장 목록을 조회한다. */
+    private boolean applyFallback(List<Object> messages, List<IntentRouter.SiteRef> loadedSites,
+                                  Consumer<String> statusConsumer) {
         String question = lastUserQuestion(messages);
-        List<IntentRouter.SiteRef> sites = IntentRouter.needsSites(question) ? loadSites() : List.of();
+        List<IntentRouter.SiteRef> sites = loadedSites != null ? loadedSites
+                : IntentRouter.needsSites(question) ? loadSites() : List.of();
         List<IntentRouter.RoutedCall> routed = IntentRouter.route(question, sites);
         if (routed.isEmpty()) {
             return false;
@@ -201,6 +210,28 @@ public class OllamaToolService {
         }
         log.info("도구 미선택 질문에 규칙 폴백 적용 tools={}", routed.stream().map(IntentRouter.RoutedCall::tool).toList());
         return true;
+    }
+
+    /**
+     * 소형 모델은 "[QA] 1022-144647 현장"처럼 기호·숫자가 섞인 이름을 현장 목록에서 못 찾거나 siteId를 추측한다(2026-10-28 실측).
+     * 현장별 도구가 필요한 질문이면 이름을 규칙으로 맞춰 siteId를 시스템 메시지로 알려 준다.
+     * 조회한 현장 목록을 돌려줘 폴백이 다시 조회하지 않게 한다. 현장 질문이 아니면 null.
+     */
+    List<IntentRouter.SiteRef> addSiteHint(List<Object> messages) {
+        String question = lastUserQuestion(messages);
+        if (!IntentRouter.needsSites(question)) {
+            return null;
+        }
+        List<IntentRouter.SiteRef> sites = loadSites();
+        List<IntentRouter.SiteRef> mentioned = IntentRouter.mentionedSites(question, sites);
+        if (!mentioned.isEmpty()) {
+            String refs = mentioned.stream()
+                    .map(site -> "'" + site.name() + "' siteId=" + site.id())
+                    .collect(Collectors.joining(", "));
+            messages.add(Map.of("role", "system",
+                    "content", "질문에 언급된 현장: " + refs + ". 현장별 도구는 이 siteId로 호출한다."));
+        }
+        return sites;
     }
 
     private static String lastUserQuestion(List<Object> messages) {

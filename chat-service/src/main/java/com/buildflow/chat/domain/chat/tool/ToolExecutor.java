@@ -7,12 +7,19 @@ import com.buildflow.chat.infra.feign.TaxClient;
 import com.buildflow.chat.infra.feign.dto.DashboardStatsDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
@@ -51,14 +58,55 @@ public class ToolExecutor {
                 case "listPurchasesBySite" -> limited(purchaseClient.listBySite(requireSiteId(args)).getData());
                 default -> null;
             };
-            return objectMapper.writeValueAsString(data);
+            return objectMapper.writeValueAsString(formatMoney(objectMapper.valueToTree(data)));
         } catch (IllegalArgumentException e) {
             return error(e.getMessage());
+        } catch (FeignException.NotFound e) {
+            // 모델이 listSites 없이 siteId를 추측하면 404가 난다. 다음 라운드에서 바로잡도록 방법을 알린다.
+            return error("siteId=" + (args == null ? "?" : args.path("siteId").asText("?")) + " 현장을 찾을 수 없습니다. listSites로 현장 ID를 확인한 뒤 다시 호출하세요.");
         } catch (Exception e) {
             // Feign 예외 메시지에는 상류 응답 본문이 섞일 수 있어 종류만 남긴다.
             log.warn("도구 실행 실패 name={}: {}", name, e.getClass().getSimpleName());
             return error("도구 실행에 실패했습니다: " + name);
         }
+    }
+
+    /** 금액이 아닌 원 단위 이름(마진·단가)과 *Amount 필드는 금액, *Rate 필드는 백분율로 본다. */
+    private static final Set<String> MONEY_FIELDS = Set.of("margin", "totalMargin", "unitPrice");
+
+    /**
+     * 소형 모델이 8000.00 같은 숫자를 "8,000만 원"·"8,000,000원"으로 부풀려 읽는 일이 실측돼(2026-10-28),
+     * 금액·비율 숫자를 "8,000원"·"84.00%" 문자열로 미리 만들어 모델이 그대로 옮겨 적게 한다.
+     */
+    static JsonNode formatMoney(JsonNode node) {
+        if (node instanceof ArrayNode array) {
+            array.forEach(ToolExecutor::formatMoney);
+        } else if (node instanceof ObjectNode object) {
+            Iterator<Map.Entry<String, JsonNode>> fields = object.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                JsonNode value = field.getValue();
+                String name = field.getKey();
+                if (value.isNumber() && isMoney(name)) {
+                    field.setValue(object.textNode(won(value.decimalValue())));
+                } else if (value.isNumber() && name.endsWith("Rate")) {
+                    field.setValue(object.textNode(value.decimalValue().setScale(2, RoundingMode.HALF_UP).toPlainString() + "%"));
+                } else {
+                    formatMoney(value);
+                }
+            }
+        }
+        return node;
+    }
+
+    private static boolean isMoney(String name) {
+        return MONEY_FIELDS.contains(name) || name.endsWith("Amount");
+    }
+
+    private static String won(BigDecimal amount) {
+        BigDecimal plain = amount.stripTrailingZeros();
+        String pattern = plain.scale() > 0 ? "#,##0.##" : "#,##0";
+        return new DecimalFormat(pattern).format(plain) + "원";
     }
 
     private static Map<String, Object> limited(List<?> items) {

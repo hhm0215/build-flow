@@ -79,6 +79,11 @@ public final class IntentRouter {
         return calls;
     }
 
+    /** 질문에 이름이 들어 있는 현장(이름이 긴 것부터 최대 {@link #MAX_SITES}개). */
+    public static List<SiteRef> mentionedSites(String question, List<SiteRef> sites) {
+        return matchSites(normalize(question), sites);
+    }
+
     static List<SiteRef> matchSites(String normalizedQuestion, List<SiteRef> sites) {
         if (sites == null) {
             return List.of();
