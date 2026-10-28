@@ -3,6 +3,11 @@ server:
 
 spring:
   cloud:
+    loadbalancer:
+      # Feign 현장·참조 확인은 DB 트랜잭션 안(행 잠금 보유 중)에서 호출된다. spring-retry가 런타임에 있어
+      # 기본값이면 GET이 한 번 더 재시도되어 잠금 보유가 최대 2배로 늘어나므로 끄고, 실패는 503으로 바로 돌려준다.
+      retry:
+        enabled: false
     openfeign:
       client:
         config:
