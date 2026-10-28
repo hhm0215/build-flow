@@ -66,6 +66,7 @@ class TaxOutboxIntegrationTest {
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
     private final TaxPaymentRepository paymentRepository;
+    private final TaxPaymentService paymentService;
 
     @MockBean private SiteReferenceValidator siteReferenceValidator;
     @MockBean private PurchaseEvidenceGuard purchaseEvidenceGuard;
@@ -74,7 +75,8 @@ class TaxOutboxIntegrationTest {
                              OutboxEventRepository outboxRepository, OutboxClaimService claimService,
                              OutboxWriter outboxWriter, PlatformTransactionManager transactionManager,
                              ObjectMapper objectMapper, JdbcTemplate jdbcTemplate,
-                             TaxPaymentRepository paymentRepository) {
+                             TaxPaymentRepository paymentRepository,
+                             TaxPaymentService paymentService) {
         this.taxService = taxService;
         this.taxRepository = taxRepository;
         this.outboxRepository = outboxRepository;
@@ -84,6 +86,7 @@ class TaxOutboxIntegrationTest {
         this.objectMapper = objectMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.paymentRepository = paymentRepository;
+        this.paymentService = paymentService;
     }
 
     @BeforeEach
@@ -159,6 +162,46 @@ class TaxOutboxIntegrationTest {
 
         assertThat(taxRepository.count()).isZero();
         assertThat(outboxRepository.count()).isZero();
+    }
+
+    @Test
+    void siteArchivedBeforeUpdateOrDeleteCommitKeepsInvoiceUnchanged() {
+        long id = taxService.create(createRequest()).getId();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(7L);
+
+        assertThatThrownBy(() -> taxService.update(id, updateRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+        assertThatThrownBy(() -> taxService.delete(id))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+
+        TaxInvoice unchanged = taxRepository.findById(id).orElseThrow();
+        assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
+        assertThat(unchanged.getCounterparty()).isEqualTo("거래처");
+        assertThat(outboxRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void siteArchivedBeforeDeleteCommitRestoresCanceledPaymentLedger() {
+        long id = taxService.create(createRequest()).getId();
+        var payment = paymentService.record(id, paymentRecordRequest("110.00"));
+        paymentService.cancel(id, payment.getId(), null);
+        long paymentsBefore = paymentRepository.count();
+        long outboxBefore = outboxRepository.count();
+        assertThat(paymentsBefore).isEqualTo(1);
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(7L);
+
+        assertThatThrownBy(() -> taxService.delete(id))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+
+        assertThat(taxRepository.existsById(id)).isTrue();
+        assertThat(paymentRepository.count()).isEqualTo(paymentsBefore);
+        assertThat(paymentRepository.findById(payment.getId()).orElseThrow().isCanceled()).isTrue();
+        assertThat(outboxRepository.count()).isEqualTo(outboxBefore);
     }
 
     @Test
@@ -399,6 +442,13 @@ class TaxOutboxIntegrationTest {
         ReflectionTestUtils.setField(request, "taxAmount", new BigDecimal("10.00"));
         ReflectionTestUtils.setField(request, "counterparty", "거래처");
         ReflectionTestUtils.setField(request, "issueDate", LocalDate.of(2026, 9, 20));
+        return request;
+    }
+
+    private com.buildflow.tax.domain.taxinvoice.dto.TaxPaymentCreateRequest paymentRecordRequest(String amount) {
+        var request = new com.buildflow.tax.domain.taxinvoice.dto.TaxPaymentCreateRequest();
+        ReflectionTestUtils.setField(request, "amount", new BigDecimal(amount));
+        ReflectionTestUtils.setField(request, "paymentDate", LocalDate.of(2026, 10, 1));
         return request;
     }
 

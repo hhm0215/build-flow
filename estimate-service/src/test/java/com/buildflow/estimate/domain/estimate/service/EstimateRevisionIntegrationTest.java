@@ -239,6 +239,40 @@ class EstimateRevisionIntegrationTest {
         assertEquals(outboxBefore, outboxRepository.count());
     }
 
+    @Test
+    void siteArchivedBeforeConfirmCommitRollsBackSupersedeAndProfitEvents() throws Exception {
+        Long original = confirmed(create(SITE, null, null, "1000"));
+        Long revision = create(SITE, EstimateKind.REVISION, original, "1200");
+        long outboxBefore = outboxRepository.count();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(SITE);
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> estimateService.confirm(revision));
+
+        assertEquals(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED, exception.getErrorCode());
+        assertEquals(EstimateStatus.CONFIRMED, status(original));
+        assertEquals(null, estimateRepository.findById(original).orElseThrow().getSupersededById());
+        assertEquals(EstimateStatus.DRAFT, status(revision));
+        assertEquals(outboxBefore, outboxRepository.count());
+        assertEquals(new BigDecimal("1000.00"), projectedEstimateTotal(SITE));
+    }
+
+    @Test
+    void siteArchivedBeforeUpdateOrDeleteCommitKeepsDraftUnchanged() throws Exception {
+        Long draft = create(SITE, null, null, "1000");
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(SITE);
+
+        assertThrows(BusinessException.class, () -> estimateService.update(draft, updateRequest()));
+        Estimate unchanged = estimateRepository.findById(draft).orElseThrow();
+        assertEquals("견적", unchanged.getTitle());
+        assertEquals(new BigDecimal("1000.00"), unchanged.getTotalAmount());
+
+        assertThrows(BusinessException.class, () -> estimateService.delete(draft));
+        assertTrue(estimateRepository.existsById(draft));
+        assertEquals(0, outboxRepository.count());
+    }
+
     private Long create(long siteId, EstimateKind kind, Long revisionOfId, String unitPrice) throws Exception {
         String json = objectMapper.writeValueAsString(new java.util.LinkedHashMap<String, Object>() {{
             put("siteId", siteId);

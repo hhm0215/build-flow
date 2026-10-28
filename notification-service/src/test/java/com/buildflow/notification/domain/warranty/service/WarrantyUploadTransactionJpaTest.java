@@ -1,6 +1,8 @@
 package com.buildflow.notification.domain.warranty.service;
 
 import com.buildflow.notification.domain.warranty.dto.WarrantyCreateRequest;
+import com.buildflow.notification.domain.warranty.dto.WarrantyUpdateRequest;
+import com.buildflow.notification.domain.warranty.repository.WarrantyFileRetentionRepository;
 import com.buildflow.notification.domain.warranty.repository.DefectWarrantyRepository;
 import com.buildflow.notification.domain.warranty.repository.WarrantyAuditEventRepository;
 import com.buildflow.notification.global.exception.BusinessException;
@@ -41,6 +43,7 @@ class WarrantyUploadTransactionJpaTest {
     @Autowired private DefectWarrantyService service;
     @Autowired private DefectWarrantyRepository repository;
     @Autowired private WarrantyAuditEventRepository auditRepository;
+    @Autowired private WarrantyFileRetentionRepository retentionRepository;
     @MockBean private WarrantyOcrService ocr;
     @MockBean private SiteReferenceValidator siteReferenceValidator;
     @TempDir Path tempDir;
@@ -105,5 +108,53 @@ class WarrantyUploadTransactionJpaTest {
 
         assertThat(repository.count()).isEqualTo(warrantiesBefore);
         assertThat(auditRepository.count()).isEqualTo(auditsBefore);
+    }
+
+    @Test
+    void 수정_삭제_후_현장이_보관되면_보정과_이력과_보존기록이_롤백된다() {
+        WarrantyCreateRequest request = org.springframework.beans.BeanUtils.instantiateClass(WarrantyCreateRequest.class);
+        ReflectionTestUtils.setField(request, "siteId", 1L);
+        ReflectionTestUtils.setField(request, "insuranceCompany", "합성 보험사");
+        ReflectionTestUtils.setField(request, "startDate", java.time.LocalDate.of(2026, 1, 1));
+        ReflectionTestUtils.setField(request, "endDate", java.time.LocalDate.of(2027, 1, 1));
+        Long id = service.create(request).getId();
+        long auditsBefore = auditRepository.count();
+        long retentionsBefore = retentionRepository.count();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(1L);
+        WarrantyUpdateRequest update = org.springframework.beans.BeanUtils.instantiateClass(WarrantyUpdateRequest.class);
+        ReflectionTestUtils.setField(update, "insuranceCompany", "바뀐 보험사");
+        ReflectionTestUtils.setField(update, "startDate", java.time.LocalDate.of(2026, 2, 1));
+        ReflectionTestUtils.setField(update, "endDate", java.time.LocalDate.of(2027, 2, 1));
+
+        assertThatThrownBy(() -> service.update(id, update))
+                .isInstanceOfSatisfying(BusinessException.class, error ->
+                        assertThat(error.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+        assertThatThrownBy(() -> service.delete(id))
+                .isInstanceOfSatisfying(BusinessException.class, error ->
+                        assertThat(error.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+
+        assertThat(repository.findById(id).orElseThrow().getInsuranceCompany()).isEqualTo("합성 보험사");
+        assertThat(auditRepository.count()).isEqualTo(auditsBefore);
+        assertThat(retentionRepository.count()).isEqualTo(retentionsBefore);
+    }
+
+    @Test
+    void 원본_PDF가_있는_보증_삭제가_재확인에서_막히면_행과_보존기록이_롤백되고_파일은_그대로다() throws Exception {
+        Path pdf = java.nio.file.Files.write(
+                tempDir.resolve(java.util.UUID.randomUUID() + ".pdf"), new byte[]{1, 2, 3});
+        Long id = repository.saveAndFlush(
+                com.buildflow.notification.domain.warranty.entity.DefectWarranty.createPending(1L, pdf.toString())).getId();
+        long auditsBefore = auditRepository.count();
+        long retentionsBefore = retentionRepository.count();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(1L);
+
+        assertThatThrownBy(() -> service.delete(id)).isInstanceOf(BusinessException.class);
+
+        assertThat(repository.existsById(id)).isTrue();
+        assertThat(auditRepository.count()).isEqualTo(auditsBefore);
+        assertThat(retentionRepository.count()).isEqualTo(retentionsBefore);
+        assertThat(pdf).exists();
     }
 }

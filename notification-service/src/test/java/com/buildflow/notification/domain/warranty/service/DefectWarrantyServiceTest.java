@@ -105,4 +105,77 @@ class DefectWarrantyServiceTest {
         order.verify(repository).flush();
         order.verify(siteReferenceValidator).recheckBeforeCommit(1L);
     }
+
+    @Test
+    void 수동_보정은_변경과_이력_flush_뒤_보관_여부를_다시_확인한다() {
+        DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
+        SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
+        WarrantyAuditRecorder auditRecorder = mock(WarrantyAuditRecorder.class);
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), siteReferenceValidator, auditRecorder, mock(WarrantyFileRetentionService.class), new TransactionTemplate(mock(PlatformTransactionManager.class)));
+        when(repository.findByIdForUpdate(7L)).thenReturn(Optional.of(manualWarranty()));
+
+        service.update(7L, validUpdate());
+
+        var order = org.mockito.Mockito.inOrder(siteReferenceValidator, repository, auditRecorder);
+        order.verify(siteReferenceValidator).requireSiteNotArchived(1L);
+        order.verify(auditRecorder).record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        order.verify(repository).flush();
+        order.verify(siteReferenceValidator).recheckNotArchivedBeforeCommit(1L);
+    }
+
+    @Test
+    void 삭제는_이력_보존기록_삭제_flush_뒤_보관_여부를_다시_확인한다() {
+        DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
+        SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
+        WarrantyAuditRecorder auditRecorder = mock(WarrantyAuditRecorder.class);
+        WarrantyFileRetentionService retention = mock(WarrantyFileRetentionService.class);
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), siteReferenceValidator, auditRecorder, retention, new TransactionTemplate(mock(PlatformTransactionManager.class)));
+        DefectWarranty warranty = manualWarranty();
+        when(repository.findByIdForUpdate(7L)).thenReturn(Optional.of(warranty));
+
+        service.delete(7L);
+
+        var order = org.mockito.Mockito.inOrder(siteReferenceValidator, repository, auditRecorder, retention);
+        order.verify(siteReferenceValidator).requireSiteNotArchived(1L);
+        order.verify(auditRecorder).record(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        order.verify(retention).retain(warranty);
+        order.verify(repository).delete(warranty);
+        order.verify(repository).flush();
+        order.verify(siteReferenceValidator).recheckNotArchivedBeforeCommit(1L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ErrorCode.class,
+            names = {"SITE_ARCHIVED_DOCUMENT_LOCKED", "SITE_REFERENCE_UNAVAILABLE"})
+    void 수정_삭제의_커밋_직전_재확인_실패를_전파한다(ErrorCode code) {
+        DefectWarrantyRepository repository = mock(DefectWarrantyRepository.class);
+        SiteReferenceValidator siteReferenceValidator = mock(SiteReferenceValidator.class);
+        DefectWarrantyService service = new DefectWarrantyService(repository, mock(WarrantyOcrService.class), mock(WarrantyAuditEventRepository.class), siteReferenceValidator, mock(WarrantyAuditRecorder.class), mock(WarrantyFileRetentionService.class), new TransactionTemplate(mock(PlatformTransactionManager.class)));
+        when(repository.findByIdForUpdate(7L)).thenAnswer(invocation -> Optional.of(manualWarranty()));
+        doThrow(new BusinessException(code)).when(siteReferenceValidator).recheckNotArchivedBeforeCommit(1L);
+
+        assertThatThrownBy(() -> service.update(7L, validUpdate()))
+                .isInstanceOfSatisfying(BusinessException.class, error ->
+                        org.assertj.core.api.Assertions.assertThat(error.getErrorCode()).isEqualTo(code));
+        assertThatThrownBy(() -> service.delete(7L))
+                .isInstanceOfSatisfying(BusinessException.class, error ->
+                        org.assertj.core.api.Assertions.assertThat(error.getErrorCode()).isEqualTo(code));
+    }
+
+    private static DefectWarranty manualWarranty() {
+        return DefectWarranty.builder()
+                .siteId(1L)
+                .insuranceCompany("기존 보험사")
+                .startDate(LocalDate.of(2026, 1, 1))
+                .endDate(LocalDate.of(2027, 1, 1))
+                .build();
+    }
+
+    private static WarrantyUpdateRequest validUpdate() {
+        WarrantyUpdateRequest request = mock(WarrantyUpdateRequest.class);
+        when(request.getInsuranceCompany()).thenReturn("바뀐 보험사");
+        when(request.getStartDate()).thenReturn(LocalDate.of(2026, 2, 1));
+        when(request.getEndDate()).thenReturn(LocalDate.of(2027, 2, 1));
+        return request;
+    }
 }

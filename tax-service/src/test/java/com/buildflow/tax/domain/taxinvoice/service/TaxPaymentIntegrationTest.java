@@ -166,6 +166,27 @@ class TaxPaymentIntegrationTest {
     }
 
     @Test
+    void siteArchivedBeforeCancelCommitRestoresPaymentAndInvoiceState() {
+        long id = taxService.create(createRequest(TaxInvoiceType.SALES)).getId();
+        TaxPaymentResponse payment = paymentService.record(id, paymentRequest("110.00"));
+        assertThat(taxRepository.findById(id).orElseThrow().isPaymentConfirmed()).isTrue();
+        long outboxBefore = outboxRepository.count();
+        org.mockito.Mockito.doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(7L);
+
+        assertThatThrownBy(() -> paymentService.cancel(id, payment.getId(), null))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+
+        assertThat(paymentRepository.findById(payment.getId()).orElseThrow().isCanceled()).isFalse();
+        assertThat(paymentRepository.sumActiveAmount(id)).isEqualByComparingTo("110.00");
+        var invoice = taxRepository.findById(id).orElseThrow();
+        assertThat(invoice.isPaymentConfirmed()).isTrue();
+        assertThat(invoice.getPaymentDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(outboxRepository.count()).isEqualTo(outboxBefore);
+    }
+
+    @Test
     void legacyConfirmedInvoiceIsBackfilledOnce() {
         long id = taxService.create(createRequest(TaxInvoiceType.SALES)).getId();
         var invoice = taxRepository.findById(id).orElseThrow();

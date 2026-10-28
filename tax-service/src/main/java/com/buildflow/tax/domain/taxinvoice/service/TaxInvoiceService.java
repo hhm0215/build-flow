@@ -97,6 +97,9 @@ public class TaxInvoiceService {
                 request.getIssueDate(),
                 request.getMemo()
         );
+        taxInvoiceRepository.flush();
+        // 첫 검사 직후 현장이 보관됐으면 수정을 커밋 전에 롤백한다 (ADR-021 보관 현장 문서 잠금)
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(taxInvoice.getSiteId());
         return TaxInvoiceResponse.from(taxInvoice, BigDecimal.ZERO);
     }
 
@@ -117,6 +120,9 @@ public class TaxInvoiceService {
         }
         taxPaymentService.deleteLedger(taxInvoice.getId());
         taxInvoiceRepository.delete(taxInvoice);
+        taxInvoiceRepository.flush();
+        // 입금 원장·계산서 삭제가 flush된 뒤 재확인해, 그 사이 보관됐으면 둘 다 롤백한다
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(taxInvoice.getSiteId());
     }
 
     /** 미수금 = Σ(공급가+세액) − Σ(유효 입금). 잔액이 남은 매출 계산서만 미수 건으로 센다. */
