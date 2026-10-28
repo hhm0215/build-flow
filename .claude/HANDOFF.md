@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
+| 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-28 11:49 KST |
+| 갱신 | 2026-10-28 11:53 KST |
 | 브랜치 | `codex/profit-reconcile-validation` (체크포인트, 드래프트 PR로 노출) |
 | PR | `codex/profit-reconcile-validation`의 드래프트 PR (`gh pr list --head codex/profit-reconcile-validation`) |
-| 현재 단계 | Harden orphan event attribution and verify MySQL integration |
-| 다음 첫 행동 | Check final SHA CI and reconcile delayed events before develop merge |
+| 현재 단계 | Local and isolated CI verification complete; final head checks and develop integration |
+| 다음 첫 행동 | Check PR 205 final SHA CI; merge to develop if clean; preserve production gates |
 
 ## 공통 사용자 지시
 
