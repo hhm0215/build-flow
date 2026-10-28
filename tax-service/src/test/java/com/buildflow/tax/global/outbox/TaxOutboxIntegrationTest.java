@@ -162,6 +162,25 @@ class TaxOutboxIntegrationTest {
     }
 
     @Test
+    void siteArchivedBeforeUpdateOrDeleteCommitKeepsInvoiceUnchanged() {
+        long id = taxService.create(createRequest()).getId();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(7L);
+
+        assertThatThrownBy(() -> taxService.update(id, updateRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+        assertThatThrownBy(() -> taxService.delete(id))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED));
+
+        TaxInvoice unchanged = taxRepository.findById(id).orElseThrow();
+        assertThat(unchanged.getTotalAmount()).isEqualByComparingTo("110.00");
+        assertThat(unchanged.getCounterparty()).isEqualTo("거래처");
+        assertThat(outboxRepository.count()).isEqualTo(1);
+    }
+
+    @Test
     void invalidCreateAmountDoesNotWriteInvoiceOrOutbox() {
         TaxInvoiceCreateRequest invalid = createRequest();
         ReflectionTestUtils.setField(invalid, "supplyAmount", new BigDecimal("9999999999999.99"));

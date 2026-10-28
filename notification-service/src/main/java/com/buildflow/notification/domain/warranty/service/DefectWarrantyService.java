@@ -119,6 +119,9 @@ public class DefectWarrantyService {
                 request.getMemo()
         );
         auditRecorder.record(WarrantyAuditAction.MANUAL_UPDATED, warranty);
+        warrantyRepository.flush();
+        // 첫 검사 직후 현장이 보관됐으면 보정·이력을 커밋 전에 롤백한다 (ADR-021 보관 현장 문서 잠금)
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(warranty.getSiteId());
         return WarrantyResponse.from(warranty);
     }
 
@@ -130,6 +133,9 @@ public class DefectWarrantyService {
         // 원본 보존: 파일은 즉시 지우지 않고 보존 기록만 같은 트랜잭션에 남긴다. 기한이 지나면 정리 작업이 폐기한다.
         fileRetention.retain(warranty);
         warrantyRepository.delete(warranty);
+        warrantyRepository.flush();
+        // 파일은 커밋 후 보존 기한 정리 작업만 지우므로, 여기서 롤백돼도 원본 PDF·보존 기록 정합이 깨지지 않는다
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(warranty.getSiteId());
     }
 
     private void deleteFileQuietly(String filePath) {
