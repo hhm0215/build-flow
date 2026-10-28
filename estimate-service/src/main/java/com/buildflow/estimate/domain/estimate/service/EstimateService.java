@@ -91,6 +91,9 @@ public class EstimateService {
         estimate.update(request.getTitle(), request.getEstimateDate(), totalAmount, request.getMemo());
         estimate.clearItems();
         addItems(estimate, request.getItems());
+        estimateRepository.flush();
+        // 첫 검사 직후 현장이 보관됐으면 변경을 커밋 전에 롤백한다 (ADR-021 보관 현장 문서 잠금)
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(estimate.getSiteId());
 
         return EstimateResponse.from(estimate);
     }
@@ -108,6 +111,8 @@ public class EstimateService {
         }
         // 초안은 관계의 원 견적이 될 수 없으므로(resolveRelationSource) 초안 삭제가 체인을 끊지 않는다.
         estimateRepository.delete(estimate);
+        estimateRepository.flush();
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(estimate.getSiteId());
     }
 
     /**
@@ -150,6 +155,9 @@ public class EstimateService {
                 .siteId(estimate.getSiteId())
                 .totalAmount(estimate.getTotalAmount())
                 .build());
+        estimateRepository.flush();
+        // 확정·기존 확정본 대체·손익 outbox가 모두 기록된 뒤 재확인해, 그 사이 보관됐으면 전부 롤백한다
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(estimate.getSiteId());
 
         return EstimateResponse.from(estimate);
     }

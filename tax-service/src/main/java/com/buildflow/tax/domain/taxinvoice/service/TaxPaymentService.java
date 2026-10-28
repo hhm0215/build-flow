@@ -108,6 +108,9 @@ public class TaxPaymentService {
         payment.cancel(LocalDateTime.now(), request == null ? null : request.getReason());
         taxPaymentRepository.flush();
         refreshInvoiceState(invoice);
+        taxInvoiceRepository.flush();
+        // 첫 검사 직후 현장이 보관됐으면 취소·계산서 상태 변경을 커밋 전에 롤백한다 (ADR-021 보관 현장 잠금)
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(invoice.getSiteId());
         return TaxPaymentResponse.from(payment);
     }
 

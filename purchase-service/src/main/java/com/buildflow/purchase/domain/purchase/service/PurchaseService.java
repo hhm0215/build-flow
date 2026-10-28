@@ -95,6 +95,9 @@ public class PurchaseService {
                         .newTotalAmount(purchase.getTotalAmount())
                         .build()
         );
+        purchaseRepository.flush();
+        // 첫 검사 직후 현장이 보관됐으면 수정·outbox 이벤트를 커밋 전에 롤백한다 (ADR-021 보관 현장 문서 잠금)
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(purchase.getSiteId());
 
         return PurchaseResponse.from(purchase);
     }
@@ -115,6 +118,8 @@ public class PurchaseService {
         );
 
         purchaseRepository.delete(purchase);
+        purchaseRepository.flush();
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(purchase.getSiteId());
     }
 
     private Purchase getPurchase(Long id) {

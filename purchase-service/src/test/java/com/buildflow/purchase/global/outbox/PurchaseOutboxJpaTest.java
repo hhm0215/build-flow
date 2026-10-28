@@ -181,6 +181,26 @@ class PurchaseOutboxJpaTest {
     }
 
     @Test
+    void siteArchivedBeforeUpdateOrDeleteCommitRollsBackChangeAndOutbox() {
+        Long id = purchaseService.create(request()).getId();
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED))
+                .when(siteReferenceValidator).recheckNotArchivedBeforeCommit(7L);
+
+        BusinessException updateError = assertThrows(BusinessException.class,
+                () -> purchaseService.update(id, updateRequest()));
+        BusinessException deleteError = assertThrows(BusinessException.class,
+                () -> purchaseService.delete(id));
+
+        assertEquals(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED, updateError.getErrorCode());
+        assertEquals(ErrorCode.SITE_ARCHIVED_DOCUMENT_LOCKED, deleteError.getErrorCode());
+        assertTrue(purchaseRepository.existsById(id));
+        assertEquals(0, purchaseRepository.findById(id).orElseThrow().getTotalAmount()
+                .compareTo(new BigDecimal("3000.00")));
+        assertEquals(1L, purchaseRepository.findById(id).orElseThrow().getEventRevision());
+        assertEquals(1, outboxRepository.count());
+    }
+
+    @Test
     void invalidCreateAmountDoesNotWritePurchaseOrOutbox() {
         PurchaseCreateRequest invalid = request();
         ReflectionTestUtils.setField(invalid, "quantity", 1001);

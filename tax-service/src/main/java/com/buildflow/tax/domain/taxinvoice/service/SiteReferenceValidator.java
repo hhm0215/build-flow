@@ -47,6 +47,15 @@ public class SiteReferenceValidator {
     }
 
     /**
+     * 기존 문서의 수정·삭제·확정 경로에서 변경·outbox 기록을 flush한 뒤 커밋 직전에 보관 여부를 다시 확인한다.
+     * 첫 검사 직후 현장이 보관되면 409(SITE_ARCHIVED_DOCUMENT_LOCKED), 확인 장애면 503을 던져 변경 전체를 롤백한다.
+     * 현장 404(고아 자료)는 첫 검사와 같이 막지 않는다.
+     */
+    public void recheckNotArchivedBeforeCommit(Long siteId) {
+        requireSiteNotArchived(siteId);
+    }
+
+    /**
      * 기존 자료의 수정·삭제 전 검사. 보관된 현장이면 409, 현장 확인 장애는 503으로 실패-닫힘.
      * 현장 검증 도입 전 생긴 고아 자료(현장 404)는 정정할 수 있도록 막지 않는다.
      */
