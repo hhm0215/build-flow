@@ -51,7 +51,8 @@ public final class ToolCatalog {
                         "특정 현장의 미수금(매출 세금계산서 대비 미입금액)을 조회한다.",
                         siteIdParam()),
                 tool("getDashboardSummary",
-                        "전체 현장에 대한 AI 요약 대시보드를 조회한다.",
+                        "전체 현장 손익 통계(AI 생성 글이 아닌 집계 숫자)를 조회한다: 전체 현장 수와 상태별 현장 수, 총견적액·총매입액·총마진·마진율 합계(합계와 마진율은 수주 전 BIDDING 현장 제외, 마진율=총마진/총견적액×100), "
+                                + "현장별 손익 목록(siteProfits: 현장명, 상태, 견적액, 매입액, 마진, 마진율; 수주 전 현장도 포함, 최근 등록순). 목록이 길면 앞쪽 일부만 넣고 siteProfitsTotalCount로 전체 건수를 알린다.",
                         noParams()),
                 tool("listEstimatesBySite",
                         "특정 현장의 견적서 목록(제목, 상태 DRAFT/CONFIRMED/SUPERSEDED, 견적일, 금액)을 조회한다. 손익에는 확정(CONFIRMED) 견적만 반영되고, 수정본에 대체된(SUPERSEDED) 견적은 이력일 뿐 손익에서 빠진다.",

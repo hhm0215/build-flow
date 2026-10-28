@@ -4,6 +4,7 @@ import com.buildflow.chat.infra.feign.EstimateClient;
 import com.buildflow.chat.infra.feign.PurchaseClient;
 import com.buildflow.chat.infra.feign.SiteClient;
 import com.buildflow.chat.infra.feign.TaxClient;
+import com.buildflow.chat.infra.feign.dto.DashboardStatsDto;
 import com.buildflow.chat.infra.feign.dto.FeignApiResponse;
 import com.buildflow.chat.infra.feign.dto.EstimateSummaryDto;
 import com.buildflow.chat.infra.feign.dto.ProfitDto;
@@ -18,10 +19,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class ToolExecutorTest {
@@ -130,5 +133,66 @@ class ToolExecutorTest {
     void 현장_목록_도구도_siteId가_없으면_error를_반환한다() {
         assertThat(executor.execute("listEstimatesBySite", null)).contains("error").contains("siteId");
         assertThat(executor.execute("listPurchasesBySite", null)).contains("error").contains("siteId");
+    }
+
+    @Test
+    void 전체_요약_도구는_결정적_손익_통계를_조회하고_합계를_보존한다() throws Exception {
+        given(siteClient.getStats()).willReturn(statsResponse(2));
+
+        JsonNode result = objectMapper.readTree(executor.execute("getDashboardSummary", null));
+
+        then(siteClient).should().getStats();
+        assertThat(result.get("totalSites").asInt()).isEqualTo(2);
+        assertThat(result.get("sitesByStatus").get("IN_PROGRESS").asInt()).isEqualTo(2);
+        assertThat(result.get("totalEstimateAmount").decimalValue()).isEqualByComparingTo("100000");
+        assertThat(result.get("totalPurchaseAmount").decimalValue()).isEqualByComparingTo("60000");
+        assertThat(result.get("totalMargin").decimalValue()).isEqualByComparingTo("40000");
+        assertThat(result.get("averageMarginRate").decimalValue()).isEqualByComparingTo("40.00");
+        assertThat(result.get("siteProfitsTotalCount").asInt()).isEqualTo(2);
+        assertThat(result.get("siteProfits")).hasSize(2);
+        assertThat(result.get("siteProfits").get(0).get("siteName").asText()).isEqualTo("현장0");
+        assertThat(result.has("note")).isFalse();
+    }
+
+    @Test
+    void 전체_요약_도구는_현장별_손익을_30건으로_자르고_합계는_그대로_둔다() throws Exception {
+        given(siteClient.getStats()).willReturn(statsResponse(31));
+
+        JsonNode result = objectMapper.readTree(executor.execute("getDashboardSummary", null));
+
+        assertThat(result.get("totalSites").asInt()).isEqualTo(31);
+        assertThat(result.get("totalEstimateAmount").decimalValue()).isEqualByComparingTo("100000");
+        assertThat(result.get("totalMargin").decimalValue()).isEqualByComparingTo("40000");
+        assertThat(result.get("siteProfitsTotalCount").asInt()).isEqualTo(31);
+        assertThat(result.get("siteProfits")).hasSize(ToolExecutor.LIST_LIMIT);
+        assertThat(result.get("note").asText()).contains("30").contains("siteProfitsTotalCount");
+    }
+
+    @Test
+    void 전체_요약_도구의_타서비스_예외는_error_json으로_degrade한다() {
+        given(siteClient.getStats()).willThrow(new RuntimeException("service down"));
+        assertThat(executor.execute("getDashboardSummary", null)).contains("error").contains("getDashboardSummary");
+    }
+
+    private static FeignApiResponse<DashboardStatsDto> statsResponse(int siteCount) {
+        List<DashboardStatsDto.SiteProfitDto> profits = IntStream.range(0, siteCount).mapToObj(i -> {
+            DashboardStatsDto.SiteProfitDto p = new DashboardStatsDto.SiteProfitDto();
+            p.setSiteId((long) i);
+            p.setSiteName("현장" + i);
+            p.setStatus("IN_PROGRESS");
+            p.setMargin(new BigDecimal("1000"));
+            return p;
+        }).toList();
+        DashboardStatsDto stats = new DashboardStatsDto();
+        stats.setTotalSites(siteCount);
+        stats.setSitesByStatus(Map.of("IN_PROGRESS", siteCount));
+        stats.setTotalEstimateAmount(new BigDecimal("100000"));
+        stats.setTotalPurchaseAmount(new BigDecimal("60000"));
+        stats.setTotalMargin(new BigDecimal("40000"));
+        stats.setAverageMarginRate(new BigDecimal("40.00"));
+        stats.setSiteProfits(profits);
+        FeignApiResponse<DashboardStatsDto> response = new FeignApiResponse<>();
+        response.setData(stats);
+        return response;
     }
 }
