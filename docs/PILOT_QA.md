@@ -161,6 +161,10 @@ Tesseract를 JVM 안(Tess4J/JNA)에서 부르던 방식을 페이지별 별도 �
 
 후속(같은 날, 로컬 재실측): 요약 도구를 결정적 손익 통계(`/dashboard/stats`)로 바꾸자(PR #211) 요약 질문이 44.2초→6~13초가 됐다. 대신 7b 모델이 원 단위 숫자 `8000.00`을 "8,000만 원"·"8,000,000원"으로 부풀렸고 프롬프트 규칙만으로는 고쳐지지 않았다. 또 "[QA] 1022-144647 현장"처럼 기호·숫자가 섞인 이름은 siteId를 추측(404)하거나 목록에서 못 찾았다. 수리: 도구 결과의 `*Amount`·`margin`·`totalMargin`·`unitPrice`를 "8,000원", `*Rate`를 "84.00%" 문자열로 미리 만들고, 질문에 이름이 든 현장의 siteId를 규칙 매칭으로 시스템 메시지에 넣고, 404는 listSites로 다시 찾으라는 안내로 돌려준다. 재실측 5문항(전체 요약·현장 2곳·인사) 금액·비율이 원본과 모두 일치(PASS), 요약 6.2초·현장 질문 2~4초. 남은 관찰: 다국어 토큰 잡음(`ước정`, `마argin율`)은 숫자에 영향 없음 — 모델 교체 검토 후보.
 
+### 2026-10-29 문서 서비스 Feign 재시도 비활성화 — 로컬 실측
+
+`spring-retry`가 런타임 경로에 있어 Spring Cloud LoadBalancer 기본값이면 Feign GET이 실패 시 한 번 더 시도된다. 현장 확인은 쓰기 트랜잭션 안(행 잠금 보유 중)에서 호출되므로 에이전트 결정(위임)으로 estimate·purchase·tax·notification만 `spring.cloud.loadbalancer.retry.enabled=false`로 끄고 실패는 503으로 바로 돌려준다(chat은 트랜잭션 밖 조회라 유지). site-service를 일시정지한 상태에서 매입 생성 503 응답 시간: 기존 6.0초(read-timeout 3초×2) → 변경 후 3.1초(1회).
+
 ### 2026-10-29 채팅 모델 비교 — qwen2.5:7b ↔ qwen3:8b (로컬 실측)
 
 develop `38c400d` chat-service, 같은 합성 `[QA]` 데이터·5문항(전체 요약·현장 2곳·목록·인사), 모델만 임시 compose override(`OLLAMA_MODEL`)로 바꿔 측정했다. 측정 후 기본값(qwen2.5:7b)으로 되돌렸다.
