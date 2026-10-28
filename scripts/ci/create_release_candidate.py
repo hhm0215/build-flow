@@ -23,6 +23,7 @@ REQUIRED_RESULTS = {
     "backup-synthetic": "RESULT_BACKUP_SYNTHETIC",
     "public-compose": "RESULT_PUBLIC_COMPOSE",
     "windows-readiness": "RESULT_WINDOWS_READINESS",
+    "profit-reconcile": "RESULT_PROFIT_RECONCILE",
 }
 DEPLOYMENT_FILES = (
     "Dockerfile",

@@ -5,6 +5,31 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 손익 재계산 삭제 매입 지연 이벤트 수리 (2026-10-28, PR #205)
+
+- PR #203 head `588bdc1`/base `b6be146`와 CI 성공을 원격 재확인하고 별도 `codex/profit-reconcile-validation` worktree에서 검토했다. Claude 원본 브랜치·기존 checkout·`output/`·업무 원본은 보존했다.
+- 독립 security/infrastructure 리뷰에서 매입 생성·삭제 이벤트가 모두 미소비이고 projection이 없으면 재계산 후 늦은 등록 이벤트만으로 원가가 부활하는 P1 결함을 확인했다. purchase 원천이 삭제 매입까지 포함한 보존 outbox eventId를 동일 REPEATABLE READ로 반환하고, site가 원천 합계·projection과 함께 미처리 견적·매입 eventId를 기록하도록 수리했다. 구버전/판별 불가 원천은 503, 수신기록 현장·유형 충돌과 고아 견적 apply는 409다.
+- 로컬 전체 Gradle `test` 및 관련 bootJar PASS: 총 457 tests, 446 통과·11 조건부 skip, 실패 0. 체크포인트 합성 20·릴리스 후보 9·Compose 정적 회귀 27 PASS. 독립 보안 재검토 신규 Critical/High/P1 없음.
+- 로컬 Docker는 시작 중 ingest socket 접근 오류로 엔진 연결 FAIL(초기화/볼륨 변경 없음). 별도 CI에서 무작위 프로젝트·tmpfs·비게시 포트로 실제 MySQL·Feign·Kafka API/지연 이벤트 회귀를 검증했다. 최종 SHA CI·develop 통합 여부는 PR에서 대조한다.
+- 2026-10-28: 격리 CI `40279837507`에서 견적 원천 조회의 MySQL collation 충돌을 재현했다. 견적 id를 SQL에서 문자열과 비교하지 않고 같은 REPEATABLE READ 스냅샷에서 정확한 record_key로 분류하도록 수리했다. 손상된 키·현장 ID를 보수적으로 분류하는 회귀와 세 서비스 테스트 PASS. [CI 40623076273](https://github.com/hhm0215/build-flow/actions/runs/40623076273)의 SHA `dad73de`에서 실제 MySQL·Feign·Kafka dry-run/반영, 삭제 이벤트 없는 지연 재생, 새 매입, 원천 장애 503과 DB 불변 PASS. 보수적 현장 ID 판정을 포함한 SHA `8870ff5`도 [전체 CI PASS](https://github.com/hhm0215/build-flow/actions/runs/40623165069). 전체 최종 head CI 및 develop 통합 상태는 PR #205에서 확인한다.
+- main/VPS/실데이터 변경 없음. 실제 복원본·외부 암호화 복원·운영 DDL/최소 권한 게이트는 남아 있고 V1 **40/100**, 실데이터 **NO-GO** 유지.
+
+## 완료된 작업 — 현장 손익 재계산 API (복원 후 UNEXPLAINED 조치, 2026-10-23)
+
+- 2026-10-23 site-service `POST /api/v1/sites/{id}/profit/reconcile`(기본 dry-run, `?apply=true`만 반영, 프론트 미노출): 손익 소비자와 같은 현장 행 비관적 잠금 아래 estimate `GET /estimates/profit-source`(CONFIRMED 합계 + 그 현장 견적의 손익 outbox eventId, SUPERSEDED 제외)·purchase `GET /purchases/profit-source`(현재 매입 금액·revision)를 Feign(2s/5s) 조회해 `site_profits`를 원천으로 덮어쓰고, 미수신 견적 eventId를 수신기록에 남기고 매입 projection을 원천 revision으로 재작성(원천에 없는 활성 projection은 최대 revision 삭제 고정)해 늦게 온 이벤트 이중 반영을 막는다. 원천 실패·형식 이상 503, 범위 초과·projection 현장 충돌·견적 행 없는 손익 이벤트(과거 확정 삭제) 409, 일치 시 무변경. PR #203 리뷰 반영: 묘비 id에 삭제 아닌 매입 이벤트는 생략 대신 실패(복원 후 AUTO_INCREMENT 재사용 감지, 런북 사전 확인 SQL 추가). site 69(2 skip)·estimate 57(1 skip)·purchase 45(1 skip) PASS. `docs/DATABASE_OPERATIONS.md`·`docs/API_SPEC.md` 갱신. 풀 Docker·실제 복원본 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
+
+## 완료된 작업 — 공개 VPS를 main `842fe82`로 반영 (2026-10-23)
+
+- 2026-10-23 `sudo buildflow-release deploy 842fe82…`(PR #202: 견적 수정본·추가공사 체인, 복원 후 재조정 점검)를 실행해 EXIT 0을 확인했다.
+- 사전 운영형 리허설(구 `0fe8c9a` → 신, 실제 Kafka)에서 status enum의 SUPERSEDED 자동 확장, 수정본 확정 200, 손익 수렴을 실측했다.
+- 반영 후 실측:
+  - 공개 `/` 200, 무인증 API 401
+  - loopback 프론트→Gateway 견적 API 401
+  - 리스닝 포트 변화 없음
+- UNVERIFIED(root 필요): DB 안의 status 정의.
+- 되돌리기: `sudo buildflow-release rollback 0fe8c9a07197d9594b257853d6a9d38abddce5ca`. SUPERSEDED 행이 있으면 먼저 런북의 보관 절차를 따른다.
+- V1 **40/100** 유지.
+
 ## 완료된 작업 — 견적 수정본 업그레이드·되돌리기 리허설 (격리 Kafka, 2026-10-23)
 
 - 2026-10-23 `scripts/db/upgrade-rehearsal-estimate.ps1`(+compose: 격리 MySQL + KRaft Kafka, `bfupgest<난수>`, 포트 비게시·tmpfs): 이전 `0fe8c9a` → 새 `c2416ef`(PR #201) `ddl-auto update`에서 status enum `SUPERSEDED` 확장(SHOW CREATE 확인)·새 컬럼 4종·인덱스, 기존 행 kind NULL→ORIGINAL, 실제 Kafka로 손익 100만→120만(수정본)→150만(추가공사) 수렴, 같은 eventId 재전송 중복 0, 역순 이벤트 수렴, 대체됨 수정 409. PASS 24·WARN 1(이전 코드는 SUPERSEDED 행이 있으면 견적 목록 500 → 보관 테이블 절차를 `docs/RELEASE_RUNBOOK.md`에 기록, 재반영 복원 후 160만 수렴 확인). 잔여 리소스 0. 결함 없음(코드 무변경). **main·VPS 미반영**. V1 **40/100** 유지.
