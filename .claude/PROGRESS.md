@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 주간 기능 Gateway 경유 실측 49/49 PASS·진행률 59/100 (2026-10-29)
+
+- 기존 스택을 볼륨 보존으로 내리고 별도 프로젝트 `bfqa`(빈 볼륨)를 같은 이미지로 띄워 QA 관리자 부트스트랩 후 `local_e2e.py` S0~S5 49/49 PASS. `bfqa` 컨테이너·볼륨만 이름 지정 삭제, 기존 스택 복구(현장 17·관리자 1 유지). 사용자 로그인 대기 게이트 해소.
+- `docs/DELIVERY_PLAN.md` 재채점 57→59(업무 동선 25→27). #233 BACKLOG 배포 완료 항목 정정, #232 자가 점검 경로 분류, #231 CI 손익 복구 인프라 진단 출력.
+
 ## 완료된 작업 — 문서 서비스 Feign 재시도 비활성화를 main `4c4ca8c`로 VPS 반영 (2026-10-29)
 
 - #228: estimate·purchase·tax·notification `spring.cloud.loadbalancer.retry.enabled=false`. site-service 일시정지 시 매입 생성 503 응답 6.0→3.1초(로컬 풀 Docker 실측).
