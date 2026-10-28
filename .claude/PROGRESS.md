@@ -5,6 +5,12 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 주간 기능 Gateway 경유 로컬 실측 스크립트 준비 (2026-10-28, 실측 아님)
+
+- `scripts/qa/local_e2e.py`(표준 라이브러리, `python -I -X utf8`): 대상 URL을 127.0.0.1/localhost/::1 원점으로 제한하고, `AdminBootstrapRunner` 표준입력 방식으로 무작위 비밀번호 QA 관리자를 만들어 `.local/qa-admin.env`(gitignore)에만 저장한다. Gateway 로그인 후 S0 인증 401·S1 분할 입금(#193)·S2 BIDDING(#192)·S3 매입 증빙(#196)·S4 수정본 체인(#201)·S5 재계산 dry-run/apply(#203/#205)를 합성 `[QA-주간-…]` 데이터로 대조하고 PASS/FAIL 표·종료 코드를 낸다.
+- 단위 테스트 `scripts/qa/test_local_e2e.py` 27건 PASS(호스트 검사·기대값·HTTP 스텁·자격 처리), CI `public-compose` job에 연결. **Docker 엔진이 꺼져 있어 스크립트 자체는 실행하지 않았다 — 실측 PENDING**. 결정·실행 방법은 `docs/PILOT_QA.md`.
+- 브랜치 `claude/local-e2e-script` 푸시, PR 미생성. main/VPS/실데이터 변경 없음. V1 **40/100** 유지, 다음 게이트: Docker 복구 후 스크립트 실측.
+
 ## 검증된 작업 — 손익 재계산 삭제 매입 지연 이벤트 수리 (2026-10-28, PR #205)
 
 - PR #203 head `588bdc1`/base `b6be146`와 CI 성공을 원격 재확인하고 별도 `codex/profit-reconcile-validation` worktree에서 검토했다. Claude 원본 브랜치·기존 checkout·`output/`·업무 원본은 보존했다.

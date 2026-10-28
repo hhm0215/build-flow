@@ -417,6 +417,8 @@ jobs:
         run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
       - name: Test cross-agent session fallback
         run: python3 -m unittest discover -s scripts/agents -p 'test_*.py'
+      - name: Test local Gateway E2E script (no Docker)
+        run: python3 -I -m unittest discover -s scripts/qa -p 'test_*.py'
       - name: Test exposure validator
         run: python3 -m unittest discover -s scripts/vps -p 'test_verify_*_compose.py'
       - name: Validate root release wrapper syntax

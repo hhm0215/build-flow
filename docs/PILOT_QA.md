@@ -116,6 +116,31 @@ Tesseract를 JVM 안(Tess4J/JNA)에서 부르던 방식을 페이지별 별도 �
 
 - 현장별 손익 카드의 `전체 보기` 버튼은 클릭 동작이 없어 업무 동선이 끊겼다. 클릭 시 `/sites`로 이동하게 하고 라우터 회귀 1건을 추가했다. 공개 VPS 화면과 `main`/VPS 반영은 PENDING.
 
+### 2026-10-28 주간 기능 Gateway 경유 실측 스크립트 — 준비만, 실측 PENDING
+
+`scripts/qa/local_e2e.py`는 이번 주 기능 5개를 로컬 풀 Docker에서 **Gateway(`127.0.0.1:8080`) 경유 JWT 인증**으로 실측한다. 작성 시점 이 PC의 Docker 엔진이 꺼져 있어 스크립트는 실행하지 않았다. 단위 테스트(호스트 검사·기대값 계산·HTTP 스텁 응답 파싱·자격 처리)만 PASS다.
+
+실행 방법:
+
+1. Docker Desktop 복구 후 `docker compose -f docker-compose.yml -f docker-compose.app.yml up -d` (기존 볼륨 유지, 초기화 금지). 전체 병렬 빌드가 네트워크 오류로 실패하면 변경 서비스만 순차 재빌드한다.
+2. 스택을 검증 대상 커밋으로 최신화: 이번 주 기능이 포함된 `develop`을 checkout한 작업 트리에서 estimate·site·purchase·tax·notification·gateway·auth 이미지를 재빌드하고 Gateway health 200을 확인한다.
+3. 저장소 루트에서 `python -I -X utf8 scripts/qa/local_e2e.py` (기본 `--base-url http://127.0.0.1:8080`). 종료 코드 0=전부 PASS, 1=FAIL 있음, 2=대상·로그인 준비 실패. 출력 표를 이 문서에 날짜·SHA와 함께 기록한다.
+
+시나리오(합성 `[QA-주간-<타임스탬프>]` 접두사 데이터를 만들고 지우지 않는다. 정책 검증용 삭제만 수행):
+
+| 시나리오 | 검사 |
+|---|---|
+| S0 Gateway 인증 | 무인증 현장 목록·재계산 401, 인증 후 200 |
+| S1 분할 입금(#193) | 매출 1,100,000 계산서 UNPAID → 300,000·500,000 입금 PARTIAL → 초과 입금 400 → 1차 취소 후 잔액 600,000 → 중복 취소 409 → 미수금 집계 → 유효 입금 있는 계산서 삭제 409 → 잔액 입금 확인 PAID·미수금 0 → 내역 3건·취소 1건 보존 |
+| S2 수주 전(#192) | BIDDING 생성 → 500,000 견적 확정·손익 수렴 → 대시보드 전체 합계 = 현장별 목록 중 BIDDING 제외 합계(우리 현장은 목록에 표시) → IN_PROGRESS 전환 200 후 합계 포함 → BIDDING 되돌리기 400 |
+| S3 매입 증빙(#196) | 매입 100,000/30,000/20,000, 매입 계산서 130,000+13,000 → 매출·다른 현장 계산서 연결 400 → 2건 연결 → 대조 요약(연결 130,000·미연결 20,000·공급가 차이 0·합계 차이 13,000) → 연결 계산서 삭제 409 → 해제 후 삭제 200·요약 갱신 |
+| S4 견적 수정본(#201) | 원 견적 1,000,000 확정·매입 200,000 → 수정본 1,200,000 확정 시 원본 SUPERSEDED → 추가공사 300,000 새 체인 → 손익 1,500,000/200,000/86.67% 수렴(최대 30초) → 대체본 수정·확정·삭제 409 → 초안을 원 견적으로 연결 400 |
+| S5 손익 재계산(#203/#205) | S4 현장 dry-run `matched`·건수 0·원천=현재=기대 손익 → apply=true 무변경(`applied=false`)·손익 불변 → 없는 현장 404 |
+
+**에이전트 결정(사용자 위임, 2026-10-28)**: 로컬 테스트 관리자는 실행 환경마다 `secrets` 모듈 무작위 비밀번호로 만들어 auth-service의 기존 `AdminBootstrapRunner`(비웹 실행, 표준입력 JSON 1줄 `loginId/name/password`)를 `docker exec -i buildflow-auth java -jar /app/app.jar --spring.main.web-application-type=none --eureka.client.enabled=false --app.admin-bootstrap.enabled=true`로 호출해 등록한다. 값은 `.gitignore`된 `.local/qa-admin.env`(생성 시 0600 요청, Windows에서는 사용자 프로필 ACL에 의존)에만 저장하고 다음 실행에서 재사용한다. 부트스트랩 출력은 버리고 비밀번호·토큰은 출력하지 않는다. 대상 URL은 `127.0.0.1`/`localhost`/`::1` 원점만 허용하고(경로·쿼리·사용자 정보 거부), 프록시·리다이렉트를 따르지 않아 VPS 오용을 막는다. 대안(기록만): 서비스 포트 직접 호출 + `X-User-Id`(2026-10-22 방식) — Gateway 인증·라우팅을 검증하지 못해 보조로만 쓴다.
+
+제약: `AdminBootstrapService`는 사용자 행이 하나라도 있으면 `ADMIN_ALREADY_EXISTS`로 거부한다. 가족 관리자 계정이 이미 있는 로컬 스택에서는 부트스트랩이 실패하고, 대화형 터미널이면 기존 로컬 관리자 값을 입력받아 저장하지 않고 사용한다(`--no-bootstrap`으로 바로 입력). 계정 추가·초기화를 위해 DB를 조작하지 않는다.
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |
