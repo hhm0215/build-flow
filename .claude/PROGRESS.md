@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 문서 서비스 Feign 재시도 비활성화를 main `4c4ca8c`로 VPS 반영 (2026-10-29)
+
+- #228: estimate·purchase·tax·notification `spring.cloud.loadbalancer.retry.enabled=false`. site-service 일시정지 시 매입 생성 503 응답 6.0→3.1초(로컬 풀 Docker 실측).
+- 릴리스 #229: 첫 CI에서 "손익 복구" job이 격리 인프라 기동 재시도까지 실패(코드 무관) → 실패 job 재실행 PASS·SHA 일치 → main `4c4ca8c` push CI PASS → `buildflow-release deploy`(공개 / 200, 무인증 API 401). 되돌리기: `rollback ae8be6c9b845b6b58b13df1169264d58cc897b70`.
+
 ## 완료된 작업 — 보증 업로드 커밋 불확실 시 원본 보존을 main `ae8be6c`로 VPS 반영 (2026-10-29)
 
 - #225: 보증 PDF 업로드에서 콜백 완료 후 커밋 단계 예외면 새 읽기 트랜잭션으로 `existsByFilePath`를 재조회해 커밋된 행이 있으면 원본 보존, 재조회 실패 시에도 보존(깨진 참조보다 고아 파일이 덜 위험). 블록 안 예외는 기존처럼 즉시 삭제. 단위 테스트 4건, notification 164건 실패 0.

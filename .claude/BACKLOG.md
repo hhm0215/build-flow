@@ -131,6 +131,13 @@
 - 2026-10-22: 대화 이력은 최근 `chat.history-limit`개만 DB에서 조회(시각·id 역순 Pageable 후 시간순 복원)하도록 변경 완료
 - 7b 토큰 잡음("마argin율") 2026-07-04·07-15 반복 실측 → 견고화 근거
 
+### CI 손익 복구 job 격리 인프라 기동 불안정
+- **배경**: `손익 복구 (MySQL · Feign · Kafka)` job이 "Infrastructure startup failed once; retrying" 후에도 실패하는 일이 #208(2026-10-28)·#229(2026-10-29)에서 반복됐다. 둘 다 재실행으로 통과해 코드 결함은 아니지만 릴리스를 지연시킨다. 스크립트가 하위 출력(`subprocess output withheld`)을 숨겨 원인이 보이지 않는다.
+- **산출물**: 실패 시 비밀값을 제외한 컨테이너 상태·마지막 로그 일부를 남기는 진단 출력, 기동 대기 조건(health 대기 시간·포트 경합) 점검, 필요 시 재시도 간격 조정
+- **관련 파일**: `scripts/db/test-profit-reconcile-docker.py`, `.github/workflows/ci.yml`
+- **예상 규모**: S
+- **상태**: TODO
+
 ### 테스트 커버리지 확장 (파운데이션은 2026-07-04 완료)
 - 파일럿(chat ToolExecutor/ToolCatalog, useListFilters) 완료 → 나머지 순수 로직으로 확장
 - 2026-10-17: 현장 마진·마진율과 tax 미수금 계산 테스트 추가(마진율 DECIMAL(5,2) 초과 저장 실패 결함 발견·수정)
