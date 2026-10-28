@@ -11,6 +11,7 @@
 - 독립 security/infrastructure 리뷰에서 매입 생성·삭제 이벤트가 모두 미소비이고 projection이 없으면 재계산 후 늦은 등록 이벤트만으로 원가가 부활하는 P1 결함을 확인했다. purchase 원천이 삭제 매입까지 포함한 보존 outbox eventId를 동일 REPEATABLE READ로 반환하고, site가 원천 합계·projection과 함께 미처리 견적·매입 eventId를 기록하도록 수리했다. 구버전/판별 불가 원천은 503, 수신기록 현장·유형 충돌과 고아 견적 apply는 409다.
 - 로컬 전체 Gradle `test` 및 관련 bootJar PASS: 총 457 tests, 446 통과·11 조건부 skip, 실패 0. 체크포인트 합성 20·릴리스 후보 9·Compose 정적 회귀 27 PASS. 독립 보안 재검토 신규 Critical/High/P1 없음.
 - 로컬 Docker는 시작 중 ingest socket 접근 오류로 엔진 연결 FAIL(초기화/볼륨 변경 없음). 별도 CI에서 무작위 프로젝트·tmpfs·비게시 포트로 실제 MySQL·Feign·Kafka API/지연 이벤트 회귀를 실행하도록 준비 중이다. 최종 SHA CI·develop 통합은 이 기록 시점 PENDING이며 PR에서 대조한다.
+- 2026-10-28: 격리 CI `40279837507`에서 견적 원천 조회의 MySQL collation 충돌을 재현했다. 견적 id를 SQL에서 문자열과 비교하지 않고 같은 REPEATABLE READ 스냅샷에서 정확한 record_key로 분류하도록 수리했다. 손상된 키를 다른 견적 id로 오인하지 않는 H2 회귀와 세 서비스 테스트 PASS. 실제 MySQL·Kafka 회귀는 새 SHA CI에서 재검증한다.
 - main/VPS/실데이터 변경 없음. 실제 복원본·외부 암호화 복원·운영 DDL/최소 권한 게이트는 남아 있고 V1 **40/100**, 실데이터 **NO-GO** 유지.
 
 ## 완료된 작업 — 현장 손익 재계산 API (복원 후 UNEXPLAINED 조치, 2026-10-23)

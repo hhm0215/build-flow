@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 손익 재계산 원천. 확정 견적 합계와 손익 이벤트 목록을 하나의 REPEATABLE READ 스냅샷에서 읽어
@@ -47,13 +49,14 @@ public class EstimateProfitSourceService {
 
         // 확정 견적은 삭제할 수 없고 초안 삭제는 손익 이벤트를 만들지 않으므로,
         // 손익 이벤트가 있는 견적은 모두 현재 행으로 남아 있다(record_key = estimateId).
-        List<String> recordKeys = estimateRepository.findIdsBySiteId(siteId).stream()
+        Set<String> recordKeys = estimateRepository.findIdsBySiteId(siteId).stream()
                 .map(String::valueOf)
-                .toList();
-        List<EstimateProfitSourceResponse.ProfitEvent> events = recordKeys.isEmpty()
-                ? List.of()
-                : outboxEventRepository.findByTopicInAndRecordKeyIn(PROFIT_TOPICS.keySet(), recordKeys)
-                        .stream()
+                .collect(Collectors.toSet());
+        Set<String> allRecordKeys = estimateRepository.findAllIds().stream()
+                .map(String::valueOf).collect(Collectors.toSet());
+        var outboxEvents = outboxEventRepository.findProfitEvents(PROFIT_TOPICS.keySet());
+        List<EstimateProfitSourceResponse.ProfitEvent> events = outboxEvents.stream()
+                        .filter(event -> recordKeys.contains(event.getRecordKey()))
                         .map(event -> EstimateProfitSourceResponse.ProfitEvent.builder()
                                 .eventId(event.getEventId())
                                 .eventType(PROFIT_TOPICS.get(event.getTopic()))
@@ -61,7 +64,10 @@ public class EstimateProfitSourceService {
                         .toList();
 
         // 2026-09-21~09-24에는 확정 견적 삭제가 허용돼 행 없이 estimate.deleted만 남았을 수 있다.
-        int orphanCount = (int) outboxEventRepository.findOrphanProfitEvents(PROFIT_TOPICS.keySet()).stream()
+        // MySQL 연결과 컬럼의 collation이 다를 수 있어 숫자 id를 SQL에서 문자열과 비교하지 않는다.
+        // 문자열을 숫자로 강제 변환하면 "1x" 같은 손상된 키를 기존 id 1로 오인할 수 있다.
+        int orphanCount = (int) outboxEvents.stream()
+                .filter(event -> !allRecordKeys.contains(event.getRecordKey()))
                 .filter(event -> belongsToSiteOrUnknown(event.getPayloadJson(), siteId))
                 .count();
 

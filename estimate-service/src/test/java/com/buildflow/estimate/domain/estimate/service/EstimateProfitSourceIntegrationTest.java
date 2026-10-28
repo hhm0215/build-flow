@@ -120,6 +120,20 @@ class EstimateProfitSourceIntegrationTest {
     }
 
     @Test
+    void malformedRecordKeyIsNotMistakenForExistingEstimate() throws Exception {
+        Long existing = create(SITE, null, null, "300");
+        estimateService.confirm(existing);
+        outboxRepository.save(com.buildflow.estimate.global.outbox.OutboxEvent.pending(
+                java.util.UUID.randomUUID().toString(), "estimate.deleted", existing + "x",
+                "{\"payload\":{\"siteId\":" + SITE + "}}", java.time.Instant.now()));
+
+        EstimateProfitSourceResponse source = sourceService.snapshot(SITE);
+
+        assertEquals(1, source.getOrphanProfitEventCount());
+        assertEquals(1, source.getProfitEvents().size());
+    }
+
+    @Test
     void emptySiteReturnsZeroAndInvalidSiteIsRejected() {
         EstimateProfitSourceResponse empty = sourceService.snapshot(99L);
         assertEquals(0, BigDecimal.ZERO.compareTo(empty.getConfirmedTotalAmount()));

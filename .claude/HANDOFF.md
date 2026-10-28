@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-26 15:26 KST |
+| 갱신 | 2026-10-28 11:48 KST |
 | 브랜치 | `codex/profit-reconcile-validation` (체크포인트, 드래프트 PR로 노출) |
 | PR | `codex/profit-reconcile-validation`의 드래프트 PR (`gh pr list --head codex/profit-reconcile-validation`) |
-| 현재 단계 | Diagnose real source 503 and harden isolated CI cleanup |
-| 다음 첫 행동 | Repair observed MySQL Feign integration failure then validate final head |
+| 현재 단계 | Fix MySQL estimate event collation failure |
+| 다음 첫 행동 | Verify real MySQL Feign Kafka and full CI at latest SHA |
 
 ## 공통 사용자 지시
 
