@@ -60,3 +60,6 @@ docs/.vps_known_hosts
 
 # gstack 툴 내부 데이터
 .gstack/
+
+# Local QA admin credentials (scripts/qa/local_e2e.py, never commit)
+.local/
