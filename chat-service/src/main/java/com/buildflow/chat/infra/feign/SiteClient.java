@@ -1,6 +1,6 @@
 package com.buildflow.chat.infra.feign;
 
-import com.buildflow.chat.infra.feign.dto.DashboardSummaryDto;
+import com.buildflow.chat.infra.feign.dto.DashboardStatsDto;
 import com.buildflow.chat.infra.feign.dto.FeignApiResponse;
 import com.buildflow.chat.infra.feign.dto.ProfitDto;
 import com.buildflow.chat.infra.feign.dto.SiteDto;
@@ -19,6 +19,6 @@ public interface SiteClient {
     @GetMapping("/api/v1/sites/{id}/profit")
     FeignApiResponse<ProfitDto> getProfit(@PathVariable("id") Long id);
 
-    @GetMapping("/api/v1/dashboard/summary")
-    FeignApiResponse<DashboardSummaryDto> getSummary();
+    @GetMapping("/api/v1/dashboard/stats")
+    FeignApiResponse<DashboardStatsDto> getStats();
 }

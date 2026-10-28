@@ -4,6 +4,7 @@ import com.buildflow.chat.infra.feign.EstimateClient;
 import com.buildflow.chat.infra.feign.PurchaseClient;
 import com.buildflow.chat.infra.feign.SiteClient;
 import com.buildflow.chat.infra.feign.TaxClient;
+import com.buildflow.chat.infra.feign.dto.DashboardStatsDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,7 @@ public class ToolExecutor {
                 case "listSites" -> siteClient.listSites().getData();
                 case "getSiteProfit" -> siteClient.getProfit(requireSiteId(args)).getData();
                 case "getOutstandingTax" -> taxClient.getOutstanding(requireSiteId(args)).getData();
-                case "getDashboardSummary" -> siteClient.getSummary().getData();
+                case "getDashboardSummary" -> dashboardStats(siteClient.getStats().getData());
                 case "listEstimatesBySite" -> limited(estimateClient.listBySite(requireSiteId(args)).getData());
                 case "listPurchasesBySite" -> limited(purchaseClient.listBySite(requireSiteId(args)).getData());
                 default -> null;
@@ -67,6 +68,32 @@ public class ToolExecutor {
         result.put("items", all.subList(0, Math.min(all.size(), LIST_LIMIT)));
         if (all.size() > LIST_LIMIT) {
             result.put("note", "앞쪽 " + LIST_LIMIT + "건만 포함했다. 전체 건수는 totalCount다.");
+        }
+        return result;
+    }
+
+    /**
+     * 전체 손익 통계는 합계 필드를 그대로 두고 현장별 목록만 {@link #LIST_LIMIT}건으로 자른다.
+     * 합계는 site-service가 전체 현장으로 계산한 값이라 목록을 잘라도 정확하다.
+     */
+    private static Map<String, Object> dashboardStats(DashboardStatsDto stats) {
+        if (stats == null) {
+            return null;
+        }
+        List<DashboardStatsDto.SiteProfitDto> all = stats.getSiteProfits() == null ? List.of() : stats.getSiteProfits();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("totalSites", stats.getTotalSites());
+        result.put("sitesByStatus", stats.getSitesByStatus());
+        result.put("totalEstimateAmount", stats.getTotalEstimateAmount());
+        result.put("totalPurchaseAmount", stats.getTotalPurchaseAmount());
+        result.put("totalMargin", stats.getTotalMargin());
+        result.put("averageMarginRate", stats.getAverageMarginRate());
+        result.put("totalsNote", "합계·마진율은 수주 전(BIDDING) 현장을 제외한 값이다. 현장별 목록에는 수주 전 현장도 포함된다.");
+        result.put("siteProfitsTotalCount", all.size());
+        result.put("siteProfits", all.subList(0, Math.min(all.size(), LIST_LIMIT)));
+        if (all.size() > LIST_LIMIT) {
+            result.put("note", "현장별 손익은 최근 등록순 앞쪽 " + LIST_LIMIT
+                    + "건만 포함했다. 전체 건수는 siteProfitsTotalCount이며 합계는 전체 현장 기준이다.");
         }
         return result;
     }
