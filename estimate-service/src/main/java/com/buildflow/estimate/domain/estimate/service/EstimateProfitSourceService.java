@@ -84,7 +84,8 @@ public class EstimateProfitSourceService {
     private boolean belongsToSiteOrUnknown(String payloadJson, Long siteId) {
         try {
             JsonNode site = objectMapper.readTree(payloadJson).path("payload").path("siteId");
-            return !site.canConvertToLong() || site.asLong() == siteId;
+            return !site.isIntegralNumber() || !site.canConvertToLong()
+                    || site.longValue() <= 0 || site.longValue() == siteId;
         } catch (Exception e) {
             return true;
         }

@@ -134,6 +134,17 @@ class EstimateProfitSourceIntegrationTest {
     }
 
     @Test
+    void malformedOrphanSiteIdsAreUnknownForEverySite() {
+        for (String site : List.of("0", "-1", "1.5", "\"2\"", "9223372036854775808")) {
+            outboxRepository.save(com.buildflow.estimate.global.outbox.OutboxEvent.pending(
+                    java.util.UUID.randomUUID().toString(), "estimate.deleted", java.util.UUID.randomUUID().toString(),
+                    "{\"payload\":{\"siteId\":" + site + "}}", java.time.Instant.now()));
+        }
+        assertEquals(5, sourceService.snapshot(SITE).getOrphanProfitEventCount());
+        assertEquals(5, sourceService.snapshot(OTHER_SITE).getOrphanProfitEventCount());
+    }
+
+    @Test
     void emptySiteReturnsZeroAndInvalidSiteIsRejected() {
         EstimateProfitSourceResponse empty = sourceService.snapshot(99L);
         assertEquals(0, BigDecimal.ZERO.compareTo(empty.getConfirmedTotalAmount()));
