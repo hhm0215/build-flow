@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 현장 보관·문서 생성 경합 차단을 main `38863fd`로 VPS 반영 (2026-10-28)
+
+- #218: 견적·매입·세금계산서·보증 생성에서 저장·flush 후 커밋 직전 현장 재확인, 보관/없음/장애면 문서·outbox 롤백(fail-closed). 보증 PDF 업로드는 PENDING 행·업로드 이력·재확인을 한 트랜잭션으로 묶고 실패 시 파일 정리. 서비스별 단위·H2 실제 롤백 테스트, 독립 리뷰 차단 결함 0. 로컬 풀 Docker 서비스 포트 직접 호출(보조)로 보관 전 생성 201·보관 후 생성 400(견적·매입·계산서) PASS. 실제 MySQL 동시 경합 실측은 PENDING.
+- 릴리스 #219 CI·SHA 일치 → main `38863fd` push CI PASS → `buildflow-release deploy` 완료(공개 / 200, 무인증 API 401). 되돌리기: `rollback 898de04b943d5f757bca0f88940f1766dfba8644`.
+
 ## 완료된 작업 — 자가 점검 에이전트·결정적 점검 스크립트 (2026-10-28)
 
 - 사용자 요청("계속 자가 점검하는 에이전트")으로 `.claude/agents/self-auditor.md`(읽기 전용 판단 점검)와 `scripts/agents/self_audit.py`(채점 7일 초과·main VPS 미반영·develop 미릴리스·PR 실패/방치·HANDOFF 방치·병합 후 작업 폴더, `--vps`로 HEAD·컨테이너·200/401)를 추가하고 CLAUDE.md 8단계·AGENTS.md §14에 세션 시작·사이클 종료·루프 사이 실행을 고정했다. 예약 heartbeat는 사용자 취소 결정대로 쓰지 않는다. 첫 실행 PASS 9·WARN 1(병합 후 남은 작업 폴더 24개) → 병합·무변경 Claude 작업 폴더 17개 정리(그중 Codex 소유 1개를 잘못 지워 같은 브랜치로 즉시 복구, 손실 없음). 후속 수정: `scripts/agents/`·`scripts/qa/`를 배포 불필요 경로로 분류, Git Bash 키 경로(`/c/...`) 정규화. 재실행 PASS 9·WARN 1(Codex 소유 폴더, 보고만).
