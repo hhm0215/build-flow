@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 채팅 정확도·잘못된 본문 400을 main `898de04`로 VPS 반영 (2026-10-28)
+
+- #210(auth·chat 잘못된 본문 400)·#211(요약 도구 결정적 통계)·#212(금액 사전 문자열화·현장 siteId 힌트·404 안내, 독립 리뷰 권고 반영)을 develop 병합 → 릴리스 PR #213 CI PASS·SHA 일치 → main `898de04` push CI PASS → `buildflow-release deploy` 완료(16개 컨테이너 Up, 공개 / 200, 무인증 API 401). 되돌리기: `rollback 98a9dd3e8d6ecdf108109839d865af81b8d9ba9e`.
+- 로컬 Gateway 경유 깨진 로그인 본문 400 PASS(컨테이너 재생성 직후 Eureka 옛 주소로 수 초간 500/503 후 회복). VPS는 AI 모델 미기동이라 채팅 변경은 실제 답변 미실측. 공개 호스트명이 저장소에 없어 외부망 400 재실측은 생략.
+
 ## 완료된 작업 — 실제 Ollama 채팅 로컬 실측·잘못된 본문 400 (2026-10-28)
 
 - 로컬 풀 Docker(`ed398c4`)와 네이티브 Ollama로 채팅 3문항 답변·조각 스트리밍 PASS, 요약 숫자는 site AI 요약 원본과 일치(`docs/PILOT_QA.md`). 실측 중 auth(로그인)·chat이 깨진 JSON 본문에 500을 주던 결함을 다른 서비스와 같은 400 처리기로 수리(`claude/unreadable-body-400`). 이어 요약 도구를 결정적 통계로 전환(PR #211, 44→6초)하고, 모델의 금액 단위 부풀림·현장 미식별을 금액 사전 문자열화·siteId 힌트·404 안내로 수리(`claude/chat-amount-unit`, 재실측 5문항 금액 일치).
