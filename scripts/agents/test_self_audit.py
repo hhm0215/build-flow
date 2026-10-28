@@ -53,7 +53,7 @@ class ReleaseTest(unittest.TestCase):
 
     def test_문서만_바뀐_경로는_미배포로_세지_않는다(self):
         paths = [".claude/PROGRESS.md", "docs/PILOT_QA.md", "AGENTS.md", "chat-service/src/A.java",
-                 "scripts/vps/root/buildflow-release", ""]
+                 "scripts/vps/root/buildflow-release", "scripts/agents/self_audit.py", "scripts/qa/local_e2e.py", ""]
         self.assertEqual(undeployed_paths(paths), ["chat-service/src/A.java", "scripts/vps/root/buildflow-release"])
 
 
@@ -117,6 +117,14 @@ buildflow-chat           {chat}
             result = self_audit.check_vps(self.SHA)
         run.assert_not_called()
         self.assertEqual(result[0][0], "UNVERIFIED")
+
+
+class KeyPathTest(unittest.TestCase):
+    def test_Git_Bash_경로를_Windows_드라이브로_바꾼다(self):
+        with patch.object(self_audit.sys, "platform", "win32"):
+            self.assertEqual(Path(self_audit.key_path("/c/Users/x/.ssh/k")), Path("C:/Users/x/.ssh/k"))
+        with patch.object(self_audit.sys, "platform", "linux"):
+            self.assertEqual(self_audit.key_path("/c/Users/x/.ssh/k"), str(Path("/c/Users/x/.ssh/k")))
 
 
 if __name__ == "__main__":

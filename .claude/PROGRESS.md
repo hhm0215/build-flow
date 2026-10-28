@@ -7,7 +7,7 @@
 
 ## 완료된 작업 — 자가 점검 에이전트·결정적 점검 스크립트 (2026-10-28)
 
-- 사용자 요청("계속 자가 점검하는 에이전트")으로 `.claude/agents/self-auditor.md`(읽기 전용 판단 점검)와 `scripts/agents/self_audit.py`(채점 7일 초과·main VPS 미반영·develop 미릴리스·PR 실패/방치·HANDOFF 방치·병합 후 작업 폴더, `--vps`로 HEAD·컨테이너·200/401)를 추가하고 CLAUDE.md 8단계·AGENTS.md §14에 세션 시작·사이클 종료·루프 사이 실행을 고정했다. 예약 heartbeat는 사용자 취소 결정대로 쓰지 않는다. 첫 실행 PASS 9·WARN 1(병합 후 남은 작업 폴더 24개). 합성 단위 테스트 11건.
+- 사용자 요청("계속 자가 점검하는 에이전트")으로 `.claude/agents/self-auditor.md`(읽기 전용 판단 점검)와 `scripts/agents/self_audit.py`(채점 7일 초과·main VPS 미반영·develop 미릴리스·PR 실패/방치·HANDOFF 방치·병합 후 작업 폴더, `--vps`로 HEAD·컨테이너·200/401)를 추가하고 CLAUDE.md 8단계·AGENTS.md §14에 세션 시작·사이클 종료·루프 사이 실행을 고정했다. 예약 heartbeat는 사용자 취소 결정대로 쓰지 않는다. 첫 실행 PASS 9·WARN 1(병합 후 남은 작업 폴더 24개) → 병합·무변경 Claude 작업 폴더 17개 정리(그중 Codex 소유 1개를 잘못 지워 같은 브랜치로 즉시 복구, 손실 없음). 후속 수정: `scripts/agents/`·`scripts/qa/`를 배포 불필요 경로로 분류, Git Bash 키 경로(`/c/...`) 정규화. 재실행 PASS 9·WARN 1(Codex 소유 폴더, 보고만).
 
 ## 완료된 작업 — 채팅 정확도·잘못된 본문 400을 main `898de04`로 VPS 반영 (2026-10-28)
 

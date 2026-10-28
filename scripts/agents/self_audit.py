@@ -23,8 +23,8 @@ PR_STALE_DAYS = 2
 # 호스트·키 경로는 저장소에 두지 않는다(로컬 환경변수).
 VPS_HOST_ENV = "BUILDFLOW_VPS_SSH"   # 예: deploy계정@서버주소
 VPS_KEY_ENV = "BUILDFLOW_VPS_KEY"    # 예: ~/.ssh/<키 파일>
-# 문서·기록만 바뀐 커밋은 배포하지 않아도 된다.
-DOC_ONLY = re.compile(r"^(\.claude/|docs/|AGENTS\.md$|CLAUDE\.md$|README)")
+# 문서·기록·에이전트/QA 도구만 바뀐 커밋은 VPS에 배포하지 않아도 된다.
+DOC_ONLY = re.compile(r"^(\.claude/|docs/|scripts/agents/|scripts/qa/|AGENTS\.md$|CLAUDE\.md$|README)")
 
 
 def run(args, cwd=None, timeout=60):
@@ -163,12 +163,20 @@ def check_worktrees(repo):
     return "PASS", "병합 후 남은 작업 폴더 없음"
 
 
+def key_path(value):
+    """Git Bash가 넘긴 /c/Users/... 형식도 Windows 파이썬이 열 수 있게 바꾼다."""
+    m = re.match(r"^/([a-zA-Z])/(.*)$", value)
+    if m and sys.platform == "win32":
+        value = f"{m.group(1).upper()}:/{m.group(2)}"
+    return str(Path(value).expanduser())
+
+
 def check_vps(expected_full_sha):
     host, key = os.environ.get(VPS_HOST_ENV), os.environ.get(VPS_KEY_ENV)
     if not host or not key:
         return [("UNVERIFIED", f"VPS 점검 생략 — 환경변수 {VPS_HOST_ENV}·{VPS_KEY_ENV} 미설정")]
     try:
-        out = run(["ssh", "-i", str(Path(key).expanduser()), "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+        out = run(["ssh", "-i", key_path(key), "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
                    host, "sudo", "buildflow-release", "status"], timeout=90)
     except (RuntimeError, OSError, subprocess.TimeoutExpired) as e:
         return [("UNVERIFIED", f"VPS status 실패: {str(e)[:120]}")]
