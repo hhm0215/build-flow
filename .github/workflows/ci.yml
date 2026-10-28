@@ -491,10 +491,28 @@ jobs:
         shell: powershell
         run: .\gradlew.bat --version
 
+  profit-reconcile:
+    name: 손익 복구 (MySQL · Feign · Kafka)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Build isolated application jars
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :site-service:bootJar :estimate-service:bootJar :purchase-service:bootJar --no-daemon
+      - name: Verify reconciliation and delayed events in isolated containers
+        run: python3 -u scripts/db/test-profit-reconcile-docker.py
+
   release-candidate:
     name: 릴리스 후보 증거 (배포 아님)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [backend, auth-flyway, chat-flyway, estimate-flyway, purchase-flyway, tax-flyway, site-flyway, notification-flyway, frontend, backup-synthetic, public-compose, windows-readiness]
+    needs: [backend, auth-flyway, chat-flyway, estimate-flyway, purchase-flyway, tax-flyway, site-flyway, notification-flyway, frontend, backup-synthetic, public-compose, windows-readiness, profit-reconcile]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -520,6 +538,7 @@ jobs:
           RESULT_BACKUP_SYNTHETIC: ${{ needs['backup-synthetic'].result }}
           RESULT_PUBLIC_COMPOSE: ${{ needs['public-compose'].result }}
           RESULT_WINDOWS_READINESS: ${{ needs['windows-readiness'].result }}
+          RESULT_PROFIT_RECONCILE: ${{ needs['profit-reconcile'].result }}
         run: python3 scripts/ci/create_release_candidate.py --output "$RUNNER_TEMP/release-candidate.json"
       - name: Store release evidence only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

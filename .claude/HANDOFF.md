@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | ACTIVE |
-| 도구 | Claude Code |
-| 갱신 | 2026-10-23 05:19 KST |
-| 브랜치 | 역할별 서브에이전트 작업 브랜치(열린 PR 참조) |
-| PR | #203 손익 재계산 API 리뷰 수정 중. main·VPS = `842fe82` |
-| 현재 단계 | 공개 VPS `842fe82` 반영 완료(견적 수정본 체인). 롤백 훈련은 권한 분류기 차단으로 미실측 |
-| 다음 첫 행동 | 역할별 서브에이전트로 BACKLOG 다음 항목(견적 수정본·추가공사 관계, 복원 후 재조정) 진행. root 래퍼 재설치(사용자) 후 `schema`로 운영 DDL 대조 |
+| 상태 | IDLE |
+| 도구 | Codex |
+| 갱신 | 2026-10-28 11:53 KST |
+| 브랜치 | `codex/profit-reconcile-validation` (체크포인트, 드래프트 PR로 노출) |
+| PR | `codex/profit-reconcile-validation`의 드래프트 PR (`gh pr list --head codex/profit-reconcile-validation`) |
+| 현재 단계 | Local and isolated CI verification complete; final head checks and develop integration |
+| 다음 첫 행동 | Check PR 205 final SHA CI; merge to develop if clean; preserve production gates |
 
 ## 공통 사용자 지시
 

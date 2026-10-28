@@ -23,6 +23,12 @@ public enum ErrorCode {
     CLIENT_ARCHIVED(HttpStatus.CONFLICT, "보관된 거래처는 복원한 뒤 수정할 수 있습니다."),
     CLIENT_ARCHIVED_NOT_ASSIGNABLE(HttpStatus.BAD_REQUEST, "보관된 거래처는 현장에 새로 연결할 수 없습니다. 거래처를 복원한 뒤 연결해 주세요."),
 
+    // Profit reconcile
+    PROFIT_SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+            "손익 원천(견적·매입) 조회에 실패해 재계산하지 않았습니다. 잠시 후 다시 시도해 주세요."),
+    PROFIT_RECONCILE_CONFLICT(HttpStatus.CONFLICT,
+            "손익 원천과 projection 상태가 충돌하거나 저장 범위를 넘어 자동 재계산할 수 없습니다."),
+
     // Ollama
     OLLAMA_API_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI 요약 서비스에 연결할 수 없습니다.");
 

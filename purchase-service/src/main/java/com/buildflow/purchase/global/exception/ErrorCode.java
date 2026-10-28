@@ -15,6 +15,7 @@ public enum ErrorCode {
     SITE_ARCHIVED_DOCUMENT_LOCKED(HttpStatus.CONFLICT, "보관된 현장의 자료는 현장을 복원한 뒤 수정·삭제할 수 있습니다."),
     SITE_ARCHIVED(HttpStatus.BAD_REQUEST, "보관된 현장에는 새 자료를 등록할 수 없습니다. 현장을 복원한 뒤 등록해 주세요."),
     INVALID_PURCHASE_AMOUNT(HttpStatus.BAD_REQUEST, "매입 금액이 허용 범위를 벗어났습니다."),
+    PROFIT_SOURCE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "손익 원천 정보를 확인할 수 없습니다."),
 
     // 증빙 세금계산서 연결
     EVIDENCE_TAX_INVOICE_NOT_FOUND(HttpStatus.BAD_REQUEST, "증빙으로 연결할 세금계산서를 찾을 수 없습니다."),

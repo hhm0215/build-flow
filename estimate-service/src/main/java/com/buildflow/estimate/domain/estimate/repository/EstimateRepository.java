@@ -15,6 +15,19 @@ public interface EstimateRepository extends JpaRepository<Estimate, Long> {
 
     List<Estimate> findBySiteIdOrderByCreatedAtDesc(Long siteId);
 
+    /** 손익 원천 조회용: 상태와 무관한 현장의 견적 id(이벤트 record_key 대조용). */
+    @Query("select e.id from Estimate e where e.siteId = :siteId order by e.id")
+    List<Long> findIdsBySiteId(@Param("siteId") Long siteId);
+
+    /** 전체 견적의 id를 읽어 손익 outbox의 고아 record_key를 정확히 판별한다. */
+    @Query("select e.id from Estimate e")
+    List<Long> findAllIds();
+
+    /** 손익 원천 조회용: 손익에 반영되는 확정 견적(CONFIRMED)만. 초안·대체본(SUPERSEDED) 제외. */
+    @Query("select e from Estimate e where e.siteId = :siteId and e.status = :status order by e.id")
+    List<Estimate> findBySiteIdAndStatus(@Param("siteId") Long siteId,
+                                         @Param("status") EstimateStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Estimate e where e.id = :id")
     Optional<Estimate> findByIdForUpdate(@Param("id") Long id);

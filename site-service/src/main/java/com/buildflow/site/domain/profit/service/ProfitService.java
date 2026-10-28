@@ -86,6 +86,15 @@ public class ProfitService {
         if (projection != null && !projection.getSiteId().equals(siteId)) {
             throw new IllegalArgumentException("같은 매입의 siteId가 변경되었습니다.");
         }
+        if (projection != null && projection.isReconciledTombstone()
+                && eventType != ProfitEventType.PURCHASE_DELETED) {
+            // 재계산 묘비는 실제 삭제 revision을 모른다. 복원으로 AUTO_INCREMENT가 되돌아가 같은 id의 새 매입이
+            // 생긴 경우 조용히 생략하면 원가가 영구 누락되므로 크게 실패시켜 재시도·DLT·경고로 드러낸다.
+            log.warn("재계산 묘비 매입에 삭제 아닌 이벤트 도착(처리 중단): eventId={}, purchaseId={}, siteId={}, revision={}",
+                    eventId, purchaseId, siteId, revision);
+            throw new IllegalStateException("손익 재계산으로 삭제 고정된 매입 id에 새 이벤트가 도착했습니다. "
+                    + "purchase AUTO_INCREMENT 재사용 여부를 확인하세요.");
+        }
 
         processedEventRepository.saveAndFlush(
                 new ProcessedProfitEvent(eventId, siteId, eventType.name()));
