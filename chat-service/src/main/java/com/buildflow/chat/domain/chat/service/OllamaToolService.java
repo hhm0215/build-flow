@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -233,7 +234,12 @@ public class OllamaToolService {
         if (!mentioned.isEmpty()) {
             // 이름은 관리자가 입력한 데이터라 지시로 읽히지 않게 JSON 데이터로만 넣고 제어문자·길이를 제한한다.
             List<Map<String, Object>> refs = mentioned.stream()
-                    .map(site -> Map.<String, Object>of("siteId", site.id(), "siteName", hintName(site.name())))
+                    .map(site -> {
+                        Map<String, Object> ref = new LinkedHashMap<>(); // 직렬화 순서 고정
+                        ref.put("siteId", site.id());
+                        ref.put("siteName", hintName(site.name()));
+                        return ref;
+                    })
                     .toList();
             try {
                 messages.add(Map.of("role", "system", "content",
