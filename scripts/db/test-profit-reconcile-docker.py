@@ -191,6 +191,7 @@ class Harness:
                 self.compose("up", "-d", "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe", timeout=240)
                 break
             except Failure:
+                self.infra_diagnostics(attempt)
                 if attempt == 2:
                     raise
                 print("[RUN] Infrastructure startup failed once; retrying", flush=True)
@@ -267,6 +268,28 @@ class Harness:
         self.api("site", path + "?apply=true", "POST", status=503)
         require(self.state() == before, "Source outage changed profit or receipts")
         print("[PASS] Unavailable source returned 503 without changing stored state")
+
+    def infra_diagnostics(self, attempt):
+        # Container state/exit code/health carry no secrets; infra logs are filtered to error lines
+        # and the generated DB password is redacted (2026-10-29: repeated fast startup failures).
+        try:
+            states = self.compose("ps", "--all", "--format",
+                                  "{{.Service}} state={{.State}} health={{.Health}} status={{.Status}} image={{.Image}}",
+                                  cleanup=True)
+            for line in states.splitlines()[:10]:
+                print(f"[DIAG infra#{attempt}] {line[:300]}", file=sys.stderr)
+        except Failure:
+            print(f"[DIAG infra#{attempt}] Container state unavailable", file=sys.stderr)
+        for service in ("mysql", "kafka"):
+            try:
+                logs = self.compose("logs", "--no-color", "--tail", "200", service, cleanup=True)
+                selected = [line for line in logs.splitlines()
+                            if any(marker in line for marker in ("ERROR", "FATAL", "Exception", "denied", "No space"))]
+                for line in selected[-8:]:
+                    safe = line.replace(self.env["RECONCILE_DB_PASSWORD"], "[redacted]")
+                    print(f"[DIAG infra#{attempt} {service}] {safe[:400]}", file=sys.stderr)
+            except Failure:
+                print(f"[DIAG infra#{attempt} {service}] Bounded logs unavailable", file=sys.stderr)
 
     def diagnostics(self):
         # These applications contain only the generated synthetic fixtures above.
