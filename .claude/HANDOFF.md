@@ -18,9 +18,9 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Claude Code |
-| 갱신 | 2026-10-29 01:00 KST |
-| 브랜치 | claude/record-vps-077ba71 |
-| PR | #221 변경 경로 경합 → 릴리스 #222. main·VPS = `077ba71` |
+| 갱신 | 2026-10-29 01:25 KST |
+| 브랜치 | claude/record-vps-ae8be6c |
+| PR | #225 → 릴리스 #226. main·VPS = `ae8be6c` |
 | 현재 단계 | /loop 위임 루프 진행 중(주간 사용량 93% 도달 시 정리 후 PC 종료 예정) |
 | 다음 첫 행동 | self_audit.py 실행 후 BACKLOG 후속(경합 패턴 확장·Feign 재시도) 검토. 로컬 주간 실측은 사용자 로그인 대기, 롤백 실측·root 래퍼 재설치는 사용자 권한 필요 |
 
