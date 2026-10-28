@@ -113,6 +113,39 @@ class PurchaseEvidenceServiceTest {
     }
 
     @Test
+    void linkAndUnlinkRecheckArchiveAfterFlushBeforeCommit() {
+        Purchase purchase = purchase(1L, 3L, "1000.00");
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(purchase));
+        when(taxClient.findById(20L)).thenReturn(found(invoice(20L, 3L, "PURCHASE", "1000.00", "100.00")));
+
+        service.link(1L, new PurchaseEvidenceLinkRequest(20L));
+        service.unlink(1L);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(siteValidator, taxClient, repository);
+        order.verify(siteValidator).requireSiteNotArchived(3L);
+        order.verify(taxClient).findById(20L);
+        order.verify(repository).flush();
+        order.verify(siteValidator).recheckNotArchivedBeforeCommit(3L);
+        order.verify(siteValidator).requireSiteNotArchived(3L);
+        order.verify(repository).flush();
+        order.verify(siteValidator).recheckNotArchivedBeforeCommit(3L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ErrorCode.class,
+            names = {"SITE_ARCHIVED_DOCUMENT_LOCKED", "SITE_REFERENCE_UNAVAILABLE"})
+    void recheckFailureAfterLinkOrUnlinkPropagatesForRollback(ErrorCode code) {
+        Purchase purchase = purchase(1L, 3L, "1000.00");
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(purchase));
+        when(taxClient.findById(20L)).thenReturn(found(invoice(20L, 3L, "PURCHASE", "1000.00", "100.00")));
+        doThrow(new BusinessException(code)).when(siteValidator).recheckNotArchivedBeforeCommit(3L);
+
+        assertError(code, () -> service.link(1L, new PurchaseEvidenceLinkRequest(20L)));
+        assertError(code, () -> service.unlink(1L));
+        verify(repository, org.mockito.Mockito.times(2)).flush();
+    }
+
+    @Test
     void unlinkClearsEvidenceWithoutTaxLookup() {
         Purchase purchase = purchase(1L, 3L, "1000.00");
         purchase.linkEvidence(20L);

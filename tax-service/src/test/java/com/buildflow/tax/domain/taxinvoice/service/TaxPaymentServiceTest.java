@@ -222,6 +222,35 @@ class TaxPaymentServiceTest {
     }
 
     @Test
+    void 취소는_취소와_계산서_상태_flush_뒤_커밋_직전에_보관_여부를_다시_확인한다() {
+        TaxPaymentResponse recorded = service.record(INVOICE_ID, request("100", LocalDate.of(2026, 10, 5)));
+
+        service.cancel(INVOICE_ID, recorded.getId(), null);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(siteValidator, paymentRepository, invoiceRepository);
+        order.verify(siteValidator).requireSiteNotArchived(7L);
+        order.verify(paymentRepository).flush();
+        order.verify(paymentRepository).sumActiveAmount(INVOICE_ID);
+        order.verify(invoiceRepository).flush();
+        order.verify(siteValidator).recheckNotArchivedBeforeCommit(7L);
+        verify(siteValidator, never()).recheckNotArchivedBeforeCommit(org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ErrorCode.class,
+            names = {"SITE_ARCHIVED_DOCUMENT_LOCKED", "SITE_REFERENCE_UNAVAILABLE"})
+    void 취소의_커밋_직전_재확인_실패를_전파한다(ErrorCode code) {
+        TaxPaymentResponse recorded = service.record(INVOICE_ID, request("100", LocalDate.of(2026, 10, 5)));
+        doThrow(new BusinessException(code)).when(siteValidator).recheckNotArchivedBeforeCommit(7L);
+
+        assertThatThrownBy(() -> service.cancel(INVOICE_ID, recorded.getId(), null))
+                .isInstanceOfSatisfying(BusinessException.class, e ->
+                        assertThat(e.getErrorCode()).isEqualTo(code));
+        // 입금 기록 경로는 재확인하지 않는다(보관 현장 허용)
+        verify(siteValidator, times(1)).recheckNotArchivedBeforeCommit(7L);
+    }
+
+    @Test
     void 하위호환_입금확인은_잔액_전부를_한_건으로_기록한다() {
         service.record(INVOICE_ID, request("300000", LocalDate.of(2026, 10, 5)));
 

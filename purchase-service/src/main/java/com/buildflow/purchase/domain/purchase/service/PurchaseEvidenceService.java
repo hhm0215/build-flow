@@ -38,6 +38,9 @@ public class PurchaseEvidenceService {
         TaxInvoiceReference invoice = taxInvoiceReferenceReader
                 .requirePurchaseInvoiceOfSite(request.getTaxInvoiceId(), purchase.getSiteId());
         purchase.linkEvidence(invoice.id());
+        purchaseRepository.flush();
+        // 첫 검사 직후 현장이 보관됐으면 연결을 커밋 전에 롤백한다 (ADR-021 보관 현장 잠금)
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(purchase.getSiteId());
         return PurchaseResponse.from(purchase);
     }
 
@@ -46,6 +49,8 @@ public class PurchaseEvidenceService {
         Purchase purchase = getPurchaseForUpdate(purchaseId);
         siteReferenceValidator.requireSiteNotArchived(purchase.getSiteId());
         purchase.unlinkEvidence();
+        purchaseRepository.flush();
+        siteReferenceValidator.recheckNotArchivedBeforeCommit(purchase.getSiteId());
         return PurchaseResponse.from(purchase);
     }
 
