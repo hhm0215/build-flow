@@ -14,6 +14,23 @@
 - 2026-10-28: 격리 CI `40279837507`에서 견적 원천 조회의 MySQL collation 충돌을 재현했다. 견적 id를 SQL에서 문자열과 비교하지 않고 같은 REPEATABLE READ 스냅샷에서 정확한 record_key로 분류하도록 수리했다. 손상된 키·현장 ID를 보수적으로 분류하는 회귀와 세 서비스 테스트 PASS. [CI 40623076273](https://github.com/hhm0215/build-flow/actions/runs/40623076273)의 SHA `dad73de`에서 실제 MySQL·Feign·Kafka dry-run/반영, 삭제 이벤트 없는 지연 재생, 새 매입, 원천 장애 503과 DB 불변 PASS. 보수적 현장 ID 판정을 포함한 SHA `8870ff5`도 [전체 CI PASS](https://github.com/hhm0215/build-flow/actions/runs/40623165069). 전체 최종 head CI 및 develop 통합 상태는 PR #205에서 확인한다.
 - main/VPS/실데이터 변경 없음. 실제 복원본·외부 암호화 복원·운영 DDL/최소 권한 게이트는 남아 있고 V1 **40/100**, 실데이터 **NO-GO** 유지.
 
+## 완료된 작업 — 손익 재계산 API를 main `98a9dd3`로 VPS 반영 (2026-10-28)
+
+- 2026-10-28 Codex 마지막 작업을 추적했다.
+  - PR #205(`codex/profit-reconcile-validation`)가 #203 전체와 독립 검토 결함 수정을 함께 develop에 병합했다(10-28 02:56Z). 고친 결함은 삭제 매입의 지연 등록·수정 이벤트가 재계산 뒤 원가를 되살리는 문제다.
+  - 실제 MySQL·Feign·Kafka 격리 CI도 함께 들어갔다.
+  - #205 헤드와 develop 병합 CI 모두 success, 작업 폴더 잔여 커밋 0.
+- Claude가 다음 단계를 이어받았다.
+  - 릴리스 PR #206을 병합했다(PR 체크 28 pass, SHA 대조 일치, main CI success).
+  - `sudo buildflow-release deploy 98a9dd3…` EXIT 0. 스키마·Compose 변경은 없다.
+- 실측:
+  - 공개 `/` 200, 무인증 API 401
+  - 새 `POST /sites/{id}/profit/reconcile`·`/estimates/profit-source`·`/purchases/profit-source` 무인증 401
+  - 리스닝 포트 변화 없음
+- 실제 복원본에서 재계산 dry-run/apply는 PENDING이다.
+- 되돌리기: `sudo buildflow-release rollback 842fe82493de0c054fae2f33200b1cc928ceaa6f`.
+- V1 **40/100** 유지.
+
 ## 완료된 작업 — 현장 손익 재계산 API (복원 후 UNEXPLAINED 조치, 2026-10-23)
 
 - 2026-10-23 site-service `POST /api/v1/sites/{id}/profit/reconcile`(기본 dry-run, `?apply=true`만 반영, 프론트 미노출): 손익 소비자와 같은 현장 행 비관적 잠금 아래 estimate `GET /estimates/profit-source`(CONFIRMED 합계 + 그 현장 견적의 손익 outbox eventId, SUPERSEDED 제외)·purchase `GET /purchases/profit-source`(현재 매입 금액·revision)를 Feign(2s/5s) 조회해 `site_profits`를 원천으로 덮어쓰고, 미수신 견적 eventId를 수신기록에 남기고 매입 projection을 원천 revision으로 재작성(원천에 없는 활성 projection은 최대 revision 삭제 고정)해 늦게 온 이벤트 이중 반영을 막는다. 원천 실패·형식 이상 503, 범위 초과·projection 현장 충돌·견적 행 없는 손익 이벤트(과거 확정 삭제) 409, 일치 시 무변경. PR #203 리뷰 반영: 묘비 id에 삭제 아닌 매입 이벤트는 생략 대신 실패(복원 후 AUTO_INCREMENT 재사용 감지, 런북 사전 확인 SQL 추가). site 69(2 skip)·estimate 57(1 skip)·purchase 45(1 skip) PASS. `docs/DATABASE_OPERATIONS.md`·`docs/API_SPEC.md` 갱신. 풀 Docker·실제 복원본 실측 PENDING, **main·VPS 미반영**. V1 **40/100** 유지.
