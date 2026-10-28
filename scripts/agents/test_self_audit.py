@@ -53,7 +53,8 @@ class ReleaseTest(unittest.TestCase):
 
     def test_문서만_바뀐_경로는_미배포로_세지_않는다(self):
         paths = [".claude/PROGRESS.md", "docs/PILOT_QA.md", "AGENTS.md", "chat-service/src/A.java",
-                 "scripts/vps/root/buildflow-release", "scripts/agents/self_audit.py", "scripts/qa/local_e2e.py", ""]
+                 "scripts/vps/root/buildflow-release", "scripts/agents/self_audit.py", "scripts/qa/local_e2e.py",
+                 "scripts/db/test-profit-reconcile-docker.py", ".github/workflows/ci.yml", "scripts/ci/x.py", ""]
         self.assertEqual(undeployed_paths(paths), ["chat-service/src/A.java", "scripts/vps/root/buildflow-release"])
 
 
