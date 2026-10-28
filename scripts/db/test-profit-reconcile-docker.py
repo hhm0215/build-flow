@@ -184,7 +184,17 @@ class Harness:
         self.started = True
         self.phase = "isolated infrastructure startup"
         print("[RUN] Starting isolated MySQL, Kafka and HTTP probe", flush=True)
-        self.compose("up", "-d", "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe", timeout=240)
+        # Hosted runners occasionally fail an image pull/start transiently (2026-10-28 PR #208);
+        # one retry of the infra-only step keeps the overall 900s deadline and output policy.
+        for attempt in (1, 2):
+            try:
+                self.compose("up", "-d", "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe", timeout=240)
+                break
+            except Failure:
+                if attempt == 2:
+                    raise
+                print("[RUN] Infrastructure startup failed once; retrying", flush=True)
+                time.sleep(10)
         self.sql("\n".join(f"CREATE DATABASE buildflow_{name} CHARACTER SET utf8mb4 "
                            "COLLATE utf8mb4_unicode_ci;" for name in PORTS))
         for topic in ("purchase.registered", "purchase.updated", "purchase.deleted",

@@ -79,6 +79,23 @@ public final class IntentRouter {
         return calls;
     }
 
+    /**
+     * 질문에 이름이 들어 있는 현장(이름이 긴 것부터 최대 {@link #MAX_SITES}개).
+     * "강남 2차"가 맞으면 그 이름에 포함된 "강남"은 같은 말의 일부일 뿐이라 뺀다.
+     */
+    public static List<SiteRef> mentionedSites(String question, List<SiteRef> sites) {
+        List<SiteRef> matched = matchSites(normalize(question), sites);
+        return matched.stream()
+                .filter(site -> matched.stream().noneMatch(other -> other != site
+                        && compact(other.name()).length() > compact(site.name()).length()
+                        && compact(other.name()).contains(compact(site.name()))))
+                .toList();
+    }
+
+    private static String compact(String name) {
+        return normalize(name).replace(" ", "");
+    }
+
     static List<SiteRef> matchSites(String normalizedQuestion, List<SiteRef> sites) {
         if (sites == null) {
             return List.of();

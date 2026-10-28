@@ -4,6 +4,7 @@ import com.buildflow.chat.global.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -38,6 +39,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({AsyncRequestNotUsableException.class, IOException.class})
     public void handleClientDisconnect(Exception e) {
         log.info("클라이언트 연결 종료로 응답 중단: {}", e.getMessage());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableRequest(HttpMessageNotReadableException e) {
+        // 요청 본문 조각이 로그에 남지 않도록 원인 예외 종류만 기록
+        log.warn("HttpMessageNotReadableException: causeType={}",
+                e.getMostSpecificCause().getClass().getSimpleName());
+        return ResponseEntity.badRequest().body(ApiResponse.error("요청 본문이 올바르지 않습니다."));
     }
 
     @ExceptionHandler(Exception.class)

@@ -1,5 +1,6 @@
 package com.buildflow.chat.domain.chat.service;
 
+import com.buildflow.chat.domain.chat.tool.IntentRouter;
 import com.buildflow.chat.domain.chat.tool.ToolExecutor;
 import com.buildflow.chat.global.exception.BusinessException;
 import com.buildflow.chat.global.exception.ErrorCode;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -358,5 +360,77 @@ class OllamaToolServiceTest {
 
         assertThat(lines).containsExactly("가나");
         assertThat(pending.toString(StandardCharsets.UTF_8)).isEqualTo("다");
+    }
+
+    @Test
+    void 현장_이름이_든_질문은_siteId_힌트를_시스템_메시지로_넣는다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        when(executor.execute(eq("listSites"), any()))
+                .thenReturn("[{\"id\":15,\"siteName\":\"[QA] 1022-144647 현장\"},{\"id\":4,\"siteName\":\"부산 창고\"}]");
+        OllamaToolService service = new OllamaToolService(WebClient.builder().build(), new ObjectMapper(), executor);
+        List<Object> messages = new ArrayList<>(List.of(Map.of("role", "user", "content", "[QA] 1022-144647 현장 손익 알려줘")));
+
+        List<IntentRouter.SiteRef> sites = service.addSiteHint(messages);
+
+        assertThat(sites).hasSize(2);
+        assertThat(messages).hasSize(2);
+        assertThat(messages.get(1)).isEqualTo(Map.of("role", "system",
+                "content", "질문에 언급된 현장 데이터: [{\"siteId\":15,\"siteName\":\"[QA] 1022-144647 현장\"}] 현장별 도구는 이 siteId로 호출한다."));
+    }
+
+    @Test
+    void 현장_도구가_필요_없는_질문은_목록을_조회하지_않는다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        OllamaToolService service = new OllamaToolService(WebClient.builder().build(), new ObjectMapper(), executor);
+        List<Object> messages = new ArrayList<>(List.of(Map.of("role", "user", "content", "안녕")));
+
+        assertThat(service.addSiteHint(messages)).isNull();
+        assertThat(messages).hasSize(1);
+        verify(executor, never()).execute(any(), any());
+    }
+
+    @Test
+    void 힌트_현장_이름은_제어문자를_지우고_길이를_제한한다() {
+        assertThat(OllamaToolService.hintName("가\n나\t다")).isEqualTo("가 나 다");
+        assertThat(OllamaToolService.hintName("가".repeat(80))).hasSize(OllamaToolService.HINT_NAME_MAX);
+    }
+
+    @Test
+    void 이름_매칭이_없으면_힌트_없이_목록만_돌려준다() {
+        ToolExecutor executor = mock(ToolExecutor.class);
+        when(executor.execute(eq("listSites"), any())).thenReturn("[{\"id\":4,\"siteName\":\"부산 창고\"}]");
+        OllamaToolService service = new OllamaToolService(WebClient.builder().build(), new ObjectMapper(), executor);
+        List<Object> messages = new ArrayList<>(List.of(Map.of("role", "user", "content", "서울 현장 마진 얼마야?")));
+
+        assertThat(service.addSiteHint(messages)).hasSize(1);
+        assertThat(messages).hasSize(1);
+    }
+
+    @Test
+    void 힌트와_폴백은_현장_목록을_한_번만_조회하고_첫_상태를_먼저_보낸다() {
+        ToolExecutor executor = fallbackExecutor();
+        AtomicInteger calls = new AtomicInteger();
+        WebClient client = WebClient.builder()
+                .exchangeFunction(request -> {
+                    String answer = calls.getAndIncrement() == 0 ? "마진은 아마 1억 원입니다." : "부산 창고 마진은 500원입니다.";
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header("Content-Type", "application/json")
+                            .body("{\"message\":{\"role\":\"assistant\",\"content\":\"" + answer + "\"},\"done\":true}")
+                            .build());
+                })
+                .build();
+        OllamaToolService service = new OllamaToolService(client, new ObjectMapper(), executor);
+        ReflectionTestUtils.setField(service, "model", "qwen2.5:7b");
+        ReflectionTestUtils.setField(service, "timeoutSeconds", 5);
+        ReflectionTestUtils.setField(service, "maxToolRounds", 4);
+        List<String> statuses = new ArrayList<>();
+
+        service.runStreaming(new ArrayList<>(List.of(Map.of("role", "user", "content", "부산 창고 마진 얼마야?"))),
+                statuses::add, token -> { });
+
+        verify(executor, times(1)).execute(eq("listSites"), any());
+        verify(executor, times(1)).execute(eq("getSiteProfit"), any());
+        assertThat(statuses.get(0)).isEqualTo("thinking");
+        assertThat(statuses.stream().filter("thinking"::equals).count()).isEqualTo(1);
     }
 }

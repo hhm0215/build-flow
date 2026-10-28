@@ -16,13 +16,13 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | IDLE |
-| 도구 | Codex |
-| 갱신 | 2026-10-28 11:53 KST |
-| 브랜치 | `codex/profit-reconcile-validation` (체크포인트, 드래프트 PR로 노출) |
-| PR | `codex/profit-reconcile-validation`의 드래프트 PR (`gh pr list --head codex/profit-reconcile-validation`) |
-| 현재 단계 | Local and isolated CI verification complete; final head checks and develop integration |
-| 다음 첫 행동 | Check PR 205 final SHA CI; merge to develop if clean; preserve production gates |
+| 상태 | ACTIVE |
+| 도구 | Claude Code |
+| 갱신 | 2026-10-28 17:56 KST |
+| 브랜치 | claude/record-vps-98a9dd3 |
+| PR | Codex #205 develop 병합 확인 → 릴리스 #206 병합. main·VPS = `98a9dd3` |
+| 현재 단계 | Codex 손익 재계산 검증 작업(#205) 이어받아 VPS `98a9dd3` 반영 완료(새 API 무인증 401) |
+| 다음 첫 행동 | BACKLOG 다음 항목을 역할별 서브에이전트로 진행. 롤백 실측·root 래퍼 재설치 후 운영 DDL 대조는 사용자 권한 필요 |
 
 ## 공통 사용자 지시
 
