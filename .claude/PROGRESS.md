@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 실제 Ollama 채팅 로컬 실측·잘못된 본문 400 (2026-10-28)
+
+- 로컬 풀 Docker(`ed398c4`)와 네이티브 Ollama로 채팅 3문항 답변·조각 스트리밍 PASS, 요약 숫자는 site AI 요약 원본과 일치(`docs/PILOT_QA.md`). 실측 중 auth(로그인)·chat이 깨진 JSON 본문에 500을 주던 결함을 다른 서비스와 같은 400 처리기로 수리(`claude/unreadable-body-400`).
+
 ## 완료된 작업 — 주간 기능 Gateway 경유 로컬 실측 스크립트 준비 (2026-10-28, 실측 아님)
 
 - `scripts/qa/local_e2e.py`(표준 라이브러리, `python -I -X utf8`): 대상 URL을 127.0.0.1/localhost/::1 원점으로 제한하고, `AdminBootstrapRunner` 표준입력 방식으로 무작위 비밀번호 QA 관리자를 만들어 `.local/qa-admin.env`(gitignore)에만 저장한다. Gateway 로그인 후 S0 인증 401·S1 분할 입금(#193)·S2 BIDDING(#192)·S3 매입 증빙(#196)·S4 수정본 체인(#201)·S5 재계산 dry-run/apply(#203/#205)를 합성 `[QA-주간-…]` 데이터로 대조하고 PASS/FAIL 표·종료 코드를 낸다.

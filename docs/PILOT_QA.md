@@ -36,7 +36,7 @@
 | 세금계산서 | 생성·수정·삭제, 입금 확인, 미수금 집계 | `[QA]` 매출 1,100원 생성→1,320원 수정·재조회→입금 확인 후 미수금 0원 PASS. 삭제·매입 세금계산서·분할 입금 PENDING/미지원 구분 필요 |
 | 보증보험 | 생성·수정·삭제, PDF 업로드·OCR 상태/수동 보정 | `[QA]` 수동 생성·보증금액 수정 1,000→1,200원·현장 상세 재조회 PASS. 2026-10-13 합성 PDF 입력 거부·트랜잭션/상태 저장 로컬 회귀 PASS, 보증보험 서비스만 공개 VPS의 검증된 `main` SHA로 배포하고 HTTPS/health/무인증 401 PASS. 실제 PDF/OCR·삭제·만료 알림은 PENDING |
 | 알림·대시보드 | 업무 이벤트 알림, 현장별/전체 손익, AI 요약 | `[QA]` 견적·매입·세금계산서 이벤트 수신과 현장별 3,000/800/2,200원, 전체 대시보드 반영 PASS. 알림 읽음 조작은 기존 항목 영향 때문에 미실행. AI 요약 모델 미기동 |
-| AI 채팅·파싱 | 모델 준비 상태, 질문·답변, 파싱/요약 | VPS 모델 미기동으로 답변·파싱 불가. 가용성 표시·전송 차단·무인증 401은 공개 실측 PASS, 무저장 거절은 단위 테스트 PASS, 모델 기동 후 실제 답변 PENDING |
+| AI 채팅·파싱 | 모델 준비 상태, 질문·답변, 파싱/요약 | VPS 모델 미기동으로 답변·파싱 불가. 가용성 표시·전송 차단·무인증 401은 공개 실측 PASS, 무저장 거절은 단위 테스트 PASS, 로컬 실제 Ollama 답변·스트리밍 PASS(2026-10-28), VPS 실제 답변 PENDING |
 
 2026-10-22 로컬 풀 Docker 실동선(`develop` `a75bb9f`, 서비스 포트 직접 호출 — Gateway·화면 경유 아님, 합성 `[QA]` 자료): 거래처·현장 생성, 현장명·견적 제목 201자 400, 견적 초안 생성→수정→**삭제→재조회 404**, 확정, 매입 2건 생성 후 손익(견적 5,000/매입 1,100/마진 3,900)→**매입 1건 삭제 후 재집계**(매입 800/마진 4,200), 매출 세금계산서 생성→**미입금 삭제**, 입금 확인→입금 확인 건 삭제 409, 새 알림 `createdAt`이 현재 KST와 1분 이내, 현장·거래처 `created_at`과 `archived_at` 원시값이 같은 KST 기준(차이 1분 이내) 18/18 PASS. 정리: 현장 15·거래처 2 보관. 공개 VPS·Gateway 인증 경로는 별도 PENDING.
 
@@ -140,6 +140,18 @@ Tesseract를 JVM 안(Tess4J/JNA)에서 부르던 방식을 페이지별 별도 �
 **에이전트 결정(사용자 위임, 2026-10-28)**: 로컬 테스트 관리자는 실행 환경마다 `secrets` 모듈 무작위 비밀번호로 만들어 auth-service의 기존 `AdminBootstrapRunner`(비웹 실행, 표준입력 JSON 1줄 `loginId/name/password`)를 `docker exec -i buildflow-auth java -jar /app/app.jar --spring.main.web-application-type=none --eureka.client.enabled=false --app.admin-bootstrap.enabled=true`로 호출해 등록한다. 값은 `.gitignore`된 `.local/qa-admin.env`(생성 시 0600 요청, Windows에서는 사용자 프로필 ACL에 의존)에만 저장하고 다음 실행에서 재사용한다. 부트스트랩 출력은 버리고 비밀번호·토큰은 출력하지 않는다. 대상 URL은 `127.0.0.1`/`localhost`/`::1` 원점만 허용하고(경로·쿼리·사용자 정보 거부), 프록시·리다이렉트를 따르지 않아 VPS 오용을 막는다. 대안(기록만): 서비스 포트 직접 호출 + `X-User-Id`(2026-10-22 방식) — Gateway 인증·라우팅을 검증하지 못해 보조로만 쓴다.
 
 제약: `AdminBootstrapService`는 사용자 행이 하나라도 있으면 `ADMIN_ALREADY_EXISTS`로 거부한다. 가족 관리자 계정이 이미 있는 로컬 스택에서는 부트스트랩이 실패하고, 대화형 터미널이면 기존 로컬 관리자 값을 입력받아 저장하지 않고 사용한다(`--no-bootstrap`으로 바로 입력). 계정 추가·초기화를 위해 DB를 조작하지 않는다.
+
+### 2026-10-28 실제 Ollama AI 채팅 — 로컬 풀 Docker 실측
+
+스택 `develop` `ed398c4`, 네이티브 Ollama(`qwen2.5:7b` 등 4개 모델), chat-service 직접 호출(`127.0.0.1:8087`, `X-User-Id`)로 합성 `[QA]` 데이터만 질문했다. Gateway 경유 로그인 실측은 위 스크립트 결과로 따로 기록한다.
+
+| 질문 | 이벤트 | 첫 조각/전체 | 판정 |
+|---|---|---|---|
+| 현장 목록 알려줘 | thinking→tool→answering, token 205 | 2.1초 / 6.8초 | PASS — 실제 15개 현장명과 일치, 조각이 도착 즉시 전달됨 |
+| 전체 현장 손익 요약해줘 | thinking→tool→thinking→answering, token 14 | 44.2초 / 44.2초 | PASS(숫자) — 총 마진 7,200원·90%·저마진 현장 목록이 site-service AI 요약 원본과 일치. 요약 도구 안에서 site-service가 LLM을 한 번 더 호출해 느리고, 도구 뒤 답변은 비스트리밍 라운드라 한 번에 도착 |
+| 안녕하세요 | thinking→answering, token 3 | 1.0초 / 1.1초 | PASS — 도구 없이 답변 |
+
+관찰: 7b 토큰 잡음(`마argin율`)이 다시 재현됐다(기존 기록과 같음). 같은 실측 중 깨진 UTF-8·잘린 JSON 본문에 auth-service(로그인)와 chat-service만 400 대신 500을 반환하고 스택 전체를 로그에 남기는 결함을 찾아, 다른 5개 서비스와 같은 `HttpMessageNotReadableException` → 400 처리기와 회귀 테스트를 추가했다. 공개 VPS는 모델 미기동이라 실제 답변은 여전히 PENDING이다.
 
 ## 업무 흐름 적합성 점검
 
