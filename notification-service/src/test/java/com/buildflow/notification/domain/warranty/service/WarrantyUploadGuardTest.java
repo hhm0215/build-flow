@@ -19,6 +19,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 
@@ -230,6 +232,78 @@ class WarrantyUploadGuardTest {
         verify(transactionManager).rollback(any());
         verify(transactionManager, never()).commit(any());
         assertThat(files()).isEmpty();
+        verifyNoInteractions(ocr);
+        // 블록 안 예외는 커밋 결과가 확실(롤백)하므로 행 존재 재조회 없이 즉시 지운다
+        verify(repository, never()).existsByFilePath(any());
+    }
+
+    private void savePendingWithId() {
+        when(repository.save(any())).thenAnswer(invocation -> {
+            DefectWarranty warranty = invocation.getArgument(0);
+            ReflectionTestUtils.setField(warranty, "id", 42L);
+            return warranty;
+        });
+    }
+
+    private void failFirstCommit() {
+        // 업로드 트랜잭션 커밋만 실패시키고, 이어지는 읽기 확인 트랜잭션 커밋은 통과시킨다
+        doThrow(new TransactionSystemException("connection lost during commit"))
+                .doNothing()
+                .when(transactionManager).commit(any());
+    }
+
+    @Test
+    void 커밋_단계_예외에서_행이_커밋됐으면_원본_파일을_보존한다() throws Exception {
+        savePendingWithId();
+        failFirstCommit();
+        when(repository.existsByFilePath(any())).thenReturn(true);
+
+        assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(TransactionSystemException.class);
+
+        assertThat(files()).hasSize(1);
+        verify(repository).existsByFilePath(files().get(0).toString());
+        verifyNoInteractions(ocr);
+    }
+
+    @Test
+    void 커밋_단계_예외에서_행이_없으면_파일을_지운다() throws Exception {
+        savePendingWithId();
+        failFirstCommit();
+        when(repository.existsByFilePath(any())).thenReturn(false);
+
+        assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(TransactionSystemException.class);
+
+        assertThat(files()).isEmpty();
+        verify(repository).existsByFilePath(any());
+        verifyNoInteractions(ocr);
+    }
+
+    @Test
+    void 커밋_단계_예외_후_행_확인도_실패하면_깨진_참조를_피하려고_원본을_보존한다() throws Exception {
+        savePendingWithId();
+        failFirstCommit();
+        when(repository.existsByFilePath(any()))
+                .thenThrow(new DataAccessResourceFailureException("db still unavailable"));
+
+        assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(TransactionSystemException.class);
+
+        assertThat(files()).hasSize(1);
+        verifyNoInteractions(ocr);
+    }
+
+    @Test
+    void 블록_안_저장_예외는_행_재조회_없이_파일을_지운다() throws Exception {
+        when(repository.save(any())).thenThrow(new DataAccessResourceFailureException("insert failed"));
+
+        assertThatThrownBy(() -> service().createFromOcr(1L, upload("x.pdf", pdf(1))))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        assertThat(files()).isEmpty();
+        verify(transactionManager, never()).commit(any());
+        verify(repository, never()).existsByFilePath(any());
         verifyNoInteractions(ocr);
     }
 
