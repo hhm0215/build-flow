@@ -11,6 +11,8 @@ import com.buildflow.chat.infra.feign.dto.ProfitDto;
 import com.buildflow.chat.infra.feign.dto.PurchaseSummaryDto;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import feign.FeignException;
+import feign.Request;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.IntStream;
 
@@ -82,7 +86,7 @@ class ToolExecutorTest {
         JsonNode args = objectMapper.readTree("{\"siteId\":1}");
         String result = executor.execute("getSiteProfit", args);
 
-        assertThat(result).contains("\"siteId\":1").contains("\"margin\":1000");
+        assertThat(result).contains("\"siteId\":1").contains("\"margin\":\"1,000원\"");
     }
 
     @Test
@@ -144,10 +148,10 @@ class ToolExecutorTest {
         then(siteClient).should().getStats();
         assertThat(result.get("totalSites").asInt()).isEqualTo(2);
         assertThat(result.get("sitesByStatus").get("IN_PROGRESS").asInt()).isEqualTo(2);
-        assertThat(result.get("totalEstimateAmount").decimalValue()).isEqualByComparingTo("100000");
-        assertThat(result.get("totalPurchaseAmount").decimalValue()).isEqualByComparingTo("60000");
-        assertThat(result.get("totalMargin").decimalValue()).isEqualByComparingTo("40000");
-        assertThat(result.get("averageMarginRate").decimalValue()).isEqualByComparingTo("40.00");
+        assertThat(result.get("totalEstimateAmount").asText()).isEqualTo("100,000원");
+        assertThat(result.get("totalPurchaseAmount").asText()).isEqualTo("60,000원");
+        assertThat(result.get("totalMargin").asText()).isEqualTo("40,000원");
+        assertThat(result.get("averageMarginRate").asText()).isEqualTo("40.00%");
         assertThat(result.get("siteProfitsTotalCount").asInt()).isEqualTo(2);
         assertThat(result.get("siteProfits")).hasSize(2);
         assertThat(result.get("siteProfits").get(0).get("siteName").asText()).isEqualTo("현장0");
@@ -161,8 +165,8 @@ class ToolExecutorTest {
         JsonNode result = objectMapper.readTree(executor.execute("getDashboardSummary", null));
 
         assertThat(result.get("totalSites").asInt()).isEqualTo(31);
-        assertThat(result.get("totalEstimateAmount").decimalValue()).isEqualByComparingTo("100000");
-        assertThat(result.get("totalMargin").decimalValue()).isEqualByComparingTo("40000");
+        assertThat(result.get("totalEstimateAmount").asText()).isEqualTo("100,000원");
+        assertThat(result.get("totalMargin").asText()).isEqualTo("40,000원");
         assertThat(result.get("siteProfitsTotalCount").asInt()).isEqualTo(31);
         assertThat(result.get("siteProfits")).hasSize(ToolExecutor.LIST_LIMIT);
         assertThat(result.get("note").asText()).contains("30").contains("siteProfitsTotalCount");
@@ -194,5 +198,68 @@ class ToolExecutorTest {
         FeignApiResponse<DashboardStatsDto> response = new FeignApiResponse<>();
         response.setData(stats);
         return response;
+    }
+
+    @Test
+    void 금액과_비율은_모델이_옮겨_적을_문자열로_만든다() throws Exception {
+        JsonNode node = objectMapper.readTree("""
+                {"totalEstimateAmount":8000.00,"margin":-1500,"unitPrice":12.5,"marginRate":84,
+                 "averageMarginRate":-3.456,"quantity":3,"siteId":7,"totalSites":2,
+                 "items":[{"totalAmount":1500000}],"title":"견적"}
+                """);
+
+        JsonNode result = ToolExecutor.formatMoney(node);
+
+        assertThat(result.get("totalEstimateAmount").asText()).isEqualTo("8,000원");
+        assertThat(result.get("margin").asText()).isEqualTo("-1,500원");
+        assertThat(result.get("unitPrice").asText()).isEqualTo("12.5원");
+        assertThat(result.get("marginRate").asText()).isEqualTo("84.00%");
+        assertThat(result.get("averageMarginRate").asText()).isEqualTo("-3.46%");
+        assertThat(result.get("items").get(0).get("totalAmount").asText()).isEqualTo("1,500,000원");
+        assertThat(result.get("quantity").asInt()).isEqualTo(3);
+        assertThat(result.get("siteId").asLong()).isEqualTo(7L);
+        assertThat(result.get("totalSites").asInt()).isEqualTo(2);
+        assertThat(result.get("title").asText()).isEqualTo("견적");
+    }
+
+    @Test
+    void 없는_현장_404는_listSites로_다시_찾으라고_안내한다() throws Exception {
+        FeignException.NotFound notFound = new FeignException.NotFound("not found",
+                Request.create(Request.HttpMethod.GET, "/api/v1/sites/1022144647/profit", Map.of(), null, StandardCharsets.UTF_8, null),
+                null, Map.of());
+        given(siteClient.getProfit(1022144647L)).willThrow(notFound);
+
+        JsonNode result = objectMapper.readTree(executor.execute("getSiteProfit", objectMapper.readTree("{\"siteId\":1022144647}")));
+
+        assertThat(result.get("error").asText()).contains("1022144647").contains("listSites");
+    }
+
+    @Test
+    void 현장_도구가_아닌_404는_일반_실패로_알리고_본문을_넘기지_않는다() {
+        FeignException.NotFound notFound = new FeignException.NotFound("upstream secret body",
+                Request.create(Request.HttpMethod.GET, "/api/v1/sites", Map.of(), null, StandardCharsets.UTF_8, null),
+                "upstream secret body".getBytes(StandardCharsets.UTF_8), Map.of());
+        given(siteClient.listSites()).willThrow(notFound);
+
+        String result = executor.execute("listSites", null);
+
+        assertThat(result).contains("도구 실행에 실패했습니다: listSites").doesNotContain("secret").doesNotContain("listSites로");
+    }
+
+    @Test
+    void 금액_서식은_기본_로케일과_무관하고_0과_큰_값도_처리한다() throws Exception {
+        Locale previous = Locale.getDefault(Locale.Category.FORMAT);
+        Locale.setDefault(Locale.Category.FORMAT, Locale.GERMANY);
+        try {
+            JsonNode result = ToolExecutor.formatMoney(objectMapper.readTree(
+                    "{\"totalAmount\":8000.5,\"margin\":0.00,\"confirmedAmount\":1E+6,\"outstandingAmount\":null}"));
+
+            assertThat(result.get("totalAmount").asText()).isEqualTo("8,000.5원");
+            assertThat(result.get("margin").asText()).isEqualTo("0원");
+            assertThat(result.get("confirmedAmount").asText()).isEqualTo("1,000,000원");
+            assertThat(result.get("outstandingAmount").isNull()).isTrue();
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, previous);
+        }
     }
 }

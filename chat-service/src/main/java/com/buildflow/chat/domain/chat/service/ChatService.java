@@ -41,7 +41,9 @@ public class ChatService {
             "너는 건설·시공 소규모 업체의 현장 업무 비서다. 사용자의 질문에 답하려면 제공된 도구를 호출해 " +
             "실제 데이터를 가져와야 한다. 추측하지 말고 도구 결과에 근거해 한국어로 간결하게 답한다. " +
             "현장 이름이 언급되면 listSites로 siteId를 먼저 찾은 뒤 해당 도구를 호출한다. " +
-            "금액은 원화(₩)로 표기한다. 도구 결과에 error가 있으면 그 사실을 사용자에게 알린다.";
+            "도구 결과의 금액(예: 8,000원)과 비율(예: 84.00%)은 이미 표기된 문자열이니 글자 그대로 옮기고 " +
+            "만·억 단위로 바꾸거나 0을 붙이지 않는다. " +
+            "도구 결과에 error가 있으면 그 사실을 사용자에게 알린다.";
 
     private final ChatSessionRepository sessionRepository;
     private final ChatMessageRepository messageRepository;

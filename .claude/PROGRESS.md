@@ -7,7 +7,7 @@
 
 ## 완료된 작업 — 실제 Ollama 채팅 로컬 실측·잘못된 본문 400 (2026-10-28)
 
-- 로컬 풀 Docker(`ed398c4`)와 네이티브 Ollama로 채팅 3문항 답변·조각 스트리밍 PASS, 요약 숫자는 site AI 요약 원본과 일치(`docs/PILOT_QA.md`). 실측 중 auth(로그인)·chat이 깨진 JSON 본문에 500을 주던 결함을 다른 서비스와 같은 400 처리기로 수리(`claude/unreadable-body-400`).
+- 로컬 풀 Docker(`ed398c4`)와 네이티브 Ollama로 채팅 3문항 답변·조각 스트리밍 PASS, 요약 숫자는 site AI 요약 원본과 일치(`docs/PILOT_QA.md`). 실측 중 auth(로그인)·chat이 깨진 JSON 본문에 500을 주던 결함을 다른 서비스와 같은 400 처리기로 수리(`claude/unreadable-body-400`). 이어 요약 도구를 결정적 통계로 전환(PR #211, 44→6초)하고, 모델의 금액 단위 부풀림·현장 미식별을 금액 사전 문자열화·siteId 힌트·404 안내로 수리(`claude/chat-amount-unit`, 재실측 5문항 금액 일치).
 
 ## 완료된 작업 — 주간 기능 Gateway 경유 로컬 실측 스크립트 준비 (2026-10-28, 실측 아님)
 
