@@ -17,7 +17,7 @@
 - **사실**: 10-12 기준선 이후 7개 스키마 Flyway CI·격리 복원·포트 비게시·반복 배포 등 게이트 증거가 쌓였는데도, 매 작업 종료 보고에 40/100을 그대로 옮겨 적었다. 사용자가 "진행률이 맨날 똑같다"고 지적했다.
 - **원인**: "증거가 통과할 때만 조정" 규칙을 "조정하지 않는 것이 안전"으로 운용했고, 재채점 시점·절차가 정해져 있지 않았다. 보고는 숫자를 확인 없이 복사했다.
 - **재발 방지 규칙**: 체크포인트 증거(실측·격리 CI·VPS 반영)가 새로 통과한 작업을 마칠 때 DELIVERY_PLAN 영역별 점수를 다시 매긴다. 보고에는 `N/100 (마지막 채점일)`을 적고, 채점일이 7일 넘게 지났으면 보고 전에 재채점한다.
-- **반영 위치**: `docs/DELIVERY_PLAN.md` "2026-10-28 재채점" 절 말미 규칙, Claude 메모리 `feedback_progress_rescore`.
+- **반영 위치**: `docs/DELIVERY_PLAN.md` "2026-10-28 재채점" 절 말미 규칙, Claude 메모리 `feedback_progress_rescore`. 후속: 사용자 요청으로 자가 점검 역할 `.claude/agents/self-auditor.md`와 결정적 점검 `scripts/agents/self_audit.py`(7일 초과 채점 WARN 등)를 추가하고 CLAUDE.md 8단계·AGENTS.md §14에 실행 시점을 고정했다.
 
 ## 2026-10-22 — Compose `!reset`이 YAML 앵커 별칭 경유로는 CI에서 무시됨
 
