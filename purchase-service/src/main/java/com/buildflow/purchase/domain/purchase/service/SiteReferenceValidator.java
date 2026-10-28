@@ -38,6 +38,15 @@ public class SiteReferenceValidator {
     }
 
     /**
+     * 새 문서 생성 경로에서 엔티티·outbox를 저장·flush한 뒤 커밋 직전에 다시 확인한다.
+     * 첫 검증과 저장 사이에 현장이 보관·삭제되면 같은 예외(400/503)를 던져 트랜잭션 전체를 롤백한다(fail-closed).
+     * 현장 DB가 달라 행 잠금으로 직렬화할 수 없으므로, 재확인과 커밋 사이의 짧은 구간만 남는다.
+     */
+    public void recheckBeforeCommit(Long siteId) {
+        requireExistingSite(siteId);
+    }
+
+    /**
      * 기존 자료의 수정·삭제 전 검사. 보관된 현장이면 409, 현장 확인 장애는 503으로 실패-닫힘.
      * 현장 검증 도입 전 생긴 고아 자료(현장 404)는 정정할 수 있도록 막지 않는다.
      */

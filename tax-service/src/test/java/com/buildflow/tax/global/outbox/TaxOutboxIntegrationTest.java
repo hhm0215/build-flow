@@ -149,6 +149,19 @@ class TaxOutboxIntegrationTest {
     }
 
     @Test
+    void siteArchivedBeforeCommitRollsBackInvoiceAndOutbox() {
+        doThrow(new BusinessException(ErrorCode.SITE_ARCHIVED))
+                .when(siteReferenceValidator).recheckBeforeCommit(7L);
+
+        assertThatThrownBy(() -> taxService.create(createRequest()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.SITE_ARCHIVED));
+
+        assertThat(taxRepository.count()).isZero();
+        assertThat(outboxRepository.count()).isZero();
+    }
+
+    @Test
     void invalidCreateAmountDoesNotWriteInvoiceOrOutbox() {
         TaxInvoiceCreateRequest invalid = createRequest();
         ReflectionTestUtils.setField(invalid, "supplyAmount", new BigDecimal("9999999999999.99"));
