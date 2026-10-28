@@ -22,6 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.IntStream;
 
@@ -231,5 +232,34 @@ class ToolExecutorTest {
         JsonNode result = objectMapper.readTree(executor.execute("getSiteProfit", objectMapper.readTree("{\"siteId\":1022144647}")));
 
         assertThat(result.get("error").asText()).contains("1022144647").contains("listSites");
+    }
+
+    @Test
+    void 현장_도구가_아닌_404는_일반_실패로_알리고_본문을_넘기지_않는다() {
+        FeignException.NotFound notFound = new FeignException.NotFound("upstream secret body",
+                Request.create(Request.HttpMethod.GET, "/api/v1/sites", Map.of(), null, StandardCharsets.UTF_8, null),
+                "upstream secret body".getBytes(StandardCharsets.UTF_8), Map.of());
+        given(siteClient.listSites()).willThrow(notFound);
+
+        String result = executor.execute("listSites", null);
+
+        assertThat(result).contains("도구 실행에 실패했습니다: listSites").doesNotContain("secret").doesNotContain("listSites로");
+    }
+
+    @Test
+    void 금액_서식은_기본_로케일과_무관하고_0과_큰_값도_처리한다() throws Exception {
+        Locale previous = Locale.getDefault(Locale.Category.FORMAT);
+        Locale.setDefault(Locale.Category.FORMAT, Locale.GERMANY);
+        try {
+            JsonNode result = ToolExecutor.formatMoney(objectMapper.readTree(
+                    "{\"totalAmount\":8000.5,\"margin\":0.00,\"confirmedAmount\":1E+6,\"outstandingAmount\":null}"));
+
+            assertThat(result.get("totalAmount").asText()).isEqualTo("8,000.5원");
+            assertThat(result.get("margin").asText()).isEqualTo("0원");
+            assertThat(result.get("confirmedAmount").asText()).isEqualTo("1,000,000원");
+            assertThat(result.get("outstandingAmount").isNull()).isTrue();
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, previous);
+        }
     }
 }

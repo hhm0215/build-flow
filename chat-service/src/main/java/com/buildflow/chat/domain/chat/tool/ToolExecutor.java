@@ -17,8 +17,10 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +37,9 @@ public class ToolExecutor {
 
     private static final Set<String> KNOWN = Set.of("listSites", "getSiteProfit", "getOutstandingTax",
             "getDashboardSummary", "listEstimatesBySite", "listPurchasesBySite");
+    /** siteId 인자로 특정 현장을 조회하는 도구. */
+    private static final Set<String> SITE_TOOLS = Set.of("getSiteProfit", "getOutstandingTax",
+            "listEstimatesBySite", "listPurchasesBySite");
     /** 모델 컨텍스트를 넘치지 않게 목록 도구는 앞쪽 일부만 넘기고 전체 건수를 함께 알린다. */
     static final int LIST_LIMIT = 30;
 
@@ -62,8 +67,12 @@ public class ToolExecutor {
         } catch (IllegalArgumentException e) {
             return error(e.getMessage());
         } catch (FeignException.NotFound e) {
-            // 모델이 listSites 없이 siteId를 추측하면 404가 난다. 다음 라운드에서 바로잡도록 방법을 알린다.
-            return error("siteId=" + (args == null ? "?" : args.path("siteId").asText("?")) + " 현장을 찾을 수 없습니다. listSites로 현장 ID를 확인한 뒤 다시 호출하세요.");
+            log.warn("도구 404 name={}", name);
+            if (SITE_TOOLS.contains(name)) {
+                // 모델이 listSites 없이 siteId를 추측하면 404가 난다. 다음 라운드에서 바로잡도록 방법을 알린다.
+                return error("siteId=" + requireSiteId(args) + " 현장을 찾을 수 없습니다. listSites로 현장 ID를 확인한 뒤 다시 호출하세요.");
+            }
+            return error("도구 실행에 실패했습니다: " + name);
         } catch (Exception e) {
             // Feign 예외 메시지에는 상류 응답 본문이 섞일 수 있어 종류만 남긴다.
             log.warn("도구 실행 실패 name={}: {}", name, e.getClass().getSimpleName());
@@ -106,7 +115,8 @@ public class ToolExecutor {
     private static String won(BigDecimal amount) {
         BigDecimal plain = amount.stripTrailingZeros();
         String pattern = plain.scale() > 0 ? "#,##0.##" : "#,##0";
-        return new DecimalFormat(pattern).format(plain) + "원";
+        // 컨테이너 기본 로케일과 무관하게 쉼표 구분·점 소수점으로 고정한다.
+        return new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.ROOT)).format(plain) + "원";
     }
 
     private static Map<String, Object> limited(List<?> items) {

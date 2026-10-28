@@ -60,4 +60,13 @@ class IntentRouterTest {
         assertThat(IntentRouter.matchSites("a 현장 마진", List.of(new SiteRef(9, "a")))).isEmpty();
         assertThat(IntentRouter.matchSites("마진", null)).isEmpty();
     }
+
+    @Test
+    void 언급된_현장은_더_긴_매칭_이름에_포함된_이름을_뺀다() {
+        List<SiteRef> sites = List.of(new SiteRef(1, "강남"), new SiteRef(2, "강남 2차"), new SiteRef(3, "부산 창고"));
+
+        assertThat(IntentRouter.mentionedSites("강남 2차 손익", sites)).extracting(SiteRef::id).containsExactly(2L);
+        assertThat(IntentRouter.mentionedSites("강남이랑 부산 창고 손익", sites)).extracting(SiteRef::id)
+                .containsExactlyInAnyOrder(1L, 3L);
+    }
 }

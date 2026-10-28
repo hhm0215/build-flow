@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -55,6 +54,9 @@ public class OllamaToolService {
 
     @Value("${ollama.api.timeout}")
     private int timeoutSeconds;
+
+    /** 힌트에 넣는 현장 이름 최대 길이. */
+    static final int HINT_NAME_MAX = 50;
 
     @Value("${chat.max-tool-rounds:4}")
     private int maxToolRounds;
@@ -107,9 +109,13 @@ public class OllamaToolService {
      */
     public String runStreaming(List<Object> messages, Consumer<String> statusConsumer,
                                Consumer<String> tokenConsumer) {
+        // 현장 힌트 조회(Feign)가 느려도 첫 상태가 바로 보이도록 먼저 보낸다.
+        statusConsumer.accept("thinking");
         List<IntentRouter.SiteRef> sites = addSiteHint(messages);
         for (int round = 0; round < maxToolRounds; round++) {
-            statusConsumer.accept("thinking");
+            if (round > 0) {
+                statusConsumer.accept("thinking");
+            }
             JsonNode message = callOllama(messages, ToolCatalog.tools());
             JsonNode toolCalls = message.get("tool_calls");
 
@@ -225,13 +231,23 @@ public class OllamaToolService {
         List<IntentRouter.SiteRef> sites = loadSites();
         List<IntentRouter.SiteRef> mentioned = IntentRouter.mentionedSites(question, sites);
         if (!mentioned.isEmpty()) {
-            String refs = mentioned.stream()
-                    .map(site -> "'" + site.name() + "' siteId=" + site.id())
-                    .collect(Collectors.joining(", "));
-            messages.add(Map.of("role", "system",
-                    "content", "질문에 언급된 현장: " + refs + ". 현장별 도구는 이 siteId로 호출한다."));
+            // 이름은 관리자가 입력한 데이터라 지시로 읽히지 않게 JSON 데이터로만 넣고 제어문자·길이를 제한한다.
+            List<Map<String, Object>> refs = mentioned.stream()
+                    .map(site -> Map.<String, Object>of("siteId", site.id(), "siteName", hintName(site.name())))
+                    .toList();
+            try {
+                messages.add(Map.of("role", "system", "content",
+                        "질문에 언급된 현장 데이터: " + objectMapper.writeValueAsString(refs) + " 현장별 도구는 이 siteId로 호출한다."));
+            } catch (Exception e) {
+                log.debug("현장 힌트 생성 실패: {}", e.getClass().getSimpleName());
+            }
         }
         return sites;
+    }
+
+    static String hintName(String name) {
+        String clean = name.replaceAll("\\p{Cntrl}", " ").strip();
+        return clean.length() > HINT_NAME_MAX ? clean.substring(0, HINT_NAME_MAX) : clean;
     }
 
     private static String lastUserQuestion(List<Object> messages) {
