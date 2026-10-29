@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 매입 생성과 현장 보관의 실제 경합 (2026-10-29, PR #236)
+
+- `scripts/db/test-archive-race-docker.py`: 무작위 Compose 프로젝트의 격리 MySQL·site·purchase·실제 Feign에서 매입 테이블 쓰기 잠금으로 첫 현장 확인 이후 INSERT를 보류했다. MySQL PROCESSLIST의 metadata lock 대기를 확인한 뒤 현장을 보관하고 잠금을 해제해 두 번째 확인의 400과 매입·outbox 롤백을 검증했다. 활성 현장 생성과 outbox 기록 대조도 통과했다.
+- [CI 40872587199](https://github.com/hhm0215/build-flow/actions/runs/40872587199), SHA `59e16a5`: 전체 CI 및 위 격리 경합 PASS. 현장 확인 이후 INSERT 대기 구간을 검증하며 재확인 이후 커밋 전 경합의 원자성을 보장하지 않는다. 견적·세금계산서·보증의 실제 경합과 운영 VPS 실측은 PENDING. 최종 head CI·develop 통합 여부는 PR에서 확인한다. V1 **59/100** 유지.
+
 ## 완료된 작업 — 주간 기능 Gateway 경유 실측 49/49 PASS·진행률 59/100 (2026-10-29)
 
 - 기존 스택을 볼륨 보존으로 내리고 별도 프로젝트 `bfqa`(빈 볼륨)를 같은 이미지로 띄워 QA 관리자 부트스트랩 후 `local_e2e.py` S0~S5 49/49 PASS. `bfqa` 컨테이너·볼륨만 이름 지정 삭제, 기존 스택 복구(현장 17·관리자 1 유지). 사용자 로그인 대기 게이트 해소.
