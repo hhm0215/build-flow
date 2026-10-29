@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | IDLE |
 | 도구 | Codex |
-| 갱신 | 2026-10-29 21:26 KST |
+| 갱신 | 2026-10-29 21:27 KST |
 | 브랜치 | `codex/archive-race-test` (체크포인트, 드래프트 PR로 노출) |
 | PR | `codex/archive-race-test`의 드래프트 PR (`gh pr list --head codex/archive-race-test`) |
-| 현재 단계 | Record isolated MySQL Feign purchase archive race verification |
-| 다음 첫 행동 | Check final CI and merge PR 236 to develop; other document races remain pending |
+| 현재 단계 | 공유 지시 반영 및 매입 보관 경합 검증 완료 |
+| 다음 첫 행동 | 최종 SHA 검사 통과 후 develop 병합 |
 
 ## 공통 사용자 지시
 
