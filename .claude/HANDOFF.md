@@ -21,8 +21,8 @@
 | 갱신 | 2026-10-29 21:51 KST |
 | 브랜치 | `codex/estimate-archive-race` (체크포인트, 드래프트 PR로 노출) |
 | PR | `codex/estimate-archive-race`의 드래프트 PR (`gh pr list --head codex/estimate-archive-race`) |
-| 현재 단계 | 견적 생성과 현장 보관의 격리 경합 검증 |
-| 다음 첫 행동 | 실제 MySQL과 Feign 경합 회귀 추가 |
+| 현재 단계 | 견적 생성과 현장 보관 경합 회귀 추가 |
+| 다음 첫 행동 | 격리 MySQL·Feign 검사 확인 |
 
 ## 공통 사용자 지시
 
