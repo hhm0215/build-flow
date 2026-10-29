@@ -18,11 +18,11 @@
 |---|---|
 | 상태 | ACTIVE |
 | 도구 | Codex |
-| 갱신 | 2026-10-29 21:19 KST |
+| 갱신 | 2026-10-29 21:21 KST |
 | 브랜치 | `codex/archive-race-test` (체크포인트, 드래프트 PR로 노출) |
 | PR | `codex/archive-race-test`의 드래프트 PR (`gh pr list --head codex/archive-race-test`) |
-| 현재 단계 | Assess real MySQL and Feign archive-document race verification |
-| 다음 첫 행동 | Inspect locking and implement isolated deterministic race regression |
+| 현재 단계 | Add isolated MySQL and Feign archive-before-commit race regression |
+| 다음 첫 행동 | Run CI and verify deterministic lock ordering and rollback |
 
 ## 공통 사용자 지시
 
