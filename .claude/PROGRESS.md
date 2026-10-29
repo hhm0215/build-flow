@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 견적 생성과 현장 보관의 실제 경합 (2026-10-29, PR #238)
+
+- 격리 MySQL의 견적 테이블 잠금과 PROCESSLIST 대기로 첫 Feign 현장 확인 이후 저장을 보류한 뒤 현장을 보관했다. 잠금 해제 후 두 번째 확인의 400, 견적·항목·outbox 0건과 활성 현장 견적 생성 성공을 확인했다. 매입 경합도 함께 재검증했다.
+- [CI 40876771175](https://github.com/hhm0215/build-flow/actions/runs/40876771175), SHA `b66daba`: 전체 검사 PASS. 세금계산서·보증 경합과 재확인 이후 커밋 전 구간은 여전히 미검증이다. V1 **59/100** 유지.
+
 ## 검증된 작업 — 매입 생성과 현장 보관의 실제 경합 (2026-10-29, PR #236)
 
 - `scripts/db/test-archive-race-docker.py`: 무작위 Compose 프로젝트의 격리 MySQL·site·purchase·실제 Feign에서 매입 테이블 쓰기 잠금으로 첫 현장 확인 이후 INSERT를 보류했다. MySQL PROCESSLIST의 metadata lock 대기를 확인한 뒤 현장을 보관하고 잠금을 해제해 두 번째 확인의 400과 매입·outbox 롤백을 검증했다. 활성 현장 생성과 outbox 기록 대조도 통과했다.
