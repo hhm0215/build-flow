@@ -17,12 +17,12 @@
 | 항목 | 값 |
 |---|---|
 | 상태 | IDLE |
-| 도구 | Claude Code |
-| 갱신 | 2026-10-29 05:00 KST |
-| 브랜치 | claude/handoff-idle-1029 |
-| PR | #228 → 릴리스 #229. main·VPS = `4c4ca8c` |
-| 현재 단계 | Claude /loop 대기(자율 진행 가능한 BACKLOG 소진, 30분 간격 자가 점검만). main·VPS = `4c4ca8c`, 진행률 59/100 |
-| 다음 첫 행동 | self_audit.py 실행. 남은 사용자 권한 게이트: 롤백 실측, root 래퍼 재설치(운영 DDL 대조). 주간 기능 로컬 실측은 별도 프로젝트 방식으로 사용자 입력 없이 재실행 가능 |
+| 도구 | Codex |
+| 갱신 | 2026-10-29 21:27 KST |
+| 브랜치 | `codex/archive-race-test` (체크포인트, 드래프트 PR로 노출) |
+| PR | `codex/archive-race-test`의 드래프트 PR (`gh pr list --head codex/archive-race-test`) |
+| 현재 단계 | 공유 지시 반영 및 매입 보관 경합 검증 완료 |
+| 다음 첫 행동 | 최종 SHA 검사 통과 후 develop 병합 |
 
 ## 공통 사용자 지시
 
