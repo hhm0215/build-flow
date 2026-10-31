@@ -13,6 +13,7 @@ from pathlib import Path
 module = SourceFileLoader("profit_harness", str(Path(__file__).with_name("test-profit-reconcile-docker.py"))).load_module()
 Harness, Failure, require = module.Harness, module.Failure, module.require
 TAX_PORT = 8085
+NOTIFICATION_PORT = 8086
 
 
 def add_tax_service(h, temporary):
@@ -47,6 +48,43 @@ def add_tax_service(h, temporary):
     }
     override = Path(temporary) / "archive-race-tax.compose.json"
     override.write_text(json.dumps({"services": {"tax": tax}}), encoding="utf-8")
+    h.prefix.extend(["-f", str(override)])
+
+
+def add_notification_service(h, temporary):
+    """Add notification-service (warranty direct create) through an archive-only Compose override."""
+    jars = [p.resolve() for p in (module.ROOT / "notification-service/build/libs").glob("*.jar")
+            if not p.name.endswith("-plain.jar")]
+    require(len(jars) == 1, "Build exactly one notification bootJar first")
+    h.env["RECONCILE_NOTIFICATION_JAR"] = jars[0].as_posix()
+    h.jars.add(str(jars[0]))
+    # Same isolation as tax: nonce label, no ports/volumes, readonly JAR mount, /tmp tmpfs only.
+    # Direct create never touches the upload directory or Tesseract; listeners stay stopped, the outbox
+    # dispatcher points at an unavailable broker, and the daily expiry/retention crons are disabled.
+    notification = {
+        "image": "eclipse-temurin:17-jre-jammy",
+        "labels": {module.LABEL: "${RECONCILE_NONCE:?Run the Python harness}"},
+        "read_only": True,
+        "tmpfs": ["/tmp"],
+        "mem_limit": "768m",
+        "environment": {
+            "DB_HOST": "mysql", "DB_USERNAME": "root",
+            "DB_PASSWORD": "${RECONCILE_DB_PASSWORD:?Run the Python harness}",
+            "SPRING_CLOUD_CONFIG_ENABLED": "false", "EUREKA_CLIENT_ENABLED": "false",
+            "SPRING_FLYWAY_ENABLED": "true", "SPRING_JPA_HIBERNATE_DDL_AUTO": "validate",
+            "MANAGEMENT_HEALTH_REDIS_ENABLED": "false", "MANAGEMENT_TRACING_ENABLED": "false",
+            "KAFKA_BOOTSTRAP_SERVERS": "unavailable:9092", "SPRING_KAFKA_LISTENER_AUTO_STARTUP": "false",
+            "UPLOAD_DIR": "/tmp/warranties",
+            "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx384m -XX:ActiveProcessorCount=2", "TZ": "Asia/Seoul",
+        },
+        "command": ["java", "-jar", "/app.jar",
+                    "--spring.cloud.openfeign.client.config.notificationSiteReferenceClient.url=http://site:8083",
+                    "--app.warranty.scheduler-cron=-", "--app.warranty.retention-purge-cron=-"],
+        "volumes": [{"type": "bind", "source": "${RECONCILE_NOTIFICATION_JAR:?Build bootJar first}",
+                     "target": "/app.jar", "read_only": True}],
+    }
+    override = Path(temporary) / "archive-race-notification.compose.json"
+    override.write_text(json.dumps({"services": {"notification": notification}}), encoding="utf-8")
     h.prefix.extend(["-f", str(override)])
 
 
@@ -220,16 +258,74 @@ def exercise_tax(h):
     print("[PASS] Active-site control committed tax invoice and outbox")
 
 
-def tax_diagnostics(h):
+def exercise_warranty(h):
+    h.phase = "warranty archive race"
+    h.sql("CREATE DATABASE buildflow_notification CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+    h.compose("up", "-d", "--no-deps", "notification", timeout=180)
+    h.wait_health("notification", port=NOTIFICATION_PORT)
+    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] warranty archive race"}, 201)["id"]
+    # Direct registration (not PDF upload). The far end date keeps it out of any expiry scan.
+    body = {"siteId": site, "insuranceCompany": "[QA] 보증보험", "policyNumber": "QA-0001",
+            "startDate": "2026-01-01", "endDate": "2030-12-31", "coverageAmount": 1000}
+    lock = subprocess.Popen(["docker", *h.prefix, "exec", "-T", "mysql", "sh", "-c",
+                             'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --batch --unbuffered --skip-column-names'],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            text=True, encoding="utf-8", env=h.env)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        lock.stdin.write("LOCK TABLES buildflow_notification.defect_warranties WRITE; SELECT 'READY';\n")
+        lock.stdin.flush()
+        ready = pool.submit(lock.stdout.readline).result(timeout=20).strip()
+        require(ready == "READY", "Synthetic MySQL table lock was not acquired")
+        pending = pool.submit(h.api, "notification", "/api/v1/warranties", "POST", body, 400, NOTIFICATION_PORT)
+        until = time.monotonic() + 8
+        blocked = False
+        while time.monotonic() < until and not pending.done():
+            blocked = int(h.sql("SELECT COUNT(*) FROM information_schema.PROCESSLIST "
+                                "WHERE DB='buildflow_notification' AND STATE='Waiting for table metadata lock';") or 0) > 0
+            if blocked:
+                break
+            time.sleep(0.2)
+        require(blocked, "Warranty INSERT did not reach the MySQL lock after its first site check")
+        h.api("site", f"/api/v1/sites/{site}/archive", "PATCH")
+        lock.stdin.write("UNLOCK TABLES;\n")
+        lock.stdin.flush()
+        pending.result(timeout=15)
+        require(h.sql("SELECT COUNT(*) FROM buildflow_notification.defect_warranties;") == "0",
+                "Archived-site warranty was committed")
+        require(h.sql("SELECT COUNT(*) FROM buildflow_notification.warranty_audit_events;") == "0",
+                "Archived-site warranty audit event was committed")
+        require(h.sql("SELECT COUNT(*) FROM buildflow_notification.outbox_events;") == "0",
+                "Archived-site warranty outbox event was committed")
+        print("[PASS] MySQL-blocked warranty rechecked archived site via Feign and rolled back warranty and audit")
+    finally:
+        if lock.stdin:
+            lock.stdin.close()
+        try:
+            lock.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            lock.terminate()
+            lock.wait(timeout=5)
+        pool.shutdown(wait=True, cancel_futures=True)
+    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] warranty control"}, 201)["id"]
+    h.api("notification", "/api/v1/warranties", "POST", dict(body, siteId=active), 201, NOTIFICATION_PORT)
+    require(h.sql("SELECT COUNT(*) FROM buildflow_notification.defect_warranties;") == "1",
+            "Active-site control warranty did not commit")
+    require(h.sql("SELECT COUNT(*) FROM buildflow_notification.warranty_audit_events;") == "1",
+            "Active-site control warranty audit event did not commit")
+    print("[PASS] Active-site control committed warranty and audit event")
+
+
+def service_diagnostics(h, service):
     # Synthetic fixtures only; bounded error lines with the generated DB password redacted.
     try:
-        logs = h.compose("logs", "--no-color", "--tail", "100", "tax", cleanup=True)
+        logs = h.compose("logs", "--no-color", "--tail", "100", service, cleanup=True)
         selected = [line for line in logs.splitlines() if " ERROR " in line or "Caused by:" in line]
         for line in selected[-10:]:
             safe = line.replace(h.env["RECONCILE_DB_PASSWORD"], "[redacted]")
-            print(f"[DIAG tax] {safe[:800]}", file=sys.stderr)
+            print(f"[DIAG {service}] {safe[:800]}", file=sys.stderr)
     except Failure:
-        print("[DIAG tax] Bounded diagnostics unavailable", file=sys.stderr)
+        print(f"[DIAG {service}] Bounded diagnostics unavailable", file=sys.stderr)
 
 
 def main():
@@ -239,9 +335,11 @@ def main():
         try:
             h = Harness(temporary)
             add_tax_service(h, temporary)
+            add_notification_service(h, temporary)
             exercise(h)
             exercise_estimate(h)
             exercise_tax(h)
+            exercise_warranty(h)
         except (Failure, OSError, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
             failed = True
             print(f"[FAIL] {error}", file=sys.stderr)
@@ -249,7 +347,8 @@ def main():
             if h is not None:
                 if failed and h.started:
                     h.diagnostics()
-                    tax_diagnostics(h)
+                    service_diagnostics(h, "tax")
+                    service_diagnostics(h, "notification")
                 try:
                     h.cleanup()
                 except (Failure, OSError, ValueError, KeyError):

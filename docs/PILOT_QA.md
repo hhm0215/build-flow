@@ -8,6 +8,8 @@
 
 2026-10-31 세금계산서 생성·현장 보관 경합: `scripts/db/test-archive-race-docker.py`에 `exercise_tax`를 추가했다. 아카이브 스크립트 전용 Compose override로 tax-service만 같은 격리 프로젝트(nonce 라벨·호스트 포트/볼륨 없음·읽기 전용 JAR, outbox는 도달 불가 브로커)에 넣고, 공용 하네스와 손익 복구 검증은 바꾸지 않았다. `[QA]` 합성 현장에서 `buildflow_tax.tax_invoices` WRITE 잠금 → 첫 Feign 확인 후 INSERT의 `Waiting for table metadata lock` 확인 → 현장 보관 → 잠금 해제 → 커밋 직전 재확인(`recheckBeforeCommit`)에서 400, 세금계산서·`outbox_events` 0건을 단언하고, 활성 현장 대조군 201·각 1건 커밋을 단언한다. `py_compile`과 병합 Compose 설정 격리 검증(`validate_config`)은 로컬 PASS, 컨테이너 실행은 PR #240 CI `손익 복구` job에서 PASS(`[PASS] MySQL-blocked tax invoice rechecked archived site via Feign and rolled back invoice and outbox`, 대조군 PASS). 보증 경로와 재확인 이후 커밋 전 구간은 여전히 범위 밖이다.
 
+2026-10-31 보증 직접 등록·현장 보관 경합: `exercise_warranty`를 추가했다. 아카이브 스크립트 전용 Compose override(`add_notification_service`)로 notification-service만 같은 격리 프로젝트(nonce 라벨·호스트 포트/볼륨 없음·읽기 전용 JAR·`/tmp` tmpfs, Kafka 리스너 자동 시작 끔, outbox는 도달 불가 브로커, 만료·보존 정리 cron 비활성)에 넣고 공용 하네스는 바꾸지 않았다. 직접 등록(PDF 업로드 아님)은 업로드 디렉터리·Tesseract를 쓰지 않는다. `[QA]` 합성 현장에서 `buildflow_notification.defect_warranties` WRITE 잠금 → 첫 Feign 확인 후 INSERT의 `Waiting for table metadata lock` 확인 → 현장 보관 → 잠금 해제 → 커밋 직전 재확인(`recheckBeforeCommit`)에서 400, 보증·`warranty_audit_events`·`outbox_events` 0건을 단언하고, 활성 현장 대조군 201·보증 1건·감사 이력 1건을 단언한다(직접 등록은 outbox를 쓰지 않음). `py_compile`과 병합 Compose 격리 검증(`validate_config`)만 로컬 확인, 컨테이너 실행은 CI `손익 복구` job PENDING. PDF 업로드 경로, 수정·삭제·확정 경로의 실제 경합, 재확인 이후 커밋 전 구간은 범위 밖이다.
+
 - 각 시나리오는 `[QA]` 식별자가 붙은 새 합성 현장과 합성 거래처만 사용한다. 실제 업체명·금액·USB 원본을 입력하지 않는다.
 - 생성/수정/조회 결과와 실패 화면을 기록한다. 정리할 때는 테스트로 생성한 정확한 ID만 대상으로 삼고, 다른 데이터에 대한 연쇄 삭제 여부를 먼저 확인한다.
 - API 단위 테스트 통과와 VPS 화면의 저장·재조회·집계 통과를 구분한다. 실패 시 화면, 작업, 입력 유형, HTTP 상태와 재현 순서를 남기되 토큰·비밀번호·업무 원문은 수집하지 않는다.
