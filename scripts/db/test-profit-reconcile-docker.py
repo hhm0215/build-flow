@@ -188,9 +188,13 @@ class Harness:
         # one retry of the infra-only step keeps the overall 900s deadline and output policy.
         for attempt in (1, 2):
             try:
-                self.compose("up", "-d", "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe", timeout=240)
+                # The retry recreates containers: restarting the same exited Kafka failed identically (2026-10-31).
+                extra = ("--force-recreate",) if attempt == 2 else ()
+                self.compose("up", "-d", *extra, "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe",
+                             timeout=240)
                 break
             except Failure:
+                self.infra_diagnostics(attempt)
                 if attempt == 2:
                     raise
                 print("[RUN] Infrastructure startup failed once; retrying", flush=True)
@@ -267,6 +271,34 @@ class Harness:
         self.api("site", path + "?apply=true", "POST", status=503)
         require(self.state() == before, "Source outage changed profit or receipts")
         print("[PASS] Unavailable source returned 503 without changing stored state")
+
+    def infra_diagnostics(self, attempt):
+        # Container state/exit code/health carry no secrets; infra logs are filtered to error lines
+        # and the generated DB password is redacted (2026-10-29: repeated fast startup failures).
+        try:
+            states = self.compose("ps", "--all", "--format",
+                                  "{{.Service}} state={{.State}} health={{.Health}} status={{.Status}} image={{.Image}}",
+                                  cleanup=True)
+            for line in states.splitlines()[:10]:
+                print(f"[DIAG infra#{attempt}] {line[:300]}", file=sys.stderr)
+        except Failure:
+            print(f"[DIAG infra#{attempt}] Container state unavailable", file=sys.stderr)
+        for service in ("mysql", "kafka"):
+            try:
+                logs = self.compose("logs", "--no-color", "--tail", "200", service, cleanup=True)
+                lines = logs.splitlines()
+                selected = [line for line in lines
+                            if any(marker in line for marker in ("ERROR", "FATAL", "Exception", "denied", "No space"))]
+                # The fatal line alone hid the cause (2026-10-31 Kafka "Error starting LogManager"):
+                # also keep the stack/cause lines that follow the first fatal fault, still bounded.
+                fatal = next((i for i, line in enumerate(lines) if "fatal fault" in line), None)
+                if fatal is not None:
+                    selected = lines[fatal:fatal + 15]
+                for line in selected[-15:]:
+                    safe = line.replace(self.env["RECONCILE_DB_PASSWORD"], "[redacted]")
+                    print(f"[DIAG infra#{attempt} {service}] {safe[:400]}", file=sys.stderr)
+            except Failure:
+                print(f"[DIAG infra#{attempt} {service}] Bounded logs unavailable", file=sys.stderr)
 
     def diagnostics(self):
         # These applications contain only the generated synthetic fixtures above.

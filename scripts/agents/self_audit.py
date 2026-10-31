@@ -23,8 +23,9 @@ PR_STALE_DAYS = 2
 # 호스트·키 경로는 저장소에 두지 않는다(로컬 환경변수).
 VPS_HOST_ENV = "BUILDFLOW_VPS_SSH"   # 예: deploy계정@서버주소
 VPS_KEY_ENV = "BUILDFLOW_VPS_KEY"    # 예: ~/.ssh/<키 파일>
-# 문서·기록·에이전트/QA 도구만 바뀐 커밋은 VPS에 배포하지 않아도 된다.
-DOC_ONLY = re.compile(r"^(\.claude/|docs/|scripts/agents/|scripts/qa/|AGENTS\.md$|CLAUDE\.md$|README)")
+# 문서·기록·에이전트/QA·CI·DB 운영 스크립트(수동 실행)만 바뀐 커밋은 VPS에 배포하지 않아도 된다.
+# scripts/vps/(배포 래퍼)·서비스·compose·frontend 변경은 배포 대상이다.
+DOC_ONLY = re.compile(r"^(\.claude/|\.github/|docs/|scripts/agents/|scripts/qa/|scripts/ci/|scripts/db/|AGENTS\.md$|CLAUDE\.md$|README)")
 
 
 def run(args, cwd=None, timeout=60):
@@ -189,10 +190,15 @@ def check_vps(expected_full_sha):
         results.append(("FAIL", f"VPS HEAD {head[:7]} ≠ PROGRESS 기록 {expected_full_sha[:7]}"))
     else:
         results.append(("PASS", f"VPS HEAD {head[:7]} = PROGRESS 기록"))
-    down = [line.split()[0] for line in out.splitlines()
-            if line.startswith("buildflow-") and " Up " not in f" {line} "]
-    results.append(("FAIL", f"Up이 아닌 컨테이너: {', '.join(down)}") if down
-                   else ("PASS", "VPS 컨테이너 모두 Up"))
+    rows = [line for line in out.splitlines() if line.startswith("buildflow-")]
+    down = [line.split()[0] for line in rows if " Up " not in f" {line} "]
+    if not rows:
+        # compose ps는 실행 중인 컨테이너만 보여 주므로 목록이 비면 전부 멈춘 것이다.
+        results.append(("FAIL", "실행 중인 buildflow 컨테이너 0개"))
+    elif down:
+        results.append(("FAIL", f"Up이 아닌 컨테이너: {', '.join(down)}"))
+    else:
+        results.append(("PASS", f"VPS 컨테이너 {len(rows)}개 모두 Up"))
     for probe, want in (("공개 /", "200"), ("무인증 API", "401")):
         m = re.search(re.escape(probe) + r" → (\d{3})", out)
         if not m:

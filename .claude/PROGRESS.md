@@ -5,6 +5,46 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 보증 업로드 경합·복원 DB 관리자 로그인·CI Kafka 진단, 진행률 63/100 (2026-10-31, PR #251·#252·#253)
+
+- #252 보증 PDF 업로드 경합(보관 후 400·행/이력 0·저장 PDF 삭제·OCR 미예약) 로컬 2회·CI PASS — 보관 경합 17경로 완료.
+- #253 합성 백업→격리 복원 DB에서 무작위 합성 관리자 로그인·로그아웃·오입력 401 로컬·CI PASS(자격 증명 미출력, PS 5.1 stdin BOM 수정). 실제 운영 백업은 미검증.
+- #251 CI 손익 복구 Kafka `Error starting LogManager` 원인 줄 15줄 출력·재시도 시 재생성. develop 기준, main 미릴리스.
+
+## 검증된 작업 — 삭제·증빙 연결/해제 경합과 시나리오 실패 격리, 진행률 62/100 (2026-10-31, PR #248·#249)
+
+- 견적 초안 삭제(행 잠금), 세금계산서·보증 삭제(첫 SQL 테이블 잠금), 매입 증빙 연결·해제(보조 인덱스 갭 잠금 `index_gap_race`) 경합 CI PASS. 첫 실행의 증빙 대조군 FAIL은 기준선 위치 테스트 결함.
+- 반복 실패 원인 분석: 서브에이전트 테스트를 로컬에서 돌리지 않아 CI가 첫 실행이었다. 로컬 Docker를 복구(남은 소켓 폴더 2곳 비켜두기, 볼륨 유지)하고 16개 시나리오 전체 로컬 PASS 후 #249로 시나리오별 실패 격리. develop 기준, main 미릴리스.
+
+## 검증된 작업 — 기존 문서 변경 7경로와 현장 보관의 실제 경합, 진행률 61/100 (2026-10-31, PR #244·#245·#246)
+
+- 변경 경로는 행 잠금 뒤 첫 보관 검사 직후의 첫 SQL 테이블(outbox_events·tax_payments·warranty_audit_events)을 잠가 순서를 만들고, 대상 행 X 잠금 보유로 대기를 증명했다. 견적 초안 수정은 FK 메타데이터 잠금 때문에 테이블 잠금이 불가해 InnoDB 행 잠금 + `data_lock_waits` 증명으로 별도 실측. 7경로 모두 보관 후 409·값 불변·대조군 PASS. #246은 쌓은 브랜치 SHA 불일치로 develop 병합 후 재대조(회고). develop 기준, main 미릴리스.
+
+## 검증된 작업 — 세금계산서·보증 생성과 현장 보관의 실제 경합, 진행률 60/100 (2026-10-31, PR #240·#242)
+
+- `scripts/db/test-archive-race-docker.py`에 tax·notification Compose override(공용 하네스 무변경)와 `exercise_tax`·`exercise_warranty` 추가. CI `손익 복구` job에서 보관 후 400·롤백(세금계산서·outbox / 보증·감사 이력 0건)과 활성 현장 대조군 PASS. 문서 생성 4경로 격리 실측 완료.
+- #239 자가 점검이 실행 컨테이너 0개를 PASS로 오판하던 결함 수정. #241 VPS 컨테이너 0개는 사용자가 다른 프로젝트에 VPS를 쓰는 중이라 장애 아님으로 정정, 에이전트 VPS 접근 금지(HANDOFF 공통 지시). `docs/DELIVERY_PLAN.md` 재채점 59→60. develop 기준, main 미릴리스.
+
+## 검증된 작업 — 견적 생성과 현장 보관의 실제 경합 (2026-10-29, PR #238)
+
+- 격리 MySQL의 견적 테이블 잠금과 PROCESSLIST 대기로 첫 Feign 현장 확인 이후 저장을 보류한 뒤 현장을 보관했다. 잠금 해제 후 두 번째 확인의 400, 견적·항목·outbox 0건과 활성 현장 견적 생성 성공을 확인했다. 매입 경합도 함께 재검증했다.
+- [CI 40876771175](https://github.com/hhm0215/build-flow/actions/runs/40876771175), SHA `b66daba`: 전체 검사 PASS. 세금계산서·보증 경합과 재확인 이후 커밋 전 구간은 여전히 미검증이다. V1 **59/100** 유지.
+
+## 검증된 작업 — 매입 생성과 현장 보관의 실제 경합 (2026-10-29, PR #236)
+
+- `scripts/db/test-archive-race-docker.py`: 무작위 Compose 프로젝트의 격리 MySQL·site·purchase·실제 Feign에서 매입 테이블 쓰기 잠금으로 첫 현장 확인 이후 INSERT를 보류했다. MySQL PROCESSLIST의 metadata lock 대기를 확인한 뒤 현장을 보관하고 잠금을 해제해 두 번째 확인의 400과 매입·outbox 롤백을 검증했다. 활성 현장 생성과 outbox 기록 대조도 통과했다.
+- [CI 40872587199](https://github.com/hhm0215/build-flow/actions/runs/40872587199), SHA `59e16a5`: 전체 CI 및 위 격리 경합 PASS. 현장 확인 이후 INSERT 대기 구간을 검증하며 재확인 이후 커밋 전 경합의 원자성을 보장하지 않는다. 견적·세금계산서·보증의 실제 경합과 운영 VPS 실측은 PENDING. 최종 head CI·develop 통합 여부는 PR에서 확인한다. V1 **59/100** 유지.
+
+## 완료된 작업 — 주간 기능 Gateway 경유 실측 49/49 PASS·진행률 59/100 (2026-10-29)
+
+- 기존 스택을 볼륨 보존으로 내리고 별도 프로젝트 `bfqa`(빈 볼륨)를 같은 이미지로 띄워 QA 관리자 부트스트랩 후 `local_e2e.py` S0~S5 49/49 PASS. `bfqa` 컨테이너·볼륨만 이름 지정 삭제, 기존 스택 복구(현장 17·관리자 1 유지). 사용자 로그인 대기 게이트 해소.
+- `docs/DELIVERY_PLAN.md` 재채점 57→59(업무 동선 25→27). #233 BACKLOG 배포 완료 항목 정정, #232 자가 점검 경로 분류, #231 CI 손익 복구 인프라 진단 출력.
+
+## 완료된 작업 — 문서 서비스 Feign 재시도 비활성화를 main `4c4ca8c`로 VPS 반영 (2026-10-29)
+
+- #228: estimate·purchase·tax·notification `spring.cloud.loadbalancer.retry.enabled=false`. site-service 일시정지 시 매입 생성 503 응답 6.0→3.1초(로컬 풀 Docker 실측).
+- 릴리스 #229: 첫 CI에서 "손익 복구" job이 격리 인프라 기동 재시도까지 실패(코드 무관) → 실패 job 재실행 PASS·SHA 일치 → main `4c4ca8c` push CI PASS → `buildflow-release deploy`(공개 / 200, 무인증 API 401). 되돌리기: `rollback ae8be6c9b845b6b58b13df1169264d58cc897b70`.
+
 ## 완료된 작업 — 보증 업로드 커밋 불확실 시 원본 보존을 main `ae8be6c`로 VPS 반영 (2026-10-29)
 
 - #225: 보증 PDF 업로드에서 콜백 완료 후 커밋 단계 예외면 새 읽기 트랜잭션으로 `existsByFilePath`를 재조회해 커밋된 행이 있으면 원본 보존, 재조회 실패 시에도 보존(깨진 참조보다 고아 파일이 덜 위험). 블록 안 예외는 기존처럼 즉시 삭제. 단위 테스트 4건, notification 164건 실패 0.

@@ -53,7 +53,8 @@ class ReleaseTest(unittest.TestCase):
 
     def test_문서만_바뀐_경로는_미배포로_세지_않는다(self):
         paths = [".claude/PROGRESS.md", "docs/PILOT_QA.md", "AGENTS.md", "chat-service/src/A.java",
-                 "scripts/vps/root/buildflow-release", "scripts/agents/self_audit.py", "scripts/qa/local_e2e.py", ""]
+                 "scripts/vps/root/buildflow-release", "scripts/agents/self_audit.py", "scripts/qa/local_e2e.py",
+                 "scripts/db/test-profit-reconcile-docker.py", ".github/workflows/ci.yml", "scripts/ci/x.py", ""]
         self.assertEqual(undeployed_paths(paths), ["chat-service/src/A.java", "scripts/vps/root/buildflow-release"])
 
 
@@ -111,6 +112,13 @@ buildflow-chat           {chat}
     def test_HEAD_불일치_중단_컨테이너_401_아님은_FAIL(self):
         statuses = [s for s, _ in self.run_vps(head="1" * 40, chat="Exited (1) 2 minutes ago", unauth="200")]
         self.assertEqual(statuses.count("FAIL"), 3)
+
+    def test_실행_중인_컨테이너가_없으면_FAIL(self):
+        out = f"HEAD {self.SHA}\nNAME      STATUS\n공개 / → 000\n무인증 API → 000\n"
+        env = {"BUILDFLOW_VPS_SSH": "deploy@example.invalid", "BUILDFLOW_VPS_KEY": "~/.ssh/example"}
+        with patch.dict(self_audit.os.environ, env), patch.object(self_audit, "run", return_value=out):
+            result = self_audit.check_vps(self.SHA)
+        self.assertIn(("FAIL", "실행 중인 buildflow 컨테이너 0개"), result)
 
     def test_접속_정보가_없으면_실행하지_않고_UNVERIFIED(self):
         with patch.dict(self_audit.os.environ, {}, clear=True), patch.object(self_audit, "run") as run:

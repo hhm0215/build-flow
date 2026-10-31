@@ -44,7 +44,15 @@ try {
 
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $startInfo
-    if (-not $process.Start()) {
+    # A UTF-8 BOM on stdin breaks the runner's single-line JSON parse. .NET Core exposes StandardInputEncoding;
+    # Windows PowerShell 5.1 derives the stdin writer from Console.InputEncoding, so swap it only around Start().
+    $bomlessUtf8 = New-Object Text.UTF8Encoding($false)
+    $previousInputEncoding = $null
+    if ($null -ne $startInfo.PSObject.Properties['StandardInputEncoding']) { $startInfo.StandardInputEncoding = $bomlessUtf8 }
+    else { $previousInputEncoding = [Console]::InputEncoding; [Console]::InputEncoding = $bomlessUtf8 }
+    try { $started = $process.Start() }
+    finally { if ($null -ne $previousInputEncoding) { [Console]::InputEncoding = $previousInputEncoding } }
+    if (-not $started) {
         throw "Could not start the local admin setup command."
     }
     $process.StandardInput.BaseStream.Write($body, 0, $body.Length)
