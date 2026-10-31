@@ -190,10 +190,15 @@ def check_vps(expected_full_sha):
         results.append(("FAIL", f"VPS HEAD {head[:7]} ≠ PROGRESS 기록 {expected_full_sha[:7]}"))
     else:
         results.append(("PASS", f"VPS HEAD {head[:7]} = PROGRESS 기록"))
-    down = [line.split()[0] for line in out.splitlines()
-            if line.startswith("buildflow-") and " Up " not in f" {line} "]
-    results.append(("FAIL", f"Up이 아닌 컨테이너: {', '.join(down)}") if down
-                   else ("PASS", "VPS 컨테이너 모두 Up"))
+    rows = [line for line in out.splitlines() if line.startswith("buildflow-")]
+    down = [line.split()[0] for line in rows if " Up " not in f" {line} "]
+    if not rows:
+        # compose ps는 실행 중인 컨테이너만 보여 주므로 목록이 비면 전부 멈춘 것이다.
+        results.append(("FAIL", "실행 중인 buildflow 컨테이너 0개"))
+    elif down:
+        results.append(("FAIL", f"Up이 아닌 컨테이너: {', '.join(down)}"))
+    else:
+        results.append(("PASS", f"VPS 컨테이너 {len(rows)}개 모두 Up"))
     for probe, want in (("공개 /", "200"), ("무인증 API", "401")):
         m = re.search(re.escape(probe) + r" → (\d{3})", out)
         if not m:
