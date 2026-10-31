@@ -27,7 +27,7 @@ services:
       retries: 30
 
   auth-service:
-    image: build-flow-auth-service
+    image: ${BUILDFLOW_TEST_AUTH_IMAGE:-build-flow-auth-service}
     profiles: ["auth-validation"]
     ports:
       - "127.0.0.1::8081"
