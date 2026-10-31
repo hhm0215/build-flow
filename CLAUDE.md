@@ -220,6 +220,7 @@ bun run preview         # 빌드 결과 미리보기
    - 머지 직전 `gh api --paginate repos/hhm0215/build-flow/pulls/<num>/commits --jq '.[].sha' | sort` ↔ `git log --format='%H' origin/main..origin/develop | sort` 비교 (`gh pr view --json commits`는 100개까지만 반환해 큰 릴리스 PR에서 거짓 불일치가 난다. GitHub API도 PR당 250개가 상한이므로 그 이상이면 PR을 나눈다)
    - PR CI 필수 체크 통과 및 SHA 일치 시 `gh pr merge <num> --merge` (Create a merge commit 방식). 실패·미완료 체크는 기다리거나 멈추고, 우회 옵션은 사용하지 않는다
    - **SHA 불일치 시 머지 중단** + 사용자에게 보고 (PR 생성 후 develop에 추가 push가 들어간 경우 — PR 본문 갱신 후 재검증 또는 PR 닫고 새로 생성)
+   - 다른 PR 브랜치 위에 쌓은 PR은 기반 PR 병합 후 develop을 그 브랜치에 병합해 기준점을 갱신하고, CI 재통과 뒤 SHA를 다시 대조한다(2026-10-31 #246 회고)
    - 머지 성공 후 `git fetch origin`으로 로컬 origin/main 최신화
 
 8. **결과 반영 (PR 머지 후)**:
