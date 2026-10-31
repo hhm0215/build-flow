@@ -5,6 +5,11 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 세금계산서·보증 생성과 현장 보관의 실제 경합, 진행률 60/100 (2026-10-31, PR #240·#242)
+
+- `scripts/db/test-archive-race-docker.py`에 tax·notification Compose override(공용 하네스 무변경)와 `exercise_tax`·`exercise_warranty` 추가. CI `손익 복구` job에서 보관 후 400·롤백(세금계산서·outbox / 보증·감사 이력 0건)과 활성 현장 대조군 PASS. 문서 생성 4경로 격리 실측 완료.
+- #239 자가 점검이 실행 컨테이너 0개를 PASS로 오판하던 결함 수정. #241 VPS 컨테이너 0개는 사용자가 다른 프로젝트에 VPS를 쓰는 중이라 장애 아님으로 정정, 에이전트 VPS 접근 금지(HANDOFF 공통 지시). `docs/DELIVERY_PLAN.md` 재채점 59→60. develop 기준, main 미릴리스.
+
 ## 검증된 작업 — 견적 생성과 현장 보관의 실제 경합 (2026-10-29, PR #238)
 
 - 격리 MySQL의 견적 테이블 잠금과 PROCESSLIST 대기로 첫 Feign 현장 확인 이후 저장을 보류한 뒤 현장을 보관했다. 잠금 해제 후 두 번째 확인의 400, 견적·항목·outbox 0건과 활성 현장 견적 생성 성공을 확인했다. 매입 경합도 함께 재검증했다.
