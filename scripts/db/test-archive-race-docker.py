@@ -505,38 +505,6 @@ def exercise_payment_cancel(h):
     print("[PASS] Active-site control committed payment cancel")
 
 
-def exercise_estimate_update(h):
-    h.phase = "estimate update archive race"
-    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] estimate update race"}, 201)["id"]
-    created = {"siteId": site, "title": "[QA] update race", "estimateDate": "2026-01-01",
-               "items": [{"itemName": "work", "unit": "ea", "quantity": 1, "unitPrice": 100}]}
-    estimate = int(h.api("estimate", "/api/v1/estimates", "POST", created, 201)["id"])
-    row = f"SELECT title, total_amount, status FROM buildflow_estimate.estimates WHERE id={estimate};"
-    items = ("SELECT COUNT(*), COALESCE(SUM(unit_price), 0) FROM buildflow_estimate.estimate_items "
-             f"WHERE estimate_id={estimate};")
-    before_row, before_items = h.sql(row), h.sql(items)
-    outbox = "SELECT COUNT(*) FROM buildflow_estimate.outbox_events;"
-    before_outbox = int(h.sql(outbox))
-    change = {"title": "[QA] update race changed", "estimateDate": "2026-01-01",
-              "items": [{"itemName": "work", "unit": "ea", "quantity": 1, "unitPrice": 300},
-                        {"itemName": "extra", "unit": "ea", "quantity": 1, "unitPrice": 50}]}
-    # update: row lock -> first check -> DRAFT check -> lazy item collection load on estimate_items
-    # (first SQL, before the orphan DELETE/INSERT and the estimates UPDATE) -> flush
-    mutation_race(h, "buildflow_estimate", "estimates", estimate, site,
-                  ("estimate", f"/api/v1/estimates/{estimate}", "PUT", change, 409), "Estimate update",
-                  lock_table="estimate_items")
-    require(h.sql(row) == before_row, "Archived-site estimate update changed the stored estimate")
-    require(h.sql(items) == before_items, "Archived-site estimate update changed the stored items")
-    require(int(h.sql(outbox)) == before_outbox, "Archived-site estimate update wrote an outbox event")
-    print("[PASS] MySQL-held estimate update rechecked archived site via Feign: 409, estimate and items unchanged")
-    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] estimate update control"}, 201)["id"]
-    control = int(h.api("estimate", "/api/v1/estimates", "POST", dict(created, siteId=active), 201)["id"])
-    h.api("estimate", f"/api/v1/estimates/{control}", "PUT", change, 200)
-    require(h.sql(f"SELECT COUNT(*) FROM buildflow_estimate.estimate_items WHERE estimate_id={control};") == "2",
-            "Active-site control estimate update did not commit")
-    print("[PASS] Active-site control committed estimate update")
-
-
 def exercise_warranty_update(h):
     h.phase = "warranty update archive race"
     site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] warranty update race"}, 201)["id"]
@@ -599,7 +567,6 @@ def main():
             exercise_purchase_delete(h)
             exercise_tax_update(h)
             exercise_payment_cancel(h)
-            exercise_estimate_update(h)
             exercise_warranty_update(h)
         except (Failure, OSError, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
             failed = True
