@@ -507,10 +507,10 @@ jobs:
       - name: Build isolated application jars
         run: |
           chmod +x ./gradlew
-          ./gradlew :site-service:bootJar :estimate-service:bootJar :purchase-service:bootJar --no-daemon
+          ./gradlew :site-service:bootJar :estimate-service:bootJar :purchase-service:bootJar :tax-service:bootJar --no-daemon
       - name: Verify reconciliation and delayed events in isolated containers
         run: python3 -u scripts/db/test-profit-reconcile-docker.py
-      - name: Verify archive and purchase creation race with real MySQL and Feign
+      - name: Verify archive and purchase/estimate/tax creation races with real MySQL and Feign
         run: python3 -u scripts/db/test-archive-race-docker.py
 
   release-candidate:

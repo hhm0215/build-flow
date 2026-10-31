@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the archive-before-commit race using isolated MySQL and real Feign HTTP."""
 import concurrent.futures
+import json
 import subprocess
 import sys
 import tempfile
@@ -11,6 +12,42 @@ from pathlib import Path
 
 module = SourceFileLoader("profit_harness", str(Path(__file__).with_name("test-profit-reconcile-docker.py"))).load_module()
 Harness, Failure, require = module.Harness, module.Failure, module.require
+TAX_PORT = 8085
+
+
+def add_tax_service(h, temporary):
+    """Add tax-service through an archive-only Compose override; the shared harness stays unchanged."""
+    jars = [p.resolve() for p in (module.ROOT / "tax-service/build/libs").glob("*.jar")
+            if not p.name.endswith("-plain.jar")]
+    require(len(jars) == 1, "Build exactly one tax bootJar first")
+    h.env["RECONCILE_TAX_JAR"] = jars[0].as_posix()
+    h.jars.add(str(jars[0]))
+    # Same isolation as the base app services: nonce label, no ports/volumes, readonly JAR mount.
+    # tax-service has no outbox enable switch, so its dispatcher points at an unavailable broker.
+    tax = {
+        "image": "eclipse-temurin:17-jre-jammy",
+        "labels": {module.LABEL: "${RECONCILE_NONCE:?Run the Python harness}"},
+        "read_only": True,
+        "tmpfs": ["/tmp"],
+        "mem_limit": "768m",
+        "environment": {
+            "DB_HOST": "mysql", "DB_USERNAME": "root",
+            "DB_PASSWORD": "${RECONCILE_DB_PASSWORD:?Run the Python harness}",
+            "SPRING_CLOUD_CONFIG_ENABLED": "false", "EUREKA_CLIENT_ENABLED": "false",
+            "SPRING_FLYWAY_ENABLED": "true", "SPRING_JPA_HIBERNATE_DDL_AUTO": "validate",
+            "MANAGEMENT_HEALTH_REDIS_ENABLED": "false", "MANAGEMENT_TRACING_ENABLED": "false",
+            "KAFKA_BOOTSTRAP_SERVERS": "unavailable:9092",
+            "JAVA_TOOL_OPTIONS": "-Xms64m -Xmx384m -XX:ActiveProcessorCount=2", "TZ": "Asia/Seoul",
+        },
+        "command": ["java", "-jar", "/app.jar",
+                    "--spring.cloud.openfeign.client.config.taxSiteReferenceClient.url=http://site:8083",
+                    "--spring.cloud.openfeign.client.config.taxPurchaseEvidenceClient.url=http://purchase:8084"],
+        "volumes": [{"type": "bind", "source": "${RECONCILE_TAX_JAR:?Build bootJar first}",
+                     "target": "/app.jar", "read_only": True}],
+    }
+    override = Path(temporary) / "archive-race-tax.compose.json"
+    override.write_text(json.dumps({"services": {"tax": tax}}), encoding="utf-8")
+    h.prefix.extend(["-f", str(override)])
 
 
 def exercise(h):
@@ -128,14 +165,83 @@ def exercise_estimate(h):
     print("[PASS] Active-site control estimate committed")
 
 
+def exercise_tax(h):
+    h.phase = "tax archive race"
+    h.sql("CREATE DATABASE buildflow_tax CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+    h.compose("up", "-d", "--no-deps", "tax", timeout=180)
+    h.wait_health("tax", port=TAX_PORT)
+    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] tax archive race"}, 201)["id"]
+    body = {"siteId": site, "type": "SALES", "supplyAmount": 1000, "taxAmount": 100,
+            "counterparty": "[QA] 거래처", "issueDate": "2026-01-01"}
+    lock = subprocess.Popen(["docker", *h.prefix, "exec", "-T", "mysql", "sh", "-c",
+                             'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --batch --unbuffered --skip-column-names'],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            text=True, encoding="utf-8", env=h.env)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        lock.stdin.write("LOCK TABLES buildflow_tax.tax_invoices WRITE; SELECT 'READY';\n")
+        lock.stdin.flush()
+        ready = pool.submit(lock.stdout.readline).result(timeout=20).strip()
+        require(ready == "READY", "Synthetic MySQL table lock was not acquired")
+        pending = pool.submit(h.api, "tax", "/api/v1/taxes", "POST", body, 400, TAX_PORT)
+        until = time.monotonic() + 8
+        blocked = False
+        while time.monotonic() < until and not pending.done():
+            blocked = int(h.sql("SELECT COUNT(*) FROM information_schema.PROCESSLIST "
+                                "WHERE DB='buildflow_tax' AND STATE='Waiting for table metadata lock';") or 0) > 0
+            if blocked:
+                break
+            time.sleep(0.2)
+        require(blocked, "Tax invoice INSERT did not reach the MySQL lock after its first site check")
+        h.api("site", f"/api/v1/sites/{site}/archive", "PATCH")
+        lock.stdin.write("UNLOCK TABLES;\n")
+        lock.stdin.flush()
+        pending.result(timeout=15)
+        require(h.sql("SELECT COUNT(*) FROM buildflow_tax.tax_invoices;") == "0",
+                "Archived-site tax invoice was committed")
+        require(h.sql("SELECT COUNT(*) FROM buildflow_tax.outbox_events;") == "0",
+                "Archived-site outbox event was committed")
+        print("[PASS] MySQL-blocked tax invoice rechecked archived site via Feign and rolled back invoice and outbox")
+    finally:
+        if lock.stdin:
+            lock.stdin.close()
+        try:
+            lock.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            lock.terminate()
+            lock.wait(timeout=5)
+        pool.shutdown(wait=True, cancel_futures=True)
+    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] tax control"}, 201)["id"]
+    h.api("tax", "/api/v1/taxes", "POST", dict(body, siteId=active), 201, TAX_PORT)
+    require(h.sql("SELECT COUNT(*) FROM buildflow_tax.tax_invoices;") == "1",
+            "Active-site control tax invoice did not commit")
+    require(h.sql("SELECT COUNT(*) FROM buildflow_tax.outbox_events;") == "1",
+            "Active-site control tax outbox did not commit")
+    print("[PASS] Active-site control committed tax invoice and outbox")
+
+
+def tax_diagnostics(h):
+    # Synthetic fixtures only; bounded error lines with the generated DB password redacted.
+    try:
+        logs = h.compose("logs", "--no-color", "--tail", "100", "tax", cleanup=True)
+        selected = [line for line in logs.splitlines() if " ERROR " in line or "Caused by:" in line]
+        for line in selected[-10:]:
+            safe = line.replace(h.env["RECONCILE_DB_PASSWORD"], "[redacted]")
+            print(f"[DIAG tax] {safe[:800]}", file=sys.stderr)
+    except Failure:
+        print("[DIAG tax] Bounded diagnostics unavailable", file=sys.stderr)
+
+
 def main():
     failed = False
     with tempfile.TemporaryDirectory(prefix="bf-archive-race-") as temporary:
         h = None
         try:
             h = Harness(temporary)
+            add_tax_service(h, temporary)
             exercise(h)
             exercise_estimate(h)
+            exercise_tax(h)
         except (Failure, OSError, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
             failed = True
             print(f"[FAIL] {error}", file=sys.stderr)
@@ -143,6 +249,7 @@ def main():
             if h is not None:
                 if failed and h.started:
                     h.diagnostics()
+                    tax_diagnostics(h)
                 try:
                     h.cleanup()
                 except (Failure, OSError, ValueError, KeyError):
