@@ -538,6 +538,115 @@ def exercise_warranty_update(h):
     require(int(h.sql(audit)) == control_audit + 1, "Active-site control warranty audit did not commit")
     print("[PASS] Active-site control committed warranty update and audit event")
 
+def row_lock_race(h, schema, row_table, row_id, child_table, child_column, site, request, label):
+    """Hold a mutation on an InnoDB row lock of child_table instead of a table lock.
+
+    LOCK TABLES on a child table also takes a shared metadata lock on its FK parent, so the parent's
+    SELECT ... FOR UPDATE would stop before the first site check. A separate REPEATABLE READ session
+    instead takes FOR UPDATE on the child rows of the target (next-key locks on the FK index, gap to the
+    next key, and the child PK records). Consistent reads such as the lazy collection load pass; the
+    mutation's flush stops at its first child write (IDENTITY INSERT of the new rows into the locked
+    gap, or the orphan DELETE of a locked child PK). The proof is performance_schema.data_lock_waits: the
+    request waits on a child_table lock blocked by exactly that session while the same transaction holds
+    the GRANTED X record lock on row_table's target PRIMARY row. Bounded well inside
+    innodb_lock_wait_timeout (default 50 s) and the 10 s probe HTTP timeout.
+    """
+    require(h.sql("SELECT @@performance_schema;") == "1", "performance_schema is required for the lock proof")
+    target = int(row_id)
+    lock = subprocess.Popen(["docker", *h.prefix, "exec", "-T", "mysql", "sh", "-c",
+                             'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --batch --unbuffered --skip-column-names'],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            text=True, encoding="utf-8", env=h.env)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        lock.stdin.write("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ; START TRANSACTION; "
+                         f"SELECT COUNT(*) FROM {schema}.{child_table} WHERE {child_column}={target} FOR UPDATE; "
+                         "SELECT CONNECTION_ID();\n")
+        lock.stdin.flush()
+        locked = pool.submit(lock.stdout.readline).result(timeout=20).strip()
+        connection = pool.submit(lock.stdout.readline).result(timeout=20).strip()
+        require(locked.isdigit() and int(locked) > 0 and connection.isdigit(),
+                f"Synthetic MySQL {child_table} row lock was not acquired")
+        blocker = (f"(SELECT THREAD_ID FROM performance_schema.threads WHERE PROCESSLIST_ID={int(connection)})")
+        require(int(h.sql(
+            f"SELECT COUNT(*) FROM performance_schema.data_locks WHERE THREAD_ID={blocker} "
+            f"AND OBJECT_SCHEMA='{schema}' AND OBJECT_NAME='{child_table}' AND INDEX_NAME='PRIMARY' "
+            "AND LOCK_TYPE='RECORD' AND LOCK_MODE LIKE 'X%' AND LOCK_STATUS='GRANTED';") or 0) >= int(locked),
+            f"Synthetic MySQL session does not hold every {child_table} child row X lock")
+        pending = pool.submit(h.api, *request)
+        until = time.monotonic() + 8
+        waiting = ""
+        while time.monotonic() < until and not pending.done():
+            waiting = h.sql(
+                "SELECT DISTINCT LOWER(SUBSTRING_INDEX(p.INFO, ' ', 1)) "
+                "FROM performance_schema.data_lock_waits w "
+                "JOIN performance_schema.data_locks r ON r.ENGINE_LOCK_ID = w.REQUESTING_ENGINE_LOCK_ID "
+                "JOIN performance_schema.data_locks x "
+                "ON x.ENGINE_TRANSACTION_ID = w.REQUESTING_ENGINE_TRANSACTION_ID "
+                "JOIN performance_schema.threads t ON t.THREAD_ID = w.REQUESTING_THREAD_ID "
+                "JOIN information_schema.PROCESSLIST p ON p.ID = t.PROCESSLIST_ID "
+                f"WHERE w.BLOCKING_THREAD_ID={blocker} AND r.LOCK_STATUS='WAITING' "
+                f"AND r.OBJECT_SCHEMA='{schema}' AND r.OBJECT_NAME='{child_table}' "
+                f"AND p.DB='{schema}' AND p.INFO LIKE '%{child_table}%' "
+                f"AND x.OBJECT_SCHEMA='{schema}' AND x.OBJECT_NAME='{row_table}' AND x.INDEX_NAME='PRIMARY' "
+                "AND x.LOCK_TYPE='RECORD' AND x.LOCK_MODE LIKE 'X%' AND x.LOCK_STATUS='GRANTED' "
+                f"AND x.LOCK_DATA='{target}';")
+            if waiting:
+                break
+            time.sleep(0.2)
+        require(bool(waiting), f"{label} did not wait on the {child_table} row lock while holding its row lock")
+        print(f"[RUN] {label} waits in {waiting.splitlines()[0][:12]} on {child_table} holding {row_table} X lock",
+              flush=True)
+        h.api("site", f"/api/v1/sites/{site}/archive", "PATCH")
+        lock.stdin.write("ROLLBACK;\n")
+        lock.stdin.flush()
+        pending.result(timeout=15)
+    finally:
+        if lock.stdin:
+            lock.stdin.close()
+        try:
+            lock.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            lock.terminate()
+            lock.wait(timeout=5)
+        pool.shutdown(wait=True, cancel_futures=True)
+
+
+def exercise_estimate_update(h):
+    h.phase = "estimate update archive race"
+    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] estimate update race"}, 201)["id"]
+    created = {"siteId": site, "title": "[QA] update race", "estimateDate": "2026-01-01",
+               "items": [{"itemName": "work", "unit": "ea", "quantity": 1, "unitPrice": 100}]}
+    estimate = int(h.api("estimate", "/api/v1/estimates", "POST", created, 201)["id"])
+    row = f"SELECT title, total_amount, status FROM buildflow_estimate.estimates WHERE id={estimate};"
+    items = ("SELECT COUNT(*), COALESCE(SUM(unit_price), 0) FROM buildflow_estimate.estimate_items "
+             f"WHERE estimate_id={estimate};")
+    before_row, before_items = h.sql(row), h.sql(items)
+    require(before_row.split("\t")[-1] == "DRAFT", "Synthetic estimate did not start as DRAFT")
+    outbox = "SELECT COUNT(*) FROM buildflow_estimate.outbox_events;"
+    before_outbox = int(h.sql(outbox))
+    change = {"title": "[QA] update race changed", "estimateDate": "2026-01-01",
+              "items": [{"itemName": "work", "unit": "ea", "quantity": 1, "unitPrice": 300},
+                        {"itemName": "extra", "unit": "ea", "quantity": 1, "unitPrice": 50}]}
+    # update: estimates FOR UPDATE -> first check -> DRAFT check -> lazy item load (consistent read) ->
+    # flush: cascaded IDENTITY INSERT of new items, then orphan DELETE, then estimates UPDATE -> recheck
+    row_lock_race(h, "buildflow_estimate", "estimates", estimate, "estimate_items", "estimate_id", site,
+                  ("estimate", f"/api/v1/estimates/{estimate}", "PUT", change, 409), "Estimate update")
+    require(h.sql(row) == before_row, "Archived-site estimate update changed the stored estimate")
+    require(h.sql(items) == before_items, "Archived-site estimate update changed the stored items")
+    require(int(h.sql(outbox)) == before_outbox, "Archived-site estimate update wrote an outbox event")
+    print("[PASS] Row-lock-held estimate update rechecked archived site via Feign: 409, estimate and items unchanged")
+    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] estimate update control"}, 201)["id"]
+    control = int(h.api("estimate", "/api/v1/estimates", "POST", dict(created, siteId=active), 201)["id"])
+    h.api("estimate", f"/api/v1/estimates/{control}", "PUT", change, 200)
+    title, total = h.sql(f"SELECT title, total_amount FROM buildflow_estimate.estimates WHERE id={control};").split("\t")
+    require(title == "[QA] update race changed" and Decimal(total) == Decimal("350"),
+            "Active-site control estimate update did not commit")
+    require(h.sql(f"SELECT COUNT(*) FROM buildflow_estimate.estimate_items WHERE estimate_id={control};") == "2",
+            "Active-site control estimate items did not commit")
+    print("[PASS] Active-site control committed estimate update")
+
+
 def service_diagnostics(h, service):
     # Synthetic fixtures only; bounded error lines with the generated DB password redacted.
     try:
@@ -568,6 +677,7 @@ def main():
             exercise_tax_update(h)
             exercise_payment_cancel(h)
             exercise_warranty_update(h)
+            exercise_estimate_update(h)
         except (Failure, OSError, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
             failed = True
             print(f"[FAIL] {error}", file=sys.stderr)
