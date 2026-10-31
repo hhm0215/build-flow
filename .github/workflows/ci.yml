@@ -510,7 +510,7 @@ jobs:
           ./gradlew :site-service:bootJar :estimate-service:bootJar :purchase-service:bootJar :tax-service:bootJar :notification-service:bootJar --no-daemon
       - name: Verify reconciliation and delayed events in isolated containers
         run: python3 -u scripts/db/test-profit-reconcile-docker.py
-      - name: Verify archive and purchase/estimate/tax/warranty creation races with real MySQL and Feign
+      - name: Verify archive races for purchase/estimate/tax/warranty creation and purchase update/estimate confirm with real MySQL and Feign
         run: python3 -u scripts/db/test-archive-race-docker.py
 
   release-candidate:

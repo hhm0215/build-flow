@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from decimal import Decimal
 
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -316,6 +317,107 @@ def exercise_warranty(h):
     print("[PASS] Active-site control committed warranty and audit event")
 
 
+def mutation_race(h, schema, row_table, row_id, site, request, label):
+    """Hold an existing-document mutation after its row lock and first site check, then archive the site.
+
+    Purchase update and estimate confirm take SELECT ... FOR UPDATE on row_table before the first site
+    check, so a LOCK TABLES on row_table would stop them before that check. The first statement after the
+    check is the outbox write (Spring Data merge of an assigned-id OutboxEvent), so outbox_events is the
+    locked table. The proof is the waiting session itself holding the target row's InnoDB X lock
+    (performance_schema), which excludes the purchase outbox dispatcher polling the same table.
+    """
+    require(h.sql("SELECT @@performance_schema;") == "1", "performance_schema is required for the lock proof")
+    lock = subprocess.Popen(["docker", *h.prefix, "exec", "-T", "mysql", "sh", "-c",
+                             'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --batch --unbuffered --skip-column-names'],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            text=True, encoding="utf-8", env=h.env)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        lock.stdin.write(f"LOCK TABLES {schema}.outbox_events WRITE; SELECT 'READY';\n")
+        lock.stdin.flush()
+        ready = pool.submit(lock.stdout.readline).result(timeout=20).strip()
+        require(ready == "READY", "Synthetic MySQL outbox table lock was not acquired")
+        pending = pool.submit(h.api, *request)
+        until = time.monotonic() + 8
+        blocked = False
+        while time.monotonic() < until and not pending.done():
+            blocked = int(h.sql(
+                "SELECT COUNT(DISTINCT p.ID) FROM information_schema.PROCESSLIST p "
+                "JOIN performance_schema.threads t ON t.PROCESSLIST_ID = p.ID "
+                "JOIN performance_schema.data_locks l ON l.THREAD_ID = t.THREAD_ID "
+                f"WHERE p.DB='{schema}' AND p.STATE='Waiting for table metadata lock' "
+                "AND p.INFO LIKE '%outbox_events%' "
+                f"AND l.OBJECT_SCHEMA='{schema}' AND l.OBJECT_NAME='{row_table}' AND l.INDEX_NAME='PRIMARY' "
+                f"AND l.LOCK_TYPE='RECORD' AND l.LOCK_MODE LIKE 'X%' AND l.LOCK_DATA='{int(row_id)}';") or 0) > 0
+            if blocked:
+                break
+            time.sleep(0.2)
+        require(blocked, f"{label} did not wait on the outbox lock while holding its row lock")
+        h.api("site", f"/api/v1/sites/{site}/archive", "PATCH")
+        lock.stdin.write("UNLOCK TABLES;\n")
+        lock.stdin.flush()
+        pending.result(timeout=15)
+    finally:
+        if lock.stdin:
+            lock.stdin.close()
+        try:
+            lock.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            lock.terminate()
+            lock.wait(timeout=5)
+        pool.shutdown(wait=True, cancel_futures=True)
+
+
+def exercise_purchase_update(h):
+    h.phase = "purchase update archive race"
+    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] purchase update race"}, 201)["id"]
+    created = {"siteId": site, "itemName": "[QA] update race", "quantity": 1, "unitPrice": 100}
+    purchase = int(h.api("purchase", "/api/v1/purchases", "POST", created, 201)["id"])
+    row = f"SELECT unit_price, event_revision FROM buildflow_purchase.purchases WHERE id={purchase};"
+    before_row = h.sql(row)
+    outbox = "SELECT COUNT(*) FROM buildflow_purchase.outbox_events;"
+    before_outbox = int(h.sql(outbox))
+    change = {"itemName": "[QA] update race", "quantity": 1, "unitPrice": 200}
+    mutation_race(h, "buildflow_purchase", "purchases", purchase, site,
+                  ("purchase", f"/api/v1/purchases/{purchase}", "PUT", change, 409), "Purchase update")
+    require(h.sql(row) == before_row, "Archived-site purchase update changed the stored row")
+    require(int(h.sql(outbox)) == before_outbox, "Archived-site purchase.updated outbox was committed")
+    print("[PASS] MySQL-held purchase update rechecked archived site via Feign: 409, row and outbox unchanged")
+    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] purchase update control"}, 201)["id"]
+    control = int(h.api("purchase", "/api/v1/purchases", "POST", dict(created, siteId=active), 201)["id"])
+    control_outbox = int(h.sql(outbox))
+    h.api("purchase", f"/api/v1/purchases/{control}", "PUT", change, 200)
+    require(Decimal(h.sql(f"SELECT unit_price FROM buildflow_purchase.purchases WHERE id={control};"))
+            == Decimal("200"), "Active-site control purchase update did not commit")
+    require(int(h.sql(outbox)) == control_outbox + 1, "Active-site control purchase.updated outbox did not commit")
+    print("[PASS] Active-site control committed purchase update and outbox")
+
+
+def exercise_estimate_confirm(h):
+    h.phase = "estimate confirm archive race"
+    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] estimate confirm race"}, 201)["id"]
+    created = {"siteId": site, "title": "[QA] confirm race", "estimateDate": "2026-01-01",
+               "items": [{"itemName": "work", "unit": "ea", "quantity": 1, "unitPrice": 100}]}
+    estimate = int(h.api("estimate", "/api/v1/estimates", "POST", created, 201)["id"])
+    status = f"SELECT status FROM buildflow_estimate.estimates WHERE id={estimate};"
+    require(h.sql(status) == "DRAFT", "Synthetic estimate did not start as DRAFT")
+    outbox = "SELECT COUNT(*) FROM buildflow_estimate.outbox_events;"
+    before_outbox = int(h.sql(outbox))
+    mutation_race(h, "buildflow_estimate", "estimates", estimate, site,
+                  ("estimate", f"/api/v1/estimates/{estimate}/confirm", "PATCH", None, 409), "Estimate confirm")
+    require(h.sql(status) == "DRAFT", "Archived-site estimate confirm was committed")
+    require(int(h.sql(outbox)) == before_outbox, "Archived-site estimate.parsed outbox was committed")
+    print("[PASS] MySQL-held estimate confirm rechecked archived site via Feign: 409, DRAFT and outbox unchanged")
+    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] estimate confirm control"}, 201)["id"]
+    control = int(h.api("estimate", "/api/v1/estimates", "POST", dict(created, siteId=active), 201)["id"])
+    control_outbox = int(h.sql(outbox))
+    h.api("estimate", f"/api/v1/estimates/{control}/confirm", "PATCH")
+    require(h.sql(f"SELECT status FROM buildflow_estimate.estimates WHERE id={control};") == "CONFIRMED",
+            "Active-site control estimate confirm did not commit")
+    require(int(h.sql(outbox)) == control_outbox + 1, "Active-site control estimate.parsed outbox did not commit")
+    print("[PASS] Active-site control committed estimate confirm and outbox")
+
+
 def service_diagnostics(h, service):
     # Synthetic fixtures only; bounded error lines with the generated DB password redacted.
     try:
@@ -340,6 +442,8 @@ def main():
             exercise_estimate(h)
             exercise_tax(h)
             exercise_warranty(h)
+            exercise_purchase_update(h)
+            exercise_estimate_confirm(h)
         except (Failure, OSError, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
             failed = True
             print(f"[FAIL] {error}", file=sys.stderr)
