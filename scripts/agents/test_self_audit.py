@@ -113,6 +113,13 @@ buildflow-chat           {chat}
         statuses = [s for s, _ in self.run_vps(head="1" * 40, chat="Exited (1) 2 minutes ago", unauth="200")]
         self.assertEqual(statuses.count("FAIL"), 3)
 
+    def test_실행_중인_컨테이너가_없으면_FAIL(self):
+        out = f"HEAD {self.SHA}\nNAME      STATUS\n공개 / → 000\n무인증 API → 000\n"
+        env = {"BUILDFLOW_VPS_SSH": "deploy@example.invalid", "BUILDFLOW_VPS_KEY": "~/.ssh/example"}
+        with patch.dict(self_audit.os.environ, env), patch.object(self_audit, "run", return_value=out):
+            result = self_audit.check_vps(self.SHA)
+        self.assertIn(("FAIL", "실행 중인 buildflow 컨테이너 0개"), result)
+
     def test_접속_정보가_없으면_실행하지_않고_UNVERIFIED(self):
         with patch.dict(self_audit.os.environ, {}, clear=True), patch.object(self_audit, "run") as run:
             result = self_audit.check_vps(self.SHA)
