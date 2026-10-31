@@ -4,7 +4,9 @@ param(
     [string]$BackupDirectory,
     [switch]$ValidateLogin,
     [switch]$TestIncompleteV2,
-    [string]$WarrantyRowsExportPath
+    [string]$WarrantyRowsExportPath,
+    # Synthetic CI/local only: read a run-time random credential from BUILDFLOW_SYNTHETIC_ADMIN_LOGIN_ID/_PASSWORD instead of prompting.
+    [switch]$SyntheticAdminFromEnvironment
 )
 
 Set-StrictMode -Version Latest
@@ -212,7 +214,7 @@ function Wait-ForContainerHealth {
 }
 
 function Start-AuthValidation {
-    param([switch]$TestLogin)
+    param([switch]$TestLogin, [switch]$CredentialFromEnvironment)
 
     [void](Invoke-DockerText -Arguments ($composeArgs + @("--profile", "auth-validation", "up", "-d", "redis", "auth-service")) -AllowStandardError)
     $authId = (Invoke-DockerText -Arguments ($composeArgs + @("ps", "-q", "auth-service"))).Trim()
@@ -247,16 +249,45 @@ function Start-AuthValidation {
         return
     }
 
-    $loginId = Read-Host "Admin login ID for isolated restore"
-    $securePassword = Read-Host "Admin password for isolated restore" -AsSecureString
     $passwordPointer = [IntPtr]::Zero
     $plainPassword = $null
     $loginBody = $null
+    $wrongBody = $null
     $accessToken = $null
+    if ($CredentialFromEnvironment) {
+        $loginId = [string]$env:BUILDFLOW_SYNTHETIC_ADMIN_LOGIN_ID
+        $securePassword = $null
+    } else {
+        $loginId = Read-Host "Admin login ID for isolated restore"
+        $securePassword = Read-Host "Admin password for isolated restore" -AsSecureString
+    }
     try {
         if ($loginId -cnotmatch '^[A-Za-z0-9._-]{3,50}$') { throw "Admin login ID format is invalid." }
-        $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-        $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+        if ($CredentialFromEnvironment) {
+            $plainPassword = [string]$env:BUILDFLOW_SYNTHETIC_ADMIN_PASSWORD
+            if ($plainPassword.Length -lt 9) { throw "Synthetic admin password is missing from the environment." }
+        } else {
+            $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+            $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+        }
+        if ($CredentialFromEnvironment) {
+            # Negative control first: a different random password for the same restored account must be rejected with 401.
+            $wrongPassword = New-RandomHex -ByteCount 24
+            if ($wrongPassword -ceq $plainPassword) { throw "Random wrong password collided with the synthetic credential." }
+            $wrongBody = [Text.Encoding]::UTF8.GetBytes((@{ loginId = $loginId; password = $wrongPassword } | ConvertTo-Json -Compress))
+            $wrongPassword = $null
+            $wrongStatus = $null
+            try {
+                Invoke-RestMethod -Uri "$baseUrl/api/v1/auth/login" -Method Post -ContentType "application/json; charset=utf-8" -Body $wrongBody -TimeoutSec 15 | Out-Null
+            }
+            catch {
+                $response = $null
+                if ($null -ne $_.Exception.PSObject.Properties['Response']) { $response = $_.Exception.Response }
+                if ($null -ne $response) { $wrongStatus = [int]$response.StatusCode }
+            }
+            if ($wrongStatus -ne 401) { throw "Wrong-password login against the restored administrator was not rejected with 401 (status: $wrongStatus)." }
+            Write-Host "[OK] Restored administrator rejected a wrong password with HTTP 401."
+        }
         $loginBody = [Text.Encoding]::UTF8.GetBytes((@{ loginId = $loginId; password = $plainPassword } | ConvertTo-Json -Compress))
         $login = Invoke-RestMethod -Uri "$baseUrl/api/v1/auth/login" -Method Post -ContentType "application/json; charset=utf-8" -Body $loginBody -TimeoutSec 15
         if (-not $login.success -or [string]::IsNullOrWhiteSpace([string]$login.data.accessToken)) {
@@ -268,6 +299,7 @@ function Start-AuthValidation {
     }
     finally {
         if ($null -ne $loginBody) { [Array]::Clear($loginBody, 0, $loginBody.Length) }
+        if ($null -ne $wrongBody) { [Array]::Clear($wrongBody, 0, $wrongBody.Length) }
         if ($passwordPointer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer) }
         $plainPassword = $null
         $accessToken = $null
@@ -424,7 +456,7 @@ try {
         Assert-RestoredWarrantyReferences -Uploads $manifest.uploads -Rows $rows -ExpectedRowCount ([long]$warrantyTable[0].rowCount)
         Write-Host '[OK] Isolated warranty volume hashes and restored DB references match the diagnostic source package.'
     }
-    Start-AuthValidation -TestLogin:$ValidateLogin
+    Start-AuthValidation -TestLogin:($ValidateLogin.IsPresent -or $SyntheticAdminFromEnvironment.IsPresent) -CredentialFromEnvironment:$SyntheticAdminFromEnvironment
     Assert-RestoreInventory -Manifest $manifest
     Write-Host "[OK] Auth validation left the restored schema and data unchanged."
     if ($manifest.formatVersion -eq 2) {

@@ -79,6 +79,8 @@ SQL 전용 v1 백업의 격리 복원에서는 `-WarrantyRowsExportPath`에 **�
 .\scripts\db\restore-test.ps1 -BackupDirectory .\backups\db\<UTC timestamp> -ValidateLogin
 ```
 
+`-SyntheticAdminFromEnvironment`는 합성 시험 전용이다. `test-v2-snapshot-docker.ps1`가 실행 중 무작위로 만든 관리자 자격 증명을 환경변수로 넘겨, 복원 DB에서 틀린 비밀번호 401과 같은 자격 증명 로그인·로그아웃을 자동 단언한다. 실제 백업에는 사용하지 않는다.
+
 필요할 때만 보호된 로컬 경로로 복원 DB 참조를 추출한다. 기존 행 JSON·증거 파일은 보존하고 새 경로를 사용한다.
 
 ```powershell

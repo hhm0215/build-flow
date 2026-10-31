@@ -13,6 +13,28 @@ services:
       timeout: 3s
       retries: 30
 
+  # One-shot non-web AdminBootstrapRunner: hashes a run-time random synthetic credential with the real auth-service encoder.
+  admin-bootstrap:
+    image: ${BUILDFLOW_TEST_AUTH_IMAGE:-build-flow-auth-service}
+    profiles: ["admin-bootstrap"]
+    environment:
+      SPRING_CLOUD_CONFIG_ENABLED: "false"
+      EUREKA_CLIENT_ENABLED: "false"
+      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
+      EUREKA_CLIENT_FETCH_REGISTRY: "false"
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+      APP_ADMIN_BOOTSTRAP_ENABLED: "true"
+      SPRING_SQL_INIT_MODE: never
+      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      DB_HOST: mysql
+      DB_USERNAME: root
+      DB_PASSWORD: ${SNAPSHOT_TEST_DB_PASSWORD:?Synthetic password required}
+      JWT_SECRET: ${SNAPSHOT_TEST_JWT_SECRET:?Synthetic JWT secret required}
+      MANAGEMENT_TRACING_ENABLED: "false"
+    labels:
+      com.buildflow.snapshot-test: ${SNAPSHOT_TEST_NONCE:?Synthetic nonce required}
+
   notification-service:
     image: mysql:8.0
     entrypoint: ["sh", "-c", "exit 0"]
