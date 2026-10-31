@@ -188,7 +188,10 @@ class Harness:
         # one retry of the infra-only step keeps the overall 900s deadline and output policy.
         for attempt in (1, 2):
             try:
-                self.compose("up", "-d", "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe", timeout=240)
+                # The retry recreates containers: restarting the same exited Kafka failed identically (2026-10-31).
+                extra = ("--force-recreate",) if attempt == 2 else ()
+                self.compose("up", "-d", *extra, "--wait", "--wait-timeout", "150", "mysql", "kafka", "probe",
+                             timeout=240)
                 break
             except Failure:
                 self.infra_diagnostics(attempt)
@@ -283,9 +286,15 @@ class Harness:
         for service in ("mysql", "kafka"):
             try:
                 logs = self.compose("logs", "--no-color", "--tail", "200", service, cleanup=True)
-                selected = [line for line in logs.splitlines()
+                lines = logs.splitlines()
+                selected = [line for line in lines
                             if any(marker in line for marker in ("ERROR", "FATAL", "Exception", "denied", "No space"))]
-                for line in selected[-8:]:
+                # The fatal line alone hid the cause (2026-10-31 Kafka "Error starting LogManager"):
+                # also keep the stack/cause lines that follow the first fatal fault, still bounded.
+                fatal = next((i for i, line in enumerate(lines) if "fatal fault" in line), None)
+                if fatal is not None:
+                    selected = lines[fatal:fatal + 15]
+                for line in selected[-15:]:
                     safe = line.replace(self.env["RECONCILE_DB_PASSWORD"], "[redacted]")
                     print(f"[DIAG infra#{attempt} {service}] {safe[:400]}", file=sys.stderr)
             except Failure:
