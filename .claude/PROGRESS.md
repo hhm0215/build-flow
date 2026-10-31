@@ -1115,17 +1115,15 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-17 갱신)
+## 다음 세션 진입점 (2026-10-31 갱신)
 
-**Git 상태**: `main`은 PR #97 병합 `5dd9a671bd19cc8ac802c23fd0051f0f6b5ebcc4`. `develop`은 PR #100~#125를 통합해 `main`보다 앞서 있으며, `develop`→`main` PR #99는 운영 DDL·복구·실제 혼합 PDF 검증 전까지 **draft 유지**다. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI 5개 PASS 후 병합)로 진행한다. 메인 체크아웃의 로컬 `develop`은 사용자 미커밋 상태(`EstimateService.java` 줄바꿈 전용 변경, `output/`) 보존을 위해 갱신하지 않았다.
+**Git 상태**: `main`은 PR #256 병합 `4b3d795`(develop `5356b1c`까지 릴리스, 운영 서비스 코드 변경 없음). 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. 메인 체크아웃은 오래된 브랜치 `codex/workspace-checkpoint-safety`에 있으므로 스크립트는 `origin/develop` 기준 별도 작업 폴더에서 실행한다.
 
-**VPS 상태**: 2026-10-13 권한 있는 Web Console에서 clean 앱 SHA `4e565968db0b2600238f0e05add9891277d2f2fd`로 notification-service만 빌드·재생성했다. 이전 실행 이미지를 고유 태그로 보존했고 보증 업로드 named volume이 유지됐다. 비root 고정 host key SSH와 별도 외부 요청에서 비loopback 22/80/443, frontend·Gateway·8081~8087 200, 무인증 보증 API 401, TLS 검증·HTTP 308, 디스크 18%·inode 3%·가용 RAM 약 2.3 GiB를 확인했다. 공개 HTTPS는 **테스트 데이터 전용**이며 실제 PDF/OCR 성공·복구는 아직 PENDING이다.
+**VPS 상태**: 마지막 배포 SHA `4c4ca8c`(2026-10-29). 2026-10-31 사용자가 VPS를 다른 프로젝트에 쓰기 위해 BuildFlow 컨테이너를 내렸고, 에이전트 VPS 접근은 금지(사용자 요청 1건 단위로만 읽기 전용 확인). 같은 날 요청 1건으로 읽기 전용 조회: 공개 포트 22·80·443만 열림, 80·443은 다른 프로젝트 Caddy가 사용(응답 헤더 `Server: Caddy`), 가용 RAM 약 6.8GB·스왑 없음·디스크 53GB 여유. BuildFlow 공개 스택 Caddy도 80·443을 쓰므로 **그대로 배포하면 충돌**한다. 공존하려면 기존 Caddy에 BuildFlow 도메인 블록을 추가하고 BuildFlow 쪽 Caddy를 빼는 방식이 추천안(사용자 결정 대기). 배포 계정은 Docker 소켓 권한이 없어 다른 프로젝트 컨테이너 구성은 미확인.
 
-**다음 작업**: `.claude/BACKLOG.md`의 공개 파일럿 CRUD/PDF·AI 검증과 실데이터 운영 게이트(외부 DB+파일 백업·격리 복원, 버전 마이그레이션, 최소 DB 권한)를 따른다. CD는 CI와 별개로 미구축이며, 운영 DB 대상 자동 배포를 아직 켜지 않는다.
+**다음 작업**: `.claude/BACKLOG.md`. 실데이터 입력 전 게이트(실제 운영 백업 외부 복원, 운영 DDL 대조, 롤백 훈련, 보안 게이트)는 모두 VPS가 필요해 보류 중이다. 진행률 63/100(2026-10-31 채점).
 
-**점검 방식**: 보안·인프라 전용 일일 heartbeat 두 건은 2026-10-09 삭제했다. 2026-10-14 현재 별개의 BuildFlow 연속 개발 heartbeat가 1시간 간격으로 ACTIVE이며, 로컬 PC/앱이 실행 중일 때만 이 채팅을 이어받는다. 사용자 요청과 예약된 개발 실행 모두 마지막 단계에서 `docs/SECURITY_OPERATIONS.md`의 읽기 전용 종료 점검을 수행한다. 상시 서버 감시나 메일/Discord 알림으로 오인하지 않는다.
-
-**Git 워크플로우**: `docs/AUTOMATION_GUIDE.md`와 ADR-011의 PR 생성·SHA 검증 후 merge 규칙을 유지한다. 이 문서의 SHA는 기록 당시 스냅샷으로, 후속 PR·배포 판단 때 다시 검증한다.
+**로컬 Docker**: 2026-10-31 남은 소켓 폴더(`%LOCALAPPDATA%\Dockerun`, `%LOCALAPPDATA%\docker-secrets-engine`)를 이름만 바꿔 비켜 두고 복구했다(볼륨 유지, 공장 초기화 금지). 격리 테스트 스크립트는 푸시 전에 로컬에서 먼저 실행한다.
 
 ## 능동 발의 로그 (실험 종료 — 2026-07-04 확정, 아카이브)
 
