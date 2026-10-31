@@ -20,6 +20,15 @@
 
 2026-10-31 실행 방식 정리: 변경 경로 12개 시나리오는 각자 합성 현장을 쓰고 잠금 세션을 finally에서 닫으므로, 하나가 실패해도 나머지를 계속 실행하고 실패 목록을 모아 마지막에 FAIL로 끝낸다(서비스 기동을 겸하는 생성 4개는 기존처럼 즉시 중단). 지금까지 실패가 CI 첫 실행에서만 드러난 원인이 로컬 미실행이었으므로, 로컬 Docker(격리 nonce 프로젝트, 호스트 포트·사용자 볼륨 미사용)에서 전체 16개 시나리오 PASS(3분 25초)를 확인한 뒤 올린다.
 
+2026-10-31 보증 PDF 업로드·현장 보관 경합: 브랜치 `claude/warranty-upload-race`에서 `exercise_warranty_upload`를 실패 격리 루프(보증 삭제 다음)에 추가했다(공용 하네스·기존 헬퍼·운영 코드 무변경). 코드 확인: `POST /api/v1/warranties/upload`(multipart `siteId`·`file`, 성공 **202** ACCEPTED·`ocrStatus=PENDING`)의 `DefectWarrantyService.createFromOcr`는 첫 현장 확인 → `UPLOAD_DIR`에 UUID `.pdf` 저장(20 MiB·`%PDF-` 서명·암호화 아님·1~10쪽·300 DPI 렌더 한도 검증) → `TransactionTemplate` 안에서 PENDING 행 IDENTITY INSERT(첫 SQL) → `UPLOADED` 이력 → flush → `recheckBeforeCommit` → 커밋 후 `processAsync` OCR 예약 순서다. 보관 현장이면 400(`SITE_ARCHIVED`). 재확인 실패는 콜백 안 예외라 `callbackCompleted=false`이므로 `pendingRowMayBeCommitted`·`existsByFilePath` 재조회 없이 저장 파일을 지운다(커밋 단계 예외일 때만 행 존재 재조회로 보존 판단). 그래서 생성 경로 패턴(`defect_warranties` LOCK TABLES, `Waiting for table metadata lock` + 실행 SQL에 `defect_warranties`)으로 INSERT를 첫 검사 뒤에 멈췄고, 대기 중 컨테이너 tmpfs `/tmp/warranties`의 PDF가 1개 늘었음을 먼저 확인해 이후 정리가 관찰 가능함을 보인다. 합성 PDF는 스크립트가 메모리에서 만든 1쪽 빈 PDF(xref 포함 최소 유효 구조)이고, 공용 `h.api`가 JSON 전용이라 probe 컨테이너에서 python으로 multipart를 보내는 최소 헬퍼를 이 스크립트에만 추가했다. 단언: 보관 후 400·`SITE_ARCHIVED` 메시지, 해당 현장 보증 행 0건, 이력·`outbox_events` 건수 불변, 업로드 디렉터리 PDF 수가 대기 전 기준선으로 복귀(정책대로 삭제), 서비스 로그에 해당 현장 접수 줄(`siteId=<id> status=`)과 새 `OCR 시작` 줄 없음(OCR 미예약). 활성 현장 대조군은 202·PENDING, 행 1건, 이력 증가, PDF 1개 보존, 접수 줄 1건이다. 이미지에 Tesseract가 없어 대조군 비동기 OCR은 실패할 수 있으나 결과를 단언하지 않는다. 로컬 Docker(격리 nonce 프로젝트, 호스트 포트·사용자 볼륨 미사용, 기존 `build-flow_*` 볼륨 4개 유지) 전체 17개 시나리오 2회 연속 PASS(종료 코드 0, PASS 34줄), 업로드 줄 원문:
+
+```
+[PASS] MySQL-blocked warranty upload rechecked archived site via Feign: 400, no row/audit, PDF removed, OCR not scheduled
+[PASS] Active-site control upload returned 202 PENDING with one row and one stored PDF
+```
+
+PR #252 CI `손익 복구` job: PASS(같은 두 줄). 재확인 이후 커밋 전 구간(커밋 단계 예외 시 행 존재 재조회 분기)은 이 실측 범위 밖이다.
+
 - 각 시나리오는 `[QA]` 식별자가 붙은 새 합성 현장과 합성 거래처만 사용한다. 실제 업체명·금액·USB 원본을 입력하지 않는다.
 - 생성/수정/조회 결과와 실패 화면을 기록한다. 정리할 때는 테스트로 생성한 정확한 ID만 대상으로 삼고, 다른 데이터에 대한 연쇄 삭제 여부를 먼저 확인한다.
 - API 단위 테스트 통과와 VPS 화면의 저장·재조회·집계 통과를 구분한다. 실패 시 화면, 작업, 입력 유형, HTTP 상태와 재현 순서를 남기되 토큰·비밀번호·업무 원문은 수집하지 않는다.
