@@ -134,6 +134,7 @@
 ### CI 손익 복구 job 격리 인프라 기동 불안정
 - **배경**: `손익 복구 (MySQL · Feign · Kafka)` job이 "Infrastructure startup failed once; retrying" 후에도 실패하는 일이 #208(2026-10-28)·#229(2026-10-29)에서 반복됐다. 둘 다 재실행으로 통과해 코드 결함은 아니지만 릴리스를 지연시킨다. 스크립트가 하위 출력(`subprocess output withheld`)을 숨겨 원인이 보이지 않는다.
 - **산출물**: 실패 시 비밀값을 제외한 컨테이너 상태·마지막 로그 일부를 남기는 진단 출력, 기동 대기 조건(health 대기 시간·포트 경합) 점검, 필요 시 재시도 간격 조정
+- **2026-10-31 진행**: #231 진단 출력으로 원인 단서 확보 — Kafka가 기동 3초 만에 `Error starting LogManager`로 종료, 같은 컨테이너 재시작도 동일 실패(PR #250 CI). 로컬은 같은 설정 5/5 정상이라 재현 불가. 치명 오류 뒤 원인 줄 15줄을 남기고 재시도 때 컨테이너를 재생성하도록 보강(로컬 손익 복구 PASS). 다음 실패 때 원인 줄로 근본 조치를 정한다.
 - **관련 파일**: `scripts/db/test-profit-reconcile-docker.py`, `.github/workflows/ci.yml`
 - **예상 규모**: S
 - **상태**: TODO
