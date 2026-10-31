@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the archive-before-commit race using isolated MySQL and real Feign HTTP."""
+import base64
 import concurrent.futures
 import json
 import subprocess
@@ -60,7 +61,8 @@ def add_notification_service(h, temporary):
     h.env["RECONCILE_NOTIFICATION_JAR"] = jars[0].as_posix()
     h.jars.add(str(jars[0]))
     # Same isolation as tax: nonce label, no ports/volumes, readonly JAR mount, /tmp tmpfs only.
-    # Direct create never touches the upload directory or Tesseract; listeners stay stopped, the outbox
+    # Only the PDF upload scenario writes to UPLOAD_DIR (container tmpfs); no Tesseract is installed and its
+    # async OCR result is never asserted. Listeners stay stopped, the outbox
     # dispatcher points at an unavailable broker, and the daily expiry/retention crons are disabled.
     notification = {
         "image": "eclipse-temurin:17-jre-jammy",
@@ -828,6 +830,143 @@ def exercise_warranty_delete(h):
     print("[PASS] Active-site control committed warranty delete and audit event")
 
 
+MULTIPART_PROBE = """
+import base64, json, sys, urllib.request, urllib.error, uuid
+r = json.load(sys.stdin)
+boundary = 'bf' + uuid.uuid4().hex
+chunks = []
+for name, value in r['fields'].items():
+    chunks.append(('--%s\\r\\nContent-Disposition: form-data; name="%s"\\r\\n\\r\\n%s\\r\\n'
+                   % (boundary, name, value)).encode())
+chunks.append(('--%s\\r\\nContent-Disposition: form-data; name="file"; filename="%s"\\r\\n'
+               'Content-Type: application/pdf\\r\\n\\r\\n' % (boundary, r['filename'])).encode())
+chunks.append(base64.b64decode(r['file']))
+chunks.append(('\\r\\n--%s--\\r\\n' % boundary).encode())
+request = urllib.request.Request(r['url'], data=b''.join(chunks), method='POST',
+                                 headers={'Content-Type': 'multipart/form-data; boundary=' + boundary})
+try:
+    with urllib.request.urlopen(request, timeout=10) as response:
+        status, text = response.status, response.read().decode()
+except urllib.error.HTTPError as error:
+    status, text = error.code, error.read().decode()
+except urllib.error.URLError:
+    status, text = 0, '{}'
+print(json.dumps({'status': status, 'body': json.loads(text)}))
+"""
+
+
+def synthetic_pdf():
+    """Minimal valid one-page PDF (no text, 200x200 pt) built in memory; no external file or real data."""
+    objects = [b"<< /Type /Catalog /Pages 2 0 R >>",
+               b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+               b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << >> >>"]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    for offset in offsets:
+        out += b"%010d 00000 n \n" % offset
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+    return bytes(out)
+
+
+def upload_warranty(h, site, status):
+    """POST /api/v1/warranties/upload (multipart siteId + file) from the probe container."""
+    request = {"url": f"http://notification:{NOTIFICATION_PORT}/api/v1/warranties/upload",
+               "fields": {"siteId": str(site)}, "filename": "qa-synthetic.pdf",
+               "file": base64.b64encode(synthetic_pdf()).decode("ascii")}
+    response = json.loads(h.compose("exec", "-T", "probe", "python", "-c", MULTIPART_PROBE,
+                                    text=json.dumps(request), timeout=20))
+    require(response["status"] == status,
+            f"Unexpected synthetic HTTP result: notification POST /api/v1/warranties/upload: {response['status']}")
+    require(response["body"].get("success") is (status < 400), "Unexpected API envelope")
+    return response["body"]
+
+
+def upload_file_count(h):
+    # UPLOAD_DIR=/tmp/warranties lives on the container's tmpfs; OCR temp dirs are elsewhere under /tmp.
+    return int(h.compose("exec", "-T", "notification", "sh", "-c",
+                         "find /tmp/warranties -maxdepth 1 -type f -name '*.pdf' 2>/dev/null | wc -l"))
+
+
+def upload_log_lines(h, needle):
+    logs = h.compose("logs", "--no-color", "notification", timeout=30)
+    return [line for line in logs.splitlines() if needle in line]
+
+
+def exercise_warranty_upload(h):
+    h.phase = "warranty upload archive race"
+    site = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] warranty upload race"}, 201)["id"]
+    rows = f"SELECT COUNT(*) FROM buildflow_notification.defect_warranties WHERE site_id={int(site)};"
+    audit = "SELECT COUNT(*) FROM buildflow_notification.warranty_audit_events;"
+    outbox = "SELECT COUNT(*) FROM buildflow_notification.outbox_events;"
+    before_audit, before_outbox, before_files = int(h.sql(audit)), int(h.sql(outbox)), upload_file_count(h)
+    before_ocr = len(upload_log_lines(h, "OCR 시작 warrantyId="))
+    # createFromOcr: first site check -> PDF written to UPLOAD_DIR -> TransactionTemplate: PENDING INSERT on
+    # defect_warranties (first SQL, blocked here) -> UPLOADED audit -> flush -> recheck -> commit -> OCR.
+    lock = subprocess.Popen(["docker", *h.prefix, "exec", "-T", "mysql", "sh", "-c",
+                             'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --batch --unbuffered --skip-column-names'],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            text=True, encoding="utf-8", env=h.env)
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
+        lock.stdin.write("LOCK TABLES buildflow_notification.defect_warranties WRITE; SELECT 'READY';\n")
+        lock.stdin.flush()
+        ready = pool.submit(lock.stdout.readline).result(timeout=20).strip()
+        require(ready == "READY", "Synthetic MySQL table lock was not acquired")
+        pending = pool.submit(upload_warranty, h, site, 400)
+        until = time.monotonic() + 8
+        blocked = False
+        while time.monotonic() < until and not pending.done():
+            blocked = int(h.sql("SELECT COUNT(*) FROM information_schema.PROCESSLIST "
+                                "WHERE DB='buildflow_notification' AND STATE='Waiting for table metadata lock' "
+                                "AND INFO LIKE '%defect_warranties%';") or 0) > 0
+            if blocked:
+                break
+            time.sleep(0.2)
+        require(blocked, "Warranty upload INSERT did not reach the MySQL lock after its first site check")
+        # The PDF is already on disk while the PENDING INSERT waits, so the cleanup below is observable.
+        require(upload_file_count(h) == before_files + 1, "Blocked warranty upload had not stored its PDF yet")
+        h.api("site", f"/api/v1/sites/{site}/archive", "PATCH")
+        lock.stdin.write("UNLOCK TABLES;\n")
+        lock.stdin.flush()
+        body = pending.result(timeout=15)
+    finally:
+        if lock.stdin:
+            lock.stdin.close()
+        try:
+            lock.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            lock.terminate()
+            lock.wait(timeout=5)
+        pool.shutdown(wait=True, cancel_futures=True)
+    # ApiResponse.error carries ErrorCode.SITE_ARCHIVED's message (400), not INVALID_SITE_REFERENCE's.
+    require("보관된 현장에는 새 자료를 등록할 수 없습니다" in (body.get("error") or ""),
+            "Archived-site upload was not rejected as SITE_ARCHIVED")
+    require(h.sql(rows) == "0", "Archived-site PENDING warranty row was committed")
+    require(int(h.sql(audit)) == before_audit, "Archived-site warranty UPLOADED audit was committed")
+    require(int(h.sql(outbox)) == before_outbox, "Archived-site warranty upload wrote an outbox event")
+    # The recheck fails inside the callback (not at commit), so createFromOcr deletes the stored PDF.
+    require(upload_file_count(h) == before_files, "Archived-site upload left its PDF in the upload directory")
+    require(not upload_log_lines(h, f"siteId={int(site)} status="), "Archived-site upload was accepted")
+    require(len(upload_log_lines(h, "OCR 시작 warrantyId=")) == before_ocr, "Archived-site upload scheduled OCR")
+    print("[PASS] MySQL-blocked warranty upload rechecked archived site via Feign: 400, no row/audit, "
+          "PDF removed, OCR not scheduled")
+    active = h.api("site", "/api/v1/sites", "POST", {"siteName": "[QA] warranty upload control"}, 201)["id"]
+    control = upload_warranty(h, active, 202)["data"]
+    require(control.get("ocrStatus") == "PENDING", "Active-site control upload did not return PENDING")
+    require(h.sql(f"SELECT COUNT(*) FROM buildflow_notification.defect_warranties WHERE site_id={int(active)};")
+            == "1", "Active-site control PENDING warranty row did not commit")
+    require(int(h.sql(audit)) >= before_audit + 1, "Active-site control UPLOADED audit did not commit")
+    require(upload_file_count(h) == before_files + 1, "Active-site control upload did not keep exactly one PDF")
+    require(len(upload_log_lines(h, f"siteId={int(active)} status=")) == 1, "Active-site control was not accepted")
+    # OCR runs asynchronously (no Tesseract in this image); its outcome is deliberately not asserted.
+    print("[PASS] Active-site control upload returned 202 PENDING with one row and one stored PDF")
+
+
 def evidence_fixture(h, name):
     """Synthetic site with one purchase and one PURCHASE tax invoice on that site."""
     site = h.api("site", "/api/v1/sites", "POST", {"siteName": f"[QA] {name}"}, 201)["id"]
@@ -942,7 +1081,8 @@ def main():
             for scenario in (exercise_purchase_update, exercise_estimate_confirm, exercise_purchase_delete,
                              exercise_tax_update, exercise_payment_cancel, exercise_warranty_update,
                              exercise_estimate_update, exercise_estimate_delete, exercise_tax_delete,
-                             exercise_warranty_delete, exercise_evidence_link, exercise_evidence_unlink):
+                             exercise_warranty_delete, exercise_warranty_upload, exercise_evidence_link,
+                             exercise_evidence_unlink):
                 try:
                     scenario(h)
                 except (Failure, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
