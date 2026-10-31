@@ -6,7 +6,7 @@
 
 2026-10-29 견적 생성·현장 보관 경합: [격리 CI](https://github.com/hhm0215/build-flow/actions/runs/40876771175)에서 실제 MySQL 잠금 대기와 Feign 재확인으로 보관 후 400 및 견적·항목·outbox 롤백을 검증했다. 활성 현장 생성도 PASS. 세금계산서·보증 경로와 재확인 이후 커밋 전 경합은 이 검증 범위 밖이다.
 
-2026-10-31 세금계산서 생성·현장 보관 경합: `scripts/db/test-archive-race-docker.py`에 `exercise_tax`를 추가했다. 아카이브 스크립트 전용 Compose override로 tax-service만 같은 격리 프로젝트(nonce 라벨·호스트 포트/볼륨 없음·읽기 전용 JAR, outbox는 도달 불가 브로커)에 넣고, 공용 하네스와 손익 복구 검증은 바꾸지 않았다. `[QA]` 합성 현장에서 `buildflow_tax.tax_invoices` WRITE 잠금 → 첫 Feign 확인 후 INSERT의 `Waiting for table metadata lock` 확인 → 현장 보관 → 잠금 해제 → 커밋 직전 재확인(`recheckBeforeCommit`)에서 400, 세금계산서·`outbox_events` 0건을 단언하고, 활성 현장 대조군 201·각 1건 커밋을 단언한다. `py_compile`과 병합 Compose 설정 격리 검증(`validate_config`)은 로컬 PASS, 로컬 Docker 데몬이 꺼져 있어 컨테이너 실행 결과는 CI(`profit-reconcile` job) **PENDING**이다. 보증 경로와 재확인 이후 커밋 전 구간은 여전히 범위 밖이다.
+2026-10-31 세금계산서 생성·현장 보관 경합: `scripts/db/test-archive-race-docker.py`에 `exercise_tax`를 추가했다. 아카이브 스크립트 전용 Compose override로 tax-service만 같은 격리 프로젝트(nonce 라벨·호스트 포트/볼륨 없음·읽기 전용 JAR, outbox는 도달 불가 브로커)에 넣고, 공용 하네스와 손익 복구 검증은 바꾸지 않았다. `[QA]` 합성 현장에서 `buildflow_tax.tax_invoices` WRITE 잠금 → 첫 Feign 확인 후 INSERT의 `Waiting for table metadata lock` 확인 → 현장 보관 → 잠금 해제 → 커밋 직전 재확인(`recheckBeforeCommit`)에서 400, 세금계산서·`outbox_events` 0건을 단언하고, 활성 현장 대조군 201·각 1건 커밋을 단언한다. `py_compile`과 병합 Compose 설정 격리 검증(`validate_config`)은 로컬 PASS, 컨테이너 실행은 PR #240 CI `손익 복구` job에서 PASS(`[PASS] MySQL-blocked tax invoice rechecked archived site via Feign and rolled back invoice and outbox`, 대조군 PASS). 보증 경로와 재확인 이후 커밋 전 구간은 여전히 범위 밖이다.
 
 - 각 시나리오는 `[QA]` 식별자가 붙은 새 합성 현장과 합성 거래처만 사용한다. 실제 업체명·금액·USB 원본을 입력하지 않는다.
 - 생성/수정/조회 결과와 실패 화면을 기록한다. 정리할 때는 테스트로 생성한 정확한 ID만 대상으로 삼고, 다른 데이터에 대한 연쇄 삭제 여부를 먼저 확인한다.
