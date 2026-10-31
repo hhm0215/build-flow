@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 기존 문서 변경 7경로와 현장 보관의 실제 경합, 진행률 61/100 (2026-10-31, PR #244·#245·#246)
+
+- 변경 경로는 행 잠금 뒤 첫 보관 검사 직후의 첫 SQL 테이블(outbox_events·tax_payments·warranty_audit_events)을 잠가 순서를 만들고, 대상 행 X 잠금 보유로 대기를 증명했다. 견적 초안 수정은 FK 메타데이터 잠금 때문에 테이블 잠금이 불가해 InnoDB 행 잠금 + `data_lock_waits` 증명으로 별도 실측. 7경로 모두 보관 후 409·값 불변·대조군 PASS. #246은 쌓은 브랜치 SHA 불일치로 develop 병합 후 재대조(회고). develop 기준, main 미릴리스.
+
 ## 검증된 작업 — 세금계산서·보증 생성과 현장 보관의 실제 경합, 진행률 60/100 (2026-10-31, PR #240·#242)
 
 - `scripts/db/test-archive-race-docker.py`에 tax·notification Compose override(공용 하네스 무변경)와 `exercise_tax`·`exercise_warranty` 추가. CI `손익 복구` job에서 보관 후 400·롤백(세금계산서·outbox / 보증·감사 이력 0건)과 활성 현장 대조군 PASS. 문서 생성 4경로 격리 실측 완료.
