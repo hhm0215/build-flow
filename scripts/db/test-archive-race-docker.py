@@ -864,6 +864,8 @@ def exercise_evidence_link(h):
     require(int(h.sql(outbox)) == before_outbox, "Archived-site evidence link wrote an outbox event")
     print("[PASS] Gap-lock-held evidence link rechecked archived site via Feign: 409, purchase stays unlinked")
     _, control, control_invoice = evidence_fixture(h, "evidence link control")
+    # The control fixture registers a new purchase (purchase.registered outbox), so re-baseline after it.
+    before_outbox = int(h.sql(outbox))
     h.api("purchase", f"/api/v1/purchases/{control}/evidence", "PUT", {"taxInvoiceId": control_invoice})
     require(evidence_of(h, control).split("\t")[0] == str(control_invoice),
             "Active-site control evidence link did not commit")
