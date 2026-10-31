@@ -931,22 +931,25 @@ def main():
             add_tax_service(h, temporary)
             add_notification_service(h, temporary)
             add_purchase_tax_reference(h, temporary)
+            # These also start services, so a failure here stops the run.
             exercise(h)
             exercise_estimate(h)
             exercise_tax(h)
             exercise_warranty(h)
-            exercise_purchase_update(h)
-            exercise_estimate_confirm(h)
-            exercise_purchase_delete(h)
-            exercise_tax_update(h)
-            exercise_payment_cancel(h)
-            exercise_warranty_update(h)
-            exercise_estimate_update(h)
-            exercise_estimate_delete(h)
-            exercise_tax_delete(h)
-            exercise_warranty_delete(h)
-            exercise_evidence_link(h)
-            exercise_evidence_unlink(h)
+            # Each scenario uses its own synthetic sites and closes its lock session in finally,
+            # so one failure is reported without hiding the scenarios after it.
+            scenario_failures = []
+            for scenario in (exercise_purchase_update, exercise_estimate_confirm, exercise_purchase_delete,
+                             exercise_tax_update, exercise_payment_cancel, exercise_warranty_update,
+                             exercise_estimate_update, exercise_estimate_delete, exercise_tax_delete,
+                             exercise_warranty_delete, exercise_evidence_link, exercise_evidence_unlink):
+                try:
+                    scenario(h)
+                except (Failure, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
+                    scenario_failures.append(scenario.__name__)
+                    print(f"[FAIL] {scenario.__name__}: {error}", file=sys.stderr)
+            if scenario_failures:
+                raise Failure(f"{len(scenario_failures)} scenario(s) failed: {', '.join(scenario_failures)}")
         except (Failure, OSError, ValueError, KeyError, concurrent.futures.TimeoutError) as error:
             failed = True
             print(f"[FAIL] {error}", file=sys.stderr)
