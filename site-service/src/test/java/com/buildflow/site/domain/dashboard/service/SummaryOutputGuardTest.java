@@ -134,4 +134,64 @@ class SummaryOutputGuardTest {
 
         assertThat(SummaryOutputGuard.violations(facts.deterministicSummary(), facts)).isEmpty();
     }
+
+    /** 정상 1 + 매입 미입력 1. */
+    private static DashboardSummaryFacts noPurchaseFacts() {
+        return DashboardSummaryFacts.from(DashboardStatsResponse.builder()
+                .totalSites(2)
+                .sitesByStatus(Map.of("IN_PROGRESS", 2))
+                .totalEstimateAmount(new BigDecimal("13000000"))
+                .totalPurchaseAmount(new BigDecimal("6000000"))
+                .totalMargin(new BigDecimal("7000000"))
+                .averageMarginRate(new BigDecimal("53.85"))
+                .siteProfits(List.of(
+                        site("정상현장", "IN_PROGRESS", "10000000", "6000000", "40.00"),
+                        site("견적만현장", "IN_PROGRESS", "3000000", "0", "100.00")))
+                .build());
+    }
+
+    @Test
+    void 매입_미입력_현장을_매입_0원이나_마진율_100퍼센트로_옮기면_막는다() {
+        DashboardSummaryFacts facts = noPurchaseFacts();
+
+        assertThat(SummaryOutputGuard.violations("견적만현장 (시공 중)은 매입 0원입니다.", facts))
+                .containsExactly(SummaryOutputGuard.NEW_NUMBER, SummaryOutputGuard.NO_PURCHASE_MISREAD);
+        assertThat(SummaryOutputGuard.violations("견적만현장 (시공 중)은 마진율 100.00%입니다.", facts))
+                .containsExactly(SummaryOutputGuard.NEW_NUMBER);
+        // stats 평균(53.85%)은 매입 미입력 현장을 섞은 값이라 사실 목록에 없다.
+        assertThat(SummaryOutputGuard.violations("전체 마진율은 53.85%입니다.", facts))
+                .containsExactly(SummaryOutputGuard.NEW_NUMBER);
+    }
+
+    @Test
+    void 매입_미입력_현장이_있는데_주의할_현장이_없다고_단정하면_막는다() {
+        assertThat(SummaryOutputGuard.violations("### 3. 주의 현장\n주의할 현장이 없습니다.", noPurchaseFacts()))
+                .containsExactly(SummaryOutputGuard.NO_PURCHASE_MISREAD);
+        // 매입 미입력 현장이 없으면 같은 문장은 그대로 허용한다.
+        DashboardSummaryFacts allPurchased = DashboardSummaryFacts.from(DashboardStatsResponse.builder()
+                .totalSites(1)
+                .sitesByStatus(Map.of("IN_PROGRESS", 1))
+                .siteProfits(List.of(site("정상현장", "IN_PROGRESS", "10000000", "6000000", "40.00")))
+                .build());
+        assertThat(SummaryOutputGuard.violations("주의할 현장이 없습니다. 지금 따로 조치할 일은 없습니다.", allPurchased)).isEmpty();
+    }
+
+    @Test
+    void 매입_미입력을_사실대로_옮긴_출력과_서버_결정_문구는_통과한다() {
+        DashboardSummaryFacts facts = noPurchaseFacts();
+        String output = """
+                ### 2. 손익
+                매입 입력 현장 1개 기준 마진 4,000,000원, 마진율 40.00%입니다.
+                매입 미입력 1개 현장은 마진율 계산에서 제외했습니다.
+
+                ### 3. 주의 현장
+                적자·저마진으로 판정된 현장은 없지만 견적만현장 (시공 중)은 매입 미입력이라 손익을 판단할 수 없습니다.
+
+                ### 4. 다음 할 일
+                - 매입 입력 필요(1개)
+                """;
+
+        assertThat(SummaryOutputGuard.violations(output, facts)).isEmpty();
+        assertThat(SummaryOutputGuard.violations(facts.deterministicSummary(), facts)).isEmpty();
+    }
 }

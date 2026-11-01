@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
  *   <li>모르는 현장명: 알려진 현장명을 지운 뒤에도 "OO현장"처럼 붙은 이름이나 "OO (시공 중)"처럼 상태 라벨이 붙은 이름이 남음.</li>
  *   <li>새 숫자: 원·% 단위 숫자가 사실 목록의 값(부호 무시)과 다르거나 만·억 같은 단위로 바뀜("8,000만 원").</li>
  *   <li>할 일 모순: 서버가 정한 할 일이 있는데 "조치할 일은 없습니다"를 덧붙임.</li>
+ *   <li>매입 미입력 오해: 매입 미입력 현장이 있는데 "매입 0원"으로 옮기거나 "주의할 현장이 없습니다"로 단정.</li>
  * </ul>
  * 결과에는 위반 종류만 담는다. 모델 출력 원문·토큰은 사용자 입력이 섞일 수 있어 담지 않는다.
  */
@@ -33,6 +34,7 @@ final class SummaryOutputGuard {
     static final String NEW_NUMBER = "사실 목록에 없는 금액·비율";
     static final String CONTRADICTION = "할 일 모순";
     static final String EMPTY = "빈 출력";
+    static final String NO_PURCHASE_MISREAD = "매입 미입력 오해";
 
     static final Set<String> ALLOWED_FOREIGN_TOKENS = Set.of("AI");
 
@@ -48,7 +50,7 @@ final class SummaryOutputGuard {
     /** "OO현장"에 붙어도 현장명이 아닌 일반 낱말. */
     private static final Set<String> GENERIC_SITE_PREFIXES = Set.of(
             "전체", "각", "모든", "해당", "주의", "대상", "나머지", "다른", "일부", "여러", "두", "세", "네", "기존",
-            "신규", "정상", "적자", "저마진", "평가", "미등록", "수주", "시공", "정산", "완료", "등록된", "그", "이");
+            "신규", "정상", "적자", "저마진", "평가", "미등록", "미입력", "수주", "시공", "정산", "완료", "등록된", "그", "이");
 
     private static final Pattern ATTACHED_SITE = Pattern.compile("([\\p{L}\\p{N}\\[\\]_-]+)현장");
 
@@ -58,6 +60,12 @@ final class SummaryOutputGuard {
                     .collect(Collectors.joining("|")) + ")\\)");
 
     private static final Pattern NO_ACTION = Pattern.compile("조치할\\s*(?:일|사항)[은이가]?\\s*없");
+
+    /** 매입 미입력 현장이 있는데 "주의할 현장이 없습니다"로 단정. */
+    private static final Pattern NO_WARNING = Pattern.compile("주의할\\s*현장[은이가]?\\s*없");
+
+    /** 매입 미입력을 "매입 0원"으로 옮김. 미입력은 0원 매입이 아니다. */
+    private static final Pattern ZERO_PURCHASE = Pattern.compile("매입(?:\\s*(?:금액|합계))?[은는이가]?\\s*0\\s*원");
 
     private SummaryOutputGuard() {
     }
@@ -80,6 +88,10 @@ final class SummaryOutputGuard {
         }
         if (!facts.nextActions().isEmpty() && NO_ACTION.matcher(output).find()) {
             violations.add(CONTRADICTION);
+        }
+        if (!facts.noPurchaseSites().isEmpty()
+                && (NO_WARNING.matcher(output).find() || ZERO_PURCHASE.matcher(output).find())) {
+            violations.add(NO_PURCHASE_MISREAD);
         }
         return List.copyOf(violations);
     }

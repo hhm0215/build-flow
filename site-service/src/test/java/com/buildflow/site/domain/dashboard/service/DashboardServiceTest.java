@@ -180,6 +180,27 @@ class DashboardServiceTest {
     }
 
     @Test
+    void 매입_미입력_현장을_매입_0원_마진율_100퍼센트로_쓴_출력은_서버_결정_문구로_바꾼다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                site(2, "견적만현장", SiteStatus.COMPLETED),
+                site(1, "정상현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(2, "3000", "0"), profit(1, "1000", "600")));
+        when(ollama.generateSummary(any()))
+                .thenReturn("합계 매입 600원, 마진율 70.00%입니다. 견적만현장 (완료)은 매입 0원입니다. 주의할 현장이 없습니다.");
+
+        String summary = service.getSummary().getSummary();
+
+        assertThat(summary)
+                .startsWith("### 1. 전체 현황")
+                .contains("- 합계(수주 전 제외): 견적 4,000원, 매입 600원")
+                .contains("- 마진(매입 입력 현장 1개 기준): 견적 1,000원, 매입 600원, 마진 400원, 마진율 40.00%")
+                .contains("- 매입 미입력 1개 현장은 마진율 계산에서 제외")
+                .contains("- 매입 입력 필요(1개)")
+                .doesNotContain("70.00%")
+                .doesNotContain("주의할 현장이 없습니다");
+    }
+
+    @Test
     void 모델_출력이_검증을_통과하면_그대로_쓴다() {
         when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "Alpha현장", SiteStatus.IN_PROGRESS)));
         when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "600")));
