@@ -1,5 +1,6 @@
 package com.buildflow.notification.domain.warranty.service;
 
+import com.buildflow.notification.domain.notification.service.NotificationMessageFormatter;
 import com.buildflow.notification.domain.notification.service.NotificationService;
 import com.buildflow.notification.domain.warranty.WarrantyDatePolicy;
 import com.buildflow.notification.domain.warranty.entity.DefectWarranty;
@@ -28,6 +29,17 @@ public class WarrantyExpiryNotificationService {
     @Transactional
     public void consume(String eventId, Long warrantyId, Long siteId,
                         String insuranceCompany, LocalDate endDate, String expiryConfirmationRef) {
+        consume(eventId, warrantyId, siteId, insuranceCompany, endDate, expiryConfirmationRef, null);
+    }
+
+    /**
+     * siteName은 소비자가 트랜잭션 밖에서 조회한 표시용 현장명이다(없으면 null, 문구만 ID 형태로 폴백).
+     * 재검증 조건에는 쓰지 않는다.
+     */
+    @Transactional
+    public void consume(String eventId, Long warrantyId, Long siteId,
+                        String insuranceCompany, LocalDate endDate, String expiryConfirmationRef,
+                        String siteName) {
         DefectWarranty warranty = warrantyRepository.findByIdForUpdate(warrantyId).orElse(null);
         LocalDate today = WarrantyDatePolicy.today();
         if (warranty == null
@@ -49,8 +61,8 @@ public class WarrantyExpiryNotificationService {
 
         long daysUntilExpiry = ChronoUnit.DAYS.between(today, warranty.getEndDate());
         notificationService.createNotification(eventId, "WARRANTY_EXPIRING",
-                String.format("하자보증보험(ID: %d, %s) 만료까지 %d일 남았습니다.",
-                        warrantyId, warranty.getInsuranceCompany(), daysUntilExpiry),
+                NotificationMessageFormatter.warrantyExpiring(siteName, warrantyId,
+                        warranty.getInsuranceCompany(), daysUntilExpiry),
                 warranty.getSiteId());
     }
 }

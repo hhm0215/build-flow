@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import com.buildflow.estimate.domain.estimate.event.EstimateParsedPayload;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -82,6 +84,11 @@ class EstimateMutationSiteRecheckTest {
         order.verify(kafkaProducerService).sendEstimateParsed(any());
         order.verify(estimateRepository).flush();
         order.verify(siteReferenceValidator).recheckNotArchivedBeforeCommit(SITE);
+
+        // 알림 문구용 견적 제목이 이벤트에 실린다(구 소비자는 무시하는 추가 필드)
+        ArgumentCaptor<EstimateParsedPayload> payload = ArgumentCaptor.forClass(EstimateParsedPayload.class);
+        verify(kafkaProducerService).sendEstimateParsed(payload.capture());
+        assertEquals("초안", payload.getValue().getTitle());
     }
 
     @ParameterizedTest

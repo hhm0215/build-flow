@@ -272,6 +272,13 @@ develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에�
 - **실측(로컬 임시 격리 스택 `bfqasess`, 루프백 13180/18181, auth `JWT_ACCESS_TOKEN_EXPIRATION=60000`, 백엔드는 기존 `bfqaui-*:local` 이미지 재사용·frontend만 수리본 빌드, notification·tax 등 제외, 끝난 뒤 컨테이너·볼륨·자격 파일 삭제)**: Gateway 직접 — 로그인 `expiresIn` 60000, 65초 뒤 만료 access 401, refresh 200·회전, 새 access 200, 이전 refresh 재사용 401, 로그아웃 200 후 그 access 401·refresh 401. 브라우저 — 로그인 후 access 만료 시각을 지나 `/sites`를 새로 고침(앱 재진입)해도 로그인 화면으로 가지 않고, 네트워크에 `401 → POST /auth/refresh 200 → 재시도`가 남고 저장 access 만료 시각이 갱신, 현장 목록 200. 로그아웃 버튼 후 저장소 토큰 null, 직전 refresh로 재발급 시도 401. 입금 관리 모달은 tax-service를 띄우지 않아 컴포넌트 테스트로만 확인.
 - **남은 위험**: refresh 토큰(7일)이 access와 같이 `localStorage`에 있어 XSS 시 탈취 창이 30분 → 최대 7일로 늘어난다(실데이터 승격 게이트의 "세션 저장소/XSS 방어"에 해당). HttpOnly 쿠키 전환은 별도 설계 결정. auth-service는 refresh를 사용자당 키 1개(`auth:refresh:{userId}`)로 두므로 두 기기 이상 동시 사용 시 한 기기의 로그인·재발급이 다른 기기의 refresh를 무효화해 그 기기는 access 만료 때 로그인으로 간다(기기별 키는 Redis 키·로그아웃 범위 설계 결정). 서버 refresh 대조·교체가 원자적이지 않다(동시 같은 토큰 2회 성공 가능).
 
+### 2026-11-01 알림 문구에 현장·거래처 이름 — 백엔드만 수리
+
+- **현상(화면 실측)**: 알림 목록이 "매출 세금계산서(ID: 1)가 등록되었습니다.", "매입(ID: 1)이 등록되었습니다.", "견적서(ID: 1)가 확정되었습니다."처럼 내부 ID만 보여 가족이 어느 현장·거래처 자료인지 알 수 없었다. 화면은 서버 `message`를 그대로 보여 주므로 백엔드만 고쳤다(프론트·API 응답 DTO 변경 없음).
+- **수리**: notification-service가 문구를 `NotificationMessageFormatter`(순수 함수)로 만든다. 예: `[강남 A현장] 견적서(외벽 도장 공사)가 확정되었습니다.`, `[강남 A현장] 매입(시멘트, 대한건자재)이 등록되었습니다.`, `[강남 A현장] 매출 세금계산서(대한건설, 1,100,000원)가 등록되었습니다.`, `[강남 A현장] 세금계산서(대한건설, 1,100,000원) 입금이 확인되었습니다.`, `[강남 A현장] 하자보증보험(ID: 5, 보험사) 만료까지 18일 남았습니다.` 이름이 하나도 없으면 기존 `(ID: n)` 문구, 현장명이 없으면 `[...]` 접두어 없이 저장한다.
+- **방식**: 견적 제목·매입 품목/거래처는 발행 서비스 payload에 선택 필드(`title`, `itemName`, `supplier`)를 추가했다(하위 호환 — `docs/ARCHITECTURE.md` 2.2). 세금계산서는 기존 `counterparty`·`totalAmount`를 쓴다. 현장명은 세 발행 서비스가 모두 갖고 있지 않아 payload 대신 notification-service가 기존 Feign으로 소비 시점에 조회한다(트랜잭션·보증 행 잠금 밖, 실패 시 폴백, 장애 뒤 30초 조회 생략으로 밀린 이벤트 소비가 타임아웃 누적으로 리밸런스되지 않게 함). eventId 멱등 처리는 그대로이고, 금액은 JSON 실수를 `BigDecimal`로 읽어 16자리 금액도 반올림되지 않는다. 사용자 입력 이름은 제어·서식 문자 제거 + 공백 접기 + 50자(코드포인트) 말줄임.
+- **검증**: `./gradlew :notification-service:test :purchase-service:test :estimate-service:test` PASS(문구 생성·필드 누락 폴백·말줄임·제어문자·금액 포맷·현장명 조회 실패 폴백·구 이벤트·발행 payload 이름 필드). 격리 스택 실측은 하지 않았다(단위 테스트만). 이미 저장된 과거 알림 문구는 바뀌지 않는다.
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |
