@@ -4,6 +4,8 @@ import { useSearchParams } from 'react-router-dom'
 export type FilterFieldSchema =
   | { type: 'string' }
   | { type: 'number' }
+  /** 엔티티 ID: 양의 안전 정수만 허용 (0·음수·소수·지수 표기는 잘못된 값으로 정리) */
+  | { type: 'id' }
   | { type: 'date' }
   | { type: 'enum'; values: readonly string[] }
 
@@ -12,13 +14,14 @@ export type FilterSchema = Record<string, FilterFieldSchema>
 /**
  * 스키마 필드에서 값 타입을 추론.
  * - string / date → string
- * - number → number
+ * - number / id → number
  * - enum → values 배열의 union
  */
 export type InferFilterField<F extends FilterFieldSchema> =
   F extends { type: 'string' } ? string
   : F extends { type: 'date' } ? string
   : F extends { type: 'number' } ? number
+  : F extends { type: 'id' } ? number
   : F extends { type: 'enum'; values: readonly (infer V)[] } ? V
   : never
 
@@ -27,6 +30,7 @@ export type InferFilters<S extends FilterSchema> = {
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const POSITIVE_INT = /^[1-9]\d*$/
 
 function parseField(raw: string, schema: FilterFieldSchema): unknown | undefined {
   if (raw === '') return undefined
@@ -36,6 +40,11 @@ function parseField(raw: string, schema: FilterFieldSchema): unknown | undefined
     case 'number': {
       const n = Number(raw)
       return Number.isFinite(n) ? n : undefined
+    }
+    case 'id': {
+      if (!POSITIVE_INT.test(raw)) return undefined
+      const n = Number(raw)
+      return Number.isSafeInteger(n) ? n : undefined
     }
     case 'date':
       return ISO_DATE.test(raw) ? raw : undefined
