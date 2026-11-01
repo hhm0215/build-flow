@@ -31,8 +31,19 @@ public class DashboardService {
     private final SiteProfitRepository siteProfitRepository;
     private final OllamaService ollamaService;
 
+    /** 기본 대시보드 집계. 보관 현장은 빼고 센다(ADR-021: 보관은 자료·손익을 유지하되 기본 집계에서 제외). */
     public DashboardStatsResponse getStats() {
-        List<Site> sites = siteRepository.findAllByOrderByCreatedAtDesc();
+        return getStats(false);
+    }
+
+    /**
+     * @param includeArchived true면 보관 현장도 현장 수·상태별 수·합계·현장별 목록에 포함한다.
+     *                        현장 상세의 개별 손익은 이 값과 무관하게 보관 현장도 그대로 조회된다.
+     */
+    public DashboardStatsResponse getStats(boolean includeArchived) {
+        List<Site> sites = siteRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(site -> includeArchived || !site.isArchived())
+                .toList();
 
         Set<Long> siteIds = sites.stream()
                 .map(Site::getId)
@@ -100,7 +111,8 @@ public class DashboardService {
     }
 
     public DashboardSummaryResponse getSummary() {
-        DashboardSummaryFacts facts = DashboardSummaryFacts.from(getStats());
+        // AI 요약 사실은 항상 기본 집계(보관 현장 제외)에서 만든다.
+        DashboardSummaryFacts facts = DashboardSummaryFacts.from(getStats(false));
         // 견적·매입이 하나도 없으면 모델을 부르지 않는다(빈 현장을 손실로 오판하는 환각 방지).
         String summary = facts.hasData() ? guardedSummary(facts) : facts.noDataMessage();
 
