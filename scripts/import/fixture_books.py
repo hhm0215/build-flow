@@ -30,10 +30,15 @@ def sample_cells(items: list[dict[str, Any]], total: Any, *, client="합성거�
         for key, col in columns.items():
             if item.get(key) is not None:
                 cells[(header_row + 1 + offset, col)] = item[key]
-    return cells
+    return {key: value for key, value in cells.items() if value is not None}
 
 
-def xlsx_bytes(cells: dict[tuple[int, int], Any], sheet_title: str = "견적서") -> bytes:
+Merge = tuple[int, int, int, int]  # 0-based (r0, c0, r1, c1), 끝 포함
+
+
+def xlsx_bytes(cells: dict[tuple[int, int], Any], sheet_title: str = "견적서",
+               merges: list[Merge] | None = None) -> bytes:
+    """수식 문자열('=SUM(...)')은 계산값 없이 저장된다(openpyxl은 계산하지 않음)."""
     import openpyxl
 
     workbook = openpyxl.Workbook()
@@ -41,6 +46,8 @@ def xlsx_bytes(cells: dict[tuple[int, int], Any], sheet_title: str = "견적서"
     sheet.title = sheet_title
     for (r, c), value in cells.items():
         sheet.cell(row=r + 1, column=c + 1, value=value)
+    for r0, c0, r1, c1 in merges or []:
+        sheet.merge_cells(start_row=r0 + 1, start_column=c0 + 1, end_row=r1 + 1, end_column=c1 + 1)
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()
@@ -64,7 +71,7 @@ def _xf(format_index: int) -> bytes:
     return _record(0x00E0, struct.pack("<HHHBBBBIiH", 0, format_index, 0x0001, 0x20, 0, 0, 0, 0, 0, 0x20C0))
 
 
-def _workbook_stream(cells: dict[tuple[int, int], Any], sheet_name: str) -> bytes:
+def _workbook_stream(cells: dict[tuple[int, int], Any], sheet_name: str, merges: list[Merge]) -> bytes:
     bof_globals = _record(0x0809, struct.pack("<HHHHII", 0x0600, 0x0005, 0x0DBB, 0x07CC, 0, 0x06))
     font = _record(0x0031, struct.pack("<HHHHHBBBB", 200, 0, 0x7FFF, 400, 0, 0, 0, 0, 0) + _unicode("Arial", 1))
     head = bof_globals + _record(0x0042, struct.pack("<H", 1200)) + _record(0x0022, struct.pack("<H", 0))
@@ -91,12 +98,16 @@ def _workbook_stream(cells: dict[tuple[int, int], Any], sheet_name: str) -> byte
             sheet += _record(0x0203, struct.pack("<HHHd", r, c, 0, float(value)))
         else:
             sheet += _record(0x0204, struct.pack("<HHH", r, c, 0) + _unicode(str(value), 2))
+    if merges:  # MERGEDCELLS: 개수 + (첫 행, 끝 행, 첫 열, 끝 열)
+        sheet += _record(0x00E5, struct.pack("<H", len(merges))
+                         + b"".join(struct.pack("<HHHH", r0, r1, c0, c1) for r0, c0, r1, c1 in merges))
     sheet += eof
     return globals_part + sheet
 
 
-def xls_bytes(cells: dict[tuple[int, int], Any], sheet_name: str = "견적서") -> bytes:
-    stream = _workbook_stream(cells, sheet_name)
+def xls_bytes(cells: dict[tuple[int, int], Any], sheet_name: str = "견적서",
+              merges: list[Merge] | None = None) -> bytes:
+    stream = _workbook_stream(cells, sheet_name, merges or [])
     # 4096바이트 미만 스트림은 미니 스트림에 들어가야 하므로, 0으로 채워 일반 섹터 스트림으로 둔다.
     stream = stream.ljust(max(4096, (len(stream) + 511) // 512 * 512), b"\x00")
     size = len(stream)

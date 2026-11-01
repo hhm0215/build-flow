@@ -8,10 +8,14 @@
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
 import hashlib
+import io
 import json
 import os
+import re
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -120,13 +124,91 @@ def _is_within(path: Path, root: Path) -> bool:
         return False
 
 
+def outside_repo(path: Path, label: str) -> Path:
+    """실데이터(현장명·적재 결과)가 담길 파일은 저장소 밖에만 둔다."""
+    resolved = path.expanduser().resolve()
+    if _is_within(resolved, REPO_ROOT.resolve()):
+        raise ImportSetupError(f"{label}은(는) 저장소 밖 경로에 둡니다")
+    return resolved
+
+
+# ─────────────────────────────────────────
+# 현장명 정규화·별칭
+# ─────────────────────────────────────────
+
+def site_key(name: str) -> str:
+    """같은 현장 후보를 묶는 키: 전각 영숫자·기호를 반각으로, 공백·괄호·기호를 없애고 소문자로.
+
+    글자 오타(예: 받침이 다른 글자)는 고치지 않는다. 그런 경우는 --site-alias로 사용자가 확정한다.
+    browser_apply.js의 siteKey와 같은 규칙이다.
+    """
+    chars = []
+    for ch in str(name or ""):
+        code = ord(ch)
+        if 0xFF01 <= code <= 0xFF5E:
+            ch = chr(code - 0xFEE0)
+        elif code == 0x3000:
+            ch = " "
+        if ch.isspace() or unicodedata.category(ch)[0] in {"P", "S"}:
+            continue
+        chars.append(ch.lower())
+    return "".join(chars)
+
+
+ALIAS_HEADERS = {"원본", "원본현장명", "source", "from"}
+
+
+def _collapse(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def load_site_aliases(path: Path) -> dict[str, tuple[str, str]]:
+    """별칭 파일 → {정규화 키: (원본 현장명, 적재 현장명)}.
+
+    .json은 {"원본": "적재"} 객체, 그 밖(.csv/.txt)은 `원본,적재` 두 열(UTF-8, 첫 줄 머리글·# 주석 허용).
+    원본은 정규화 키로 비교하므로 띄어쓰기·괄호·기호 차이까지 한 줄로 덮는다.
+    """
+    resolved = outside_repo(path, "현장 별칭 파일(--site-alias)")
+    try:
+        raw = resolved.read_bytes().decode("utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ImportSetupError(f"현장 별칭 파일을 읽을 수 없습니다({exc.__class__.__name__})") from None
+    pairs: list[tuple[int, str, str]] = []
+    if resolved.suffix.lower() == ".json":
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            raise ImportSetupError("현장 별칭 JSON 형식이 올바르지 않습니다") from None
+        if not isinstance(data, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in data.items()):
+            raise ImportSetupError('현장 별칭 JSON은 {"원본 현장명": "적재 현장명"} 객체여야 합니다')
+        pairs = [(index, k, v) for index, (k, v) in enumerate(data.items(), start=1)]
+    else:
+        for line_no, row in enumerate(csv.reader(io.StringIO(raw)), start=1):
+            cells = [c.strip() for c in row]
+            if not any(cells) or cells[0].startswith("#"):
+                continue
+            if not pairs and re.sub(r"\s", "", cells[0]).lower() in ALIAS_HEADERS:
+                continue
+            if len(cells) < 2:
+                raise ImportSetupError(f"현장 별칭 {line_no}행: '원본,적재' 두 열이 필요합니다")
+            pairs.append((line_no, cells[0], cells[1]))
+    aliases: dict[str, tuple[str, str]] = {}
+    for line_no, source, target in pairs:
+        source, target = _collapse(source), _collapse(target)
+        key = site_key(source)
+        if not key or not target or len(target) > 200:
+            raise ImportSetupError(f"현장 별칭 {line_no}번째 항목: 원본·적재 이름이 비었거나 200자를 넘습니다")
+        if key in aliases and aliases[key][1] != target:
+            raise ImportSetupError(f"현장 별칭 {line_no}번째 항목: 같은 원본(공백·기호 무시)에 적재 이름이 둘입니다")
+        aliases[key] = (source, target)
+    return aliases
+
+
 class Ledger:
     """JSONL 적재 기록. 키 = (대상 base_url, 종류, 파일 SHA-256, 시트). 저장소 안 경로는 거부한다."""
 
     def __init__(self, path: Path):
-        resolved = path.expanduser().resolve()
-        if _is_within(resolved, REPO_ROOT.resolve()):
-            raise ImportSetupError("적재 기록은 저장소 밖 경로에 둡니다(--ledger)")
+        resolved = outside_repo(path, "적재 기록(--ledger)")
         self.path = resolved
         self.records: list[dict[str, Any]] = []
         if resolved.exists():
