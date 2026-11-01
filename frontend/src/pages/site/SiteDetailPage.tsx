@@ -12,6 +12,7 @@ import {
   HardHat,
   MapPin,
   Pencil,
+  Plus,
   ShieldCheck,
   ShoppingBag,
   TrendingUp,
@@ -36,6 +37,10 @@ import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/t
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
 import PurchaseEvidenceSummaryCard from './PurchaseEvidenceSummaryCard'
+import PurchaseCreateModal from '../purchase/PurchaseCreateModal'
+import TaxCreateModal from '../tax/TaxCreateModal'
+import WarrantyUploadModal from '../warranty/WarrantyUploadModal'
+import type { EstimateCreateLocationState } from '../estimate/EstimateListPage'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   BIDDING: '수주 전',
@@ -213,6 +218,20 @@ function EmptyTab({ message }: { message: string }) {
   )
 }
 
+/** 탭 상단의 '추가' 버튼. 보관된 현장은 신규 등록을 서버가 거부하므로 버튼을 막고 이유를 보여준다. */
+function TabAddAction({ label, archived, onClick }: { label: string; archived: boolean; onClick: () => void }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      {archived && (
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>보관된 현장에는 새 자료를 등록할 수 없습니다. 복원 후 등록하세요.</span>
+      )}
+      <Button size="small" type="primary" icon={<Plus size={13} />} disabled={archived} onClick={onClick}>
+        {label}
+      </Button>
+    </div>
+  )
+}
+
 function ListSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -284,6 +303,7 @@ export default function SiteDetailPage() {
   const [tab, setTab] = useState<string>('estimates')
   const [editOpen, setEditOpen] = useState(false)
   const [clientEditOpen, setClientEditOpen] = useState(false)
+  const [createKind, setCreateKind] = useState<'purchase' | 'tax' | 'warranty' | null>(null)
 
   const handleStatusChange = (next: SiteStatus) => {
     if (!site || next === site.status) return
@@ -328,6 +348,12 @@ export default function SiteDetailPage() {
         <div className="shimmer" style={{ height: 320, borderRadius: 12 }} />
       </div>
     )
+  }
+
+  const archived = !!site.archivedAt
+  const openEstimateCreate = () => {
+    const state: EstimateCreateLocationState = { createForSiteId: siteId }
+    navigate('/estimates', { state })
   }
 
   return (
@@ -420,7 +446,9 @@ export default function SiteDetailPage() {
             {
               key: 'estimates',
               label: tabLabel('견적서', estimates.length, estimatesLoading, estimatesError),
-              children: estimatesError ? (
+              children: <>
+                <TabAddAction label="견적서 추가" archived={archived} onClick={openEstimateCreate} />
+                {estimatesError ? (
                 <ErrorState message="견적서를 불러오지 못했습니다." onRetry={estimatesRefetch} />
               ) : estimatesLoading ? (
                 <ListSkeleton />
@@ -475,12 +503,14 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 연결된 견적서가 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
             {
               key: 'purchases',
               label: tabLabel('매입', purchases.length, purchasesLoading, purchasesError),
               children: <>
+                <TabAddAction label="매입 추가" archived={archived} onClick={() => setCreateKind('purchase')} />
                 <PurchaseEvidenceSummaryCard siteId={siteId} />
                 {purchasesError ? (
                 <ErrorState message="매입 내역을 불러오지 못했습니다." onRetry={purchasesRefetch} />
@@ -540,7 +570,9 @@ export default function SiteDetailPage() {
             {
               key: 'taxes',
               label: tabLabel('세금계산서', taxes.length, taxesLoading, taxesError),
-              children: taxesError ? (
+              children: <>
+                <TabAddAction label="세금계산서 추가" archived={archived} onClick={() => setCreateKind('tax')} />
+                {taxesError ? (
                 <ErrorState message="세금계산서를 불러오지 못했습니다." onRetry={taxesRefetch} />
               ) : taxesLoading ? (
                 <ListSkeleton />
@@ -618,12 +650,15 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 연결된 세금계산서가 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
             {
               key: 'warranties',
               label: tabLabel('보증보험', warranties.length, warrantiesLoading, warrantiesError),
-              children: warrantiesError ? (
+              children: <>
+                <TabAddAction label="보증보험 추가" archived={archived} onClick={() => setCreateKind('warranty')} />
+                {warrantiesError ? (
                 <ErrorState message="보증보험을 불러오지 못했습니다." onRetry={warrantiesRefetch} />
               ) : warrantiesLoading ? (
                 <ListSkeleton />
@@ -697,12 +732,22 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 등록된 하자보증보험이 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
           ]}
         />
       </motion.section>
       {editOpen && <SiteEditModal site={site} onClose={() => setEditOpen(false)} />}
+      {createKind === 'purchase' && !archived && (
+        <PurchaseCreateModal initialSiteId={siteId} onClose={() => setCreateKind(null)} />
+      )}
+      {createKind === 'tax' && !archived && (
+        <TaxCreateModal initialSiteId={siteId} onClose={() => setCreateKind(null)} />
+      )}
+      {createKind === 'warranty' && !archived && (
+        <WarrantyUploadModal open initialSiteId={siteId} onClose={() => setCreateKind(null)} />
+      )}
       {clientEditOpen && site.client && (
         <ClientEditModal client={site.client} onClose={() => setClientEditOpen(false)} />
       )}

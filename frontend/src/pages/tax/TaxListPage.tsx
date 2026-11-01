@@ -1,9 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { Receipt, Plus, Wallet, Pencil, Trash2 } from 'lucide-react'
-import { Alert, Modal, Form, Input, InputNumber, Select, DatePicker } from 'antd'
-import type { Dayjs } from 'dayjs'
-import SiteSelect from '../../components/SiteSelect'
+import SiteNameCell from '../../components/SiteNameCell'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
 import FilterBar from '../../components/filters/FilterBar'
@@ -13,12 +11,14 @@ import FilterDateRange from '../../components/filters/FilterDateRange'
 import FilterAmountRange from '../../components/filters/FilterAmountRange'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
-import { useTaxes, useCreateTax } from '../../api/taxes.api'
-import type { TaxInvoice, TaxInvoiceCreateRequest, TaxInvoiceType, TaxPaymentStatus } from '../../types'
+import { useTaxes } from '../../api/taxes.api'
+import { useSites } from '../../api/sites.api'
+import type { TaxInvoice, TaxInvoiceType, TaxPaymentStatus } from '../../types'
 import TaxPaymentsModal from './TaxPaymentsModal'
 import TaxEditModal from './TaxEditModal'
 import TaxDeleteModal from './TaxDeleteModal'
-import { validateTaxAmounts } from '../../utils/tax'
+import TaxCreateModal from './TaxCreateModal'
+import { buildSiteDisplayMap } from '../../utils/siteName'
 import { PAYMENT_STATUS_META, hasActivePayment, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 
 type PaymentStatus = TaxPaymentStatus
@@ -44,16 +44,6 @@ interface TaxFilters {
   maxAmount: number
 }
 
-interface TaxCreateFormValues {
-  siteId: number
-  type: TaxInvoiceType
-  supplyAmount: number
-  taxAmount: number
-  counterparty: string
-  issueDate: Dayjs
-  memo?: string
-}
-
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
   type: { type: 'enum', values: ['SALES', 'PURCHASE'] },
@@ -66,15 +56,13 @@ const FILTER_SCHEMA: FilterSchema = {
 
 export default function TaxListPage() {
   const { data, isLoading, isError, refetch } = useTaxes()
-  const createTax = useCreateTax()
+  const { data: sites } = useSites()
+  const siteDisplay = useMemo(() => buildSiteDisplayMap(sites), [sites])
   const [modalOpen, setModalOpen] = useState(false)
   // 입금 기록·취소 뒤 목록이 다시 조회되면 모달도 최신 잔액을 보도록 ID로 보관한다.
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<number | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<TaxInvoice | null>(null)
   const [deletingInvoice, setDeletingInvoice] = useState<TaxInvoice | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const createInFlight = useRef(false)
-  const [form] = Form.useForm<TaxCreateFormValues>()
   const invoices = useMemo(() => data ?? [], [data])
 
   const { filters, setFilters, filtered, activeCount, resetFilters } =
@@ -100,45 +88,6 @@ export default function TaxListPage() {
       },
     })
 
-  const closeCreate = () => {
-    if (createInFlight.current || createTax.isPending) return
-    setModalOpen(false)
-    setCreateError(null)
-    form.resetFields()
-  }
-
-  const submitCreate = async () => {
-    if (createInFlight.current || createTax.isPending) return
-    createInFlight.current = true
-    try {
-      const values = await form.validateFields()
-      const amountError = validateTaxAmounts(values.supplyAmount, values.taxAmount)
-      if (amountError) {
-        setCreateError(amountError)
-        return
-      }
-      const body: TaxInvoiceCreateRequest = {
-        siteId: values.siteId,
-        type: values.type,
-        supplyAmount: values.supplyAmount,
-        taxAmount: values.taxAmount,
-        counterparty: values.counterparty.trim(),
-        issueDate: values.issueDate.format('YYYY-MM-DD'),
-        memo: values.memo?.trim() || undefined,
-      }
-      setCreateError(null)
-      await createTax.mutateAsync(body)
-      setModalOpen(false)
-      form.resetFields()
-    } catch (cause: unknown) {
-      if (cause && typeof cause === 'object' && 'errorFields' in cause) return
-      const responseError = (cause as { response?: { data?: { error?: string } } })?.response?.data?.error
-      setCreateError(responseError ?? '세금계산서를 등록하지 못했습니다. 다시 시도해 주세요.')
-    } finally {
-      createInFlight.current = false
-    }
-  }
-
   const unpaidInvoices = filtered.filter((t) => remainingOf(t) > 0)
   const unpaidTotal = unpaidInvoices.reduce((sum, t) => sum + remainingOf(t), 0)
   const unpaidCount = unpaidInvoices.length
@@ -154,7 +103,7 @@ export default function TaxListPage() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => { setCreateError(null); setModalOpen(true) }}
+            onClick={() => setModalOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 16px',
@@ -257,7 +206,7 @@ export default function TaxListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['구분', '거래처', '공급가', '세액', '합계', '입금 상태', '처리'].map((h) => (
+                {['구분', '현장', '거래처', '발행일', '공급가', '세액', '합계', '입금 상태', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -288,8 +237,14 @@ export default function TaxListPage() {
                       {inv.type === 'SALES' ? '매출' : '매입'}
                     </span>
                   </td>
+                  <td style={{ padding: '14px 20px', fontSize: 13 }}>
+                    <SiteNameCell site={siteDisplay(inv.siteId)} />
+                  </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                     {inv.counterparty ?? '-'}
+                  </td>
+                  <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    {inv.issueDate ?? '-'}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' }}>
                     ₩{inv.supplyAmount.toLocaleString('ko-KR')}
@@ -341,68 +296,7 @@ export default function TaxListPage() {
         </motion.div>
       )}
 
-      <Modal
-        title="세금계산서 등록"
-        open={modalOpen}
-        okText="등록"
-        cancelText="취소"
-        confirmLoading={createTax.isPending}
-        okButtonProps={{ disabled: createTax.isPending }}
-        cancelButtonProps={{ disabled: createTax.isPending }}
-        closable={!createTax.isPending}
-        maskClosable={!createTax.isPending}
-        keyboard={!createTax.isPending}
-        destroyOnHidden
-        onCancel={closeCreate}
-        onOk={submitCreate}
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          {createError && <Alert type="error" message={createError} showIcon style={{ marginBottom: 16 }} />}
-          <Form.Item name="type" label="구분" rules={[{ required: true, message: '구분을 선택해주세요' }]}>
-            <Select
-              placeholder="매출 / 매입 선택"
-              options={[
-                { label: '매출', value: 'SALES' },
-                { label: '매입', value: 'PURCHASE' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item name="siteId" label="현장" rules={[{ required: true, message: '현장을 선택해주세요' }]}>
-            <SiteSelect placeholder="현장 검색 / 선택" />
-          </Form.Item>
-          <Form.Item name="counterparty" label="거래처" rules={[{ required: true, message: '거래처를 입력해주세요' }]}>
-            <Input placeholder="거래처명" maxLength={200} />
-          </Form.Item>
-          <Form.Item name="supplyAmount" label="공급가액" rules={[{ required: true, message: '공급가액을 입력해주세요' }]}>
-            <InputNumber<number>
-              style={{ width: '100%' }}
-              min={0}
-              max={9_999_999_999_999.99}
-              precision={2}
-              formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0)}
-              placeholder="공급가액"
-            />
-          </Form.Item>
-          <Form.Item name="taxAmount" label="세액" rules={[{ required: true, message: '세액을 입력해주세요' }]}>
-            <InputNumber<number>
-              style={{ width: '100%' }}
-              min={0}
-              max={9_999_999_999_999.99}
-              precision={2}
-              formatter={(value) => `₩ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => Number(value?.replace(/₩\s?|(,*)/g, '') ?? 0)}
-              placeholder="세액"
-            />
-          </Form.Item>
-          <Form.Item name="issueDate" label="발행일" rules={[{ required: true, message: '발행일을 선택해주세요' }]}>
-            <DatePicker style={{ width: '100%' }} placeholder="발행일 선택" />
-          </Form.Item>
-          <Form.Item name="memo" label="메모">
-            <Input.TextArea rows={3} placeholder="메모 (선택)" maxLength={16000} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {modalOpen && <TaxCreateModal onClose={() => setModalOpen(false)} />}
       {paymentInvoice && (
         <TaxPaymentsModal
           invoice={paymentInvoice}

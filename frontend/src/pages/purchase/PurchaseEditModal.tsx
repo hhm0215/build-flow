@@ -106,8 +106,8 @@ export default function PurchaseEditModal({ purchase, onClose }: Props) {
             parser={(value) => Number(value?.replace(/,/g, '') ?? 0)}
           />
         </Form.Item>
-        <Form.Item name="supplier" label="공급업체">
-          <Input placeholder="공급업체명" maxLength={200} />
+        <Form.Item name="supplier" label="거래처">
+          <Input placeholder="거래처명" maxLength={200} />
         </Form.Item>
         <Form.Item name="purchaseDate" label="매입일">
           <DatePicker style={{ width: '100%' }} placeholder="매입일 선택" />

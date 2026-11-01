@@ -48,7 +48,7 @@ describe('PurchaseEditModal', () => {
     const onClose = vi.fn()
     render(<PurchaseEditModal purchase={purchase} onClose={onClose} />)
     expect(screen.getByPlaceholderText('품목명')).toHaveValue('기존 자재')
-    expect(screen.getByPlaceholderText('공급업체명')).toHaveValue('')
+    expect(screen.getByPlaceholderText('거래처명')).toHaveValue('')
     fireEvent.change(screen.getByPlaceholderText('품목명'), { target: { value: '수정 자재' } })
     const save = screen.getByRole('button', { name: '저장' })
     fireEvent.click(save)

@@ -89,7 +89,7 @@ export default function MainLayout() {
         </div>
 
         {/* Nav items */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav aria-label="주 메뉴" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {menuItems.map(({ key, icon: Icon, label }) => {
             const isActive = location.pathname === key
             return (
@@ -98,6 +98,8 @@ export default function MainLayout() {
                 whileHover={{ x: 2 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(key)}
+                aria-label={label}
+                aria-current={isActive ? 'page' : undefined}
                 style={{
                   position: 'relative',
                   display: 'flex',

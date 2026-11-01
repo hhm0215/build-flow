@@ -1,7 +1,33 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardPage from './DashboardPage'
+import DashboardPage, { buildStatCards } from './DashboardPage'
+
+describe('buildStatCards', () => {
+  const empty = {
+    sitesByStatus: {}, totalEstimateAmount: 0, totalPurchaseAmount: 0,
+    totalMargin: 0, averageMarginRate: 0, totalSites: 0,
+  }
+  const card = (cards: ReturnType<typeof buildStatCards>, title: string) => cards.find((c) => c.title === title)!
+
+  it('현장이 없으면 흑자·주의 평가 배지를 숨기고 마진율은 -로 둔다', () => {
+    const cards = buildStatCards(empty)
+    expect(card(cards, '총 마진').change).toBe('')
+    expect(card(cards, '총 마진').changeType).toBe('neutral')
+    expect(card(cards, '평균 마진율').value).toBe('-')
+    expect(card(cards, '평균 마진율').change).toBe('')
+  })
+
+  it('데이터가 있으면 기존 평가 배지를 보여준다', () => {
+    const cards = buildStatCards({
+      ...empty, sitesByStatus: { IN_PROGRESS: 1 }, totalSites: 1,
+      totalEstimateAmount: 600_000, totalPurchaseAmount: 273_000, totalMargin: 327_000, averageMarginRate: 54.5,
+    })
+    expect(card(cards, '총 마진').change).toBe('흑자')
+    expect(card(cards, '평균 마진율').value).toBe('54.5%')
+    expect(card(cards, '평균 마진율').change).toBe('양호')
+  })
+})
 
 const { summaryRefetch, summaryQuery } = vi.hoisted(() => ({
   summaryRefetch: vi.fn(),
