@@ -69,11 +69,17 @@
 | estimate.parsed | estimate-service | site-service · notification-service | 공내역 AI 파싱 완료 → 손익 재계산 + 알림 |
 | estimate.deleted | estimate-service | site-service · notification-service | 수정본 확정으로 대체(SUPERSEDED)된 확정본 금액 차감(payload `reason=SUPERSEDED`, `supersededById`) + 과거 확정 삭제 outbox 재전송/재생 호환. 정상 API는 CONFIRMED 삭제를 409로 거부 |
 | purchase.registered | purchase-service | site-service · notification-service | 매입 revision 1 전체 상태 → projection 반영 + 알림 |
-| purchase.updated | purchase-service | site-service | 증가한 revision의 전체 상태 → projection 교체 |
-| purchase.deleted | purchase-service | site-service | 증가한 revision의 삭제 상태 → tombstone 보존 |
+| purchase.updated | purchase-service | site-service · notification-service | 증가한 revision의 전체 상태 → projection 교체 + 알림 |
+| purchase.deleted | purchase-service | site-service · notification-service | 증가한 revision의 삭제 상태 → tombstone 보존 + 알림 |
 | tax.registered | tax-service | notification-service | 세금계산서 등록 → 알림 (미수금은 tax-service DB에서 직접 계산) |
 | tax.payment.confirmed | tax-service | notification-service | 유효 입금 합계가 총액에 도달해 완료될 때 1회 → 알림 (분할 입금 건별 이벤트 없음, 미수금은 tax-service DB에서 직접 계산) |
 | warranty.expiring | notification-service | notification-service | 하자보증 만료 임박 → 인앱 알림 (스케줄러 매일 09:00, cooldown 7일) |
+
+#### 알림 문구용 선택 필드 (2026-11-01 추가, 하위 호환)
+
+- `estimate.parsed`·`estimate.deleted` payload에 `title`(견적 제목), `purchase.registered/updated/deleted` payload에 `itemName`(품목명)·`supplier`(거래처, null이면 생략)을 **추가**했다. 기존 필드·메시지 형식 `{eventId, eventType, timestamp, payload}`는 그대로다. `tax.registered`·`tax.payment.confirmed`는 이미 있던 `counterparty`·`totalAmount`를 쓴다.
+- site-service는 payload를 `Map`으로 읽고 아는 키만 쓰므로 추가 필드를 무시한다. notification-service는 이 필드를 선택값으로 읽어 형식이 다르거나 없으면(구 이벤트·재생) 기존 `(ID: n)` 문구로 폴백하며 소비를 실패시키지 않는다.
+- 현장명은 이벤트에 싣지 않고 notification-service가 소비 시점에 site-service `GET /api/v1/sites/{id}`(기존 Feign `SiteReferenceClient`, 연결 2초·읽기 3초)로 조회한다. 실패·404·응답 이상이면 현장명 없이 저장한다(알림 저장을 막지 않음). 장애(404 제외) 뒤 30초는 조회를 건너뛰어 밀린 이벤트 소비가 Feign 타임아웃 누적으로 poll 간격을 넘지 않게 한다. 사용자 입력 이름은 제어·서식 문자를 지우고 50자로 말줄임한다. 금액은 `Locale.ROOT` 천 단위 쉼표 + `원`.
 
 #### 계획 토픽 (미구현)
 

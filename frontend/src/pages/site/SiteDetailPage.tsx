@@ -12,6 +12,7 @@ import {
   HardHat,
   MapPin,
   Pencil,
+  Plus,
   ShieldCheck,
   ShoppingBag,
   TrendingUp,
@@ -19,6 +20,8 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import ErrorState from '../../components/ErrorState'
+import NotFoundState from '../../components/NotFoundState'
+import { isNotFoundError } from '../../utils/httpError'
 import {
   useArchiveSite,
   useRestoreSite,
@@ -36,6 +39,10 @@ import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/t
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
 import PurchaseEvidenceSummaryCard from './PurchaseEvidenceSummaryCard'
+import PurchaseCreateModal from '../purchase/PurchaseCreateModal'
+import TaxCreateModal from '../tax/TaxCreateModal'
+import WarrantyUploadModal from '../warranty/WarrantyUploadModal'
+import type { EstimateCreateLocationState } from '../estimate/EstimateListPage'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
   BIDDING: '수주 전',
@@ -141,11 +148,11 @@ function SummaryCard({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{title}</div>
           <div
+            className="bf-summary-value"
             style={{
-              fontSize: 20,
               fontWeight: 700,
               color: 'var(--text-primary)',
               letterSpacing: '-0.03em',
@@ -213,6 +220,20 @@ function EmptyTab({ message }: { message: string }) {
   )
 }
 
+/** 탭 상단의 '추가' 버튼. 보관된 현장은 신규 등록을 서버가 거부하므로 버튼을 막고 이유를 보여준다. */
+function TabAddAction({ label, archived, onClick }: { label: string; archived: boolean; onClick: () => void }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      {archived && (
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>보관된 현장에는 새 자료를 등록할 수 없습니다. 복원 후 등록하세요.</span>
+      )}
+      <Button size="small" type="primary" icon={<Plus size={13} />} disabled={archived} onClick={onClick}>
+        {label}
+      </Button>
+    </div>
+  )
+}
+
 function ListSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -242,9 +263,16 @@ export default function SiteDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const siteId = Number(id)
-  const invalidId = !id || Number.isNaN(siteId)
+  // 0·음수·소수는 조회가 꺼져(enabled: !!id) 로딩 화면에 멈추므로 잘못된 ID로 함께 처리한다
+  const invalidId = !id || !Number.isInteger(siteId) || siteId <= 0
 
-  const { data: site, isLoading: siteLoading, isError: siteError, refetch: siteRefetch } = useSite(siteId)
+  const {
+    data: site,
+    isLoading: siteLoading,
+    isError: siteError,
+    error: siteErrorDetail,
+    refetch: siteRefetch,
+  } = useSite(siteId)
   const updateStatus = useUpdateSiteStatus()
   const archiveSite = useArchiveSite()
   const restoreSite = useRestoreSite()
@@ -284,6 +312,7 @@ export default function SiteDetailPage() {
   const [tab, setTab] = useState<string>('estimates')
   const [editOpen, setEditOpen] = useState(false)
   const [clientEditOpen, setClientEditOpen] = useState(false)
+  const [createKind, setCreateKind] = useState<'purchase' | 'tax' | 'warranty' | null>(null)
 
   const handleStatusChange = (next: SiteStatus) => {
     if (!site || next === site.status) return
@@ -306,11 +335,13 @@ export default function SiteDetailPage() {
     })
   }
 
-  if (invalidId) {
+  if (invalidId || (siteError && isNotFoundError(siteErrorDetail))) {
     return (
-      <ErrorState
-        message="잘못된 현장 ID입니다. 목록에서 다시 선택해 주세요."
-        onRetry={() => navigate('/sites')}
+      <NotFoundState
+        title="현장을 찾을 수 없습니다"
+        subTitle="삭제됐거나 주소가 잘못된 현장입니다. 현장 목록에서 다시 선택해 주세요."
+        actionLabel="목록으로"
+        to="/sites"
       />
     )
   }
@@ -328,6 +359,12 @@ export default function SiteDetailPage() {
         <div className="shimmer" style={{ height: 320, borderRadius: 12 }} />
       </div>
     )
+  }
+
+  const archived = !!site.archivedAt
+  const openEstimateCreate = () => {
+    const state: EstimateCreateLocationState = { createForSiteId: siteId }
+    navigate('/estimates', { state })
   }
 
   return (
@@ -364,13 +401,8 @@ export default function SiteDetailPage() {
         archiveChanging={archiveSite.isPending || restoreSite.isPending}
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: 12,
-        }}
-      >
+      {/* 열 배치는 index.css .bf-summary-grid (데스크톱 4열 · 태블릿 2열 · 모바일 1열) */}
+      <div className="bf-summary-grid">
         <SummaryCard
           icon={FileText}
           title="매출 (견적서 합계)"
@@ -420,7 +452,9 @@ export default function SiteDetailPage() {
             {
               key: 'estimates',
               label: tabLabel('견적서', estimates.length, estimatesLoading, estimatesError),
-              children: estimatesError ? (
+              children: <>
+                <TabAddAction label="견적서 추가" archived={archived} onClick={openEstimateCreate} />
+                {estimatesError ? (
                 <ErrorState message="견적서를 불러오지 못했습니다." onRetry={estimatesRefetch} />
               ) : estimatesLoading ? (
                 <ListSkeleton />
@@ -475,12 +509,14 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 연결된 견적서가 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
             {
               key: 'purchases',
               label: tabLabel('매입', purchases.length, purchasesLoading, purchasesError),
               children: <>
+                <TabAddAction label="매입 추가" archived={archived} onClick={() => setCreateKind('purchase')} />
                 <PurchaseEvidenceSummaryCard siteId={siteId} />
                 {purchasesError ? (
                 <ErrorState message="매입 내역을 불러오지 못했습니다." onRetry={purchasesRefetch} />
@@ -540,7 +576,9 @@ export default function SiteDetailPage() {
             {
               key: 'taxes',
               label: tabLabel('세금계산서', taxes.length, taxesLoading, taxesError),
-              children: taxesError ? (
+              children: <>
+                <TabAddAction label="세금계산서 추가" archived={archived} onClick={() => setCreateKind('tax')} />
+                {taxesError ? (
                 <ErrorState message="세금계산서를 불러오지 못했습니다." onRetry={taxesRefetch} />
               ) : taxesLoading ? (
                 <ListSkeleton />
@@ -577,7 +615,7 @@ export default function SiteDetailPage() {
                           )}
                         </div>
                       </div>
-                      <div
+                      <div className="bf-info-grid"
                         style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -618,12 +656,15 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 연결된 세금계산서가 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
             {
               key: 'warranties',
               label: tabLabel('보증보험', warranties.length, warrantiesLoading, warrantiesError),
-              children: warrantiesError ? (
+              children: <>
+                <TabAddAction label="보증보험 추가" archived={archived} onClick={() => setCreateKind('warranty')} />
+                {warrantiesError ? (
                 <ErrorState message="보증보험을 불러오지 못했습니다." onRetry={warrantiesRefetch} />
               ) : warrantiesLoading ? (
                 <ListSkeleton />
@@ -665,7 +706,7 @@ export default function SiteDetailPage() {
                           </div>
                           <InfoBadge color={expiringColor}>{expiringLabel}</InfoBadge>
                         </div>
-                        <div
+                        <div className="bf-info-grid"
                           style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -697,12 +738,22 @@ export default function SiteDetailPage() {
                 </div>
               ) : (
                 <EmptyTab message="이 현장에 등록된 하자보증보험이 아직 없습니다." />
-              ),
+              )}
+              </>,
             },
           ]}
         />
       </motion.section>
       {editOpen && <SiteEditModal site={site} onClose={() => setEditOpen(false)} />}
+      {createKind === 'purchase' && !archived && (
+        <PurchaseCreateModal initialSiteId={siteId} onClose={() => setCreateKind(null)} />
+      )}
+      {createKind === 'tax' && !archived && (
+        <TaxCreateModal initialSiteId={siteId} onClose={() => setCreateKind(null)} />
+      )}
+      {createKind === 'warranty' && !archived && (
+        <WarrantyUploadModal open initialSiteId={siteId} onClose={() => setCreateKind(null)} />
+      )}
       {clientEditOpen && site.client && (
         <ClientEditModal client={site.client} onClose={() => setClientEditOpen(false)} />
       )}
@@ -750,7 +801,7 @@ function SiteHeaderHero({
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="bf-hero-main">
           <div
             style={{
               display: 'flex',
@@ -765,8 +816,8 @@ function SiteHeaderHero({
             현장 상세
           </div>
           <div
+            className="bf-hero-title"
             style={{
-              fontSize: 28,
               fontWeight: 800,
               color: 'white',
               letterSpacing: '-0.04em',
@@ -802,8 +853,8 @@ function SiteHeaderHero({
         </div>
 
         <div
+          className="bf-hero-side"
           style={{
-            minWidth: 220,
             padding: '14px 16px',
             borderRadius: 12,
             background: 'rgba(255,255,255,0.05)',

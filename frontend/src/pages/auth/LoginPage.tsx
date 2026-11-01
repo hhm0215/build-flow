@@ -26,7 +26,7 @@ export default function LoginPage() {
         loginId: values.loginId,
         password: values.password,
       })
-      setTokens(response.data.data.accessToken)
+      setTokens(response.data.data.accessToken, response.data.data.refreshToken)
       navigate('/dashboard')
     } catch (err: unknown) {
       const msg =

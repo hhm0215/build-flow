@@ -23,7 +23,12 @@ export default function LogoutButton() {
       useAuthStore.getState().logout()
       navigate('/login', { replace: true })
     } catch {
-      // Keep the token available for a retry if revocation was not confirmed.
+      if (!useAuthStore.getState().isAuthenticated) {
+        // 만료 access + refresh 거부(400/401/403/404) — 서버에 살아 있는 토큰이 없어 인터셉터가 로컬 토큰을 지웠다.
+        navigate('/login', { replace: true })
+        return
+      }
+      // 5xx·네트워크 등 폐기 미확인 — 재시도할 수 있게 토큰을 보존한다.
       setFailed(true)
     } finally {
       inFlight.current = false

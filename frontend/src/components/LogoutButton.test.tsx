@@ -58,7 +58,7 @@ describe('서버 로그아웃', () => {
     expect(JSON.parse(localStorage.getItem('buildflow-auth')!).state.accessToken).toBeNull()
   })
 
-  it.each([401, 500, 'network', 'unsuccessful-response'] as const)(
+  it.each([500, 'network', 'unsuccessful-response'] as const)(
     '%s 실패를 명시하고 토큰을 보존하여 서버 로그아웃을 재시도할 수 있다',
     async (failure) => {
       const adapter = vi.fn<AxiosAdapter>(async (config) => {
@@ -91,4 +91,57 @@ describe('서버 로그아웃', () => {
       expect(useAuthStore.getState().accessToken).toBeNull()
     },
   )
+  it.each([400, 401, 403, 404])('만료 access로 로그아웃 → refresh가 %s로 거부되면 로컬 토큰을 지우고 로그인으로 간다', async (status) => {
+    useAuthStore.getState().setTokens('expired-access', 'dead-refresh')
+    const adapter = vi.fn<AxiosAdapter>(async (config) => {
+      const code = config.url === '/auth/refresh' ? status : 401
+      const response = { config, status: code, statusText: '', headers: {}, data: { success: false, data: null, error: 'x' } }
+      throw new AxiosError('Request failed', undefined, config, undefined, response)
+    })
+    axiosInstance.defaults.adapter = adapter
+    renderLogout()
+
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+
+    expect(await screen.findByText('관리자 로그인 화면')).toBeInTheDocument()
+    expect(adapter.mock.calls.map((c) => c[0].url)).toEqual(['/auth/logout', '/auth/refresh'])
+    expect(useAuthStore.getState()).toMatchObject({ accessToken: null, refreshToken: null, isAuthenticated: false })
+    expect(JSON.parse(localStorage.getItem('buildflow-auth')!).state.accessToken).toBeNull()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('refresh 토큰 없이 로그아웃이 401이면 살아 있는 토큰이 없으므로 로컬을 지우고 로그인으로 간다', async () => {
+    const adapter = vi.fn<AxiosAdapter>(async (config) => {
+      const response = { config, status: 401, statusText: '', headers: {}, data: { success: false, data: null, error: 'x' } }
+      throw new AxiosError('Request failed', undefined, config, undefined, response)
+    })
+    axiosInstance.defaults.adapter = adapter
+    renderLogout()
+
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+
+    expect(await screen.findByText('관리자 로그인 화면')).toBeInTheDocument()
+    expect(adapter).toHaveBeenCalledTimes(1)
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+  })
+
+  it.each([503, 'network'] as const)('만료 access로 로그아웃 → refresh가 %s(일시 장애)면 토큰을 보존하고 재시도를 안내한다', async (failure) => {
+    useAuthStore.getState().setTokens('expired-access', 'live-refresh')
+    const adapter = vi.fn<AxiosAdapter>(async (config) => {
+      if (config.url === '/auth/refresh' && failure === 'network') throw new AxiosError('Network Error', 'ERR_NETWORK', config)
+      const code = config.url === '/auth/refresh' ? 503 : 401
+      const response = { config, status: code, statusText: '', headers: {}, data: { success: false, data: null, error: 'x' } }
+      throw new AxiosError('Request failed', undefined, config, undefined, response)
+    })
+    axiosInstance.defaults.adapter = adapter
+    renderLogout()
+
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('서버 로그아웃을 확인하지 못했습니다')
+    expect(useAuthStore.getState()).toMatchObject({
+      accessToken: 'expired-access', refreshToken: 'live-refresh', isAuthenticated: true,
+    })
+    expect(screen.queryByText('관리자 로그인 화면')).not.toBeInTheDocument()
+  })
 })

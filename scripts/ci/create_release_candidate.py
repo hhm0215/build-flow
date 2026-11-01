@@ -13,6 +13,7 @@ REPOSITORY = "hhm0215/build-flow"
 REQUIRED_RESULTS = {
     "backend": "RESULT_BACKEND",
     "auth-flyway": "RESULT_AUTH_FLYWAY",
+    "auth-redis": "RESULT_AUTH_REDIS",
     "chat-flyway": "RESULT_CHAT_FLYWAY",
     "estimate-flyway": "RESULT_ESTIMATE_FLYWAY",
     "purchase-flyway": "RESULT_PURCHASE_FLYWAY",

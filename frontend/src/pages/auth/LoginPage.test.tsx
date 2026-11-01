@@ -27,7 +27,7 @@ afterEach(() => {
 describe('LoginPage 실제 API 모드', () => {
   it('loginId와 비밀번호만 로그인 API로 전송한다', async () => {
     const post = vi.spyOn(axiosInstance, 'post').mockResolvedValueOnce({
-      data: { data: { accessToken: 'access-token' } },
+      data: { data: { accessToken: 'access-token', refreshToken: 'refresh-token' } },
     })
     render(
       <MemoryRouter>
@@ -46,6 +46,10 @@ describe('LoginPage 실제 API 모드', () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith('/auth/login', {
       loginId: 'admin',
       password: 'secret-password',
+    }))
+    // 30분 access 만료 후 재발급할 수 있도록 refresh 토큰도 보관한다
+    await waitFor(() => expect(useAuthStore.getState()).toMatchObject({
+      accessToken: 'access-token', refreshToken: 'refresh-token', isAuthenticated: true,
     }))
   })
 

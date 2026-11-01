@@ -77,6 +77,26 @@ describe('TaxEditModal', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
   })
 
+  it('공급가액을 바꾸면 세액을 10%로 다시 채우고, 직접 고친 세액은 덮어쓰지 않는다', async () => {
+    render(<TaxEditModal invoice={invoice} onClose={vi.fn()} />)
+    const supply = screen.getByPlaceholderText('공급가액')
+    const tax = screen.getByPlaceholderText('세액')
+    fireEvent.change(supply, { target: { value: '273005' } })
+    await waitFor(() => expect(tax).toHaveValue('27300.00'))
+    fireEvent.change(tax, { target: { value: '27000' } })
+    fireEvent.change(supply, { target: { value: '300000' } })
+    await waitFor(() => expect(supply).toHaveValue('300000.00'))
+    expect(tax).toHaveValue('27000.00')
+  })
+
+  it('저장된 세액이 10%와 다르면 사용자가 정한 값으로 보고 유지한다', async () => {
+    render(<TaxEditModal invoice={{ ...invoice, taxAmount: 0, totalAmount: 1000 }} onClose={vi.fn()} />)
+    const supply = screen.getByPlaceholderText('공급가액')
+    fireEvent.change(supply, { target: { value: '5000' } })
+    await waitFor(() => expect(supply).toHaveValue('5000.00'))
+    expect(screen.getByPlaceholderText('세액')).toHaveValue('0.00')
+  })
+
   it('DB 합계 범위를 넘는 값은 서버에 보내지 않는다', async () => {
     render(<TaxEditModal invoice={invoice} onClose={vi.fn()} />)
     fireEvent.change(screen.getByPlaceholderText('공급가액'), { target: { value: '9999999999999.99' } })

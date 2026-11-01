@@ -10,6 +10,14 @@ vi.mock('../../api/taxes.api', () => ({
   useTaxes: () => ({ data: invoices.items, isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateTax: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
+vi.mock('../../api/sites.api', () => ({
+  useSites: () => ({
+    data: [
+      { id: 1, siteName: '강남 리모델링', archivedAt: null },
+      { id: 2, siteName: '지난 현장', archivedAt: '2026-10-01T00:00:00' },
+    ],
+  }),
+}))
 vi.mock('./TaxPaymentsModal', () => ({
   default: ({ invoice }: { invoice: TaxInvoice }) => (
     <div data-testid="payment-target">{invoice.id}:{invoice.remainingAmount}</div>
@@ -94,9 +102,22 @@ describe('TaxListPage', () => {
     expect(screen.getByTestId('delete-target')).toHaveTextContent('1')
   })
 
+  it('현장명·보관 표식과 발행일 열을 보여준다', () => {
+    invoices.items = [invoice(1, 'SALES', false), { ...invoice(5, 'PURCHASE', false), siteId: 2, issueDate: '2026-10-31' }]
+    render(<MemoryRouter><TaxListPage /></MemoryRouter>)
+    expect(screen.getByRole('columnheader', { name: '현장' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '발행일' })).toBeInTheDocument()
+    expect(screen.getByText('강남 리모델링')).toBeInTheDocument()
+    expect(screen.getByText('지난 현장')).toBeInTheDocument()
+    expect(screen.getByText('보관')).toBeInTheDocument()
+    expect(screen.getByText('2026-09-01')).toBeInTheDocument()
+    expect(screen.getByText('2026-10-31')).toBeInTheDocument()
+  })
+
   it('nullable 거래처를 안전하게 표시한다', () => {
     invoices.items = [{ ...invoice(1, 'SALES', false), counterparty: null, issueDate: null, memo: null }]
     render(<MemoryRouter><TaxListPage /></MemoryRouter>)
-    expect(screen.getByText('-')).toBeInTheDocument()
+    // 거래처·발행일 모두 비어 있으면 '-'로 표시한다.
+    expect(screen.getAllByText('-')).toHaveLength(2)
   })
 })

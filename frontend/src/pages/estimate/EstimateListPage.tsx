@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { FileText, GitBranch, History, Pencil, Plus, Trash2, Sparkles } from 'lucide-react'
 import { Alert, Modal, Form, Input, InputNumber, DatePicker, Button } from 'antd'
@@ -77,8 +78,20 @@ function formatKRW(n: number) {
   return `₩${n.toLocaleString('ko-KR')}`
 }
 
+/** 현장 상세의 '견적서 추가'가 navigate state로 넘기는 값 */
+export interface EstimateCreateLocationState {
+  createForSiteId?: number
+}
+
 export default function EstimateListPage() {
   const { data, isLoading, isError, refetch } = useEstimates()
+  const location = useLocation()
+  const navigate = useNavigate()
+  // 현장 상세에서 넘어오면 그 현장이 선택된 작성 모달을 바로 연다.
+  const [presetSiteId, setPresetSiteId] = useState<number | undefined>(() => {
+    const sid = (location.state as EstimateCreateLocationState | null)?.createForSiteId
+    return typeof sid === 'number' ? sid : undefined
+  })
   const estimates = useMemo(() => data ?? [], [data])
 
   const { filters, setFilters, filtered, activeCount, resetFilters } =
@@ -102,7 +115,7 @@ export default function EstimateListPage() {
       },
     })
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(presetSiteId != null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<Estimate | null>(null)
   const [editTarget, setEditTarget] = useState<Estimate | null>(null)
@@ -131,6 +144,13 @@ export default function EstimateListPage() {
   const [form] = Form.useForm()
   const createMutation = useCreateEstimate()
 
+  useEffect(() => {
+    // 새로고침·뒤로가기로 작성 모달이 다시 열리지 않도록 일회성 state를 지운다.
+    if ((location.state as EstimateCreateLocationState | null)?.createForSiteId != null) {
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+    }
+  }, [location, navigate])
+
   const handleParsedConfirm = (items: ParsedItemResult[], fileName: string) => {
     setPendingItems(items)
     setUploadOpen(false)
@@ -152,6 +172,7 @@ export default function EstimateListPage() {
     form.resetFields()
     setPendingItems(null)
     setDerived(null)
+    setPresetSiteId(undefined)
   }
 
   const handleOk = async () => {
@@ -188,6 +209,7 @@ export default function EstimateListPage() {
       await createMutation.mutateAsync(body)
       setOpen(false)
       setDerived(null)
+      setPresetSiteId(undefined)
       form.resetFields()
     } catch (cause: unknown) {
       if (cause && typeof cause === 'object' && 'errorFields' in cause) return
@@ -288,7 +310,9 @@ export default function EstimateListPage() {
           form={form}
           layout="vertical"
           style={{ marginTop: 16 }}
-          initialValues={derived ? derivedInitialValues(derived) : undefined}
+          initialValues={derived
+            ? derivedInitialValues(derived)
+            : presetSiteId != null ? { siteId: presetSiteId } : undefined}
         >
           {derived ? (
             <Form.Item name="siteId" hidden><Input /></Form.Item>
@@ -334,13 +358,8 @@ export default function EstimateListPage() {
                 {fields.map(({ key, name, ...restField }) => (
                   <div
                     key={key}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 70px 80px 120px auto',
-                      gap: 8,
-                      alignItems: 'start',
-                      marginBottom: 4,
-                    }}
+                    className="bf-item-row"
+                    style={{ marginBottom: 4 }}
                   >
                     <Form.Item
                       {...restField}
@@ -489,10 +508,12 @@ export default function EstimateListPage() {
             background: 'var(--bg-card)',
             border: '1px solid var(--border)',
             borderRadius: 12,
-            overflow: 'hidden',
+            overflowX: 'auto',
+            overflowY: 'hidden',
           }}
+          className="bf-table-wrap"
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="bf-list-table bf-list-table--sticky" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['제목', '관계', '상태', '총액', '항목 수', '견적일', '처리'].map((h) => (

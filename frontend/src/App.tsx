@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import MainLayout from './layouts/MainLayout'
+import NotFoundState from './components/NotFoundState'
 import LoginPage from './pages/auth/LoginPage'
 import { useAuthStore } from './stores/authStore'
 
@@ -9,6 +10,7 @@ import { useAuthStore } from './stores/authStore'
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const SiteListPage = lazy(() => import('./pages/site/SiteListPage'))
 const SiteDetailPage = lazy(() => import('./pages/site/SiteDetailPage'))
+const ClientListPage = lazy(() => import('./pages/client/ClientListPage'))
 const EstimateListPage = lazy(() => import('./pages/estimate/EstimateListPage'))
 const PurchaseListPage = lazy(() => import('./pages/purchase/PurchaseListPage'))
 const TaxListPage = lazy(() => import('./pages/tax/TaxListPage'))
@@ -48,11 +50,14 @@ export default function App() {
         <Route path="dashboard" element={<Page><DashboardPage /></Page>} />
         <Route path="sites" element={<Page><SiteListPage /></Page>} />
         <Route path="sites/:id" element={<Page><SiteDetailPage /></Page>} />
+        <Route path="clients" element={<Page><ClientListPage /></Page>} />
         <Route path="estimates" element={<Page><EstimateListPage /></Page>} />
         <Route path="purchases" element={<Page><PurchaseListPage /></Page>} />
         <Route path="taxes" element={<Page><TaxListPage /></Page>} />
         <Route path="notifications" element={<Page><NotificationListPage /></Page>} />
         <Route path="warranties" element={<Page><WarrantyListPage /></Page>} />
+        {/* 없는 주소는 레이아웃 안에서 404 안내 — 비로그인이면 위 PrivateRoute가 먼저 /login으로 보낸다 */}
+        <Route path="*" element={<NotFoundState />} />
       </Route>
     </Routes>
   )

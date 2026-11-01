@@ -224,6 +224,103 @@ develop `e649ad2` 이미지, 로컬 풀 Docker. 기존 스택에 가족 관리�
 
 이는 로컬 Gateway·JWT 경유 실측이며 공개 VPS 동선 실측이나 실데이터 승인이 아니다. 재실행은 같은 방식(별도 프로젝트·빈 볼륨)으로 사용자 입력 없이 가능하다.
 
+### 2026-11-01 보증 합성 PDF 업로드→OCR Gateway 경유 실측 — 로컬 27/27 PASS
+
+develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에서 `python -I -X utf8 scripts/qa/warranty_ocr_e2e.py`를 실행했다. 스크립트가 별도 Compose 프로젝트 `bfqaocr`를 만든다. 이 프로젝트는 빈 볼륨 `bfqaocr_*` 4개를 쓰고, 고정 container_name과 공용 네트워크를 쓰지 않으며, Gateway만 `127.0.0.1:18080`에 공개한다. 띄우는 서비스는 mysql·redis·kafka·eureka·gateway·auth·site·notification이고, 이미지는 이 작업 트리에서 `bfqaocr-*:local`로 순차 빌드했다. notification은 VPS와 같게 896m·`-Xmx320m`으로 제한했다. QA 관리자는 `AdminBootstrapRunner`로 부트스트랩하고, 비밀번호·DB 비밀번호·JWT 비밀은 실행할 때마다 메모리에서만 무작위로 만든다(출력·저장 없음). 기존 `build-flow` 프로젝트는 꺼진 상태 그대로 두었고 볼륨 4개도 건드리지 않았다.
+
+합성 PDF는 실행 임시 디렉터리에서만 만들었다(커밋·외부 다운로드 없음). 생성기 `scripts/qa/WarrantyOcrPdfGen.java`는 notification 이미지에 들어 있는 PDFBox 3 jar, 로컬 `eclipse-temurin:17-jdk-jammy`(`--network none`), 호스트 맑은 고딕 `.ttf`로 돌린다. 생성한 PDF 두 종류는 아래와 같다. 텍스트 층 글자 수는 앱과 같은 PDFBox 추출로 다시 세어 단언했다.
+
+| 합성 PDF | 텍스트 층 | ocrStatus | 추출 필드 | 서버 OCR 기록(UPLOADED→OCR_APPLIED) / 폴링 관찰 |
+|---|---|---|---|---|
+| (a) 한글 폰트 내장 텍스트 1쪽, 12,122B | 117자 → PDFBox 경로 | SUCCESS | 서울보증보험·`QA-520951-01`·2025-11-16~2026-11-16 모두 정확 | 0.0초 / 0.8초 |
+| (b) 300 DPI 흑백 래스터만 있는 1쪽, 36,729B | 0자 → Tesseract CLI 경로 | SUCCESS | 삼성화재·`2026-143441`·2025-11-21~2026-11-21 모두 정확(증권번호도 정확, 판정은 정규화 일치·미추출 허용) | 1.0초 / 1.1초 |
+
+- 두 PDF에서 확인한 동선: 업로드 202 `PENDING`(원본 보유) → `SUCCESS`(`expiryConfirmed=false`) → MANUAL 확인 전 만료 목록(30일)에서 제외 → PUT 확인 저장 200 `MANUAL`·만료 확정 → 만료 목록 포함·남은 일수 일치 → 무인증 원본 다운로드 401 → 인증 다운로드 200, SHA-256·바이트 수가 업로드와 같음 → 감사 이력 `UPLOADED→OCR_APPLIED→MANUAL_UPDATED`. 무인증 보증 목록 401도 확인했다.
+- 메모리(notification, 896 MiB 제한): 대기 391 MiB, OCR 중 `docker stats` 표본 최대 433 MiB, cgroup `memory.peak` 504 MiB(기동 포함), `memory.max` 접촉 0회, `oom_kill` 0. 이미지 빌드는 캐시 상태로 7초(첫 빌드 123초), 기동부터 라우팅 준비까지 78초.
+- 실측 후 `bfqaocr` 컨테이너·네트워크는 `down`(`-v` 없음)으로 내리고, 볼륨 4개는 이름을 지정해 삭제했다(잔여 0). 기존 `build-flow_*` 볼륨 4개가 그대로 있는 것을 확인했다. `bfqaocr-*:local` 이미지 5개는 재실행(`--skip-build`)용으로 남겼다.
+- 시험 도구 수정 2건(제품 결함 아님): Gateway는 config import 검사 때문에 config-server 없이 기동하지 못해 격리 정의에 `SPRING_CLOUD_CONFIG_ENABLED=false`를 넣었다. 준비 대기 중 종료된 컨테이너를 바로 보고하도록 했다. 운영 코드 변경은 없다.
+- 한계: 깨끗한 합성 1쪽만 시험했다. 기울어짐·저해상도·실제 증권 서식의 OCR 정확도, 공개 VPS 업로드/OCR(현재 VPS 접속 금지), 실데이터는 이 결과로 통과 처리하지 않는다. 10쪽 최악 경로의 시간·메모리는 2026-10-17 기록을 따른다.
+
+### 2026-11-01 화면 QA용 로컬 격리 전체 스택 — `scripts/qa/ui_stack.py`
+
+사람(또는 에이전트 내장 브라우저)이 실제 화면을 눌러 보는 용도다. `python -I -X utf8 scripts/qa/ui_stack.py up [--skip-build] [--no-chat]`은 별도 Compose 프로젝트 `bfqaui`(빈 볼륨 `bfqaui_*` 4개, 고정 container_name·공용 네트워크 없음)로 mysql·redis·kafka·eureka·gateway·auth·estimate·site·purchase·tax·notification·chat과 frontend(Nginx 프로덕션 이미지)를 띄운다. config-server는 띄우지 않고 서비스마다 `SPRING_CLOUD_CONFIG_ENABLED=false`를 준다. 공개 포트는 루프백만이다: 화면 `http://127.0.0.1:13080`(Nginx가 `/api/`를 `gateway-server:8080`으로 프록시), Gateway `127.0.0.1:18081`(준비 확인·API 직접 호출). 이미지는 작업 트리에서 `bfqaui-*:local`로 순차 빌드한다. 사용자 `build-flow-*` 태그는 건드리지 않는다. DB 비밀번호·JWT 비밀은 실행 메모리에서만 무작위로 만든다. `AdminBootstrapRunner`로 만든 QA 관리자 자격 증명은 출력하지 않고, 저장소 무시 경로 `.local/qa-ui-admin.json`에만 저장한다(`output/`은 `.gitignore` 대상이 아니라서 쓰지 않는다). `up`은 frontend 200, frontend 경유 로그인 200, 서비스별 목록 API 200을 확인한 뒤 URL만 출력하고 스택을 켜 둔다. 합성 시드는 넣지 않는다. `up`을 다시 실행하면 이전 `bfqaui` 스택을 먼저 지우고 빈 상태로 새로 띄운다. `status`는 컨테이너 상태와 화면 응답을 보여 준다. `down`은 `bfqaui` 컨테이너·네트워크를 `down`(`-v` 없음)으로 내리고, 볼륨은 이름을 지정해 지운 뒤 자격 파일도 지운다. 기존 `build-flow` 프로젝트와 볼륨 4개는 조회만 한다. chat은 호스트 Ollama가 없으면 기동은 되지만 채팅을 쓸 수 없다고 표시된다. estimate의 AI 파싱도 Ollama가 있어야 동작한다(Claude API 키는 넘기지 않음).
+
+### 2026-11-01 가족 일상 화면 동선 실측과 화면 수리 — 로컬 격리 스택 브라우저 실측, 수리는 프론트 회귀만
+
+로컬 격리 전체 스택(브라우저 → Gateway·JWT)에서 현장 → 견적 → 매입 → 세금계산서 화면 동선을 합성 데이터로 실측했다. 저장·금액·손익은 모두 정확했다(견적 600,000 − 매입 273,000 = 마진 327,000, 마진율 54.5%, 미수금 660,000). 대신 가족이 매일 쓰기에 불편한 화면 결함이 나왔고, 브랜치 `claude/ui-family-fixes`에서 프론트엔드만 고쳤다(백엔드·API 계약·MSW 변경 없음).
+
+| 실측 결함 | 수리 |
+|---|---|
+| 세금계산서 등록·수정에서 세액을 매번 손으로 계산 | 공급가액을 입력하면 세액이 비었거나 직접 고치지 않은 경우 공급가액의 10%를 **원 미만 절사**로 채운다(서버는 세액을 계산하지 않고 입력값을 소수 2자리로 저장하므로 화면 기본값 규칙). 직접 고친 세액은 덮어쓰지 않고, 세액을 지우면 다시 자동 채움. 수정 폼은 저장된 세액이 10%와 다르면 사용자가 정한 값으로 보고 유지. 등록 폼에서 세액을 지우면 0원이 되던 입력 변환도 고쳐 필수 검증이 0원으로 통과하지 않게 했다 |
+| 매입·세금계산서 목록에 현장이 안 보임, 세금계산서 발행일 없음 | 두 목록에 '현장' 열(이미 쓰는 현장 목록 조회로 siteId→현장명, 보관 현장은 흐리게 + `보관` 표식), 세금계산서 목록에 '발행일' 열 추가 |
+| 매입 목록 '거래처'와 폼 '공급업체' 용어 불일치 | 화면 문구를 '거래처'로 통일(DTO 필드 `supplier`는 그대로) |
+| 매입일을 비워 두면 목록에 '-'로 남아 기간 집계 곤란 | 매입 등록 매입일 기본값 = 오늘(KST, `Asia/Seoul`). 서버 DTO가 선택값이라 지울 수는 있다 |
+| 현장 0개 대시보드에 총 마진 '흑자'·평균 마진율 '주의' | 현장·금액이 없으면 평가 배지를 숨기고, 견적 합계가 0이면 평균 마진율을 '-'로 표시 |
+| 현장 상세 탭에서 바로 등록할 수 없음 | 견적서·매입·세금계산서·보증보험 탭에 '추가' 버튼. 매입·세금계산서·보증은 등록 모달을 그 현장이 선택된 상태로 바로 연다(목록 화면과 같은 모달 컴포넌트 재사용). 견적서는 작성 모달이 공내역서 파싱·수정본 흐름과 묶여 있어 견적서 화면으로 이동해 그 현장이 선택된 작성 모달을 연다. 보관 현장은 버튼을 막고 "복원 후 등록" 안내. 보증 업로드의 현장 입력도 숫자 ID 대신 현장 검색 선택으로 바꿨다 |
+| 사이드바 메뉴 접근성 | 메뉴 버튼에 `aria-label`·`aria-current="page"`, 메뉴 영역에 `aria-label` |
+
+- 검증: 프론트 `bun run lint`(경고 0)·`bun run test`·`bun run build` 로컬 PASS. 세액 계산·덮어쓰기 규칙, KST 오늘, 현장명 매핑, 대시보드 빈 상태, 현장 상세 추가 버튼(보관 현장 비활성 포함)을 Vitest로 고정했다.
+- 브라우저 재실측(같은 날, `bfqaui` 격리 스택의 프론트만 수리본 이미지로 교체, 데이터 유지): 현장 상세 탭별 추가 버튼 노출, 세금계산서 추가 시 현장 미리 선택·공급가액 123,457 → 세액 12,345 자동 채움, 매입 목록 현장 열·매입 등록 매입일 기본 2026-11-01, 세금계산서 목록 현장·발행일 열 PASS. 빈 대시보드 배지는 데이터가 있어 화면 미확인(컴포넌트 테스트로 고정). `main`·공개 VPS 미반영, 실데이터 미사용.
+
+### 2026-11-01 30분 뒤 로그인 화면으로 튕김 — access 재발급 미구현 수리
+
+- **현상**: 로그인 후 약 1시간 다른 일을 하다 `/taxes`로 이동하자 로그인 화면으로 튕겼다(브라우저 실측). auth-service 설정은 access 30분·refresh 7일이다.
+- **원인(프론트)**: 백엔드 `/api/v1/auth/refresh`(본문 `{refreshToken}` → 회전 발급, Gateway 인증 필터 밖, auth `permitAll`, Nginx 로그인 rate limit은 `= /api/v1/auth/login`만 적용)는 정상인데 프론트가 쓰지 않았다. `LoginPage.tsx`가 로그인 응답의 `accessToken`만 저장하고 `refreshToken`을 버렸고(`authStore`에 필드 없음), `axiosInstance.ts` 응답 인터셉터는 보호 API 401이면 곧바로 `logout()` + `/login` 이동만 했다. 라우트 가드(`App.tsx` `PrivateRoute`)는 저장된 `isAuthenticated`만 보므로 재진입 자체는 통과하고, 만료된 access로 나간 첫 API 401에서 튕긴 것이다. `docs/STUDY_GUIDE.md`의 설계(refresh는 Redis + 클라이언트 보관, 401 시 자동 갱신, 실패 시 로그인)가 프론트에 구현되지 않은 상태였다.
+- **수리(프론트만, 백엔드·DTO 변경 없음)**: 로그인 응답의 refresh 토큰을 access와 같은 저장소(`buildflow-auth`)에 보관. 보호 API 401 → refresh 1회 → 새 access로 원 요청 1회 재시도. 동시 401은 refresh 호출 하나를 공유(서버가 refresh를 회전하므로 병렬 호출은 두 번째가 거부돼 세션이 끊김). refresh가 400/401/403/404로 거부되면 로그인으로, 네트워크·5xx는 일시 장애로 보고 세션 유지. 재시도도 401이면 반복 없이 로그인으로. 다른 탭이 먼저 회전한 경우 저장소 새 토큰을 사용하고, `storage` 이벤트로 탭 간 토큰·로그아웃을 동기화. 만료 access로 로그아웃하면 재발급 후 서버 폐기를 재시도(기존 계약대로 폐기 미확인 시 토큰 보존·실패 안내). 채팅 스트림(fetch)도 같은 재발급 경로. MSW에 refresh 핸들러 추가.
+- **함께**: 세금계산서 입금 관리 모달의 입금액 기본값이 `660000.00`으로 보이던 것을 `₩ 660,000`(₩·천 단위 쉼표·정수, 센트가 있으면 그대로)으로. `precision={2}` 대신 반올림 없는 표시/파서를 쓰고 소수 자릿수는 기존 `validatePaymentAmount`가 검증한다.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`·`bun run build` PASS. Vitest로 401→refresh→재시도, 동시 401 단일 refresh, 재진입(만료 access + 유효 refresh) 유지, refresh 거부 시 로그아웃, 일시 장애 시 유지, 재시도 401 루프 방지, 다른 탭 회전, 만료 access 로그아웃 재시도, 채팅 스트림 재시도, MSW refresh 계약, 입금액 형식을 고정했다.
+- **실측(로컬 임시 격리 스택 `bfqasess`, 루프백 13180/18181, auth `JWT_ACCESS_TOKEN_EXPIRATION=60000`, 백엔드는 기존 `bfqaui-*:local` 이미지 재사용·frontend만 수리본 빌드, notification·tax 등 제외, 끝난 뒤 컨테이너·볼륨·자격 파일 삭제)**: Gateway 직접 — 로그인 `expiresIn` 60000, 65초 뒤 만료 access 401, refresh 200·회전, 새 access 200, 이전 refresh 재사용 401, 로그아웃 200 후 그 access 401·refresh 401. 브라우저 — 로그인 후 access 만료 시각을 지나 `/sites`를 새로 고침(앱 재진입)해도 로그인 화면으로 가지 않고, 네트워크에 `401 → POST /auth/refresh 200 → 재시도`가 남고 저장 access 만료 시각이 갱신, 현장 목록 200. 로그아웃 버튼 후 저장소 토큰 null, 직전 refresh로 재발급 시도 401. 입금 관리 모달은 tax-service를 띄우지 않아 컴포넌트 테스트로만 확인.
+- **남은 위험**: refresh 토큰(7일)이 access와 같이 `localStorage`에 있어 XSS 시 탈취 창이 30분 → 최대 7일로 늘어난다(실데이터 승격 게이트의 "세션 저장소/XSS 방어"에 해당). HttpOnly 쿠키 전환은 별도 설계 결정. auth-service는 refresh를 사용자당 키 1개(`auth:refresh:{userId}`)로 두므로 두 기기 이상 동시 사용 시 한 기기의 로그인·재발급이 다른 기기의 refresh를 무효화해 그 기기는 access 만료 때 로그인으로 간다(기기별 키는 Redis 키·로그아웃 범위 설계 결정). 서버 refresh 대조·교체가 원자적이지 않다(동시 같은 토큰 2회 성공 가능).
+
+### 2026-11-01 세션 보강 — refresh 절대 상한·재사용 탐지·원자 회전, CSP Report-Only·HSTS (PR #263 보안 검토 후속)
+
+- **서버(auth-service)**: refresh 토큰에 세션 id(`sid`)·최초 로그인 시각(`sst`)·`jti` claim을 넣고, 회전해도 `sid`·`sst`는 그대로 옮긴다. 절대 상한 `jwt.session-absolute-expiration`(기본 7일 = refresh TTL, env `JWT_SESSION_ABSOLUTE_EXPIRATION`)을 넘으면 회전 불가(401), refresh 토큰 만료와 Redis TTL은 `min(refresh TTL, sst + 상한 − 지금)`. Redis 키는 기존 `auth:refresh:{userId}` 그대로이며 값만 `v3|sid|현재 토큰 SHA-256|직전 토큰 SHA-256|회전 시각`(원문 토큰 미저장)으로 바꿨다. 회전은 Lua 한 번(GET→sid·해시 비교→SET PX)으로 원자 처리하고, 로그아웃은 같은 키 DEL이라 Redis 단일 스레드 순서상 로그아웃 뒤 새 refresh가 살아나지 않는다. 이미 회전된 refresh가 다시 오면 키를 폐기(이후 refresh 401 "이미 사용된…")하되, 직전 토큰이 유예(`jwt.refresh-reuse-grace` 기본 30초) 안이면 여러 탭 동시 재발급으로 보고 폐기 없이 **409**를 준다. 다른 세션 sid·이전 형식 값은 변경 없이 401.
+- **배포 호환**: `sid`/`sst` 없는 기존 refresh 토큰은 401 → 기존 로그인 세션은 access 만료 시 **재로그인 1회**로 충분하다(키 형식 동일, 이전 값은 다음 로그인이 덮어씀). access 토큰·Gateway·notification 블랙리스트는 변경 없음.
+- **프론트**: (M1) 로그인마다 클라이언트 세션 세대값 `sessionId`를 저장하고 refresh 회전은 유지·로그아웃은 지운다. 재발급 응답 반영 직전 메모리·저장소의 세대값/로그인 상태를 다시 대조해 다른 탭의 로그아웃(또는 새 로그인) 뒤 늦은 응답이 세션을 되살리거나 덮어쓰지 않게 하고, 이 탭이 로그아웃한 세션 토큰이 storage 이벤트로 다시 오면 따르지 않고 로그아웃 상태를 다시 쓴다. (M2) 로그아웃 401 → refresh가 400/401/403/404로 거부(또는 refresh 없음)되면 서버에 살아 있는 토큰이 없으므로 로컬 토큰을 지우고 로그인으로; 5xx·네트워크·409 미해결은 기존대로 보존·재시도 안내. (L1) 실패 요청의 Authorization이 현재 저장 access와 다르면 refresh 없이 새 access로 1회 재시도. refresh 409면 최대 2초 동안 다른 탭이 저장할 새 토큰을 기다려 사용하고, 없으면 일시 장애로 세션 유지.
+- **Nginx/Caddy**: `frontend/nginx.conf`(LAN·공개 공통 경로)에 `Content-Security-Policy-Report-Only`(`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`), `always`로 오류 응답 포함. `'unsafe-inline'`은 Ant Design CSS-in-JS `<style>` 주입(실측 24개)·React `style` 속성 때문에 필요, Google Fonts는 `index.css`의 Inter `@import` 때문. `= /api/v1/auth/refresh` 전용 `limit_req` 30r/m·burst 10(429는 프론트가 일시 장애로 취급). Caddy에 `Strict-Transport-Security "max-age=31536000"`(PUBLIC_HOST apex/하위 여부 확인 전이라 includeSubDomains·preload 없음), CSP는 Caddy에서 중복 설정하지 않는다.
+- **검증**: `./gradlew :auth-service:test` PASS(AuthService 11·RefreshSessionStore 6·JwtTokenProvider 6 등, Lua는 스크립트 문자열·분기 순서·인자·반환 코드 매핑 단위 테스트). 프론트 `bun run lint`(경고 0)·`bun run test`(전체 PASS)·`bun run build` PASS — 세대값 유지/신규, 늦은 재발급 응답 무시, 종료 세션 storage 되살림 거부, 새 세션 storage 수용, 409 대기·미해결 유지, L1 재시도, LogoutButton 400/401/403/404 정리·503/네트워크 보존. CI와 같은 방식의 `caddy adapt --validate`·`nginx -t` 로컬 PASS(HSTS 헤더 adapt 결과 확인).
+- **실측(로컬 임시 격리 스택 `bfqahard`, 루프백 13280/18281, mysql·redis·eureka·gateway(기존 `bfqaui-*:local` 이미지)·auth·frontend(수리본 빌드), auth `JWT_ACCESS_TOKEN_EXPIRATION=60000`·`JWT_SESSION_ABSOLUTE_EXPIRATION=90000`·`JWT_REFRESH_REUSE_GRACE=5000`, 끝난 뒤 컨테이너·볼륨·이미지·자격 파일 삭제, `build-flow` 볼륨 4개·`bfqaui` 스택 무변경)**: Gateway 직접 — 로그인 값 `v3|…`(원문 토큰 없음)·PTTL 89536≤90000, 회전 200, 직전 refresh 유예 내 재사용 409·키 유지, 현재 refresh 회전 200, 유예 후 이전 refresh 재사용 401("이미 사용된…")·키 삭제·최신 refresh도 401, 같은 refresh 병렬 2회 = [200, 409]이고 승자 토큰 계속 유효, 로그아웃 200 후 refresh 401, 로그아웃↔회전 병렬 20회 되살아남 0, 상한 60% 시점 회전 200·회전 후 PTTL이 남은 상한 이하(늘지 않음), 상한 경과 후 refresh 401. frontend 경유 — HTML·API 응답 모두 CSP-Report-Only 헤더, refresh 11회 연속 401 뒤 429. 브라우저 — 로그인→대시보드·현장·세금계산서·견적서·AI 채팅 열기·로그아웃 동안 CSP 위반 콘솔 0건(합성 외부 이미지 프로브로 위반 기록이 콘솔에 남는 것 확인), Inter 웹폰트 로드, 로그아웃 후 저장소 토큰·sessionId null. 일부 화면은 업무 서비스를 띄우지 않아 503(CSP 무관).
+- **남은 결정**: refresh HttpOnly 쿠키 전환(XSS 시 localStorage refresh 탈취 창 — 사용자 설계 결정 대기), CSP enforce 전환(Report-Only 위반 0 확인 후 별도 결정; 웹폰트 자체 호스팅 시 외부 출처 제거 가능, `'unsafe-inline'` 스타일은 Ant Design nonce 설정 전까지 유지), 기기별 세션(현재 사용자당 키 1개 — 한 기기 로그인이 다른 기기 refresh를 무효화), HSTS includeSubDomains/preload(도메인 구조 확인 후). 로그아웃과 경합해 로그아웃 **직전**에 회전으로 발급된 access는 블랙리스트 대상이 아니라 만료(30분)까지 유효하다(클라이언트는 M1로 되살리지 않음). LAN 직결에서는 Nginx 레이트 리밋 키가 클라이언트 `X-Forwarded-For`라 우회 가능(기존 로그인 리밋과 동일, 공개 경로는 Caddy가 덮어씀).
+
+### 2026-11-01 휴대폰·태블릿 화면 깨짐 — 브라우저 실측 발견, 수리는 프론트 회귀만
+- **현상(로컬 격리 스택 브라우저 실측)**: 375×812 모바일에서 `MainLayout`의 사이드바가 240px로 고정돼 본문이 135px만 남았다. 대시보드 통계 카드가 글자 단위로 세로 줄바꿈되고 `₩` 금액이 잘렸다. 768×1024 태블릿에서도 사이드바 240px가 남아 본문이 528px이고, 현장 상세 제목 "[QA] 화면 실측 현장"이 단어마다 세로로 꺾이며 요약 카드 4개가 한 줄에 몰렸다. 가족이 현장에서 휴대폰으로 쓸 가능성이 높아 V1 핵심 결함으로 본다.
+- **수리(프론트만, API 계약 변경 없음)**: 분기 기준을 모바일 `< 768px`, 컴팩트(모바일+태블릿) `< 1024px`로 두고 `useViewport` 훅(`matchMedia` 구독, 없으면 데스크톱)과 `index.css` 미디어 쿼리가 같은 값을 쓴다.
+  - 내비게이션: 1024px 미만은 고정 사이드바 대신 헤더의 `메뉴 열기` 버튼 + 왼쪽 Ant Design `Drawer`(같은 메뉴·로그아웃). 메뉴를 고르면 이동 후 Drawer가 닫히고, 활성 메뉴 `aria-current="page"`와 메뉴 버튼 `aria-label`을 유지. 데스크톱은 기존 사이드바 그대로.
+  - 대시보드 통계 카드: 데스크톱 3+2 → 태블릿 2열(마지막 1장은 전체 폭) → 모바일 1열. 금액은 말줄임·줄바꿈 없이 폭에 맞춰 글자 크기만 줄인다(`clamp`). 현장별 손익 표와 AI 요약은 1024px 미만에서 위아래로 쌓인다.
+  - 목록 표(견적·매입·세금계산서·보증, 대시보드 현장별 손익): 한 방식으로 통일 — 표 컨테이너 가로 스크롤 + 1024px 미만에서 셀 줄바꿈 금지 + 마지막 `처리` 열을 오른쪽에 고정(sticky)해 처리 버튼이 화면 밖으로 사라지지 않게 했다. 현장 목록(탐색 패널+선택 현장)은 1024px 미만에서 세로로 쌓이고, 알림 목록은 원래 카드형이라 헤더 버튼 줄바꿈만 손봤다.
+  - 등록/수정 모달: 모바일에서 폭 `100vw - 16px`, 높이를 화면 안으로 제한하고 본문만 스크롤해 하단 버튼이 항상 보이게, 버튼은 넘치면 줄바꿈. 견적 품목 입력 행은 품목명 한 줄 + 단위·수량·단가·삭제 한 줄로.
+  - 현장 상세: 요약 카드 4열 → 태블릿 2열 → 모바일 1열. 헤더는 제목 영역이 320px보다 좁아지면 상태·수정 박스를 아래 줄로 내리고 제목 글자 크기를 폭에 맞춘다(단어 단위 세로 꺾임 방지). 탭 안 3열 정보 칸은 모바일 2열.
+  - 필터 바: 1024px 미만에서 입력이 폭을 넘지 않게, 모바일에서는 검색·상태·기간·금액 입력을 한 줄에 하나씩 전체 폭으로(금액 범위는 두 칸이 반씩).
+  - 채팅 런처: 1024px 미만 본문 하단 여백을 88px로 늘려 마지막 버튼이 런처에 가리지 않게 했다(모달·Drawer는 런처보다 위 레이어). 알림 벨 드롭다운도 화면 폭을 넘지 않게.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(60파일 257테스트)·`bun run build` PASS. Vitest로 `useViewport` 분기(375/767/768/1023/1024/1440px, 크기 변경 재계산, 구독 해제, `matchMedia` 부재)와 `MainLayout`(데스크톱 사이드바·메뉴 버튼 없음, 375/768px 메뉴 버튼만, Drawer 메뉴 선택 시 이동·닫힘·`aria-current` 갱신)을 고정했다.
+- **브라우저 재확인: PASS(2026-11-01, `bfqaui` 격리 스택 프론트만 수리본으로 교체)** — 375×812: 사이드바 없음·본문 375px·가로 넘침 0, 메뉴 열기 버튼으로 Drawer 열림·메뉴 선택 시 이동 후 닫힘, 대시보드 카드 1열(금액 온전), 세금계산서 목록 가로 스크롤·처리 열 고정(입금 버튼 화면 안). 768×1024: 본문 768px, 현장 상세 제목 한 줄·요약 카드 2열. 등록 모달·견적·매입·보증 목록의 모바일 화면은 미확인.
+
+### 2026-11-01 알림 문구에 현장·거래처 이름 — 백엔드만 수리
+
+- **현상(화면 실측)**: 알림 목록이 "매출 세금계산서(ID: 1)가 등록되었습니다.", "매입(ID: 1)이 등록되었습니다.", "견적서(ID: 1)가 확정되었습니다."처럼 내부 ID만 보여 가족이 어느 현장·거래처 자료인지 알 수 없었다. 화면은 서버 `message`를 그대로 보여 주므로 백엔드만 고쳤다(프론트·API 응답 DTO 변경 없음).
+- **수리**: notification-service가 문구를 `NotificationMessageFormatter`(순수 함수)로 만든다. 예: `[강남 A현장] 견적서(외벽 도장 공사)가 확정되었습니다.`, `[강남 A현장] 매입(시멘트, 대한건자재)이 등록되었습니다.`, `[강남 A현장] 매출 세금계산서(대한건설, 1,100,000원)가 등록되었습니다.`, `[강남 A현장] 세금계산서(대한건설, 1,100,000원) 입금이 확인되었습니다.`, `[강남 A현장] 하자보증보험(ID: 5, 보험사) 만료까지 18일 남았습니다.` 이름이 하나도 없으면 기존 `(ID: n)` 문구, 현장명이 없으면 `[...]` 접두어 없이 저장한다.
+- **방식**: 견적 제목·매입 품목/거래처는 발행 서비스 payload에 선택 필드(`title`, `itemName`, `supplier`)를 추가했다(하위 호환 — `docs/ARCHITECTURE.md` 2.2). 세금계산서는 기존 `counterparty`·`totalAmount`를 쓴다. 현장명은 세 발행 서비스가 모두 갖고 있지 않아 payload 대신 notification-service가 기존 Feign으로 소비 시점에 조회한다(트랜잭션·보증 행 잠금 밖, 실패 시 폴백, 장애 뒤 30초 조회 생략으로 밀린 이벤트 소비가 타임아웃 누적으로 리밸런스되지 않게 함). eventId 멱등 처리는 그대로이고, 금액은 JSON 실수를 `BigDecimal`로 읽어 16자리 금액도 반올림되지 않는다. 사용자 입력 이름은 제어·서식 문자 제거 + 공백 접기 + 50자(코드포인트) 말줄임.
+- **검증**: `./gradlew :notification-service:test :purchase-service:test :estimate-service:test` PASS(문구 생성·필드 누락 폴백·말줄임·제어문자·금액 포맷·현장명 조회 실패 폴백·구 이벤트·발행 payload 이름 필드). 격리 스택 실측은 하지 않았다(단위 테스트만). 이미 저장된 과거 알림 문구는 바뀌지 않는다.
+
+### 2026-11-01 refresh 회전 Lua 실제 Redis 통합 테스트·유예 축소·LAN 보안 헤더 (PR #265 보안 재검토 후속)
+
+- **M-1 (PENDING — CI 결과 대기)**: `auth-service` `RefreshSessionStoreRedisIntegrationTest`가 회전 Lua를 실제 Redis에서 실행한다. 단위 테스트(Mockito)는 스크립트 문자열·인자만 고정하므로 Lua 패턴·분기·원자성은 이 테스트가 증명한다. 고정 시나리오: 회전 성공(값 `v3|sid|새 해시|직전 해시|회전 시각`, PTTL ≤ 넘긴 TTL), 유예 내 직전 토큰 `CONCURRENT`(서비스 409)·값 불변, 유예 밖 직전 토큰 `REUSED`(401)·키 DEL·이후 최신 토큰 `NOT_FOUND`(401), 모르는 토큰도 재사용 처리, 다른 sid `OTHER_SESSION`·값 불변, 이전 형식(원문 JWT)·`v2`·필드 부족/초과·숫자 아닌 회전 시각·빈 sid·빈 문자열 → 거부·값·TTL 불변, 키 없음 → `NOT_FOUND`·키 생성 없음, 같은 토큰 병렬 2회 20번 반복 모두 `[ROTATED, CONCURRENT]`·승자 토큰 유효, 로그아웃 DEL↔회전 병렬 200회 되살아남 0, `AuthService`+실제 Redis로 refresh TTL(2h)이 절대 상한(1h)보다 길어도 로그인 PTTL ≤ 상한·상한 60% 시점 회전 후 PTTL ≤ 남은 상한, 409/401 오류 코드 매핑. 전용 DB 인덱스 15에서 이 테스트가 만든 키만 지우며, `AUTH_REDIS_INTEGRATION=true`와 `REDIS_HOST=127.0.0.1`일 때만 실행된다(일반 `:auth-service:test`에서는 건너뜀). CI 잡 `auth-redis`(인증 refresh 회전, `redis:7.2-alpine` 서비스 컨테이너)가 이 클래스만 돌리고 결과 XML의 tests ≥ 16·skipped 0을 단언하며, 릴리스 후보 증거 잡의 `needs`·`REQUIRED_RESULTS`에 추가했다. Testcontainers는 쓰지 않았다(기존 Flyway 잡과 같은 서비스 컨테이너+환경 변수 게이트 방식).
+- **로컬 실행**: 임시 컨테이너 `bfrit-redis`(`redis:7.2-alpine`, `127.0.0.1:16399`) — 16건 PASS·skipped 0, 종료 시 DB 15 키 0개, 컨테이너 삭제. `build-flow` 볼륨 4개·`bfqaui` 스택 무변경.
+- **L-2**: `jwt.refresh-reuse-grace` 기본값 30초 → **10초**(env `JWT_REFRESH_REUSE_GRACE`). `0 ≤ grace < jwt.refresh-token-expiration`을 생성자에서 검사해 위반이면 기동 실패(단위 테스트: 0·TTL−1 허용, TTL·TTL 초과·음수 거부). 유예가 짧을수록 탈취 토큰이 409로 숨을 수 있는 창이 줄고, 여러 탭 동시 재발급은 프론트가 409 후 최대 2초 동안 다른 탭의 새 토큰을 기다리므로 10초로 충분하다.
+- **L-5**: `frontend/nginx.conf`에 `X-Frame-Options: DENY`·`X-Content-Type-Options: nosniff`·`Referrer-Policy: no-referrer`(Caddy와 같은 값, `always`)를 서버 블록에 추가해 LAN 직결 경로에도 붙인다. 공개 경로에서는 Caddy `reverse_proxy`의 `header_down -…`로 Nginx 사본을 지워 Caddy 값이 한 번만 나간다. 로컬 확인: CI와 같은 `nginx -t`·`caddy adapt --validate` PASS, 임시 Nginx(실제 `nginx.conf`)+Caddy(실제 Caddyfile, 호스트 줄만 평문 HTTP로 치환) 컨테이너에서 Nginx 직접 응답에 세 헤더 각 1회, Caddy 경유 응답에 세 헤더+HSTS 각 1회(중복 없음), 끝난 뒤 컨테이너·네트워크 삭제.
+- **L-1 (미구현 — 설계 메모)**: 재사용 탐지 시 이미 발급된 access(최대 30분)를 즉시 끊으려면 auth가 `REUSED`에서 `auth:revoked-before:{userId}` = 탐지 시각(TTL = access TTL)을 쓰고, Gateway `AuthorizationHeaderFilter`(그리고 access를 직접 검증하는 notification SSE 경로)가 블랙리스트 조회와 함께 이 키를 읽어 `iat < 표식`이면 401을 준다. 고려점: JWT `iat`는 초 단위라 표식도 초로 내림해 저장하고 `iat < 표식초`만 거부하는 규칙으로 고정해야 함(같은 초에 발급된 access는 통과 — 최대 1초 창을 허용하는 대신 탐지 직후 재로그인한 정상 access를 막지 않음), 요청마다 Redis 조회 1회 추가(현재 블랙리스트와 묶어 MGET 가능), auth·gateway·notification 공용 키 계약 문서화와 세 서비스 동시 배포. 같은 표식으로 로그아웃 직전 회전 access 잔존 문제도 닫을 수 있다. 변경 범위(3개 서비스·공용 키 규칙·시간 단위)가 커서 이번 후속에서는 하지 않았다.
+- **남은 위험**: L-1 미구현으로 재사용 탐지 뒤에도 공격자가 이미 받은 access는 만료까지 유효. 통합 테스트는 단일 Redis 인스턴스 기준이며 Redis Cluster·복제 지연은 대상 밖(운영도 단일 인스턴스).
+
+### 2026-11-01 없는 주소·없는 현장 빈 화면 — 브라우저 실측 발견, 수리는 프론트 회귀만
+- **현상**: `App.tsx`에 catch-all 라우트가 없어 `/clients` 같은 없는 주소는 로그인 상태에서도 레이아웃 없이 빈 화면이었다. 없는 현장 상세 `/sites/999999`는 서버 404(`SITE_NOT_FOUND`)를 일반 조회 실패("데이터를 불러오는 중 오류", 다시 시도)로 보여 줬고 404도 1회 재시도했다. `/sites/0`·음수는 조회가 꺼진 채 로딩 화면에 멈췄다.
+- **수리(프론트만, API 계약 변경 없음)**: 레이아웃 라우트 안에 `path="*"` → Ant Design `Result` 404 "페이지를 찾을 수 없습니다" + `대시보드로` 버튼(사이드바/모바일 Drawer 유지). 비로그인은 기존 `PrivateRoute`가 먼저 `/login`으로 보낸다. 현장 상세는 API 404와 잘못된 ID(문자·0·음수·소수)를 "현장을 찾을 수 없습니다" + `목록으로`(`/sites`)로 안내하고, `useSite`는 404를 재시도하지 않는다. 404 외 오류는 기존 안내·다시 시도 유지.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(63파일 280테스트)·`bun run build` PASS. Vitest로 없는 경로 → 404 화면·주 메뉴·대시보드 버튼 이동, 비로그인 → `/login`, 현장 404·500·잘못된 ID 분기, 404 판별·재시도 규칙을 고정했다. 브라우저 재확인은 미실시.
+
+### 2026-11-01 현장에 연결되지 않은 거래처를 관리할 화면 없음 — 거래처 메뉴 추가, 프론트 회귀만
+- **현상**: 거래처는 현장 등록 창의 "새 거래처 등록"으로만 만들고, 수정·보관·복원은 거래처가 연결된 현장 상세의 "거래처 수정"에서만 가능했다. 어느 현장에도 연결되지 않은 거래처는 화면에서 관리할 수 없었다.
+- **수리(프론트만, API 계약 변경 없음)**: 사이드바·모바일 Drawer 공용 메뉴의 `현장 관리` 아래에 `거래처`(`/clients`) 추가. 목록은 업체명·대표자·사업자번호·연락처 검색, 보관 제외(기본)/보관된 거래처만/보관 포함 전체 필터(현장 목록과 같은 URL 필터), 연결 현장 수(현장 목록 응답에서 계산, 보관 현장 수 병기), 행별 `수정`(기존 `ClientEditModal`)·`보관`/`복원`(확인 후 기존 archive/restore API)과 `거래처 등록`(기존 `ClientCreateModal`). 보관 거래처는 내용을 흐리게 하고 `보관` 표시. 좁은 화면은 기존 표 가로 스크롤·처리 열 고정 규칙을 따르고 휴대폰에서는 대표자·사업자번호 열을 접는다. 현장 목록에 거래처 ID 필터가 없어 거래처 이름 → 현장 목록 필터 이동은 넣지 않았다.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(64파일 289테스트)·`bun run build` PASS. Vitest로 목록·연결 현장 수, 보관 필터 3종, 검색, 수정·등록 모달 열기, 보관/복원 요청, 메뉴 항목 순서·이동(데스크톱·모바일)을 고정했다. 브라우저 재확인(같은 날 `bfqaui` 격리 스택 프론트만 교체): 사이드바 '거래처' 메뉴(현장 관리 다음)·`/clients` 화면, 현장 미연결 거래처 등록 → 목록 표시(연결 현장 0곳) → 보관 확인 후 기본 필터에서 숨김 PASS.
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |
