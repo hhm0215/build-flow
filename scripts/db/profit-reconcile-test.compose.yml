@@ -55,6 +55,9 @@ services:
       KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: "1"
       KAFKA_CFG_NUM_PARTITIONS: "1"
       KAFKA_HEAP_OPTS: -Xms128m -Xmx256m
+      # LogCleaner allocates a 128 MiB dedupe buffer by default; with a 256 MiB heap this intermittently
+      # failed broker startup with OutOfMemoryError (CI 2026-11-01). This isolated test never compacts much.
+      KAFKA_CFG_LOG_CLEANER_DEDUPE_BUFFER_SIZE: "16777216"
     tmpfs: ["/bitnami/kafka:rw,size=256m,uid=1001,gid=1001"]
     mem_limit: 768m
     healthcheck:
