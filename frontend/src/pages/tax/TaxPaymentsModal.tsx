@@ -102,7 +102,7 @@ export default function TaxPaymentsModal({ invoice, onClose }: Props) {
           {PAYMENT_STATUS_META[status].label}
         </span>
       </p>
-      <div
+      <div className="bf-info-grid"
         style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 16 }}
         aria-label="입금 요약"
       >

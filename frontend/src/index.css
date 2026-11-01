@@ -260,3 +260,154 @@ button {
   .chat-launcher { right: 16px; bottom: 16px; }
   .chat-panel { inset: 0; width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
 }
+
+/* ─────────────────────────────────────────────
+   반응형 레이아웃 (모바일 < 768px, 태블릿 768~1023px)
+   기준값은 src/hooks/useViewport.ts와 같게 유지한다.
+   ───────────────────────────────────────────── */
+
+.bf-main { padding: 24px; }
+
+/* 대시보드 통계 카드: 데스크톱 3+2, 태블릿 2열, 모바일 1열 */
+.bf-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.bf-stat-grid > * { grid-column: span 3; min-width: 0; }
+.bf-stat-grid > :nth-child(-n+3) { grid-column: span 2; }
+/* 금액은 잘리거나 말줄임 되지 않도록 폭에 맞춰 글자 크기를 줄인다 */
+.bf-stat-value {
+  font-size: clamp(18px, 2.2vw, 26px);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-dashboard-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+}
+
+/* 요약 카드 4개 (현장 상세·현장 목록 선택 현장) */
+.bf-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+/* 4열일 때 칸이 좁아지므로 금액이 넘치지 않게 글자 크기를 폭에 맞춘다 */
+.bf-summary-value {
+  font-size: clamp(16px, 1.6vw, 20px);
+  font-variant-numeric: tabular-nums;
+}
+
+.bf-site-explorer {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* 현장 헤더: 좌측 정보가 좁아지면 우측 상태 박스를 아래로 내린다 */
+.bf-hero-main { flex: 1 1 320px; min-width: 0; }
+.bf-hero-side { flex: 1 1 220px; max-width: 100%; }
+.bf-hero-title { font-size: clamp(20px, 3vw, 28px) !important; overflow-wrap: anywhere; }
+@media (min-width: 1024px) {
+  .bf-hero-side { flex: 0 0 auto; min-width: 220px; }
+}
+
+/* 견적 품목 입력 행 */
+.bf-item-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 80px 120px auto;
+  gap: 8px;
+  align-items: start;
+}
+
+/* 목록 테이블: 좁은 화면에서는 가로 스크롤 + 처리 열 고정 */
+.bf-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023px) {
+  .bf-main { padding: 16px 16px 88px; }
+
+  .bf-stat-grid > *,
+  .bf-stat-grid > :nth-child(-n+3) { grid-column: span 3; }
+  .bf-stat-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .bf-stat-value { font-size: clamp(18px, 3.4vw, 26px); }
+
+  .bf-dashboard-bottom { grid-template-columns: minmax(0, 1fr); }
+  .bf-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bf-summary-value { font-size: 20px; }
+  .bf-site-explorer { grid-template-columns: minmax(0, 1fr); }
+  .bf-site-explorer > aside { position: static !important; }
+
+  .bf-list-table th,
+  .bf-list-table td { white-space: nowrap; }
+  .bf-list-table--sticky th:last-child,
+  .bf-list-table--sticky td:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--bg-elevated);
+    box-shadow: -8px 0 12px -8px rgba(0, 0, 0, 0.6);
+    z-index: 1;
+  }
+
+  /* 필터 바: 검색·기간·금액 입력이 폭을 넘지 않게 */
+  .bf-filter-fields > *,
+  .bf-filter-fields .ant-input-affix-wrapper,
+  .bf-filter-fields .ant-select,
+  .bf-filter-fields .ant-picker { max-width: 100%; }
+}
+
+@media (max-width: 767px) {
+  .bf-stat-grid > *,
+  .bf-stat-grid > :nth-child(-n+3),
+  .bf-stat-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .bf-stat-value { font-size: clamp(18px, 6.4vw, 26px); }
+
+  .bf-summary-grid { grid-template-columns: minmax(0, 1fr); }
+
+  .bf-page-header { flex-direction: column; align-items: stretch !important; }
+
+  /* 탭 안 3열 정보 그리드는 2열로 */
+  .bf-info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  .bf-item-row { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
+  .bf-item-row > :first-child { grid-column: 1 / -1; }
+
+  /* 필터 바: 입력을 한 줄에 하나씩 */
+  .bf-filter-fields { flex-direction: column; align-items: stretch !important; }
+  .bf-filter-fields > *,
+  .bf-filter-fields .ant-input-affix-wrapper,
+  .bf-filter-fields .ant-select,
+  .bf-filter-fields .ant-picker { width: 100% !important; }
+  .bf-amount-range { display: flex !important; }
+  .bf-amount-range .ant-input-number { flex: 1 1 0; min-width: 0; width: auto !important; }
+
+  /* 모달: 화면 폭에 맞추고 본문만 스크롤해 하단 버튼을 항상 보이게 */
+  .ant-modal {
+    max-width: calc(100vw - 16px) !important;
+    top: 8px !important;
+    margin: 0 auto !important;
+    padding-bottom: 8px !important;
+  }
+  .ant-modal-content {
+    padding: 16px !important;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    display: flex;
+    flex-direction: column;
+  }
+  .ant-modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .ant-modal-footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .ant-modal-footer .ant-btn + .ant-btn { margin-inline-start: 0 !important; }
+}
