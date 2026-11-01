@@ -48,6 +48,8 @@ public class PurchaseService {
                         .siteId(saved.getSiteId())
                         .revision(saved.getEventRevision())
                         .totalAmount(saved.getTotalAmount())
+                        .itemName(saved.getItemName())
+                        .supplier(saved.getSupplier())
                         .build()
         );
         purchaseRepository.flush();
@@ -93,6 +95,8 @@ public class PurchaseService {
                         .revision(purchase.getEventRevision())
                         .oldTotalAmount(oldTotalAmount)
                         .newTotalAmount(purchase.getTotalAmount())
+                        .itemName(purchase.getItemName())
+                        .supplier(purchase.getSupplier())
                         .build()
         );
         purchaseRepository.flush();
@@ -114,6 +118,8 @@ public class PurchaseService {
                         .siteId(purchase.getSiteId())
                         .revision(deleteRevision)
                         .totalAmount(purchase.getTotalAmount())
+                        .itemName(purchase.getItemName())
+                        .supplier(purchase.getSupplier())
                         .build()
         );
 
