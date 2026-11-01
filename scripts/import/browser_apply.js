@@ -15,7 +15,13 @@
  *   const result = await buildflowApplyTaxPlan(<계획 JSON>) → 결과 JSON을 taxes.py --record-result로 기록.
  * 현장 연결 규칙(보수적): 상호를 정규화(주식회사·(주)·㈜·공백·기호 제거)해 활성 거래처와 정확히 1곳 일치하고,
  * 그 거래처의 활성 현장 중 현장명 정규화 키가 품목명 정규화 키에 들어 있는 현장이 정확히 1개일 때만 연결한다.
- * 0개·여러 개면 만들지 않고 skipped에 사유(거래처 없음/현장 없음/후보 여럿)를 남긴다. 거래처·현장은 만들지 않는다.
+ * 거래처는 계획의 clientName(taxes.py --client-alias 적용 결과, 없으면 상호)으로 찾는다. 계획에 siteName
+ * (--site-map 지정)이 있으면 그 이름(정규화 키)이 그 거래처 활성 현장으로 정확히 1개일 때만 연결하고 아니면 '지정 현장 없음'.
+ * 포함 규칙이 0개면 보조 규칙: 품목명 키에서 일반어(금속공사·공사·잔금·계약금·중도금·인테리어 등)를 뺀 뒤
+ * '현장명 키 ⊂ 품목명 키' 또는 '품목명 키(4글자 이상) ⊂ 현장명 키'가 정확히 1개일 때만 연결한다.
+ * 연결한 항목에는 matchRule(exact/alias/site-map/contains)을 남긴다.
+ * 0개·여러 개면 만들지 않고 skipped에 사유(거래처 없음/현장 없음/후보 여럿/지정 현장 없음)와 후보 이름을 남긴다.
+ * 거래처·현장은 만들지 않는다.
  * 메모의 출처 표식이 이미 있는 세금계산서는 다시 만들지 않고, 다른 파일·수동 입력으로 같은 내용(작성일자·상호·
  * 공급가액·세액)이 이미 있으면 건너뛴다. 입금 확인은 하지 않는다.
  *
@@ -277,6 +283,9 @@
   const REASON_NO_SITE = '현장 없음'
   const REASON_MANY = '후보 여럿'
   const REASON_SAME_CONTENT = '같은 내용 이미 있음'
+  const REASON_NO_MAPPED_SITE = '지정 현장 없음'
+  // 건너뜀 항목에 더 남기는 칸(--unmatched-csv가 사람이 site-map을 채우도록 내보냄). 적재 기록에는 안 들어감
+  const TAX_SKIP_FIELDS = ['counterparty', 'itemName', 'clientName', 'siteName']
   /** taxes.py marker_of와 같은 형식: [가져오기 매출 sha256:<16자> 행:<n>] */
   const TAX_MARKER = /\[가져오기 매출 sha256:([0-9a-f]{16}) 행:\d+\]/
 
@@ -316,26 +325,71 @@
     }
   }
 
-  /** 거래처·현장 후보 결정. 반환: { site, client } 또는 { reason, candidates }. */
+  /**
+   * 보조 규칙에서 품목명 키에서 빼는 일반어(정규화 키 기준). 긴 말부터 지워 '금속공사'가 '공사'보다 먼저 빠진다.
+   * taxes.py는 이 목록을 쓰지 않는다(연결은 브라우저에서만 정함).
+   */
+  const GENERIC_ITEM_WORDS = ['금속공사', '인테리어', '계약금', '중도금', '선급금', '기성금', '잔금', '공사']
+  const MIN_ITEM_KEY_IN_SITE = 4
+
+  function stripGenericWords(key) {
+    let out = String(key || '')
+    for (const word of GENERIC_ITEM_WORDS) out = out.split(word).join('')
+    return out
+  }
+
+  function siteSummary(rows) {
+    return {
+      candidates: rows.map((s) => Number(s.id)),
+      candidateNames: rows.map((s) => String(s?.siteName ?? '')),
+    }
+  }
+
+  /**
+   * 거래처·현장 후보 결정. 반환: { site, client, matchRule } 또는 { reason, candidates, candidateNames }.
+   * matchRule: site-map(계획이 지정한 현장) > contains(일반어 뺀 보조 규칙) > alias(거래처 별칭 + 포함 규칙)
+   * > exact(상호 그대로 + 포함 규칙). clientRule은 거래처를 찾은 방법(exact/alias)만 따로 남긴다.
+   */
   function matchSite(entry, clients, sites) {
-    const key = companyKey(entry.counterparty)
+    const aliased = Boolean(entry.clientAlias)
+    const key = companyKey(entry.clientName || entry.counterparty)
     const matchedClients = key ? clients.filter((c) => !c?.archivedAt && companyKey(c?.companyName) === key) : []
-    if (!matchedClients.length) return { reason: REASON_NO_CLIENT, candidates: [] }
-    if (matchedClients.length > 1) return { reason: REASON_MANY, candidates: matchedClients.map((c) => Number(c.id)), of: 'client' }
+    if (!matchedClients.length) return { reason: REASON_NO_CLIENT, candidates: [], candidateNames: [] }
+    if (matchedClients.length > 1) {
+      return {
+        reason: REASON_MANY, of: 'client',
+        candidates: matchedClients.map((c) => Number(c.id)),
+        candidateNames: matchedClients.map((c) => String(c?.companyName ?? '')),
+      }
+    }
     const client = matchedClients[0]
+    const clientRule = aliased ? 'alias' : 'exact'
+    const clientId = Number(client.id)
+    const own = sites.filter((s) => !s?.archivedAt && s?.client && Number(s.client.id) === clientId && siteKey(s.siteName))
+
+    if (entry.siteName) {
+      const wanted = siteKey(entry.siteName)
+      const named = own.filter((s) => siteKey(s.siteName) === wanted)
+      if (named.length !== 1) return { reason: REASON_NO_MAPPED_SITE, ...siteSummary(named), clientId }
+      return { site: named[0], client, matchRule: 'site-map', clientRule }
+    }
+
     const itemKey = siteKey(entry.itemName)
-    const matchedSites = itemKey
-      ? sites.filter((s) => {
-        if (s?.archivedAt || !s?.client || Number(s.client.id) !== Number(client.id)) return false
+    const matchedSites = itemKey ? own.filter((s) => itemKey.includes(siteKey(s.siteName))) : []
+    if (matchedSites.length > 1) return { reason: REASON_MANY, of: 'site', ...siteSummary(matchedSites), clientId }
+    if (matchedSites.length === 1) return { site: matchedSites[0], client, matchRule: clientRule, clientRule }
+
+    // 보조 규칙: 일반어를 뺀 품목명 키로 '현장명 ⊂ 품목명' 또는 '품목명(4글자 이상) ⊂ 현장명'이 정확히 1개일 때만
+    const core = stripGenericWords(itemKey)
+    const loose = core
+      ? own.filter((s) => {
         const k = siteKey(s.siteName)
-        return k && itemKey.includes(k)
+        return core.includes(k) || ([...core].length >= MIN_ITEM_KEY_IN_SITE && k.includes(core))
       })
       : []
-    if (!matchedSites.length) return { reason: REASON_NO_SITE, candidates: [], clientId: Number(client.id) }
-    if (matchedSites.length > 1) {
-      return { reason: REASON_MANY, candidates: matchedSites.map((s) => Number(s.id)), of: 'site', clientId: Number(client.id) }
-    }
-    return { site: matchedSites[0], client }
+    if (loose.length > 1) return { reason: REASON_MANY, of: 'site', ...siteSummary(loose), clientId }
+    if (loose.length === 1) return { site: loose[0], client, matchRule: 'contains', clientRule }
+    return { reason: REASON_NO_SITE, candidates: [], candidateNames: [], clientId }
   }
 
   async function applyTaxPlan(plan, options) {
@@ -394,14 +448,16 @@
         const k = contentKey(entry.invoice.issueDate, entry.invoice.counterparty, entry.invoice.supplyAmount, entry.invoice.taxAmount)
         const fileTag = String(entry.sha256 || '').slice(0, 16)
         const same = others.find((o) => !o.used && o.key === k && o.file !== fileTag)
+        const skipBase = { ...base }
+        for (const field of TAX_SKIP_FIELDS) skipBase[field] = entry[field] ?? null
         if (same) {
           same.used = true
-          result.skipped.push({ ...base, reason: REASON_SAME_CONTENT, detail: '다른 파일·수동 입력으로 같은 작성일자·상호·금액이 이미 있음' })
+          result.skipped.push({ ...skipBase, reason: REASON_SAME_CONTENT, detail: '다른 파일·수동 입력으로 같은 작성일자·상호·금액이 이미 있음' })
           continue
         }
         const match = matchSite(entry, clients, sites)
         if (!match.site) {
-          const skip = { ...base, reason: match.reason, candidates: match.candidates }
+          const skip = { ...skipBase, reason: match.reason, candidates: match.candidates, candidateNames: match.candidateNames }
           if (match.of) skip.of = match.of === 'client' ? '거래처' : '현장'
           if (match.clientId != null) skip.clientId = match.clientId
           result.skipped.push(skip)
@@ -410,7 +466,10 @@
         const siteId = Number(match.site.id)
         const created = await request('POST', '/api/v1/taxes', { siteId, ...entry.invoice })
         invoices.push(created)
-        result.entries.push({ ...base, taxInvoiceId: Number(created.id), siteId, clientId: Number(match.client.id), action: 'created' })
+        result.entries.push({
+          ...base, taxInvoiceId: Number(created.id), siteId, clientId: Number(match.client.id), action: 'created',
+          matchRule: match.matchRule, clientRule: match.clientRule,
+        })
       }
       result.ok = true
     } catch (error) {
@@ -421,5 +480,5 @@
     return result
   }
 
-  return { applyPlan, applyTaxPlan, siteKey, companyKey }
+  return { applyPlan, applyTaxPlan, siteKey, companyKey, stripGenericWords }
 })
