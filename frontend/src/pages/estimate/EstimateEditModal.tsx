@@ -119,7 +119,7 @@ export default function EstimateEditModal({ estimate, onClose }: Props) {
           {(fields, { add, remove }) => (
             <>
               {fields.map(({ key, name, ...restField }) => (
-                <div key={key} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 120px auto', gap: 8, alignItems: 'start' }}>
+                <div key={key} className="bf-item-row">
                   <Form.Item {...restField} name={[name, 'itemName']} rules={[{ required: true, whitespace: true, message: '품목명' }]}>
                     <Input placeholder="품목명" maxLength={200} />
                   </Form.Item>

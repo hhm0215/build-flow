@@ -145,6 +145,7 @@ public class EstimateService {
                     .totalAmount(previous.getTotalAmount())
                     .reason(EstimateParsedPayload.REASON_SUPERSEDED)
                     .supersededById(estimate.getId())
+                    .title(previous.getTitle())
                     .build());
         }
 
@@ -154,6 +155,7 @@ public class EstimateService {
                 .estimateId(estimate.getId())
                 .siteId(estimate.getSiteId())
                 .totalAmount(estimate.getTotalAmount())
+                .title(estimate.getTitle())
                 .build());
         estimateRepository.flush();
         // 확정·기존 확정본 대체·손익 outbox가 모두 기록된 뒤 재확인해, 그 사이 보관됐으면 전부 롤백한다

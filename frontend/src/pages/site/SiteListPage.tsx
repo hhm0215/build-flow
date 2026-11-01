@@ -150,9 +150,9 @@ function SummaryCard({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{title}</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+          <div className="bf-summary-value" style={{ fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
             {value}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>{description}</div>
@@ -381,14 +381,7 @@ export default function SiteListPage() {
           ))}
         </div>
       ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '320px minmax(0, 1fr)',
-            gap: 16,
-            alignItems: 'start',
-          }}
-        >
+        <div className="bf-site-explorer">
           <aside
             style={{
               background: 'var(--bg-card)',
@@ -556,13 +549,13 @@ export default function SiteListPage() {
                       flexWrap: 'wrap',
                     }}
                   >
-                    <div>
+                    <div className="bf-hero-main">
                       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
                         선택된 현장
                       </div>
                       <div
+                        className="bf-hero-title"
                         style={{
-                          fontSize: 26,
                           fontWeight: 800,
                           color: 'white',
                           letterSpacing: '-0.04em',
@@ -577,8 +570,8 @@ export default function SiteListPage() {
                       </div>
                     </div>
                     <div
+                      className="bf-hero-side"
                       style={{
-                        minWidth: 220,
                         padding: '14px 16px',
                         borderRadius: 12,
                         background: 'rgba(255,255,255,0.05)',
@@ -616,13 +609,7 @@ export default function SiteListPage() {
                   </div>
                 </motion.section>
 
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                    gap: 12,
-                  }}
-                >
+                <div className="bf-summary-grid">
                   <SummaryCard
                     icon={FileText}
                     title="견적서 합계"
@@ -782,7 +769,7 @@ export default function SiteListPage() {
                               )}
                             </div>
                           </div>
-                          <div
+                          <div className="bf-info-grid"
                             style={{
                               display: 'grid',
                               gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',

@@ -19,7 +19,7 @@ export default function FilterAmountRange({
   }
 
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+    <div className="bf-amount-range" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
       <InputNumber
         placeholder="최소 금액"
         value={minAmount ?? null}
