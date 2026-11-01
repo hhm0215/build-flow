@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import ErrorState from '../../components/ErrorState'
+import NotFoundState from '../../components/NotFoundState'
+import { isNotFoundError } from '../../utils/httpError'
 import {
   useArchiveSite,
   useRestoreSite,
@@ -261,9 +263,16 @@ export default function SiteDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const siteId = Number(id)
-  const invalidId = !id || Number.isNaN(siteId)
+  // 0·음수·소수는 조회가 꺼져(enabled: !!id) 로딩 화면에 멈추므로 잘못된 ID로 함께 처리한다
+  const invalidId = !id || !Number.isInteger(siteId) || siteId <= 0
 
-  const { data: site, isLoading: siteLoading, isError: siteError, refetch: siteRefetch } = useSite(siteId)
+  const {
+    data: site,
+    isLoading: siteLoading,
+    isError: siteError,
+    error: siteErrorDetail,
+    refetch: siteRefetch,
+  } = useSite(siteId)
   const updateStatus = useUpdateSiteStatus()
   const archiveSite = useArchiveSite()
   const restoreSite = useRestoreSite()
@@ -326,11 +335,13 @@ export default function SiteDetailPage() {
     })
   }
 
-  if (invalidId) {
+  if (invalidId || (siteError && isNotFoundError(siteErrorDetail))) {
     return (
-      <ErrorState
-        message="잘못된 현장 ID입니다. 목록에서 다시 선택해 주세요."
-        onRetry={() => navigate('/sites')}
+      <NotFoundState
+        title="현장을 찾을 수 없습니다"
+        subTitle="삭제됐거나 주소가 잘못된 현장입니다. 현장 목록에서 다시 선택해 주세요."
+        actionLabel="목록으로"
+        to="/sites"
       />
     )
   }
