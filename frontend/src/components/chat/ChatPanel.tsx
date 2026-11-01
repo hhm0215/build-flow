@@ -28,10 +28,10 @@ export default function ChatPanel() {
   const canSend = availability.isSuccess && availability.data
 
   // 스트리밍 중에는 토큰마다 실행되므로 smooth 애니메이션 재시작 비용을 피한다
-  useEffect(
-    () => bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' }),
-    [messages, phase, streaming],
-  )
+  // 블록 본문 필수: 최신 Chromium의 scrollIntoView는 Promise를 반환하므로 식 본문이면 React가 그 값을 정리 함수로 호출하다 앱 전체가 사라진다
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' })
+  }, [messages, phase, streaming])
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const updateAssistant = (id: string, updater: (message: ChatMessage) => ChatMessage) => {

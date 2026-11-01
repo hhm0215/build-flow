@@ -326,6 +326,12 @@ develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에�
 - **수리(프론트만, API 계약 변경 없음)**: 현장 목록에 URL 쿼리 `clientId` 거래처 필터(검색 가능한 선택, 보관 거래처는 `보관된 거래처` 묶음·`(보관)` 표시, 목록에 없는 ID는 `거래처 #ID (목록에 없음)`). `useFilterParams`에 양의 정수만 받는 `id` 타입을 추가해 `0`·음수·소수·지수·앞자리 0·초과 정수는 URL에서 지운다. 현장 목록 필터에 적용 개수와 `필터 N개 초기화`를 더했다. 기존 `GET /sites`는 `status`·`archived`만 받고 이미 보관 포함 전체 현장과 거래처를 함께 내려 주므로 받은 목록에서 거른다. 거래처 목록의 업체명·연결 현장 수는 `/sites?clientId=<id>`로 이동하며, 보관 현장이 섞인 거래처는 연결 현장 수와 결과가 같도록 `&archive=ALL`을 붙인다. 휴대폰에서는 현장 탐색 필터가 기존 `bf-filter-fields` 규칙으로 폭을 채운다.
 - **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(65파일 301테스트)·`bun run build` PASS. Vitest로 `id` 파싱·정리, 선택지 구성·필터 술어·이동 경로, 현장 목록의 쿼리 필터·보관 조합·잘못된 값 정리·초기화·검색 선택, 거래처 목록 링크 이동을 고정했다. 브라우저 재확인(데스크톱·태블릿·휴대폰 화면, 거래처 → 현장 이동)은 PASS(2026-11-01 `bfqaui` 격리 스택: 거래처 목록 업체명 링크 → `/sites?clientId=1`, 필터 칸에 '(보관)' 거래처 선택 표시, 필터 결과 0·'필터 1개 초기화' 노출).
 
+### 2026-11-01 AI 채팅 질문 후 앱 전체가 하얗게 사라짐 — effect 반환값 수리, 프론트 회귀만
+- **현상(로컬 격리 스택 브라우저 실측, 실제 Ollama)**: 채팅에 "안녕하세요"를 보내면 `/api/v1/chat/stream`이 200으로 시작한 뒤 화면 전체가 비었다(본문 텍스트 0). 콘솔 `TypeError: c is not a function`, 압축 안 한 빌드에서 React `commitHookEffectListUnmount`의 `destroy()` 호출 지점.
+- **원인**: `ChatPanel` 자동 스크롤 effect가 식 본문 화살표라 `scrollIntoView` 반환값을 그대로 돌려줬다. 최신 Chromium의 `scrollIntoView`는 Promise를 반환하므로 React가 그 값을 정리 함수로 호출하다 실패했고, 에러 바운더리가 없어 루트 전체가 언마운트됐다.
+- **수리(프론트만, API 계약 변경 없음)**: effect를 블록 본문으로 바꿔 아무것도 반환하지 않는다. 같은 패턴은 저장소에 이 1곳뿐이었다. 재발 방지로 ESLint `no-restricted-syntax` 규칙을 추가해 `useEffect`·`useLayoutEffect`·`useInsertionEffect`(및 `React.` 접두) 콜백의 식 본문을 오류로 막는다(정리 함수를 바로 반환하는 `() => () => ...`는 허용, 새 의존성 없음). 레이아웃의 페이지 영역(라우트 출력, 경로가 바뀌면 자동 해제)과 채팅 패널을 각각 `ErrorBoundary`로 감싸 오류 시 antd `Result` 안내 "문제가 생겼습니다. 다시 시도해 주세요."와 `다시 시도` 버튼을 보인다. 채팅 오류는 페이지를 지우지 않는다. 오류 원문·스택(토큰이 섞일 수 있음)은 화면과 콘솔 기록에 남기지 않고 영역 이름·오류 종류만 기록한다.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(66파일 306테스트)·`bun run build` PASS. Vitest로 `scrollIntoView`가 Promise를 반환하는 목에서 스트리밍 렌더·완료·언마운트가 예외 없이 동작함(수리 전 코드에서는 `destroy is not a function`으로 실패 재현), 에러 바운더리의 안내 표시·토큰 비노출·다시 시도 리셋·경로 변경 리셋·형제 영역 보존을 고정했다. 브라우저 재확인(실제 Ollama로 채팅 질문 후 화면 유지)은 **PENDING**.
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |
