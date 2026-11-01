@@ -96,9 +96,19 @@ class FakeGateway:
             client = next((c for c in self.clients if c["id"] == body.get("clientId")), None)
             row = {"id": 200 + len(self.sites), "siteName": body["siteName"], "client": client,
                    "memo": body.get("memo"), "startDate": body.get("startDate"), "endDate": body.get("endDate"),
-                   "archivedAt": None}
+                   "status": body.get("status") or "IN_PROGRESS", "archivedAt": None}
             self.sites.append(row)
             return handler._reply(201, row)
+        if path.startswith("/api/v1/sites/"):
+            parts = path.split("/")
+            row = next((s for s in self.sites if s["id"] == int(parts[4])), None)
+            if row is None:
+                return handler._reply(404, error="not found")
+            if method == "PATCH" and parts[-1] == "status":
+                if row.get("status") == "BIDDING" and body["status"] != "IN_PROGRESS":
+                    return handler._reply(400, error="transition not allowed")
+                row["status"] = body["status"]
+            return handler._reply(200, row)
         if path == "/api/v1/estimates" and method == "GET":
             site_id = int(urllib.parse.parse_qs(parsed.query)["siteId"][0])
             return handler._reply(200, [e for e in self.estimates if e["siteId"] == site_id])
@@ -127,7 +137,9 @@ class FakeGateway:
         return [r for r in self.requests if r[0] == "POST" and r[1] == path]
 
 
-class CliTest(unittest.TestCase):
+class CliBase(unittest.TestCase):
+    """임시 현장 폴더·적재 기록·CLI 실행 도우미(테스트 없음)."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="bf-import-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
@@ -158,6 +170,8 @@ class CliTest(unittest.TestCase):
             return []
         return [json.loads(line) for line in self.ledger.read_text(encoding="utf-8").splitlines() if line]
 
+
+class CliTest(CliBase):
     def test_dry_run_does_not_call_api(self):
         self.write("견적1.xlsx", xlsx_bytes(sample_cells(ITEMS, 8000)))
         factory = mock.Mock(side_effect=AssertionError("dry-run에서 API 생성 금지"))

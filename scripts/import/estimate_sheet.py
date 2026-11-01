@@ -6,6 +6,11 @@
 
 서버(estimate-service)는 수량·단가를 소수 2자리까지 받고 항목 금액 = 수량×단가로 다시 계산한다.
 그래서 여기서 계산한 합계(Σ 수량×단가)가 합계금액 셀과 다르면 ERROR로 둔다.
+
+병합 셀: 머리글 위(수신처·현장명·합계 영역)는 병합 범위 전체에 왼쪽 위 값을 채운다. 품목 영역에서는
+품명·규격·사이즈·비고처럼 글자 열만 세로 병합 아래 행에 값을 물려주고, 수량·단가·금액은 물려주지 않는다
+(같은 금액을 두 번 세지 않기 위해). 물려받은 품명 행은 금액이 있으면 같은 품명의 별도 품목이 되고,
+금액이 없으면 기존 규칙대로 "금액 없는 품명 행"으로 빠진다.
 """
 
 from __future__ import annotations
@@ -18,6 +23,9 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 MAX_ROWS = 3000
+SITE_MISSING_ERROR = "현장명 셀(R6C6)이 비어 있음"
+NO_ITEMS_ERROR = "품목이 없음"
+TOTAL_FORMULA_WARNING = "합계 셀 계산값 없음(수식) — 품목 합계로 검증 불가"
 MAX_COLS = 40
 MAX_QUANTITY = Decimal("99999999.99")
 MAX_AMOUNT = Decimal("9999999999999.99")
@@ -70,6 +78,8 @@ class ParsedEstimate:
     estimate_date: Optional[dt.date]
     date_source: str
     sheet_year: Optional[int] = None  # 3행 근처 "YYYY년" 표기. 날짜로 쓰지 않는다
+    total_formula_uncached: bool = False  # 합계 셀이 수식인데 저장된 계산값이 없음
+    lump_from_total: bool = False  # 품목이 없어 합계금액 1식 품목으로 만듦
     items: list[ParsedItem] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
@@ -89,8 +99,16 @@ class ParsedEstimate:
 # 셀 격자 읽기
 # ─────────────────────────────────────────
 
-def load_grid(data: bytes) -> tuple[str, list[list[Any]]]:
-    """파일 바이트(매직 넘버로 형식 판별)에서 첫 시트를 값 격자로 읽는다."""
+@dataclass
+class Sheet:
+    title: str
+    grid: list[list[Any]]
+    merges: list[tuple[int, int, int, int]] = field(default_factory=list)  # 0-based (r0, c0, r1, c1) 포함
+    total_formula: Optional[Any] = None  # (r, c) -> 수식 여부 판별 함수(xlsx만)
+
+
+def load_sheet(data: bytes) -> Sheet:
+    """파일 바이트(매직 넘버로 형식 판별)에서 첫 시트의 값 격자와 병합 범위를 읽는다."""
     if data[:4] == b"PK\x03\x04":
         return _load_xlsx(data)
     if data[:8] == bytes.fromhex("D0CF11E0A1B11AE1"):
@@ -98,34 +116,79 @@ def load_grid(data: bytes) -> tuple[str, list[list[Any]]]:
     raise SheetFormatError("엑셀 파일 형식이 아닙니다(.xlsx/.xls 서명 없음)")
 
 
-def _load_xlsx(data: bytes) -> tuple[str, list[list[Any]]]:
+def load_grid(data: bytes) -> tuple[str, list[list[Any]]]:
+    sheet = load_sheet(data)
+    return sheet.title, sheet.grid
+
+
+def _clip_merge(r0: int, c0: int, r1: int, c1: int) -> Optional[tuple[int, int, int, int]]:
+    if r0 >= MAX_ROWS or c0 >= MAX_COLS:
+        return None
+    return r0, c0, min(r1, MAX_ROWS - 1), min(c1, MAX_COLS - 1)
+
+
+def _load_xlsx(data: bytes) -> Sheet:
     import openpyxl
 
+    # read_only 모드는 병합 범위를 주지 않으므로 일반 모드로 연다(파일 크기 상한은 호출 측에서 제한).
     try:
-        workbook = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        workbook = openpyxl.load_workbook(io.BytesIO(data), read_only=False, data_only=True)
     except Exception as exc:  # noqa: BLE001 - 손상 파일을 형식 오류로 통일
         raise SheetFormatError(f"xlsx를 열 수 없습니다({exc.__class__.__name__})") from None
     try:
         if not workbook.worksheets:
             raise SheetFormatError("시트가 없습니다")
         sheet = workbook.worksheets[0]
-        grid = []
-        for index, row in enumerate(sheet.iter_rows(values_only=True, max_col=MAX_COLS)):
-            if index >= MAX_ROWS:
-                break
-            grid.append(list(row))
-        return sheet.title, grid
+        max_row = min(sheet.max_row or 0, MAX_ROWS)
+        grid = [list(row) for row in sheet.iter_rows(min_row=1, max_row=max_row, max_col=MAX_COLS,
+                                                     values_only=True)] if max_row else []
+        merges = []
+        for rng in sheet.merged_cells.ranges:
+            clipped = _clip_merge(rng.min_row - 1, rng.min_col - 1, rng.max_row - 1, rng.max_col - 1)
+            if clipped:
+                merges.append(clipped)
+        return Sheet(sheet.title, grid, merges, lambda r, c: _xlsx_is_formula(data, r, c))
     finally:
         workbook.close()
 
 
-def _load_xls(data: bytes) -> tuple[str, list[list[Any]]]:
+def _xlsx_is_formula(data: bytes, r: int, c: int) -> bool:
+    """data_only=True에서 비어 보이는 셀이 사실 계산값 없는 수식인지(수식 문자열로 다시 읽어 확인)."""
+    import openpyxl
+
+    try:
+        workbook = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=False)
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        sheet = workbook.worksheets[0]
+        for row in sheet.iter_rows(min_row=r + 1, max_row=r + 1, min_col=c + 1, max_col=c + 1, values_only=True):
+            value = row[0] if row else None
+            if isinstance(value, str):
+                return value.startswith("=")
+            return type(value).__name__ in {"ArrayFormula", "DataTableFormula"}
+        return False
+    finally:
+        workbook.close()
+
+
+def _open_xls(data: bytes):
     import xlrd
 
     try:
-        book = xlrd.open_workbook(file_contents=data, on_demand=True)
+        return xlrd.open_workbook(file_contents=data, on_demand=True, formatting_info=True)
+    except Exception:  # noqa: BLE001 - 서식 정보를 못 읽는 파일은 병합 없이 다시 연다
+        pass
+    try:
+        return xlrd.open_workbook(file_contents=data, on_demand=True)
     except Exception as exc:  # noqa: BLE001
         raise SheetFormatError(f"xls를 열 수 없습니다({exc.__class__.__name__})") from None
+
+
+def _load_xls(data: bytes) -> Sheet:
+    import xlrd
+
+    book = _open_xls(data)
     try:
         if book.nsheets < 1:
             raise SheetFormatError("시트가 없습니다")
@@ -147,9 +210,42 @@ def _load_xls(data: bytes) -> tuple[str, list[list[Any]]]:
                 else:
                     row.append(cell.value)
             grid.append(row)
-        return sheet.name, grid
+        merges = []
+        for rlo, rhi, clo, chi in getattr(sheet, "merged_cells", None) or []:
+            clipped = _clip_merge(rlo, clo, rhi - 1, chi - 1)  # xlrd는 끝 행·열이 배타적
+            if clipped:
+                merges.append(clipped)
+        return Sheet(sheet.name, grid, merges)
     finally:
         book.release_resources()
+
+
+def apply_merges(grid: list[list[Any]], merges: list[tuple[int, int, int, int]], header_row: int,
+                 text_cols: set[int]) -> set[tuple[int, int]]:
+    """병합 값을 격자에 채운다. 품목 영역에서 물려받은 (행, 열)을 돌려준다."""
+    inherited: set[tuple[int, int]] = set()
+    for r0, c0, r1, c1 in merges:
+        value = cell(grid, r0, c0)
+        if value is None:
+            continue
+        for r in range(r0, min(r1, len(grid) - 1) + 1):
+            row = grid[r]
+            for c in range(c0, c1 + 1):
+                if (r, c) == (r0, c0):
+                    continue
+                if r < header_row:
+                    target = True
+                else:
+                    target = r0 > header_row and r > r0 and c in text_cols
+                if not target:
+                    continue
+                if c >= len(row):
+                    row.extend([None] * (c + 1 - len(row)))
+                if row[c] is None:
+                    row[c] = value
+                    if r > header_row:
+                        inherited.add((r, c))
+    return inherited
 
 
 def cell(grid: list[list[Any]], r: int, c: int) -> Any:
@@ -289,8 +385,17 @@ def _size_columns(mapping: dict[str, int]) -> list[int]:
     return list(range(start, end))
 
 
-def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool = False) -> ParsedEstimate:
-    sheet_name, grid = load_grid(data)
+def _merged_origin(merges: list[tuple[int, int, int, int]], r: int, c: int) -> tuple[int, int]:
+    for r0, c0, r1, c1 in merges:
+        if r0 <= r <= r1 and c0 <= c <= c1:
+            return r0, c0
+    return r, c
+
+
+def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool = False,
+                   lump_when_empty: bool = False, lump_name: str = "견적 합계") -> ParsedEstimate:
+    sheet = load_sheet(data)
+    sheet_name, grid = sheet.title, sheet.grid
     header_row, mapping, by_text = find_header(grid)
     warnings: list[str] = []
     errors: list[str] = []
@@ -303,12 +408,25 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
         if missing:
             warnings.append("머리글에 없는 열은 고정 위치 사용: " + ", ".join(missing))
 
+    size_cols = _size_columns(mapping)
+    text_cols = {mapping["name"], mapping["spec"], *size_cols}
+    if "note" in mapping:
+        text_cols.add(mapping["note"])
+    inherited = apply_merges(grid, sheet.merges, header_row, text_cols)
+    inherited_name_rows = {r for r, c in inherited if c == mapping["name"]}
+
     client_name = strip_client_suffix(text(cell(grid, *CLIENT_CELL)))
     site_name = text(cell(grid, *SITE_CELL))
     raw_total = cell(grid, *TOTAL_CELL)
     cell_total = amount_from_text(raw_total) if raw_total is not None else None
+    total_formula_uncached = False
     if cell_total is None:
-        errors.append("합계금액 셀(R11C7)이 비었거나 숫자가 아님(수식은 엑셀에서 저장한 계산값이 필요)")
+        origin = _merged_origin(sheet.merges, *TOTAL_CELL)
+        if raw_total is None and sheet.total_formula is not None and sheet.total_formula(*origin):
+            total_formula_uncached = True
+            warnings.append(TOTAL_FORMULA_WARNING)
+        else:
+            errors.append("합계금액 셀(R11C7)이 비었거나 숫자가 아님(수식은 엑셀에서 저장한 계산값이 필요)")
 
     estimate_date, date_source = find_date(grid, header_row)
     sheet_year = find_sheet_year(grid, header_row)
@@ -316,7 +434,6 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
     items: list[ParsedItem] = []
     skipped_summary = 0
     skipped_blank_named = 0
-    size_cols = _size_columns(mapping)
     for r in range(header_row + 1, len(grid)):
         name = text(cell(grid, r, mapping["name"]))
         try:
@@ -390,16 +507,27 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
         warnings.append(f"합계·소계 행 {skipped_summary}개 제외")
     if skipped_blank_named:
         warnings.append(f"금액 없는 품명 행 {skipped_blank_named}개 제외")
+    inherited_items = sum(1 for item in items if item.row in inherited_name_rows)
+    if inherited_items:
+        warnings.append(f"병합된 품명을 아래 행 {inherited_items}개에 물려줌(각 행을 같은 품명의 별도 품목으로 넣음)")
+    lump_from_total = False
+    if not items and lump_when_empty and cell_total is not None and cell_total > 0:
+        if fits_scale(cell_total) and cell_total <= MAX_AMOUNT:
+            items.append(ParsedItem(row=TOTAL_CELL[0], name=(lump_name or "견적 합계")[:200], unit=LUMP_UNIT,
+                                    quantity=Decimal(1), unit_price=cell_total))
+            lump_from_total = True
+            warnings.append("품목이 없어 합계금액을 1식 품목 하나로 넣음(--lump-when-empty)")
     if not items:
-        errors.append("품목이 없음")
+        errors.append(NO_ITEMS_ERROR)
     if not site_name:
-        errors.append("현장명 셀(R6C6)이 비어 있음")
+        errors.append(SITE_MISSING_ERROR)
     if not client_name:
         warnings.append("수신처 셀(R5C3)이 비어 있어 거래처 없이 현장을 찾음")
 
     parsed = ParsedEstimate(
         sheet=sheet_name, client_name=client_name, site_name=site_name, cell_total=cell_total,
-        estimate_date=estimate_date, date_source=date_source, sheet_year=sheet_year, items=items,
+        estimate_date=estimate_date, date_source=date_source, sheet_year=sheet_year,
+        total_formula_uncached=total_formula_uncached, lump_from_total=lump_from_total, items=items,
         warnings=warnings, errors=errors,
     )
     total = parsed.computed_total
