@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,8 +19,9 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/stats")
-    public ResponseEntity<ApiResponse<DashboardStatsResponse>> getStats() {
-        DashboardStatsResponse stats = dashboardService.getStats();
+    public ResponseEntity<ApiResponse<DashboardStatsResponse>> getStats(
+            @RequestParam(name = "includeArchived", defaultValue = "false") boolean includeArchived) {
+        DashboardStatsResponse stats = dashboardService.getStats(includeArchived);
         return ResponseEntity.ok(ApiResponse.success(stats));
     }
 

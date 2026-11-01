@@ -13,8 +13,11 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,6 +38,12 @@ class DashboardServiceTest {
         Site site = Site.builder().siteName(name).build();
         ReflectionTestUtils.setField(site, "id", id);
         site.changeStatus(status);
+        return site;
+    }
+
+    private static Site archived(long id, String name, SiteStatus status) {
+        Site site = site(id, name, status);
+        site.archive(LocalDateTime.of(2026, 11, 1, 9, 0));
         return site;
     }
 
@@ -178,5 +187,74 @@ class DashboardServiceTest {
         when(ollama.generateSummary(any())).thenReturn(output);
 
         assertThat(service.getSummary().getSummary()).isEqualTo(output);
+    }
+    @Test
+    void 보관_현장은_기본_대시보드_집계와_현장별_목록에서_빠진다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                archived(2, "테스트현장", SiteStatus.COMPLETED),
+                site(1, "A현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenAnswer(inv -> {
+            Collection<Long> ids = inv.getArgument(0);
+            return Stream.of(profit(2, "9000", "1000"), profit(1, "1000", "800"))
+                    .filter(p -> ids.contains(p.getSiteId()))
+                    .toList();
+        });
+
+        DashboardStatsResponse stats = service.getStats();
+
+        assertThat(stats.getTotalSites()).isEqualTo(1);
+        assertThat(stats.getSitesByStatus()).isEqualTo(Map.of("IN_PROGRESS", 1));
+        assertThat(stats.getTotalEstimateAmount()).isEqualByComparingTo("1000");
+        assertThat(stats.getTotalPurchaseAmount()).isEqualByComparingTo("800");
+        assertThat(stats.getAverageMarginRate()).isEqualByComparingTo("20.00");
+        assertThat(stats.getSiteProfits()).extracting(SiteProfitSummary::getSiteName).containsExactly("A현장");
+        assertThat(service.getStats(false).getTotalSites()).isEqualTo(1);
+    }
+
+    @Test
+    void 보관_포함_파라미터면_보관_현장도_집계한다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                archived(2, "테스트현장", SiteStatus.COMPLETED),
+                site(1, "A현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(2, "9000", "1000"), profit(1, "1000", "800")));
+
+        DashboardStatsResponse stats = service.getStats(true);
+
+        assertThat(stats.getTotalSites()).isEqualTo(2);
+        assertThat(stats.getSitesByStatus()).isEqualTo(Map.of("COMPLETED", 1, "IN_PROGRESS", 1));
+        assertThat(stats.getTotalEstimateAmount()).isEqualByComparingTo("10000");
+        assertThat(stats.getTotalPurchaseAmount()).isEqualByComparingTo("1800");
+        assertThat(stats.getSiteProfits()).extracting(SiteProfitSummary::getSiteName).containsExactly("테스트현장", "A현장");
+    }
+
+    @Test
+    void AI_요약_사실에서_보관_현장을_뺀다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                archived(2, "보관적자현장", SiteStatus.IN_PROGRESS),
+                site(1, "적자현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenAnswer(inv -> {
+            Collection<Long> ids = inv.getArgument(0);
+            return Stream.of(profit(2, "1000", "5000"), profit(1, "1000", "1200"))
+                    .filter(p -> ids.contains(p.getSiteId()))
+                    .toList();
+        });
+        when(ollama.generateSummary(any())).thenReturn("요약");
+
+        service.getSummary();
+
+        ArgumentCaptor<DashboardSummaryFacts> captor = ArgumentCaptor.forClass(DashboardSummaryFacts.class);
+        verify(ollama).generateSummary(captor.capture());
+        DashboardSummaryFacts facts = captor.getValue();
+        assertThat(facts.warningSites()).containsExactly("적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)");
+        assertThat(facts.toString()).doesNotContain("보관적자현장");
+    }
+
+    @Test
+    void 보관_현장만_있으면_현장_없음_안내를_주고_모델을_부르지_않는다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(archived(1, "테스트현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of());
+
+        assertThat(service.getSummary().getSummary()).isEqualTo(DashboardSummaryFacts.NO_SITE_MESSAGE);
+        verifyNoInteractions(ollama);
     }
 }
