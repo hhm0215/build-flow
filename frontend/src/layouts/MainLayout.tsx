@@ -19,6 +19,7 @@ import { useSite } from '../api/sites.api'
 import NotificationBell from '../components/NotificationBell'
 import ChatPanel from '../components/chat/ChatPanel'
 import LogoutButton from '../components/LogoutButton'
+import ErrorBoundary from '../components/ErrorBoundary'
 import { useViewport } from '../hooks/useViewport'
 
 const menuItems = [
@@ -284,12 +285,16 @@ export default function MainLayout() {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               style={{ minHeight: '100%' }}
             >
-              <Outlet />
+              <ErrorBoundary area="page" resetKey={location.pathname}>
+                <Outlet />
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
-      <ChatPanel />
+      <ErrorBoundary area="chat" compact fallbackClassName="chat-panel">
+        <ChatPanel />
+      </ErrorBoundary>
     </div>
   )
 }
