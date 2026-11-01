@@ -14,6 +14,10 @@ http:// {
     encode zstd gzip
 
     header {
+        # HTTPS 전용 호스트에만 HSTS. PUBLIC_HOST가 apex인지 하위 도메인인지 운영자가 확인하기 전에는
+        # 형제 하위 도메인까지 묶는 includeSubDomains·preload를 붙이지 않는다.
+        # CSP(Report-Only)는 frontend Nginx가 붙인다 — 여기서 중복 설정하지 않는다.
+        Strict-Transport-Security "max-age=31536000"
         X-Content-Type-Options nosniff
         Referrer-Policy no-referrer
         X-Frame-Options DENY

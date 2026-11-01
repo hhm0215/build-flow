@@ -41,6 +41,10 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 1800000     # 30분
   refresh-token-expiration: 604800000  # 7일
+  # 최초 로그인부터의 절대 세션 상한. refresh 회전으로 늘어나지 않는다(JWT_SESSION_ABSOLUTE_EXPIRATION으로 덮어쓰기)
+  session-absolute-expiration: 604800000  # 7일
+  # 여러 탭이 같은 refresh로 동시에 재발급할 때 직전 토큰을 재사용 탐지 없이 거부만 하는 유예
+  refresh-reuse-grace: 30000  # 30초
 
 management:
   endpoints:

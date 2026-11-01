@@ -1,5 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
-import { useAuthStore } from '../stores/authStore'
+import { isEndedSession, readPersistedAuth, useAuthStore } from '../stores/authStore'
 
 const axiosInstance = axios.create({
   baseURL: '/api/v1',
@@ -14,7 +14,13 @@ function pathOf(requestUrl?: string) {
   return requestUrl?.split('?')[0] ?? ''
 }
 
-type RetriableConfig = InternalAxiosRequestConfig & { _authRetried?: boolean }
+type RetriableConfig = InternalAxiosRequestConfig & { _authRetried?: boolean; _authTokenSynced?: boolean }
+
+function sentAuthorization(config: InternalAxiosRequestConfig): string | null {
+  const headers = config.headers as InternalAxiosRequestConfig['headers'] | undefined
+  const value = headers?.get?.('Authorization') ?? headers?.Authorization
+  return typeof value === 'string' ? value : null
+}
 
 axiosInstance.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken
@@ -41,10 +47,28 @@ export function shouldHandleSessionExpired(status?: number, requestUrl?: string)
 /** refresh 토큰이 서버에서 거부된 응답 — 세션 종료로 본다. 네트워크·5xx는 일시 장애로 보고 세션을 지우지 않는다. */
 const REFRESH_REJECTED_STATUSES = [400, 401, 403, 404]
 
+/** 서버가 직전 refresh의 동시 재발급을 세션 폐기 없이 알리는 응답. */
+const REFRESH_IN_PROGRESS_STATUS = 409
+const ROTATION_WAIT_MS = 2000
+const ROTATION_POLL_MS = 100
+
+async function waitForRotatedAccess(usedRefreshToken: string): Promise<string | null> {
+  for (let waited = 0; waited <= ROTATION_WAIT_MS; waited += ROTATION_POLL_MS) {
+    const persisted = readPersistedAuth()
+    if (persisted?.isAuthenticated && persisted.accessToken && persisted.refreshToken
+      && persisted.refreshToken !== usedRefreshToken && !isEndedSession(persisted.sessionId)) {
+      await useAuthStore.persist.rehydrate()
+      return persisted.accessToken
+    }
+    await new Promise((resolve) => setTimeout(resolve, ROTATION_POLL_MS))
+  }
+  return null
+}
+
 let refreshInFlight: Promise<string | null> | null = null
 
 async function requestRefresh(): Promise<string | null> {
-  const usedRefreshToken = useAuthStore.getState().refreshToken
+  const { refreshToken: usedRefreshToken, sessionId: usedSessionId } = useAuthStore.getState()
   if (!usedRefreshToken) return null
   try {
     const response = await axiosInstance.post('/auth/refresh', { refreshToken: usedRefreshToken })
@@ -52,12 +76,29 @@ async function requestRefresh(): Promise<string | null> {
     if (response.data?.success !== true || !tokens?.accessToken || !tokens?.refreshToken) {
       throw new Error('Refresh response was not confirmed')
     }
-    // 재발급 대기 중 사용자가 로그아웃했다면 세션을 되살리지 않는다.
-    if (!useAuthStore.getState().isAuthenticated) return null
-    useAuthStore.getState().setTokens(tokens.accessToken, tokens.refreshToken)
+    // 재발급 대기 중 이 탭이나 다른 탭(아직 storage 이벤트 전)이 로그아웃·재로그인했다면
+    // 늦게 도착한 응답으로 세션을 되살리거나 새 세션을 덮어쓰지 않는다.
+    const current = useAuthStore.getState()
+    const persisted = readPersistedAuth()
+    const persistedChanged = persisted !== null
+      && (!persisted.isAuthenticated || persisted.sessionId !== usedSessionId)
+    if (!current.isAuthenticated || current.sessionId !== usedSessionId || persistedChanged) {
+      if (persisted?.isAuthenticated && persisted.accessToken && !isEndedSession(persisted.sessionId)) {
+        await useAuthStore.persist.rehydrate()
+        return persisted.accessToken
+      }
+      return null
+    }
+    current.rotateTokens(tokens.accessToken, tokens.refreshToken)
     return tokens.accessToken as string
   } catch (error) {
     const status = (error as { response?: { status?: number } })?.response?.status
+    if (status === REFRESH_IN_PROGRESS_STATUS) {
+      // 다른 탭이 같은 refresh로 방금 회전했다(서버 유예 내 409, 세션 유지). 그 탭이 저장소에 쓸 새 토큰을 잠시 기다린다.
+      const rotatedAccess = await waitForRotatedAccess(usedRefreshToken)
+      if (rotatedAccess) return rotatedAccess
+      throw error
+    }
     if (status === undefined || !REFRESH_REJECTED_STATUSES.includes(status)) throw error
     // 다른 탭이 먼저 회전했다면 저장소의 새 토큰을 쓴다.
     await useAuthStore.persist.rehydrate()
@@ -98,6 +139,14 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // 요청을 보낸 뒤 다른 요청·탭이 이미 access를 갱신했다면 refresh(회전) 없이 새 access로 한 번 재시도한다.
+    const currentAccess = useAuthStore.getState().accessToken
+    if (!config._authTokenSynced && currentAccess && sentAuthorization(config) !== `Bearer ${currentAccess}`) {
+      config._authTokenSynced = true
+      config.headers.Authorization = `Bearer ${currentAccess}`
+      return axiosInstance(config)
+    }
+
     let accessToken: string | null
     try {
       accessToken = await refreshAccessToken()
@@ -106,8 +155,10 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error)
     }
     if (!accessToken) {
-      // refresh가 서버에서 거부됨 = 세션 종료. 로그아웃 요청은 기존 계약대로 호출 화면이 실패를 알리고 토큰을 보존한다.
-      if (!isLogout) handleSessionExpired()
+      // refresh가 서버에서 거부됨(400/401/403/404) 또는 refresh 없음 = 서버에 살아 있는 토큰이 없다.
+      // 로그아웃 요청이면 로컬 토큰만 지우고 화면 이동은 호출 화면(LogoutButton)이 맡는다.
+      if (isLogout) useAuthStore.getState().logout()
+      else handleSessionExpired()
       return Promise.reject(error)
     }
     config._authRetried = true
