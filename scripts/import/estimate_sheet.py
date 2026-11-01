@@ -298,6 +298,16 @@ def to_decimal(value: Any) -> Optional[Decimal]:
     raise NumberError(raw)
 
 
+def quantity_with_unit(value: Any) -> Optional[Decimal]:
+    """총수량 셀: 숫자이거나 '7.6M'·'4본'·'1EA'처럼 숫자 뒤에 단위가 붙은 글자. 그 밖의 글자는 None."""
+    try:
+        return to_decimal(value)
+    except NumberError:
+        pass
+    match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*[A-Za-z가-힣㎡㎥]{1,4}\s*", str(value))
+    return _plain(Decimal(match.group(1))) if match else None
+
+
 def amount_from_text(value: Any) -> Optional[Decimal]:
     """합계 셀: 숫자이거나 '일금 ... (₩1,234,000)' 같은 글자 안의 마지막 숫자 묶음."""
     try:
@@ -434,11 +444,12 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
     items: list[ParsedItem] = []
     skipped_summary = 0
     skipped_blank_named = 0
+    amount_rows: dict[int, Decimal] = {}  # 수량×단가≠금액 셀인 행 → 금액 셀 값
     for r in range(header_row + 1, len(grid)):
         name = text(cell(grid, r, mapping["name"]))
         try:
             qty = to_decimal(cell(grid, r, mapping["qty"]))
-            total_qty = to_decimal(cell(grid, r, mapping["total_qty"])) if "total_qty" in mapping else None
+            total_qty = quantity_with_unit(cell(grid, r, mapping["total_qty"])) if "total_qty" in mapping else None
             price = to_decimal(cell(grid, r, mapping["price"]))
             amount = to_decimal(cell(grid, r, mapping["amount"]))
         except NumberError:
@@ -468,6 +479,7 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
                     warnings.append(f"{r + 1}행: 수량×단가≠금액, 총수량×단가=금액이라 총수량 사용")
                 else:
                     warnings.append(f"{r + 1}행: 수량×단가({quantity * unit_price})≠금액 셀({amount})")
+                    amount_rows[r] = amount
         elif amount not in (None, Decimal(0)):
             if unit and unit != LUMP_UNIT:
                 detail.append(unit)  # 1식으로 바꾸므로 원래 규격은 품명에 남긴다
@@ -503,6 +515,14 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
             continue
         items.append(ParsedItem(row=r, name=full_name, unit=unit, quantity=quantity, unit_price=unit_price))
 
+    if amount_rows and cell_total is not None:
+        by_amount = [item if item.row not in amount_rows else ParsedItem(
+            row=item.row, name=f"{item.name} ({format_amount(item.quantity)}{item.unit} × {format_amount(item.unit_price)})"[:200],
+            unit=LUMP_UNIT, quantity=Decimal(1), unit_price=amount_rows[item.row]) for item in items]
+        if sum(i.amount for i in items) != cell_total and sum(i.amount for i in by_amount) == cell_total:
+            # 견적서에 찍힌 금액 셀로 합계금액이 맞으면 그 행을 1식으로 바꾸고 원래 수량·단가는 품명에 남긴다
+            items = by_amount
+            warnings.append(f"수량×단가≠금액 행 {len(amount_rows)}개를 금액 셀 기준 1식으로 넣음(합계금액과 일치)")
     if skipped_summary:
         warnings.append(f"합계·소계 행 {skipped_summary}개 제외")
     if skipped_blank_named:

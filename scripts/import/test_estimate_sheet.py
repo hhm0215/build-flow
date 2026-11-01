@@ -104,6 +104,26 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(parsed.errors, [])
         self.assertTrue(any("수량×단가" in w for w in parsed.warnings))
 
+    def test_amount_cell_used_when_it_matches_total(self):
+        items = [{"no": 1, "name": "자재", "spec": "M", "qty": 6, "price": 10000, "amount": 80000},
+                 {"no": 2, "name": "시공", "spec": "품", "qty": 2, "price": 300000, "amount": 600000}]
+        parsed = parse_estimate(xlsx_bytes(sample_cells(items, 680000)))
+        self.assertEqual(parsed.errors, [])
+        first = parsed.items[0]
+        self.assertEqual((first.name, first.unit, first.quantity, first.unit_price),
+                         ("자재 (6M × 10,000)", "식", Decimal(1), Decimal(80000)))
+        self.assertEqual(parsed.items[1].unit_price, Decimal(300000))  # 맞는 행은 그대로
+        self.assertTrue(any("금액 셀 기준 1식" in w for w in parsed.warnings))
+
+    def test_total_qty_with_unit_text(self):
+        items = [{"no": 1, "name": "파이프", "spec": "본", "qty": 2, "total_qty": "7.6M", "price": 1000,
+                  "amount": 7600},
+                 {"no": 2, "name": "사다리", "spec": "M", "qty": 6, "total_qty": "4본", "amount": 80000}]
+        parsed = parse_estimate(xlsx_bytes(sample_cells(items, 87600)))
+        self.assertEqual(parsed.errors, [])
+        self.assertEqual(parsed.items[0].quantity, Decimal("7.6"))
+        self.assertEqual(parsed.items[1].unit_price, Decimal(80000))
+
     def test_scale_over_two_places_is_error(self):
         items = [{"no": 1, "name": "소수 품목", "spec": "EA", "qty": 0.333, "price": 3, "amount": 1}]
         parsed = parse_estimate(xlsx_bytes(sample_cells(items, 1)))
