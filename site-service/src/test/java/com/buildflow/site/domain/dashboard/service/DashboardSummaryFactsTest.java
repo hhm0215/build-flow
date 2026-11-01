@@ -101,6 +101,50 @@ class DashboardSummaryFactsTest {
     }
 
     @Test
+    void 서버_결정_문구는_현황_손익_주의_현장_할_일을_템플릿으로_옮긴다() {
+        DashboardSummaryFacts facts = DashboardSummaryFacts.from(stats(
+                Map.of("IN_PROGRESS", 2, "SETTLING", 1, "BIDDING", 1),
+                "11000000", "8200000", "25.45",
+                site("정상현장", "IN_PROGRESS", "10000000", "7000000", "30.00"),
+                site("적자현장", "SETTLING", "1000000", "1200000", "-20.00"),
+                site("빈현장", "IN_PROGRESS", "0", "0", "0"),
+                site("입찰현장", "BIDDING", "5000000", "0", "100.00")));
+
+        assertThat(facts.siteNames()).containsExactly("정상현장", "적자현장", "빈현장", "입찰현장");
+        assertThat(facts.deterministicSummary()).isEqualTo("""
+                ### 1. 전체 현황
+
+                - 전체 현장 4개 (수주 전 1개, 시공 중 2개, 정산 중 1개)
+                - 손익 평가 대상 2개, 견적 미등록 1개, 수주 전 1개
+
+                ### 2. 손익
+
+                - 합계(수주 전 제외): 견적 11,000,000원, 매입 8,200,000원, 마진 2,800,000원, 마진율 25.45%
+                - 견적 미등록 현장은 손실이 아니라 아직 데이터가 없는 상태라 손익 평가에서 뺐습니다.
+                - 수주 전 현장은 계약 전 견적이라 손익 평가에서 뺐습니다.
+
+                ### 3. 주의 현장
+
+                - 적자현장 (정산 중): 적자 (마진 -200,000원, 마진율 -20.00%)
+
+                ### 4. 다음 할 일
+
+                - 적자현장: 매입 내역과 추가공사 견적 누락 여부 확인
+                - 빈현장: 견적 등록""");
+    }
+
+    @Test
+    void 서버_결정_문구는_주의_현장과_할_일이_없으면_없다고_쓴다() {
+        DashboardSummaryFacts facts = DashboardSummaryFacts.from(stats(Map.of("IN_PROGRESS", 1), "10000000", "4000000", "60.00",
+                site("정상현장", "IN_PROGRESS", "10000000", "4000000", "60.00")));
+
+        assertThat(facts.deterministicSummary())
+                .contains("### 3. 주의 현장\n\n- 주의할 현장이 없습니다.")
+                .endsWith("### 4. 다음 할 일\n\n- 지금 따로 조치할 일은 없습니다.")
+                .doesNotContain("견적 미등록 현장은");
+    }
+
+    @Test
     void 정상_현장만_있으면_주의_현장은_없음으로_넘긴다() {
         DashboardSummaryFacts facts = DashboardSummaryFacts.from(stats(Map.of("IN_PROGRESS", 1), "10000000", "4000000", "60.00",
                 site("정상현장", "IN_PROGRESS", "10000000", "4000000", "60.00")));
