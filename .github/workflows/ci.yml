@@ -75,6 +75,50 @@ jobs:
           print('Auth Flyway MySQL integration test executed and passed.')
           PY
 
+  auth-redis:
+    name: 인증 refresh 회전 (Lua · Redis 7.2)
+    runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=30
+    env:
+      AUTH_REDIS_INTEGRATION: "true"
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6379"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+      - name: Run refresh rotation Lua script against real Redis
+        run: ./gradlew :auth-service:test --tests com.buildflow.auth.domain.user.service.RefreshSessionStoreRedisIntegrationTest --no-daemon
+      - name: Assert Redis integration test actually ran
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          result = Path('auth-service/build/test-results/test/TEST-com.buildflow.auth.domain.user.service.RefreshSessionStoreRedisIntegrationTest.xml')
+          suite = ElementTree.parse(result).getroot()
+          assert int(suite.attrib['tests']) >= 16, suite.attrib
+          assert suite.attrib['skipped'] == '0', suite.attrib
+          assert suite.attrib['failures'] == '0', suite.attrib
+          assert suite.attrib['errors'] == '0', suite.attrib
+          print('Auth refresh rotation Redis integration test executed and passed.')
+          PY
+
   chat-flyway:
     name: 채팅 DB (Flyway · MySQL 8)
     runs-on: ubuntu-24.04
@@ -516,7 +560,7 @@ jobs:
   release-candidate:
     name: 릴리스 후보 증거 (배포 아님)
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    needs: [backend, auth-flyway, chat-flyway, estimate-flyway, purchase-flyway, tax-flyway, site-flyway, notification-flyway, frontend, backup-synthetic, public-compose, windows-readiness, profit-reconcile]
+    needs: [backend, auth-flyway, auth-redis, chat-flyway, estimate-flyway, purchase-flyway, tax-flyway, site-flyway, notification-flyway, frontend, backup-synthetic, public-compose, windows-readiness, profit-reconcile]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -532,6 +576,7 @@ jobs:
         env:
           RESULT_BACKEND: ${{ needs.backend.result }}
           RESULT_AUTH_FLYWAY: ${{ needs['auth-flyway'].result }}
+          RESULT_AUTH_REDIS: ${{ needs['auth-redis'].result }}
           RESULT_CHAT_FLYWAY: ${{ needs['chat-flyway'].result }}
           RESULT_ESTIMATE_FLYWAY: ${{ needs['estimate-flyway'].result }}
           RESULT_PURCHASE_FLYWAY: ${{ needs['purchase-flyway'].result }}

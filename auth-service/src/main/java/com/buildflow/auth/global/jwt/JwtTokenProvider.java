@@ -32,10 +32,14 @@ public class JwtTokenProvider {
             @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
             @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration,
             @Value("${jwt.session-absolute-expiration:604800000}") long sessionAbsoluteExpiration,
-            @Value("${jwt.refresh-reuse-grace:30000}") long refreshReuseGrace
+            @Value("${jwt.refresh-reuse-grace:10000}") long refreshReuseGrace
     ) {
-        if (refreshTokenExpiration <= 0 || sessionAbsoluteExpiration <= 0 || refreshReuseGrace < 0) {
-            throw new IllegalArgumentException("refresh/session expiration must be positive and reuse grace non-negative");
+        if (refreshTokenExpiration <= 0 || sessionAbsoluteExpiration <= 0) {
+            throw new IllegalArgumentException("refresh/session expiration must be positive");
+        }
+        // 유예가 refresh TTL 이상이면 직전 토큰 재사용이 사실상 탐지되지 않는다 — 잘못된 설정은 기동 실패로 막는다.
+        if (refreshReuseGrace < 0 || refreshReuseGrace >= refreshTokenExpiration) {
+            throw new IllegalArgumentException("jwt.refresh-reuse-grace must be >= 0 and < jwt.refresh-token-expiration");
         }
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
