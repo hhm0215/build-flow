@@ -4,13 +4,21 @@
 사용:
   python -I -X utf8 scripts/import/taxes.py <목록 파일 또는 폴더>... [--emit-plan <JSON>]
       [--base-url http://localhost:3000] [--ledger <저장소 밖 경로>] [--recursive] [--skip-negative]
-  python -I -X utf8 scripts/import/taxes.py --record-result <브라우저 결과 JSON> [--ledger ...]
+      [--client-alias <CSV>] [--site-map <CSV>]
+  python -I -X utf8 scripts/import/taxes.py --record-result <브라우저 결과 JSON> [--ledger ...] [--unmatched-csv <CSV>]
+  python -I -X utf8 scripts/import/taxes.py --from-result <브라우저 결과 JSON> --unmatched-csv <CSV>
 
 - 기본은 미리보기(dry-run)이며 API를 호출하지 않는다. 직접 --apply는 없다.
 - --emit-plan은 API를 부르지 않고 행 정보(작성일자·상호·공급가액·세액·품목명·출처 표식)만 담은 계획 JSON을
   저장소 밖 경로에 쓴다. 현장 연결은 계획 시점에 정할 수 없으므로, 로그인된 로컬 BuildFlow 페이지에서
   browser_apply.js의 buildflowApplyTaxPlan이 현재 거래처·현장 목록으로 보수적으로 정한다
   (상호 정규화 일치 거래처 1곳 + 그 거래처 활성 현장 중 현장명이 품목명에 든 현장이 정확히 1개일 때만).
+- 추측 매칭은 하지 않는다. 사람이 확정한 별칭으로만 결정적으로 넓힌다:
+  --client-alias `세금계산서 상호,DB 거래처명`(상호 → 거래처 이름, 계획 entry의 clientName),
+  --site-map `세금계산서 상호(또는 *),품목명,DB 현장명`(그 행의 현장을 직접 지정, 계획 entry의 siteName).
+  둘 다 저장소 밖 경로만 받는다. 비교는 정규화 키(주식회사·(주)·공백·기호 무시)로 한다.
+- --unmatched-csv는 브라우저 결과에서 연결 못 한 행을 `상호,품목명,작성일자,공급가액,사유,후보` CSV로
+  저장소 밖에 써서 사람이 site-map을 채울 수 있게 한다.
 - 원본은 바이트로 읽기만 한다. 미리보기에 ERROR가 하나라도 있으면 계획을 거부한다(강제 옵션 없음).
 - 같은 (대상, 파일 SHA-256, 행)은 적재 기록(ledger, kind 'tax')으로 다시 넣지 않고, 메모의 출처 표식으로
   브라우저 쪽에서도 다시 만들지 않는다. 입금 확인은 하지 않는다. 매입 세금계산서는 다루지 않는다.
@@ -19,7 +27,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
+import io
 import json
 import re
 import sys
@@ -32,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from estimate_sheet import SheetFormatError, format_amount  # noqa: E402
 from import_common import (  # noqa: E402
     DEFAULT_BASE_URL, ImportSetupError, Ledger, SourceFile, collect_files, default_ledger_path, outside_repo,
-    read_source, validate_base_url,
+    read_source, site_key, validate_base_url,
 )
 from tax_sheet import ParsedTaxList, TaxRow, parse_tax_list  # noqa: E402
 
@@ -43,6 +53,94 @@ RESULT_FORMAT = "buildflow-tax-import-result"
 FORMAT_VERSION = 1
 MARKER_PREFIX = "[가져오기 매출 sha256:"
 NEGATIVE_BLOCKER = "수정(음수) 세금계산서 — API가 음수 금액을 받지 않음. 빼고 진행하려면 --skip-negative(화면에서 원 건과 상계)"
+
+
+# 별칭 파일 첫 줄 머리글로 볼 첫 칸(공백 제거·소문자)
+CLIENT_ALIAS_HEADERS = {"세금계산서상호", "상호", "원본", "source", "from"}
+SITE_MAP_HEADERS = {"세금계산서상호", "세금계산서상호(또는*)", "상호", "source"}
+SITE_MAP_ANY = "*"
+UNMATCHED_HEADER = ["상호", "품목명", "작성일자", "공급가액", "사유", "후보"]
+# 사람이 site-map을 채울 대상이 아닌 건너뜀(이미 같은 세금계산서가 있음)
+UNMATCHED_EXCLUDED_REASONS = {"같은 내용 이미 있음"}
+
+
+def company_key(name: str) -> str:
+    """browser_apply.js companyKey와 같은 규칙: 주식회사·(주)·㈜ 표기를 없앤 뒤 site_key."""
+    stripped = re.sub(r"[(（]\s*주\s*[)）]", "", str(name or "").replace("주식회사", "")).replace("㈜", "")
+    return site_key(stripped)
+
+
+def _collapse(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _read_csv(path: Path, label: str, headers: set[str], columns: int) -> list[tuple[int, list[str]]]:
+    """저장소 밖 CSV(UTF-8, 첫 줄 머리글·# 주석 허용) → [(줄 번호, 앞 columns칸)]."""
+    resolved = outside_repo(path, label)
+    try:
+        raw = resolved.read_bytes().decode("utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ImportSetupError(f"{label}을(를) 읽을 수 없습니다({exc.__class__.__name__})") from None
+    rows: list[tuple[int, list[str]]] = []
+    for line_no, row in enumerate(csv.reader(io.StringIO(raw)), start=1):
+        cells = [_collapse(c) for c in row]
+        if not any(cells) or cells[0].startswith("#"):
+            continue
+        if not rows and re.sub(r"\s", "", cells[0]).lower() in headers:
+            continue
+        if len(cells) < columns or not all(cells[:columns]):
+            raise ImportSetupError(f"{label} {line_no}행: {columns}열이 모두 필요합니다")
+        if any(len(c) > 200 for c in cells[:columns]):
+            raise ImportSetupError(f"{label} {line_no}행: 200자를 넘는 칸이 있습니다")
+        rows.append((line_no, cells[:columns]))
+    return rows
+
+
+def load_client_aliases(path: Path) -> dict[str, str]:
+    """`세금계산서 상호,DB 거래처명` → {상호 정규화 키: DB 거래처명}. 같은 상호에 이름이 둘이면 거부."""
+    label = "거래처 별칭 파일(--client-alias)"
+    aliases: dict[str, str] = {}
+    for line_no, (source, target) in _read_csv(path, label, CLIENT_ALIAS_HEADERS, 2):
+        key = company_key(source)
+        if not key or not company_key(target):
+            raise ImportSetupError(f"{label} {line_no}행: 상호·거래처명이 기호만으로 되어 있습니다")
+        if key in aliases and aliases[key] != target:
+            raise ImportSetupError(f"{label} {line_no}행: 같은 상호(주식회사·공백·기호 무시)에 거래처명이 둘입니다")
+        aliases[key] = target
+    return aliases
+
+
+@dataclass
+class SiteMap:
+    """`세금계산서 상호(또는 *),품목명,DB 현장명`. 품목명은 정규화 키가 같아야 걸린다(포함 아님)."""
+
+    rules: dict[tuple[str, str], str] = field(default_factory=dict)  # (상호 키 또는 *, 품목명 키) → 현장명
+    used: set[tuple[str, str]] = field(default_factory=set)
+
+    def lookup(self, counterparty: str, item_name: str) -> Optional[str]:
+        item = site_key(item_name)
+        if not item:
+            return None
+        for key in ((company_key(counterparty), item), (SITE_MAP_ANY, item)):  # 상호를 지정한 줄이 * 줄보다 먼저
+            if key in self.rules:
+                self.used.add(key)
+                return self.rules[key]
+        return None
+
+
+def load_site_map(path: Path) -> SiteMap:
+    label = "현장 지정 파일(--site-map)"
+    site_map = SiteMap()
+    for line_no, (source, item, site_name) in _read_csv(path, label, SITE_MAP_HEADERS, 3):
+        company = SITE_MAP_ANY if source == SITE_MAP_ANY else company_key(source)
+        item_key = site_key(item)
+        if not company or not item_key or not site_key(site_name):
+            raise ImportSetupError(f"{label} {line_no}행: 상호·품목명·현장명이 기호만으로 되어 있습니다")
+        key = (company, item_key)
+        if key in site_map.rules and site_map.rules[key] != site_name:
+            raise ImportSetupError(f"{label} {line_no}행: 같은 상호·품목명(공백·기호 무시)에 현장명이 둘입니다")
+        site_map.rules[key] = site_name
+    return site_map
 
 
 def marker_of(sha256: str, row: int) -> str:
@@ -169,8 +267,9 @@ def print_preview(plans: list[FilePlan], skip_negative: bool) -> None:
             print(f"    확인 필요: {blocker}")
         for error in plan.errors:
             print(f"    ERROR: {error}")
-    print("현장 연결은 적용 시(browser_apply.js) 현재 거래처·현장 목록으로 정합니다: 상호가 정규화 일치하는 거래처 1곳,"
-          " 그 거래처 활성 현장 중 현장명이 품목명에 든 현장이 정확히 1개일 때만 연결하고, 나머지는 사유와 함께 건너뜁니다")
+    print("현장 연결은 적용 시(browser_apply.js) 현재 거래처·현장 목록으로 정합니다: 상호(--client-alias 적용)가 정규화"
+          " 일치하는 거래처 1곳, 그 거래처 활성 현장 중 --site-map 지정 현장 또는 현장명이 품목명에 든 현장이 정확히 1개일"
+          " 때만 연결하고(없으면 일반어를 뺀 품목명으로 한 번 더), 나머지는 사유와 함께 건너뜁니다")
 
 
 def invoice_body(plan: FilePlan, row: TaxRow) -> dict[str, Any]:
@@ -188,18 +287,28 @@ def invoice_body(plan: FilePlan, row: TaxRow) -> dict[str, Any]:
     }
 
 
-def build_browser_plan(plans: list[FilePlan], base_url: str, skip_negative: bool) -> dict[str, Any]:
-    """browser_apply.js(buildflowApplyTaxPlan)가 실행할 행 목록. 토큰·원본 경로는 넣지 않는다."""
+def build_browser_plan(plans: list[FilePlan], base_url: str, skip_negative: bool,
+                       client_aliases: Optional[dict[str, str]] = None,
+                       site_map: Optional[SiteMap] = None) -> dict[str, Any]:
+    """browser_apply.js(buildflowApplyTaxPlan)가 실행할 행 목록. 토큰·원본 경로는 넣지 않는다.
+
+    clientName은 별칭을 적용한 거래처 이름(별칭이 없으면 상호 그대로), siteName은 site-map이 지정한 현장명
+    (없으면 null → 브라우저가 포함 규칙으로 정함). 세금계산서 본문의 상호(counterparty)는 원본 그대로 둔다.
+    """
+    aliases = client_aliases or {}
     entries = []
     for index, plan in enumerate(plans, start=1):
         if plan.source is None or plan.parsed is None:
             continue
         for row in plan.pending_rows(skip_negative):
+            alias = aliases.get(company_key(row.counterparty))
             entries.append({
                 "entry": f"{index}:{row.row}", "file": index, "sha256": plan.source.sha256,
                 "sheet": plan.parsed.sheet, "row": row.row, "fileName": plan.path.name,
                 "marker": marker_of(plan.source.sha256, row.row), "issueDate": row.issue_date.isoformat(),
                 "counterparty": row.counterparty, "itemName": row.item_name,
+                "clientName": alias or row.counterparty, "clientAlias": alias is not None,
+                "siteName": site_map.lookup(row.counterparty, row.item_name) if site_map else None,
                 "supplyAmount": format(row.supply, "f"), "taxAmount": format(row.tax, "f"),
                 "invoice": invoice_body(plan, row),
             })
@@ -238,7 +347,8 @@ def record_tax_result(result: dict[str, Any], ledger: Ledger) -> int:
             "row": int(raw["row"]), "fileName": raw.get("fileName"), "issueDate": raw.get("issueDate"),
             "supplyAmount": raw.get("supplyAmount"), "taxAmount": raw.get("taxAmount"),
             "taxInvoiceId": int(raw["taxInvoiceId"]), "siteId": int(raw["siteId"]),
-            "clientId": raw.get("clientId"), "action": raw.get("action"), "appliedVia": "browser",
+            "clientId": raw.get("clientId"), "action": raw.get("action"), "matchRule": raw.get("matchRule"),
+            "appliedVia": "browser",
         })
     added = unchanged = 0
     for record in records:
@@ -268,8 +378,50 @@ def record_tax_result(result: dict[str, Any], ledger: Ledger) -> int:
     return 0
 
 
-def read_result(path: Path) -> dict[str, Any]:
-    resolved = outside_repo(path, "브라우저 결과 JSON(--record-result)")
+def _csv_cell(value: Any) -> str:
+    """표 계산 프로그램이 수식으로 읽지 않게 =·+·@·탭으로 시작하는 글자(숫자 아닌 '-' 포함)는 ' 를 붙인다."""
+    text = "" if value is None else str(value)
+    if text[:1] in ("=", "+", "@", "\t", "\r") or (text[:1] == "-" and not re.fullmatch(r"-\d+(\.\d+)?", text)):
+        return "'" + text
+    return text
+
+
+def write_unmatched_csv(result: dict[str, Any], path: Path) -> int:
+    """결과의 건너뛴 행(같은 내용 이미 있음 제외) → `상호,품목명,작성일자,공급가액,사유,후보` CSV(저장소 밖)."""
+    if result.get("format") != RESULT_FORMAT or result.get("version") != FORMAT_VERSION:
+        raise ImportSetupError("buildflowApplyTaxPlan 결과 형식이 아닙니다(format/version)")
+    target = outside_repo(path, "미연결 CSV(--unmatched-csv)")
+    lines = []
+    excluded = 0
+    for item in result.get("skipped") or []:
+        if not isinstance(item, dict) or item.get("row") is None:
+            continue
+        reason = str(item.get("reason") or "사유 없음")
+        if reason in UNMATCHED_EXCLUDED_REASONS:
+            excluded += 1
+            continue
+        names = item.get("candidateNames") or item.get("candidates") or []
+        candidates = " / ".join(str(n) for n in names) if isinstance(names, list) else str(names)
+        if item.get("siteName"):
+            reason = f"{reason}(지정: {item['siteName']})"
+        lines.append([item.get("counterparty"), item.get("itemName"), item.get("issueDate"),
+                      item.get("supplyAmount"), reason, candidates])
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow(UNMATCHED_HEADER)
+    for line in lines:
+        writer.writerow([_csv_cell(v) for v in line])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(buffer.getvalue().encode("utf-8-sig"))  # 엑셀에서 한글이 깨지지 않게 BOM
+    note = f" · 같은 내용 이미 있음 {excluded}행 제외" if excluded else ""
+    print(f"미연결 CSV: {len(lines)}행{note} → {target}")
+    if lines:
+        print("site-map에는 `세금계산서 상호(또는 *),품목명,DB 현장명`으로 옮겨 적고 다시 계획하세요")
+    return len(lines)
+
+
+def read_result(path: Path, label: str = "브라우저 결과 JSON(--record-result)") -> dict[str, Any]:
+    resolved = outside_repo(path, label)
     try:
         result = json.loads(resolved.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -287,6 +439,14 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
                       help="API 호출 없이 브라우저 적용용 계획 JSON을 저장소 밖 경로에 저장")
     mode.add_argument("--record-result", type=Path, default=None,
                       help="buildflowApplyTaxPlan 결과 JSON을 적재 기록에 남김(경로 인자 없이 단독 실행)")
+    mode.add_argument("--from-result", type=Path, default=None,
+                      help="--unmatched-csv용 결과 JSON(적재 기록은 남기지 않음, 경로 인자 없이 단독 실행)")
+    parser.add_argument("--unmatched-csv", type=Path, default=None,
+                        help="결과에서 연결 못 한 행을 저장소 밖 CSV로 저장(--record-result 또는 --from-result와 함께)")
+    parser.add_argument("--client-alias", type=Path, default=None,
+                        help="`세금계산서 상호,DB 거래처명` CSV(저장소 밖)")
+    parser.add_argument("--site-map", type=Path, default=None,
+                        help="`세금계산서 상호(또는 *),품목명,DB 현장명` CSV(저장소 밖)")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="로컬 Gateway 주소(기본 프론트 Nginx 경유)")
     parser.add_argument("--ledger", type=Path, default=None, help="적재 기록 JSONL(저장소 밖)")
     parser.add_argument("--recursive", action="store_true", help="하위 폴더까지 찾기")
@@ -297,16 +457,31 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
     try:
+        if args.from_result:
+            if args.paths or not args.unmatched_csv:
+                raise ImportSetupError("--from-result는 목록 경로 없이 --unmatched-csv와 함께 실행합니다")
+            write_unmatched_csv(read_result(args.from_result, "브라우저 결과 JSON(--from-result)"), args.unmatched_csv)
+            return 0
         ledger = Ledger(args.ledger or default_ledger_path())
         if args.record_result:
             if args.paths:
                 raise ImportSetupError("--record-result는 목록 경로 없이 단독으로 실행합니다")
-            return record_tax_result(read_result(args.record_result), ledger)
+            result = read_result(args.record_result)
+            if args.unmatched_csv:
+                outside_repo(args.unmatched_csv, "미연결 CSV(--unmatched-csv)")
+            code = record_tax_result(result, ledger)
+            if args.unmatched_csv:
+                write_unmatched_csv(result, args.unmatched_csv)
+            return code
+        if args.unmatched_csv:
+            raise ImportSetupError("--unmatched-csv는 --record-result 또는 --from-result와 함께 씁니다")
         if not args.paths:
             raise ImportSetupError("매출 세금계산서 목록 파일 또는 폴더 경로가 필요합니다")
         base_url = validate_base_url(args.base_url)
         if args.emit_plan:
             outside_repo(args.emit_plan, "계획 JSON(--emit-plan)")
+        client_aliases = load_client_aliases(args.client_alias) if args.client_alias else {}
+        site_map = load_site_map(args.site_map) if args.site_map else None
         files, hidden = collect_files(args.paths, SUFFIXES, args.recursive)
     except ImportSetupError as exc:
         print(f"설정 오류: {exc}", file=sys.stderr)
@@ -335,9 +510,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     if blocked:
         print("확인 필요 항목이 있어 계획을 거부합니다. 안내된 옵션으로 확정한 뒤 다시 실행하세요", file=sys.stderr)
         return 1
-    browser_plan = build_browser_plan(plans, base_url, args.skip_negative)
+    browser_plan = build_browser_plan(plans, base_url, args.skip_negative, client_aliases, site_map)
     written = write_json_outside_repo(args.emit_plan, browser_plan, "계획 JSON(--emit-plan)")
     print(f"계획 저장: 세금계산서 행 {len(browser_plan['entries'])}건 → {written}")
+    entries = browser_plan["entries"]
+    if client_aliases:
+        print(f"거래처 별칭 적용: {sum(1 for e in entries if e['clientAlias'])}행 / 별칭 {len(client_aliases)}개")
+    if site_map is not None:
+        unused = len(site_map.rules) - len(site_map.used)
+        print(f"현장 지정 적용: {sum(1 for e in entries if e['siteName'])}행 / 지정 {len(site_map.rules)}줄"
+              + (f"(이번 계획에 안 걸린 줄 {unused})" if unused else ""))
     print("로그인된 BuildFlow 페이지 콘솔에서 browser_apply.js를 붙여 넣고 buildflowApplyTaxPlan(계획)으로 적용한 뒤,"
           " 결과 JSON을 --record-result로 기록하세요")
     return 0
