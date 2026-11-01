@@ -499,6 +499,10 @@ def record_result(path: Path, ledger: Ledger) -> int:
         result = json.loads(resolved.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ImportSetupError(f"결과 JSON을 읽을 수 없습니다({exc.__class__.__name__})") from None
+    import taxes  # 세금계산서 결과(buildflowApplyTaxPlan)도 같은 명령으로 기록한다
+
+    if isinstance(result, dict) and result.get("format") == taxes.RESULT_FORMAT:
+        return taxes.record_tax_result(result, ledger)
     if not isinstance(result, dict) or result.get("format") != RESULT_FORMAT or result.get("version") != FORMAT_VERSION:
         raise ImportSetupError("browser_apply.js 결과 형식이 아닙니다(format/version)")
     base_url = validate_base_url(str(result.get("baseUrl") or ""))
