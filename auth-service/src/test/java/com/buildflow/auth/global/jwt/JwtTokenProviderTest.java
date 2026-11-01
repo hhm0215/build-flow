@@ -8,12 +8,14 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JwtTokenProviderTest {
 
     private static final String SECRET = "auth-service-token-test-secret-must-be-at-least-32-bytes";
-    private final JwtTokenProvider tokens = new JwtTokenProvider(SECRET, 1_800_000L, 604_800_000L);
+    private final JwtTokenProvider tokens = new JwtTokenProvider(SECRET, 1_800_000L, 604_800_000L, 604_800_000L, 30_000L);
 
     @Test
     void accessTokenUsesAdminLoginIdAndVersionTwo() {
@@ -28,10 +30,38 @@ class JwtTokenProviderTest {
 
     @Test
     void refreshTokenCannotBeUsedAsAccessToken() {
-        String token = tokens.generateRefreshToken(1L);
+        long now = System.currentTimeMillis();
+        String token = tokens.generateRefreshToken(1L, "sid-1", now, now);
 
         assertEquals(1L, tokens.getUserId(token, "refresh"));
         assertThrows(BusinessException.class, () -> tokens.getUserId(token, "access"));
+    }
+
+    @Test
+    void refreshTokenCarriesSessionAndNeverExpiresAfterAbsoluteLimit() {
+        long now = System.currentTimeMillis();
+        long startedAt = now - 604_800_000L + 60_000L; // 상한까지 1분 남음
+        String token = tokens.generateRefreshToken(1L, "sid-1", startedAt, now);
+
+        JwtTokenProvider.RefreshTokenClaims claims = tokens.parseRefreshToken(token);
+        assertEquals("sid-1", claims.sessionId());
+        assertEquals(startedAt, claims.sessionStartedAt());
+        long exp = tokens.parseClaims(token).getExpiration().getTime();
+        assertTrue(exp <= startedAt + 604_800_000L);
+        assertNotEquals(token, tokens.generateRefreshToken(1L, "sid-1", startedAt, now), "jti로 같은 시각에도 다른 값");
+    }
+
+    @Test
+    void rejectsVersionTwoRefreshWithoutSessionClaims() {
+        String legacy = Jwts.builder()
+                .subject("1")
+                .claim("type", "refresh")
+                .claim("authVersion", 2)
+                .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+
+        assertEquals(1L, tokens.getUserId(legacy, "refresh"));
+        assertThrows(BusinessException.class, () -> tokens.parseRefreshToken(legacy));
     }
 
     @Test

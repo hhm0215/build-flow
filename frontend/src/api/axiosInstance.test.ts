@@ -200,3 +200,138 @@ describe('access 만료 후 refresh 재발급', () => {
     ])
   })
 })
+
+describe('탭 간 로그아웃 세대값과 최신 access 재사용', () => {
+  beforeEach(() => {
+    useAuthStore.getState().setTokens('expired-access', 'refresh-0')
+  })
+  afterEach(() => {
+    axiosInstance.defaults.adapter = originalAdapter
+    vi.restoreAllMocks()
+  })
+
+  it('refresh 회전은 같은 세션 세대값을 유지하고 로그인은 새 세대값을 만든다', async () => {
+    const before = useAuthStore.getState().sessionId
+    expect(before).toBeTruthy()
+    fakeServer({ '/taxes': [unauthorized, ok('t')], '/auth/refresh': [rotated(1)] })
+
+    await axiosInstance.get('/taxes')
+
+    expect(useAuthStore.getState().sessionId).toBe(before)
+    useAuthStore.getState().setTokens('next-login', 'next-refresh')
+    expect(useAuthStore.getState().sessionId).not.toBe(before)
+  })
+
+  it('재발급 대기 중 다른 탭이 로그아웃했다면(storage 이벤트 전) 늦은 응답으로 세션을 되살리지 않는다', async () => {
+    let finishRefresh: (() => void) | undefined
+    const adapter = vi.fn<AxiosAdapter>((config) => {
+      if (config.url === '/auth/refresh') {
+        return new Promise<AxiosResponse>((resolve) => {
+          finishRefresh = () => resolve({ config, status: 200, statusText: '', headers: {}, data: rotated(9).data })
+        })
+      }
+      const response: AxiosResponse = { config, status: 401, statusText: '', headers: {}, data: unauthorized.data }
+      return Promise.reject(new AxiosError('fail', '401', config, null, response))
+    })
+    axiosInstance.defaults.adapter = adapter
+    const pending = axiosInstance.get('/taxes')
+    await vi.waitFor(() => expect(finishRefresh).toBeDefined())
+    // 다른 탭의 로그아웃이 저장소에만 반영된 상태
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+      state: { accessToken: null, refreshToken: null, sessionId: null, isAuthenticated: false }, version: 0,
+    }))
+
+    finishRefresh?.()
+    await expect(pending).rejects.toBeTruthy()
+
+    expect(adapter.mock.calls.map((c) => c[0].url)).toEqual(['/taxes', '/auth/refresh'])
+    expect(useAuthStore.getState()).toMatchObject({ accessToken: null, isAuthenticated: false })
+    expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)!).state).toMatchObject({
+      accessToken: null, refreshToken: null, isAuthenticated: false,
+    })
+  })
+
+  it('이 탭이 로그아웃한 세션 토큰이 다른 탭에서 다시 쓰이면 따르지 않고 로그아웃 상태를 다시 쓴다', () => {
+    const ended = useAuthStore.getState().sessionId
+    useAuthStore.getState().logout()
+    const revived = JSON.stringify({
+      state: { accessToken: 'late-access', refreshToken: 'late-refresh', sessionId: ended, isAuthenticated: true },
+      version: 0,
+    })
+    localStorage.setItem(AUTH_STORAGE_KEY, revived)
+
+    window.dispatchEvent(new StorageEvent('storage', { key: AUTH_STORAGE_KEY, newValue: revived }))
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY)!).state.isAuthenticated).toBe(false)
+  })
+
+  it('다른 세션(새 로그인)의 저장값은 그대로 따른다', async () => {
+    useAuthStore.getState().logout()
+    const fresh = JSON.stringify({
+      state: { accessToken: 'new-login', refreshToken: 'new-refresh', sessionId: 'other-session', isAuthenticated: true },
+      version: 0,
+    })
+    localStorage.setItem(AUTH_STORAGE_KEY, fresh)
+
+    window.dispatchEvent(new StorageEvent('storage', { key: AUTH_STORAGE_KEY, newValue: fresh }))
+
+    await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('new-login'))
+  })
+
+  it('refresh 409(다른 탭이 방금 회전)면 세션을 지우지 않고 그 탭이 저장한 새 토큰으로 재시도한다', async () => {
+    const { calls } = fakeServer({ '/taxes': [unauthorized, ok('t')], '/auth/refresh': [{ status: 409 }] })
+    const sessionId = useAuthStore.getState().sessionId
+    setTimeout(() => {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+        state: { accessToken: 'other-tab-access', refreshToken: 'other-tab-refresh', sessionId, isAuthenticated: true },
+        version: 0,
+      }))
+    }, 250)
+
+    const response = await axiosInstance.get('/taxes')
+
+    expect(response.data.data).toBe('t')
+    expect(calls.map((c) => [c.url, c.auth])).toEqual([
+      ['/taxes', 'Bearer expired-access'],
+      ['/auth/refresh', null],
+      ['/taxes', 'Bearer other-tab-access'],
+    ])
+    expect(useAuthStore.getState()).toMatchObject({ refreshToken: 'other-tab-refresh', isAuthenticated: true })
+  })
+
+  it('refresh 409 뒤 새 토큰이 오지 않으면 일시 장애로 보고 세션을 유지한다', async () => {
+    fakeServer({ '/taxes': [unauthorized], '/auth/refresh': [{ status: 409 }] })
+
+    await expect(axiosInstance.get('/taxes')).rejects.toMatchObject({ response: { status: 401 } })
+
+    expect(useAuthStore.getState()).toMatchObject({
+      accessToken: 'expired-access', refreshToken: 'refresh-0', isAuthenticated: true,
+    })
+  }, 10_000)
+
+  it('실패 요청의 Authorization이 이미 갱신된 access와 다르면 refresh 없이 새 access로 재시도한다', async () => {
+    const calls: [string, string | null][] = []
+    let first = true
+    axiosInstance.defaults.adapter = vi.fn<AxiosAdapter>(async (config) => {
+      calls.push([config.url ?? '', (config.headers.get('Authorization') as string | undefined) ?? null])
+      if (first) {
+        first = false
+        // 이 요청이 나간 사이 다른 요청이 access를 갱신했다.
+        useAuthStore.getState().rotateTokens('fresh-access', 'refresh-1')
+        const response: AxiosResponse = { config, status: 401, statusText: '', headers: {}, data: unauthorized.data }
+        throw new AxiosError('fail', '401', config, null, response)
+      }
+      return { config, status: 200, statusText: '', headers: {}, data: ok('t').data }
+    })
+
+    const response = await axiosInstance.get('/taxes')
+
+    expect(response.data.data).toBe('t')
+    expect(calls).toEqual([
+      ['/taxes', 'Bearer expired-access'],
+      ['/taxes', 'Bearer fresh-access'],
+    ])
+    expect(useAuthStore.getState().refreshToken).toBe('refresh-1')
+  })
+})
