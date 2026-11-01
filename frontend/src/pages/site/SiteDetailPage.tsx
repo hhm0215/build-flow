@@ -34,7 +34,7 @@ import { useTaxes } from '../../api/taxes.api'
 import { useWarranties } from '../../api/warranties.api'
 import type { Site, SiteStatus } from '../../types'
 import { SITE_STATUSES, canTransitionSiteStatus } from '../../utils/siteStatus'
-import { calculateDocumentProfit } from '../../utils/estimate'
+import { calculateDocumentProfit, compareEstimatesByDateDesc, formatDocumentDate } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
@@ -288,7 +288,7 @@ export default function SiteDetailPage() {
   const taxes = (taxesData ?? []).filter((t) => t.siteId === siteId)
   const warranties = (warrantiesData ?? []).filter((w) => w.siteId === siteId)
 
-  const sortedEstimates = [...estimates].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const sortedEstimates = [...estimates].sort(compareEstimatesByDateDesc)
   const sortedPurchases = [...purchases].sort((a, b) =>
     (b.purchaseDate ?? '').localeCompare(a.purchaseDate ?? ''))
   const sortedTaxes = [...taxes].sort((a, b) =>
@@ -477,7 +477,7 @@ export default function SiteDetailPage() {
                             {estimate.title}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                            작성일 {formatDate(estimate.createdAt)} · 항목 {estimate.items.length}건
+                            견적일 {formatDocumentDate(estimate.estimateDate)} · 항목 {estimate.items.length}건 · 등록일 {formatDocumentDate(estimate.createdAt)}
                           </div>
                         </div>
                         <InfoBadge color={ESTIMATE_STATUS_COLOR[estimate.status]}>

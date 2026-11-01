@@ -27,6 +27,30 @@ export function additionsOfChain(estimates: Estimate[], chain: Estimate[]): Esti
     .sort((a, b) => a.id - b.id)
 }
 
+/**
+ * 견적 카드/목록 정렬: 업무 날짜(견적일) 최신순. 같은 견적일이면 등록(생성) 시각, 그다음 id 역순.
+ * 과거 견적을 나중에 등록해도 등록일이 아닌 견적일 기준으로 놓인다. 견적일이 없으면 맨 뒤.
+ */
+export function compareEstimatesByDateDesc(
+  a: Pick<Estimate, 'id' | 'estimateDate' | 'createdAt'>,
+  b: Pick<Estimate, 'id' | 'estimateDate' | 'createdAt'>,
+): number {
+  const aDate = a.estimateDate?.slice(0, 10) ?? ''
+  const bDate = b.estimateDate?.slice(0, 10) ?? ''
+  if (aDate !== bDate) {
+    if (!aDate) return 1
+    if (!bDate) return -1
+    return bDate.localeCompare(aDate)
+  }
+  return (b.createdAt ?? '').localeCompare(a.createdAt ?? '') || b.id - a.id
+}
+
+/** 화면 표시용 날짜(YYYY-MM-DD). 값이 없으면 '-'이며 다른 날짜로 대체하지 않는다. */
+export function formatDocumentDate(value?: string | null): string {
+  if (!value) return '-'
+  return value.split('T')[0]
+}
+
 /** target을 확정하면 대체될 현재 확정본(같은 체인에 최대 1개). */
 export function estimateSupersededByConfirming(estimates: Estimate[], target: Estimate): Estimate | null {
   return estimateChain(estimates, target)

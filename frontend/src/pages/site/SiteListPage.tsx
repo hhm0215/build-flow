@@ -27,7 +27,7 @@ import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { Site, SiteStatus } from '../../types'
-import { sumConfirmedEstimateAmount } from '../../utils/estimate'
+import { compareEstimatesByDateDesc, formatDocumentDate, sumConfirmedEstimateAmount } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 import { SITE_STATUSES } from '../../utils/siteStatus'
 import { buildClientFilterOptions, matchesClientFilter } from '../../utils/siteClientFilter'
@@ -321,7 +321,7 @@ export default function SiteListPage() {
         ? []
         : estimates
             .filter((estimate) => estimate.siteId === selectedSiteIdResolved)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+            .sort(compareEstimatesByDateDesc),
     [estimates, selectedSiteIdResolved],
   )
 
@@ -736,7 +736,7 @@ export default function SiteListPage() {
                                 {estimate.title}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                                작성일 {formatDate(estimate.createdAt)} · 항목 {estimate.items.length}건
+                                견적일 {formatDocumentDate(estimate.estimateDate)} · 항목 {estimate.items.length}건 · 등록일 {formatDocumentDate(estimate.createdAt)}
                               </div>
                             </div>
                             <InfoBadge color={ESTIMATE_STATUS_COLOR[estimate.status]}>
