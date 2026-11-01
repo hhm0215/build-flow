@@ -22,7 +22,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** 대시보드 AI 요약: 모델 응답 처리와 실패를 OLLAMA_API_FAILED 하나로 모으는지, 프롬프트 금액 표기를 고정한다. */
+/** 대시보드 AI 요약: 모델 응답 처리와 실패를 OLLAMA_API_FAILED 하나로 모으는지 고정한다. 사실 분류는 DashboardSummaryFactsTest. */
 class OllamaServiceTest {
 
     private OllamaService service(ExchangeFunction exchange) {
@@ -40,7 +40,11 @@ class OllamaServiceTest {
                 .build());
     }
 
-    private static DashboardStatsResponse stats() {
+    private static DashboardSummaryFacts stats() {
+        return DashboardSummaryFacts.from(rawStats());
+    }
+
+    private static DashboardStatsResponse rawStats() {
         return DashboardStatsResponse.builder()
                 .totalSites(1)
                 .sitesByStatus(Map.of("IN_PROGRESS", 1))
@@ -78,20 +82,11 @@ class OllamaServiceTest {
     }
 
     @Test
-    void 프롬프트_금액은_지수_표기_없이_원_단위로_적는다() {
-        String prompt = ReflectionTestUtils.invokeMethod(service(respond(HttpStatus.OK, "{}")), "buildDataPrompt", stats());
-
-        assertThat(prompt)
-                .contains("총 견적액: 10000000원")
-                .contains("- [QA] 현장 (시공 중): 견적 10000000원, 매입 4000000.00원, 마진 6000000.00원 (마진율 60.00%)")
-                .contains("- 상태별: 시공 중 1개")
+    void 시스템_프롬프트는_사실_외_판단을_금지하고_사실은_로케일_고정_표기다() {
+        assertThat(OllamaService.SYSTEM_PROMPT).contains("제공된 사실 외의 판단").contains("견적 미등록")
+                .contains("'다음 할 일' 항목만 옮기고 새로 만들지 마세요");
+        assertThat(stats().toPrompt())
+                .contains("- [QA] 현장 (시공 중): 견적 10,000,000원, 매입 4,000,000원, 마진 6,000,000원, 마진율 60.00%")
                 .doesNotContain("E+");
-    }
-
-    @Test
-    void 상태별_건수는_수주_전부터_한국어_라벨로_적고_모르는_값은_원문을_남긴다() {
-        assertThat(OllamaService.statusCounts(Map.of("COMPLETED", 1, "BIDDING", 2, "IN_PROGRESS", 3, "LEGACY", 4)))
-                .isEqualTo("수주 전 2개, 시공 중 3개, 완료 1개, LEGACY 4개");
-        assertThat(OllamaService.statusCounts(Map.of())).isEqualTo("없음");
     }
 }

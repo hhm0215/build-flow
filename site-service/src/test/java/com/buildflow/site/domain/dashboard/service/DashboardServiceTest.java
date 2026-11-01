@@ -9,6 +9,7 @@ import com.buildflow.site.domain.site.entity.Site;
 import com.buildflow.site.domain.site.entity.SiteStatus;
 import com.buildflow.site.domain.site.repository.SiteRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -18,6 +19,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** 대시보드 전체 손익은 현장별 손익 합계로 계산하고, 손익 기록이 없는 현장은 0으로 보여 준다. */
@@ -110,14 +113,44 @@ class DashboardServiceTest {
     }
 
     @Test
-    void 요약은_집계를_모델에_넘기고_생성_시각을_붙인다() {
+    void 현장이_없으면_모델을_부르지_않고_결정적_안내를_준다() {
         when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
         when(profits.findBySiteIdIn(any())).thenReturn(List.of());
+
+        DashboardSummaryResponse summary = service.getSummary();
+
+        assertThat(summary.getSummary()).isEqualTo(DashboardSummaryFacts.NO_SITE_MESSAGE);
+        assertThat(summary.getGeneratedAt()).isNotNull();
+        verifyNoInteractions(ollama);
+    }
+
+    @Test
+    void 견적_매입이_없는_현장만_있으면_모델을_부르지_않고_손실로_말하지_않는다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "[QA] AI 요약 현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of());
+
+        DashboardSummaryResponse summary = service.getSummary();
+
+        assertThat(summary.getSummary()).startsWith(DashboardSummaryFacts.NO_DATA_MESSAGE_PREFIX).doesNotContain("적자");
+        verifyNoInteractions(ollama);
+    }
+
+    @Test
+    void 데이터가_있으면_서버가_분류한_사실을_모델에_넘기고_생성_시각을_붙인다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                site(2, "빈현장", SiteStatus.IN_PROGRESS),
+                site(1, "적자현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "1200")));
         when(ollama.generateSummary(any())).thenReturn("요약");
 
         DashboardSummaryResponse summary = service.getSummary();
 
         assertThat(summary.getSummary()).isEqualTo("요약");
         assertThat(summary.getGeneratedAt()).isNotNull();
+        ArgumentCaptor<DashboardSummaryFacts> captor = ArgumentCaptor.forClass(DashboardSummaryFacts.class);
+        verify(ollama).generateSummary(captor.capture());
+        DashboardSummaryFacts facts = captor.getValue();
+        assertThat(facts.warningSites()).containsExactly("적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)");
+        assertThat(facts.noEstimateSites()).containsExactly("빈현장 (시공 중): 견적·매입 미등록");
     }
 }

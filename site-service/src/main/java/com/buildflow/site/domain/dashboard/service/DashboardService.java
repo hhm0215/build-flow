@@ -100,8 +100,9 @@ public class DashboardService {
     }
 
     public DashboardSummaryResponse getSummary() {
-        DashboardStatsResponse stats = getStats();
-        String summary = ollamaService.generateSummary(stats);
+        DashboardSummaryFacts facts = DashboardSummaryFacts.from(getStats());
+        // 견적·매입이 하나도 없으면 모델을 부르지 않는다(빈 현장을 손실로 오판하는 환각 방지).
+        String summary = facts.hasData() ? ollamaService.generateSummary(facts) : facts.noDataMessage();
 
         return DashboardSummaryResponse.builder()
                 .summary(summary)
