@@ -169,8 +169,10 @@ def audit_seconds(history: list[dict]) -> Optional[float]:
     return (end - start).total_seconds() if start and end else None
 
 
-def build_compose(repo: Path, gateway_port: int) -> dict:
-    """격리 프로젝트 Compose 정의. 비밀값은 ${BFQA_*} 참조만 담고 파일에 쓰지 않는다."""
+def build_compose(repo: Path, gateway_port: int, project: str = PROJECT) -> dict:
+    """격리 프로젝트 Compose 정의. 비밀값은 ${BFQA_*} 참조만 담고 파일에 쓰지 않는다.
+    `project`는 이름·이미지 태그(`{project}-*:local`)에 쓰이며 ui_stack.py가 bfqaui로 재사용한다."""
+    project = require_isolated_project(project)
     root = repo.as_posix()
     eureka = {"EUREKA_CLIENT_SERVICEURL_DEFAULTZONE": "http://eureka-server:8761/eureka/"}
     common = {"SPRING_PROFILES_ACTIVE": "docker", "MANAGEMENT_TRACING_ENABLED": "false", **eureka}
@@ -180,12 +182,12 @@ def build_compose(repo: Path, gateway_port: int) -> dict:
 
     def app(service: str, dockerfile: str = "Dockerfile", **extra: Any) -> dict:
         spec = {"build": {"context": root, "dockerfile": dockerfile, "args": {"SERVICE_NAME": service}},
-                "image": f"{PROJECT}-{service}:local"}
+                "image": f"{project}-{service}:local"}
         spec.update(extra)
         return spec
 
     return {
-        "name": PROJECT,
+        "name": project,
         "services": {
             "mysql": {
                 "image": "mysql:8.0",
