@@ -241,6 +241,10 @@ develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에�
 - 시험 도구 수정 2건(제품 결함 아님): Gateway는 config import 검사 때문에 config-server 없이 기동하지 못해 격리 정의에 `SPRING_CLOUD_CONFIG_ENABLED=false`를 넣었다. 준비 대기 중 종료된 컨테이너를 바로 보고하도록 했다. 운영 코드 변경은 없다.
 - 한계: 깨끗한 합성 1쪽만 시험했다. 기울어짐·저해상도·실제 증권 서식의 OCR 정확도, 공개 VPS 업로드/OCR(현재 VPS 접속 금지), 실데이터는 이 결과로 통과 처리하지 않는다. 10쪽 최악 경로의 시간·메모리는 2026-10-17 기록을 따른다.
 
+### 2026-11-01 화면 QA용 로컬 격리 전체 스택 — `scripts/qa/ui_stack.py`
+
+사람(또는 에이전트 내장 브라우저)이 실제 화면을 눌러 보는 용도다. `python -I -X utf8 scripts/qa/ui_stack.py up [--skip-build] [--no-chat]`은 별도 Compose 프로젝트 `bfqaui`(빈 볼륨 `bfqaui_*` 4개, 고정 container_name·공용 네트워크 없음)로 mysql·redis·kafka·eureka·gateway·auth·estimate·site·purchase·tax·notification·chat과 frontend(Nginx 프로덕션 이미지)를 띄운다. config-server는 띄우지 않고 서비스마다 `SPRING_CLOUD_CONFIG_ENABLED=false`를 준다. 공개 포트는 루프백만이다: 화면 `http://127.0.0.1:13080`(Nginx가 `/api/`를 `gateway-server:8080`으로 프록시), Gateway `127.0.0.1:18081`(준비 확인·API 직접 호출). 이미지는 작업 트리에서 `bfqaui-*:local`로 순차 빌드한다. 사용자 `build-flow-*` 태그는 건드리지 않는다. DB 비밀번호·JWT 비밀은 실행 메모리에서만 무작위로 만든다. `AdminBootstrapRunner`로 만든 QA 관리자 자격 증명은 출력하지 않고, 저장소 무시 경로 `.local/qa-ui-admin.json`에만 저장한다(`output/`은 `.gitignore` 대상이 아니라서 쓰지 않는다). `up`은 frontend 200, frontend 경유 로그인 200, 서비스별 목록 API 200을 확인한 뒤 URL만 출력하고 스택을 켜 둔다. 합성 시드는 넣지 않는다. `up`을 다시 실행하면 이전 `bfqaui` 스택을 먼저 지우고 빈 상태로 새로 띄운다. `status`는 컨테이너 상태와 화면 응답을 보여 준다. `down`은 `bfqaui` 컨테이너·네트워크를 `down`(`-v` 없음)으로 내리고, 볼륨은 이름을 지정해 지운 뒤 자격 파일도 지운다. 기존 `build-flow` 프로젝트와 볼륨 4개는 조회만 한다. chat은 호스트 Ollama가 없으면 기동은 되지만 채팅을 쓸 수 없다고 표시된다. estimate의 AI 파싱도 Ollama가 있어야 동작한다(Claude API 키는 넘기지 않음).
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |
