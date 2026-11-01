@@ -170,9 +170,10 @@ export default function PurchaseListPage() {
         </motion.div>
       ) : (
         <motion.div
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}
+          className="bf-table-wrap"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden' }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="bf-list-table bf-list-table--sticky" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['현장', '품목명', '수량', '단가', '금액', '거래처', '매입일', '증빙', '처리'].map((h) => (
