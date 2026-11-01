@@ -72,12 +72,28 @@ describe('TaxPaymentsModal', () => {
     expect(screen.getByText('부분 입금')).toBeInTheDocument()
     expect(screen.getByText(/취소됨 2026-10-10 09:30 · 오입금/)).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /입금 취소$/ })).toHaveLength(1)
+    // 기본값은 다른 금액 입력과 같은 ₩·쉼표·정수 형식 (이전: 70000.00)
+    expect(screen.getByPlaceholderText('입금액')).toHaveValue('₩ 70,000')
 
     fireEvent.click(screen.getByRole('button', { name: '입금 기록' }))
 
     await waitFor(() => expect(state.record.mutateAsync).toHaveBeenCalledOnce())
     expect(state.record.mutateAsync.mock.calls[0][0]).toMatchObject({ taxId: 17, amount: 70000 })
     expect(state.record.mutateAsync.mock.calls[0][0].paymentDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('쉼표·₩가 섞인 입력도 센트까지 반올림 없이 보낸다', async () => {
+    state.record.mutateAsync.mockResolvedValue({ id: 4 })
+    render(<TaxPaymentsModal invoice={invoice} onClose={vi.fn()} />)
+    const amount = screen.getByPlaceholderText('입금액')
+    fireEvent.change(amount, { target: { value: '₩ 12,345.5' } })
+    fireEvent.blur(amount)
+    expect(amount).toHaveValue('₩ 12,345.5')
+
+    fireEvent.click(screen.getByRole('button', { name: '입금 기록' }))
+
+    await waitFor(() => expect(state.record.mutateAsync).toHaveBeenCalledOnce())
+    expect(state.record.mutateAsync.mock.calls[0][0]).toMatchObject({ amount: 12345.5 })
   })
 
   it('잔액을 넘는 입금액은 API를 호출하지 않고 오류를 보여준다', async () => {

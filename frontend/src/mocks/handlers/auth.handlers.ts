@@ -39,6 +39,27 @@ export const authHandlers = [
     },
   ),
 
+  // 실백엔드 계약: { refreshToken } → TokenResponse (RefreshRequest.java, 회전 발급)
+  http.post<never, { refreshToken?: string }>('/api/v1/auth/refresh', async ({ request }) => {
+    const body = await request.json().catch(() => ({} as { refreshToken?: string }))
+    if (!body?.refreshToken) {
+      return HttpResponse.json<ApiResponse<null>>(
+        { success: false, data: null, error: '리프레시 토큰은 필수입니다.' },
+        { status: 400 },
+      )
+    }
+    return HttpResponse.json<ApiResponse<LoginResponse>>({
+      success: true,
+      data: {
+        accessToken: `mock-jwt-token-buildflow-${Date.now()}`,
+        refreshToken: `mock-refresh-token-buildflow-${Date.now()}`,
+        tokenType: 'Bearer',
+        expiresIn: 3600,
+      },
+      error: null,
+    })
+  }),
+
   http.post('/api/v1/auth/logout', () => {
     return HttpResponse.json<ApiResponse<null>>({ success: true, data: null, error: null })
   }),

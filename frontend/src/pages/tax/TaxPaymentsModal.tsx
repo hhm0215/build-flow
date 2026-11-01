@@ -4,7 +4,9 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useCancelTaxPayment, useRecordTaxPayment, useTaxPayments } from '../../api/taxes.api'
 import type { TaxInvoice, TaxPayment } from '../../types'
-import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf, validatePaymentAmount } from '../../utils/taxPayment'
+import {
+  PAYMENT_STATUS_META, formatWonInput, parseWonInput, paymentStatusOf, remainingOf, validatePaymentAmount,
+} from '../../utils/taxPayment'
 
 interface FormValues {
   amount: number
@@ -173,7 +175,9 @@ export default function TaxPaymentsModal({ invoice, onClose }: Props) {
               style={{ width: '100%' }}
               min={0.01}
               max={remaining}
-              precision={2}
+              // precision={2}는 정수 기본값을 660000.00으로 보이게 한다. 소수 자릿수는 validatePaymentAmount가 반올림 없이 검증한다.
+              formatter={formatWonInput}
+              parser={parseWonInput}
               placeholder="입금액"
             />
           </Form.Item>
