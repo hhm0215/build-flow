@@ -5,6 +5,12 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 매입 미입력 손익 표시·내역서형 양식·병합 가드 (2026-11-01, PR #289~#293)
+
+- #289 main 릴리스 `ddae48a`(VPS 자동 배포 없음). #290 내역서형 견적 양식 해석(보류 4건 OK, 모두 현장 미상 공내역서라 미적재). 거래처 표기 중복 8쌍 로컬 정리.
+- #291 화면: 매입 0원 현장은 '매입 미입력', 평균 마진율·흑자 판정은 매입 입력 현장만. #292 AI 요약도 같은 기준, "매입 입력 필요(N개)". 로컬 189개 현장 실화면·요약 확인.
+- #291이 CI 실패 체크(러너 Maven 일시 장애) 상태로 병합된 사고 → 재실행 성공 확인, #293 `scripts/agents/merge_pr.py`(전 체크 성공+SHA 일치만 병합)·회고·CLAUDE.md 규칙.
+
 ## 완료된 작업 — 로컬 USB 견적 적재·가져오기 도구 실데이터 보강 (2026-11-01, PR #281~#287)
 
 - 로컬 개발 DB에만 2025·2026 견적 적재(현장별 최신 견적 확정·현장 완료, 적재 전 mysqldump 백업, 기록은 저장소 밖 ledger). 운영 VPS DB에는 넣지 않음. 실데이터는 Git·PR·문서에 없음.
@@ -1152,7 +1158,7 @@
 
 ## 다음 세션 진입점 (2026-11-01 갱신)
 
-**Git 상태**: `main`은 PR #272 병합 `287118e`. `develop`은 PR #287 병합 `534bd70`까지(그 뒤 기록 PR). 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
+**Git 상태**: `main`은 PR #289 병합 `ddae48a`. `develop`은 PR #292 병합 `9083132`까지(그 뒤 기록 PR). PR 병합은 `scripts/agents/merge_pr.py <번호> --wait`로만. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
 
 **로컬 실데이터**: 로컬 스택은 `bf-audit`(origin/develop 작업 폴더)에서 `.local/local-gateway-port.yml` override(gateway 18080, redis 16379)로 기동, 프론트 http://localhost:3000. 적재 도구 `scripts/import/`, 백업·ledger는 저장소 밖 `Documents/Dev/build-flow-backups/`.
 
