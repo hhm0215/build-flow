@@ -358,13 +358,8 @@ export default function EstimateListPage() {
                 {fields.map(({ key, name, ...restField }) => (
                   <div
                     key={key}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 70px 80px 120px auto',
-                      gap: 8,
-                      alignItems: 'start',
-                      marginBottom: 4,
-                    }}
+                    className="bf-item-row"
+                    style={{ marginBottom: 4 }}
                   >
                     <Form.Item
                       {...restField}
@@ -513,10 +508,12 @@ export default function EstimateListPage() {
             background: 'var(--bg-card)',
             border: '1px solid var(--border)',
             borderRadius: 12,
-            overflow: 'hidden',
+            overflowX: 'auto',
+            overflowY: 'hidden',
           }}
+          className="bf-table-wrap"
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="bf-list-table bf-list-table--sticky" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['제목', '관계', '상태', '총액', '항목 수', '견적일', '처리'].map((h) => (

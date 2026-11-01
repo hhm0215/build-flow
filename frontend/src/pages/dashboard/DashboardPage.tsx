@@ -144,12 +144,12 @@ function StatCard({ title, value, change, changeType, icon: Icon, accentColor, i
         pointerEvents: 'none',
       }} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 8, letterSpacing: '0.02em' }}>
             {title}
           </div>
-          <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1 }}>
+          <div className="bf-stat-value" style={{ fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.04em', lineHeight: 1.1 }}>
             {value}
           </div>
           {change && (
@@ -276,20 +276,16 @@ export default function DashboardPage() {
         <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>현장 현황 및 손익 요약</p>
       </motion.div>
 
-      {/* Stat cards — 상단 3개 + 하단 2개 균등 배치 */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(6, 1fr)',
-        gap: 12,
-      }}>
+      {/* Stat cards — 열 배치는 index.css .bf-stat-grid (데스크톱 3+2 · 태블릿 2열 · 모바일 1열) */}
+      <div className="bf-stat-grid">
         {statsLoading
           ? Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} style={{ gridColumn: i < 3 ? 'span 2' : 'span 3' }}>
+              <div key={i}>
                 <StatCardSkeleton index={i} />
               </div>
             ))
           : statCards.map((stat, i) => (
-              <div key={stat.title} style={{ gridColumn: i < 3 ? 'span 2' : 'span 3' }}>
+              <div key={stat.title}>
                 <StatCard {...stat} index={i} />
               </div>
             ))
@@ -297,7 +293,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom section */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
+      <div className="bf-dashboard-bottom">
         {/* Site profits table */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -340,7 +336,8 @@ export default function DashboardPage() {
               등록된 현장이 없습니다
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="bf-table-wrap">
+            <table className="bf-list-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   {['현장명', '상태', '견적액', '매입액', '마진', '마진율'].map((h) => (
@@ -420,6 +417,7 @@ export default function DashboardPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </motion.div>
 

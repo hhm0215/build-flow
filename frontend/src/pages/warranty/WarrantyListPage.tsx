@@ -224,9 +224,10 @@ export default function WarrantyListPage() {
         </motion.div>
       ) : (
         <motion.div
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}
+          className="bf-table-wrap"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden' }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="bf-list-table bf-list-table--sticky" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['보험사', '증권번호', '보증금액', '보증기간', '만료까지', '상태', '처리'].map((h) => (

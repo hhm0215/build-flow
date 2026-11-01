@@ -58,7 +58,7 @@ export default function FilterBar({ children, activeCount = 0, onReset }: Filter
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+      <div className="bf-filter-fields" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: '1 1 240px', minWidth: 0 }}>
         {children}
       </div>
 

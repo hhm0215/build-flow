@@ -146,11 +146,11 @@ function SummaryCard({
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{title}</div>
           <div
+            className="bf-summary-value"
             style={{
-              fontSize: 20,
               fontWeight: 700,
               color: 'var(--text-primary)',
               letterSpacing: '-0.03em',
@@ -390,13 +390,8 @@ export default function SiteDetailPage() {
         archiveChanging={archiveSite.isPending || restoreSite.isPending}
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: 12,
-        }}
-      >
+      {/* 열 배치는 index.css .bf-summary-grid (데스크톱 4열 · 태블릿 2열 · 모바일 1열) */}
+      <div className="bf-summary-grid">
         <SummaryCard
           icon={FileText}
           title="매출 (견적서 합계)"
@@ -609,7 +604,7 @@ export default function SiteDetailPage() {
                           )}
                         </div>
                       </div>
-                      <div
+                      <div className="bf-info-grid"
                         style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -700,7 +695,7 @@ export default function SiteDetailPage() {
                           </div>
                           <InfoBadge color={expiringColor}>{expiringLabel}</InfoBadge>
                         </div>
-                        <div
+                        <div className="bf-info-grid"
                           style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -795,7 +790,7 @@ function SiteHeaderHero({
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="bf-hero-main">
           <div
             style={{
               display: 'flex',
@@ -810,8 +805,8 @@ function SiteHeaderHero({
             현장 상세
           </div>
           <div
+            className="bf-hero-title"
             style={{
-              fontSize: 28,
               fontWeight: 800,
               color: 'white',
               letterSpacing: '-0.04em',
@@ -847,8 +842,8 @@ function SiteHeaderHero({
         </div>
 
         <div
+          className="bf-hero-side"
           style={{
-            minWidth: 220,
             padding: '14px 16px',
             borderRadius: 12,
             background: 'rgba(255,255,255,0.05)',
