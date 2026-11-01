@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
 import { ApiResponse, Site, SiteCreateRequest, SiteUpdateRequest, Profit } from '../types'
 import { DASHBOARD_KEY } from './dashboard.api'
+import { retryUnlessNotFound } from '../utils/httpError'
 
 export const SITES_KEY = {
   all: ['sites'] as const,
@@ -70,6 +71,8 @@ export function useSite(id: number) {
     queryKey: SITES_KEY.detail(id),
     queryFn: () => fetchSite(id),
     enabled: !!id,
+    // 없는 현장(404)은 재시도해도 같으므로 바로 "찾을 수 없음" 안내로 넘긴다
+    retry: retryUnlessNotFound,
   })
 }
 

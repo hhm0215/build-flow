@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Spin } from 'antd'
 import MainLayout from './layouts/MainLayout'
+import NotFoundState from './components/NotFoundState'
 import LoginPage from './pages/auth/LoginPage'
 import { useAuthStore } from './stores/authStore'
 
@@ -53,6 +54,8 @@ export default function App() {
         <Route path="taxes" element={<Page><TaxListPage /></Page>} />
         <Route path="notifications" element={<Page><NotificationListPage /></Page>} />
         <Route path="warranties" element={<Page><WarrantyListPage /></Page>} />
+        {/* 없는 주소는 레이아웃 안에서 404 안내 — 비로그인이면 위 PrivateRoute가 먼저 /login으로 보낸다 */}
+        <Route path="*" element={<NotFoundState />} />
       </Route>
     </Routes>
   )
