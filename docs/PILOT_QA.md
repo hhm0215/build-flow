@@ -224,6 +224,23 @@ develop `e649ad2` 이미지, 로컬 풀 Docker. 기존 스택에 가족 관리�
 
 이는 로컬 Gateway·JWT 경유 실측이며 공개 VPS 동선 실측이나 실데이터 승인이 아니다. 재실행은 같은 방식(별도 프로젝트·빈 볼륨)으로 사용자 입력 없이 가능하다.
 
+### 2026-11-01 보증 합성 PDF 업로드→OCR Gateway 경유 실측 — 로컬 27/27 PASS
+
+develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에서 `python -I -X utf8 scripts/qa/warranty_ocr_e2e.py`를 실행했다. 스크립트가 별도 Compose 프로젝트 `bfqaocr`를 만든다. 이 프로젝트는 빈 볼륨 `bfqaocr_*` 4개를 쓰고, 고정 container_name과 공용 네트워크를 쓰지 않으며, Gateway만 `127.0.0.1:18080`에 공개한다. 띄우는 서비스는 mysql·redis·kafka·eureka·gateway·auth·site·notification이고, 이미지는 이 작업 트리에서 `bfqaocr-*:local`로 순차 빌드했다. notification은 VPS와 같게 896m·`-Xmx320m`으로 제한했다. QA 관리자는 `AdminBootstrapRunner`로 부트스트랩하고, 비밀번호·DB 비밀번호·JWT 비밀은 실행할 때마다 메모리에서만 무작위로 만든다(출력·저장 없음). 기존 `build-flow` 프로젝트는 꺼진 상태 그대로 두었고 볼륨 4개도 건드리지 않았다.
+
+합성 PDF는 실행 임시 디렉터리에서만 만들었다(커밋·외부 다운로드 없음). 생성기 `scripts/qa/WarrantyOcrPdfGen.java`는 notification 이미지에 들어 있는 PDFBox 3 jar, 로컬 `eclipse-temurin:17-jdk-jammy`(`--network none`), 호스트 맑은 고딕 `.ttf`로 돌린다. 생성한 PDF 두 종류는 아래와 같다. 텍스트 층 글자 수는 앱과 같은 PDFBox 추출로 다시 세어 단언했다.
+
+| 합성 PDF | 텍스트 층 | ocrStatus | 추출 필드 | 서버 OCR 기록(UPLOADED→OCR_APPLIED) / 폴링 관찰 |
+|---|---|---|---|---|
+| (a) 한글 폰트 내장 텍스트 1쪽, 12,122B | 117자 → PDFBox 경로 | SUCCESS | 서울보증보험·`QA-520951-01`·2025-11-16~2026-11-16 모두 정확 | 0.0초 / 0.8초 |
+| (b) 300 DPI 흑백 래스터만 있는 1쪽, 36,729B | 0자 → Tesseract CLI 경로 | SUCCESS | 삼성화재·`2026-143441`·2025-11-21~2026-11-21 모두 정확(증권번호도 정확, 판정은 정규화 일치·미추출 허용) | 1.0초 / 1.1초 |
+
+- 두 PDF에서 확인한 동선: 업로드 202 `PENDING`(원본 보유) → `SUCCESS`(`expiryConfirmed=false`) → MANUAL 확인 전 만료 목록(30일)에서 제외 → PUT 확인 저장 200 `MANUAL`·만료 확정 → 만료 목록 포함·남은 일수 일치 → 무인증 원본 다운로드 401 → 인증 다운로드 200, SHA-256·바이트 수가 업로드와 같음 → 감사 이력 `UPLOADED→OCR_APPLIED→MANUAL_UPDATED`. 무인증 보증 목록 401도 확인했다.
+- 메모리(notification, 896 MiB 제한): 대기 391 MiB, OCR 중 `docker stats` 표본 최대 433 MiB, cgroup `memory.peak` 504 MiB(기동 포함), `memory.max` 접촉 0회, `oom_kill` 0. 이미지 빌드는 캐시 상태로 7초(첫 빌드 123초), 기동부터 라우팅 준비까지 78초.
+- 실측 후 `bfqaocr` 컨테이너·네트워크는 `down`(`-v` 없음)으로 내리고, 볼륨 4개는 이름을 지정해 삭제했다(잔여 0). 기존 `build-flow_*` 볼륨 4개가 그대로 있는 것을 확인했다. `bfqaocr-*:local` 이미지 5개는 재실행(`--skip-build`)용으로 남겼다.
+- 시험 도구 수정 2건(제품 결함 아님): Gateway는 config import 검사 때문에 config-server 없이 기동하지 못해 격리 정의에 `SPRING_CLOUD_CONFIG_ENABLED=false`를 넣었다. 준비 대기 중 종료된 컨테이너를 바로 보고하도록 했다. 운영 코드 변경은 없다.
+- 한계: 깨끗한 합성 1쪽만 시험했다. 기울어짐·저해상도·실제 증권 서식의 OCR 정확도, 공개 VPS 업로드/OCR(현재 VPS 접속 금지), 실데이터는 이 결과로 통과 처리하지 않는다. 10쪽 최악 경로의 시간·메모리는 2026-10-17 기록을 따른다.
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |
