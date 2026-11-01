@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 검증된 작업 — 합성 보증 PDF 업로드→OCR 로컬 실측, 진행률 64/100 (2026-11-01, PR #259)
+
+- `scripts/qa/warranty_ocr_e2e.py`: 별도 Compose 프로젝트 `bfqaocr`(빈 볼륨, Gateway만 루프백)에서 합성 텍스트·이미지 PDF 업로드→OCR SUCCESS→MANUAL 확인→만료 목록→원본 체크섬 27/27 PASS. 운영 코드 결함 없음. #255 create-admin stdin BOM 수정, #258 자가 점검 로컬 스크립트 분류, #256 main 릴리스 `4b3d795`. 개발 범위는 가족 V1로 한정(사용자 지시).
+
 ## 검증된 작업 — 보증 업로드 경합·복원 DB 관리자 로그인·CI Kafka 진단, 진행률 63/100 (2026-10-31, PR #251·#252·#253)
 
 - #252 보증 PDF 업로드 경합(보관 후 400·행/이력 0·저장 PDF 삭제·OCR 미예약) 로컬 2회·CI PASS — 보관 경합 17경로 완료.
