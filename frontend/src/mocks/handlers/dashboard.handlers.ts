@@ -16,15 +16,19 @@ export const dashboardHandlers = [
       totalPurchaseAmount: 53_600_000,
       totalMargin: 61_400_000,
       averageMarginRate: 53.39,
-      siteProfits: mockSites.map((s) => ({
-        siteId: s.id,
-        siteName: s.siteName,
-        status: s.status,
-        estimateAmount: 25_000_000,
-        purchaseAmount: 10_000_000,
-        margin: 15_000_000,
-        marginRate: 60,
-      })),
+      // 마지막 현장은 매입 미입력(0원) 상태 — 대시보드가 마진율 100% 대신 '매입 미입력'으로 보여야 한다.
+      siteProfits: mockSites.map((s, i) => {
+        const noPurchase = i === mockSites.length - 1
+        return {
+          siteId: s.id,
+          siteName: s.siteName,
+          status: s.status,
+          estimateAmount: 25_000_000,
+          purchaseAmount: noPurchase ? 0 : 10_000_000,
+          margin: noPurchase ? 25_000_000 : 15_000_000,
+          marginRate: noPurchase ? 100 : 60,
+        }
+      }),
     }
 
     return HttpResponse.json<ApiResponse<DashboardStats>>({

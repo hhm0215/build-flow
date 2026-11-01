@@ -18,6 +18,13 @@ import ErrorState from '../../components/ErrorState'
 import { useDashboardStats, useDashboardSummary } from '../../api/dashboard.api'
 import type { SiteProfitSummary } from '../../types'
 import { siteCountCaption } from '../../utils/siteStatus'
+import {
+  NEEDS_PURCHASE_LABEL,
+  NO_PURCHASE_LABEL,
+  evaluateMargin,
+  evaluationBasisCaption,
+  hasPurchaseInput,
+} from '../../utils/marginEvaluation'
 
 // ── Helpers ──────────────────────────────────────
 
@@ -100,12 +107,14 @@ interface StatCardProps {
   value: string
   change: string
   changeType: 'up' | 'down' | 'neutral'
+  /** 계산 기준 등 보조 문구 */
+  note?: string
   icon: React.ElementType
   accentColor: string
   index: number
 }
 
-function StatCard({ title, value, change, changeType, icon: Icon, accentColor, index }: StatCardProps) {
+function StatCard({ title, value, change, changeType, note, icon: Icon, accentColor, index }: StatCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -167,6 +176,11 @@ function StatCard({ title, value, change, changeType, icon: Icon, accentColor, i
               {change}
             </div>
           )}
+          {note && (
+            <div style={{ marginTop: change ? 4 : 10, fontSize: 11, color: 'var(--text-muted)' }}>
+              {note}
+            </div>
+          )}
         </div>
         <div style={{
           width: 40,
@@ -195,11 +209,16 @@ export function buildStatCards(stats: {
   totalMargin: number
   averageMarginRate: number
   totalSites: number
+  siteProfits?: SiteProfitSummary[]
 }): Omit<StatCardProps, 'index'>[] {
   const inProgress = stats.sitesByStatus['IN_PROGRESS'] || 0
-  // 현장·견적·매입이 하나도 없으면 흑자/주의 같은 평가 배지는 의미가 없으므로 숨긴다.
-  const hasProfitData = stats.totalSites > 0 && (stats.totalEstimateAmount > 0 || stats.totalPurchaseAmount > 0)
-  const hasMarginRate = stats.totalSites > 0 && stats.totalEstimateAmount > 0
+  // 매입 0원 현장은 견적액이 그대로 마진처럼 보이므로 흑자·마진율 판정에서 빼고, 매입이 입력된 현장만으로 계산한다.
+  const evaluation = evaluateMargin(stats.siteProfits ?? [])
+  const evaluated = evaluation.evaluatedSiteCount > 0 && evaluation.marginRate !== null
+  // 현장·견적이 하나도 없으면 안내 문구도 의미가 없으므로 비운다.
+  const hasAnyData = stats.totalSites > 0 && (stats.totalEstimateAmount > 0 || stats.totalPurchaseAmount > 0)
+  const pendingNote = hasAnyData ? NEEDS_PURCHASE_LABEL : ''
+  const basisNote = evaluated ? evaluationBasisCaption(evaluation) : pendingNote
 
   return [
     {
@@ -228,17 +247,19 @@ export function buildStatCards(stats: {
     },
     {
       title: '총 마진',
-      value: `\u20A9${formatAmount(stats.totalMargin)}`,
-      change: hasProfitData ? (stats.totalMargin >= 0 ? '흑자' : '적자') : '',
-      changeType: hasProfitData ? (stats.totalMargin >= 0 ? 'up' : 'down') : 'neutral',
+      value: evaluated ? `\u20A9${formatAmount(evaluation.margin)}` : '-',
+      change: evaluated ? (evaluation.margin >= 0 ? '흑자' : '적자') : '',
+      changeType: evaluated ? (evaluation.margin >= 0 ? 'up' : 'down') : 'neutral',
+      note: basisNote,
       icon: TrendingUp,
-      accentColor: stats.totalMargin >= 0 ? '#22c55e' : '#ef4444',
+      accentColor: !evaluated ? '#71717a' : evaluation.margin >= 0 ? '#22c55e' : '#ef4444',
     },
     {
       title: '평균 마진율',
-      value: hasMarginRate ? `${stats.averageMarginRate.toFixed(1)}%` : '-',
-      change: hasMarginRate ? (stats.averageMarginRate >= 20 ? '양호' : '주의') : '',
-      changeType: hasMarginRate ? (stats.averageMarginRate >= 20 ? 'up' : 'down') : 'neutral',
+      value: evaluated ? `${(evaluation.marginRate ?? 0).toFixed(1)}%` : '-',
+      change: evaluated ? ((evaluation.marginRate ?? 0) >= 20 ? '양호' : '주의') : '',
+      changeType: evaluated ? ((evaluation.marginRate ?? 0) >= 20 ? 'up' : 'down') : 'neutral',
+      note: basisNote,
       icon: Percent,
       accentColor: '#8b5cf6',
     },
@@ -357,6 +378,7 @@ export default function DashboardPage() {
                 {siteProfits.map((site, i) => {
                   const statusColor = STATUS_COLOR[site.status] || '#6b7280'
                   const statusLabel = STATUS_LABEL[site.status] || site.status
+                  const purchased = hasPurchaseInput(site.purchaseAmount)
 
                   return (
                     <motion.tr
@@ -397,7 +419,7 @@ export default function DashboardPage() {
                       <td style={{
                         padding: '13px 16px',
                         fontSize: 13,
-                        color: site.margin >= 0 ? 'var(--success)' : 'var(--danger)',
+                        color: !purchased ? 'var(--text-muted)' : site.margin >= 0 ? 'var(--success)' : 'var(--danger)',
                         fontWeight: 600,
                         textAlign: 'right',
                       }}>
@@ -410,7 +432,21 @@ export default function DashboardPage() {
                         fontWeight: 600,
                         textAlign: 'right',
                       }}>
-                        {site.marginRate.toFixed(1)}%
+                        {purchased ? `${site.marginRate.toFixed(1)}%` : (
+                          <span style={{
+                            display: 'inline-block',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: 20,
+                            background: 'rgba(161,161,170,0.12)',
+                            color: 'var(--text-muted)',
+                            border: '1px solid rgba(161,161,170,0.3)',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {NO_PURCHASE_LABEL}
+                          </span>
+                        )}
                       </td>
                     </motion.tr>
                   )

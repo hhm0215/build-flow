@@ -29,6 +29,7 @@ import { useTaxes } from '../../api/taxes.api'
 import { Site, SiteStatus } from '../../types'
 import { compareEstimatesByDateDesc, formatDocumentDate, sumConfirmedEstimateAmount } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
+import { hasPurchaseInput, siteMarginRateCaption } from '../../utils/marginEvaluation'
 import { SITE_STATUSES } from '../../utils/siteStatus'
 import { buildClientFilterOptions, matchesClientFilter } from '../../utils/siteClientFilter'
 import SiteCreateModal from './SiteCreateModal'
@@ -691,8 +692,8 @@ export default function SiteListPage() {
                     icon={TrendingUp}
                     title="마진"
                     value={estimatesFailed || purchasesFailed ? '조회 실패' : estimatesLoading || purchasesLoading ? '불러오는 중' : formatCompactKRW(estimateTotal - purchaseTotal)}
-                    description={estimatesFailed || purchasesFailed ? '견적서·매입 조회 후 산출' : estimatesLoading || purchasesLoading ? '조회 중' : estimateTotal > 0 ? `마진율 ${((estimateTotal - purchaseTotal) / estimateTotal * 100).toFixed(1)}%` : '아직 산출 전'}
-                    color={estimatesFailed || purchasesFailed || estimatesLoading || purchasesLoading ? '#a1a1aa' : estimateTotal - purchaseTotal >= 0 ? '#22c55e' : '#ef4444'}
+                    description={estimatesFailed || purchasesFailed ? '견적서·매입 조회 후 산출' : estimatesLoading || purchasesLoading ? '조회 중' : siteMarginRateCaption(estimateTotal, purchaseTotal)}
+                    color={estimatesFailed || purchasesFailed || estimatesLoading || purchasesLoading || !hasPurchaseInput(purchaseTotal) ? '#a1a1aa' : estimateTotal - purchaseTotal >= 0 ? '#22c55e' : '#ef4444'}
                   />
                 </div>
 
