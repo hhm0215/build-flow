@@ -111,6 +111,7 @@
 - 현장 CRUD/PDF 전체 동선과 실제 VPS 재부팅 복구, 릴리스 image ID/SHA와 되돌릴 수 있는 이전 이미지 기록.
 - 세션 저장소/XSS 방어(CSP 등), PDF 형식·페이지·자원 제한, 의존성/이미지 취약점 및 보안 패치 평가.
   - 2026-11-01 부분 반영(로컬 격리 스택 실측, VPS 미배포): refresh 절대 상한(기본 7일, 회전으로 연장 불가)·재사용 탐지 시 세션 키 폐기·Lua 원자 회전(로그아웃 DEL과 경합해도 부활 없음), 프론트 탭 간 로그아웃 세대값, Nginx CSP **Report-Only**·refresh 전용 레이트 리밋, Caddy HSTS `max-age=31536000`. 근거는 `docs/PILOT_QA.md` "세션 보강" 항목. **미완료**: refresh가 여전히 `localStorage`(HttpOnly 쿠키 전환 결정 대기), CSP enforce 미전환, 기기별 세션 없음. 공개 경로 배포 후 외부 HTTPS 응답의 `Strict-Transport-Security`·`Content-Security-Policy-Report-Only` 헤더와 기존 세션 재로그인 1회를 별도로 확인해야 하며 그 전까지 이 항목은 PENDING이다.
+  - 2026-11-01 후속(PR #265 보안 재검토, 브랜치 `claude/refresh-redis-it`, VPS 미배포): (M-1) 회전 Lua를 실제 Redis 7.2에서 실행하는 `RefreshSessionStoreRedisIntegrationTest`와 CI 잡 `auth-redis`(Redis 서비스 컨테이너, `AUTH_REDIS_INTEGRATION`·`REDIS_HOST=127.0.0.1` 게이트, 건너뜀 0 단언, 릴리스 후보 증거 `needs`에 포함) 추가 — 로컬 임시 Redis PASS, **CI 결과 전까지 PENDING**. (L-2) `jwt.refresh-reuse-grace` 기본 30초→10초, `0 ≤ grace < refresh TTL` 위반 시 기동 실패. (L-5) LAN 직결 경로 Nginx에 `X-Frame-Options DENY`·`X-Content-Type-Options nosniff`·`Referrer-Policy no-referrer`(always) 추가, 공개 경로는 Caddy `header_down`으로 Nginx 사본을 지워 헤더가 한 번만 나간다(로컬 Nginx·Caddy 컨테이너로 확인). (L-1) 재사용 탐지 시 access 즉시 무효화는 **미구현·설계 메모만**(`docs/PILOT_QA.md` 해당 항목) — 그때까지 재사용 탐지 후에도 이미 발급된 access는 최대 30분 유효.
 - 운영 알림 수신 채널과 실패 복구 절차 검증. GitHub CI 성공은 VPS 배포 성공의 증거가 아니다.
 
 ## 사용자 프롬프트 종료 점검 — 보안 역할
