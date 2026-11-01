@@ -158,6 +158,15 @@ describe('SiteListPage relation failures', () => {
     expect(screen.queryByText('₩2,200')).not.toBeInTheDocument()
   })
 
+  it('견적 카드는 견적일을 업무 날짜로, 생성 시각은 등록일로 구분해 표시한다', async () => {
+    populateRelations()
+    query.estimates = query.estimates?.map((estimate) => ({ ...estimate, estimateDate: '2026-01-02', createdAt: '2026-10-19T09:00:00' }))
+    renderPage()
+
+    expect(await screen.findByText('견적일 2026-01-02 · 항목 0건 · 등록일 2026-10-19')).toBeInTheDocument()
+    expect(screen.queryByText(/작성일/)).not.toBeInTheDocument()
+  })
+
   it('모든 관계 조회가 성공하면 실제 합계와 마진을 표시한다', async () => {
     populateRelations()
     renderPage()

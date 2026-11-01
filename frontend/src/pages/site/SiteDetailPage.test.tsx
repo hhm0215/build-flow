@@ -109,6 +109,23 @@ describe('SiteDetailPage relation failures', () => {
     expect(screen.getByText('이 현장에 연결된 견적서가 아직 없습니다.')).toBeInTheDocument()
   })
 
+  it('견적 카드는 등록일이 아닌 견적일을 업무 날짜로 표시하고 견적일 최신순으로 놓는다', () => {
+    const base = { siteId: 4, status: 'DRAFT', totalAmount: 1000, memo: '', kind: 'ORIGINAL', revisionOfId: null, supersededById: null, items: [] }
+    query.estimates = [
+      { ...base, id: 21, chainRootId: 21, title: '합성 과거 견적', estimateDate: '2026-01-02',
+        createdAt: '2026-11-01T09:00:00', updatedAt: '2026-11-01T09:00:00' },
+      { ...base, id: 20, chainRootId: 20, title: '합성 최근 견적', estimateDate: '2026-10-20',
+        createdAt: '2026-10-20T09:00:00', updatedAt: '2026-10-20T09:00:00' },
+    ]
+    renderPage()
+
+    expect(screen.getByText('견적일 2026-01-02 · 항목 0건 · 등록일 2026-11-01')).toBeInTheDocument()
+    expect(screen.getByText('견적일 2026-10-20 · 항목 0건 · 등록일 2026-10-20')).toBeInTheDocument()
+    expect(screen.queryByText(/작성일/)).not.toBeInTheDocument()
+    const titles = screen.getAllByText(/^합성 (과거|최근) 견적$/).map((el) => el.textContent)
+    expect(titles).toEqual(['합성 최근 견적', '합성 과거 견적'])
+  })
+
   it('실패 후 캐시된 옛 견적이 있어도 현재 목록처럼 표시하지 않는다', () => {
     query.estimates = [{
       id: 10, siteId: 4, title: '오래된 합성 견적', status: 'CONFIRMED', totalAmount: 3000,
