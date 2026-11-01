@@ -65,12 +65,13 @@ class DashboardSummaryFactsTest {
     void 혼합_데이터에서_적자_저마진만_주의로_견적_미등록과_수주_전은_평가에서_뺀다() {
         DashboardSummaryFacts facts = DashboardSummaryFacts.from(stats(
                 Map.of("IN_PROGRESS", 4, "SETTLING", 1, "BIDDING", 1),
-                "13000000", "11050000", "15.00",
+                "17000000", "11050000", "35.00",
                 site("정상현장", "IN_PROGRESS", "10000000", "7000000", "30.00"),
                 site("적자현장", "SETTLING", "1000000", "1200000", "-20.00"),
                 site("저마진현장", "IN_PROGRESS", "2000000", "1850000", "7.50"),
                 site("빈현장", "IN_PROGRESS", "0", "0", "0"),
                 site("매입만현장", "IN_PROGRESS", "0", "1000000", "0"),
+                site("견적만현장", "IN_PROGRESS", "4000000", "0", "100.00"),
                 site("입찰현장", "BIDDING", "5000000", "0", "100.00")));
 
         assertThat(facts.hasData()).isTrue();
@@ -84,20 +85,29 @@ class DashboardSummaryFactsTest {
         assertThat(facts.noEstimateSites()).containsExactly(
                 "빈현장 (시공 중): 견적·매입 미등록",
                 "매입만현장 (시공 중): 견적 미등록, 매입 1,000,000원 등록됨");
+        assertThat(facts.noPurchaseSites()).containsExactly("견적만현장 (시공 중): 견적 4,000,000원, 매입 미입력");
         assertThat(facts.biddingSites()).containsExactly("입찰현장 (수주 전): 계약 전 견적 5,000,000원");
+        // 마진율은 stats 평균(35.00%)이 아니라 매입 입력 현장 3개만으로: 2,950,000 / 13,000,000 = 22.69%
+        assertThat(facts.averageMarginRate()).isEqualTo("22.69%");
         assertThat(facts.nextActions()).containsExactly(
                 "적자현장: 매입 내역과 추가공사 견적 누락 여부 확인",
                 "저마진현장: 남은 매입 계획과 마진 확인",
+                "매입 입력 필요(1개)",
                 "빈현장: 견적 등록",
                 "매입만현장: 견적 등록");
 
         String prompt = facts.toPrompt();
         assertThat(prompt)
-                .contains("- 손익 평가 대상 현장: 3개 (견적 미등록 2개, 수주 전 1개는 평가 제외)")
-                .contains("- 합계(수주 전 제외, 견적 미등록 현장의 매입 포함): 견적 13,000,000원, 매입 11,050,000원, 마진 1,950,000원, 마진율 15.00%")
+                .contains("- 손익 평가 대상 현장: 3개 (매입 미입력 1개, 견적 미등록 2개, 수주 전 1개는 평가 제외)")
+                .contains("- 합계(수주 전 제외, 견적 미등록 현장의 매입 포함): 견적 17,000,000원, 매입 11,050,000원\n")
+                .contains("- 마진(매입 입력 현장 3개 기준): 견적 13,000,000원, 매입 10,050,000원, 마진 2,950,000원, 마진율 22.69%")
+                .contains("- 매입 미입력 1개 현장은 마진율 계산에서 제외")
                 .contains("## 주의 현장 (서버 판정: 적자 또는 마진율 10% 미만)\n\n- 적자현장")
+                .contains("## 매입 미입력 현장 (견적만 등록, 마진율 계산 제외)\n\n- 견적만현장")
                 .contains("## 견적 미등록 현장 (손실 아님, 데이터 없음)\n\n- 빈현장")
-                .doesNotContain("빈현장 (시공 중): 견적 0");
+                .doesNotContain("빈현장 (시공 중): 견적 0")
+                .doesNotContain("100.00%")
+                .doesNotContain("35.00%");
     }
 
     @Test
@@ -115,11 +125,12 @@ class DashboardSummaryFactsTest {
                 ### 1. 전체 현황
 
                 - 전체 현장 4개 (수주 전 1개, 시공 중 2개, 정산 중 1개)
-                - 손익 평가 대상 2개, 견적 미등록 1개, 수주 전 1개
+                - 손익 평가 대상 2개, 매입 미입력 0개, 견적 미등록 1개, 수주 전 1개
 
                 ### 2. 손익
 
-                - 합계(수주 전 제외): 견적 11,000,000원, 매입 8,200,000원, 마진 2,800,000원, 마진율 25.45%
+                - 합계(수주 전 제외): 견적 11,000,000원, 매입 8,200,000원
+                - 마진(매입 입력 현장 2개 기준): 견적 11,000,000원, 매입 8,200,000원, 마진 2,800,000원, 마진율 25.45%
                 - 견적 미등록 현장은 손실이 아니라 아직 데이터가 없는 상태라 손익 평가에서 뺐습니다.
                 - 수주 전 현장은 계약 전 견적이라 손익 평가에서 뺐습니다.
 
@@ -142,6 +153,36 @@ class DashboardSummaryFactsTest {
                 .contains("### 3. 주의 현장\n\n- 주의할 현장이 없습니다.")
                 .endsWith("### 4. 다음 할 일\n\n- 지금 따로 조치할 일은 없습니다.")
                 .doesNotContain("견적 미등록 현장은");
+    }
+
+    @Test
+    void 매입_미입력_현장만_있으면_마진율을_계산하지_않고_매입_입력을_할_일로_준다() {
+        DashboardSummaryFacts facts = DashboardSummaryFacts.from(stats(Map.of("IN_PROGRESS", 1, "COMPLETED", 1),
+                "7000000", "0", "100.00",
+                site("가현장", "IN_PROGRESS", "3000000", "0", "100.00"),
+                site("나현장", "COMPLETED", "4000000", "0", "100.00")));
+
+        assertThat(facts.hasData()).isTrue();
+        assertThat(facts.evaluatedSites()).isEmpty();
+        assertThat(facts.warningSites()).isEmpty();
+        assertThat(facts.noPurchaseSites()).containsExactly(
+                "가현장 (시공 중): 견적 3,000,000원, 매입 미입력",
+                "나현장 (완료): 견적 4,000,000원, 매입 미입력");
+        assertThat(facts.averageMarginRate()).isEqualTo(DashboardSummaryFacts.NO_PURCHASE_RATE);
+        assertThat(facts.nextActions()).containsExactly("매입 입력 필요(2개)");
+        assertThat(facts.toPrompt())
+                .contains("- 마진율: 매입이 입력된 현장이 없어 마진율을 계산하지 않음")
+                .contains("- 매입 미입력 2개 현장은 마진율 계산에서 제외")
+                .doesNotContain("100.00%");
+        assertThat(facts.deterministicSummary())
+                .contains("- 손익 평가 대상 0개, 매입 미입력 2개, 견적 미등록 0개, 수주 전 0개")
+                .contains("- 합계(수주 전 제외): 견적 7,000,000원, 매입 미입력\n- 마진율: 매입이 입력된 현장이 없어 마진율을 계산하지 않음\n"
+                        + "- 매입 미입력 2개 현장은 마진율 계산에서 제외")
+                .contains("### 3. 주의 현장\n\n- 적자·저마진으로 판정된 현장은 없습니다. 매입 미입력 2개 현장은 매입을 입력해야 손익을 판단할 수 있습니다.")
+                .endsWith("### 4. 다음 할 일\n\n- 매입 입력 필요(2개)")
+                .doesNotContain("주의할 현장이 없습니다")
+                .doesNotContain("매입 0원")
+                .doesNotContain("100.00%");
     }
 
     @Test

@@ -20,8 +20,10 @@ import java.util.Map;
  * <ul>
  *   <li>견적 합계 0 → 견적 미등록(데이터 없음). 손익·마진율 평가와 주의 판정에서 뺀다.</li>
  *   <li>수주 전(BIDDING) → 계약 전 견적. 손익 평가에서 뺀다.</li>
+ *   <li>매입 합계 0 → 매입 미입력(견적만 등록). "매입 0원, 마진율 100%"로 보이지 않게 손익·마진율 평가와 주의 판정에서 뺀다.</li>
  *   <li>그 외 → 마진 &lt; 0이면 적자, 마진율 &lt; 10%면 저마진, 나머지는 정상.</li>
- *   <li>다음 할 일도 적자 → 저마진 → 견적 미등록 순으로 서버가 정한다.</li>
+ *   <li>마진·마진율 합계는 손익 평가 대상(매입이 입력된 현장)만으로 서버가 계산한다.</li>
+ *   <li>다음 할 일도 적자 → 저마진 → 매입 입력 → 견적 미등록 순으로 서버가 정한다.</li>
  * </ul>
  * 금액·비율은 실행 환경 로케일과 무관하게 Locale.ROOT로 미리 문자열화한다.
  */
@@ -31,10 +33,13 @@ public record DashboardSummaryFacts(
         List<String> evaluatedSites,
         List<String> warningSites,
         List<String> noEstimateSites,
+        List<String> noPurchaseSites,
         List<String> biddingSites,
         List<String> nextActions,
         String totalEstimate,
         String totalPurchase,
+        String evaluatedEstimate,
+        String evaluatedPurchase,
         String totalMargin,
         String averageMarginRate,
         boolean hasData,
@@ -42,6 +47,9 @@ public record DashboardSummaryFacts(
 ) {
 
     static final BigDecimal LOW_MARGIN_RATE = BigDecimal.TEN;
+
+    static final String NO_EVALUATED_RATE = "평가 대상 없음";
+    static final String NO_PURCHASE_RATE = "매입이 입력된 현장이 없어 마진율을 계산하지 않음";
 
     static final String NO_SITE_MESSAGE =
             "아직 등록된 현장이 없습니다. 현장을 만들고 견적·매입을 등록하면 손익 요약을 볼 수 있습니다.";
@@ -52,12 +60,15 @@ public record DashboardSummaryFacts(
         List<String> evaluated = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         List<String> noEstimate = new ArrayList<>();
+        List<String> noPurchase = new ArrayList<>();
         List<String> bidding = new ArrayList<>();
         List<String> lossActions = new ArrayList<>();
         List<String> lowMarginActions = new ArrayList<>();
         List<String> estimateActions = new ArrayList<>();
         List<String> names = new ArrayList<>();
         boolean hasData = false;
+        BigDecimal evaluatedEstimate = BigDecimal.ZERO;
+        BigDecimal evaluatedPurchase = BigDecimal.ZERO;
 
         for (SiteProfitSummary site : sites) {
             BigDecimal estimate = orZero(site.getEstimateAmount());
@@ -83,6 +94,13 @@ public record DashboardSummaryFacts(
                 bidding.add(label + ": 계약 전 견적 " + won(estimate));
                 continue;
             }
+            if (purchase.signum() == 0) {
+                // 과거 견적만 등록하고 매입을 아직 넣지 않은 현장. 마진율 100%로 합산하면 손익을 부풀린다.
+                noPurchase.add(label + ": 견적 " + won(estimate) + ", 매입 미입력");
+                continue;
+            }
+            evaluatedEstimate = evaluatedEstimate.add(estimate);
+            evaluatedPurchase = evaluatedPurchase.add(purchase);
             String line = label + ": 견적 " + won(estimate) + ", 매입 " + won(purchase)
                     + ", 마진 " + won(margin) + ", 마진율 " + percent(rate);
             evaluated.add(line);
@@ -96,9 +114,20 @@ public record DashboardSummaryFacts(
         }
 
         boolean anyEvaluated = !evaluated.isEmpty();
-        // 우선순위: 적자 → 저마진 → 견적 미등록. 모델이 할 일을 새로 만들지 않도록 서버가 정한다.
+        BigDecimal evaluatedMargin = evaluatedEstimate.subtract(evaluatedPurchase);
+        String rate;
+        if (anyEvaluated) {
+            rate = percent(evaluatedMargin.multiply(BigDecimal.valueOf(100))
+                    .divide(evaluatedEstimate, 2, RoundingMode.HALF_UP));
+        } else {
+            rate = noPurchase.isEmpty() ? NO_EVALUATED_RATE : NO_PURCHASE_RATE;
+        }
+        // 우선순위: 적자 → 저마진 → 매입 입력 → 견적 미등록. 모델이 할 일을 새로 만들지 않도록 서버가 정한다.
         List<String> actions = new ArrayList<>(lossActions);
         actions.addAll(lowMarginActions);
+        if (!noPurchase.isEmpty()) {
+            actions.add("매입 입력 필요(" + noPurchase.size() + "개)");
+        }
         actions.addAll(estimateActions);
         return new DashboardSummaryFacts(
                 stats.getTotalSites(),
@@ -106,12 +135,17 @@ public record DashboardSummaryFacts(
                 List.copyOf(evaluated),
                 List.copyOf(warnings),
                 List.copyOf(noEstimate),
+                List.copyOf(noPurchase),
                 List.copyOf(bidding),
                 List.copyOf(actions),
                 won(orZero(stats.getTotalEstimateAmount())),
-                won(orZero(stats.getTotalPurchaseAmount())),
-                won(orZero(stats.getTotalMargin())),
-                anyEvaluated ? percent(orZero(stats.getAverageMarginRate())) : "평가 대상 없음",
+                // 매입 미입력 현장만 있어 매입 합계가 0이면 "매입 0원" 대신 미입력으로 적는다.
+                orZero(stats.getTotalPurchaseAmount()).signum() == 0 && !noPurchase.isEmpty()
+                        ? "미입력" : won(orZero(stats.getTotalPurchaseAmount())),
+                won(evaluatedEstimate),
+                won(evaluatedPurchase),
+                won(evaluatedMargin),
+                rate,
                 hasData,
                 List.copyOf(names));
     }
@@ -133,11 +167,15 @@ public record DashboardSummaryFacts(
         StringBuilder sb = new StringBuilder();
         sb.append("### 1. 전체 현황\n\n");
         sb.append("- 전체 현장 ").append(totalSites).append("개 (").append(statusCounts).append(")\n");
-        sb.append("- 손익 평가 대상 ").append(evaluatedSites.size()).append("개, 견적 미등록 ")
+        sb.append("- 손익 평가 대상 ").append(evaluatedSites.size()).append("개, 매입 미입력 ")
+                .append(noPurchaseSites.size()).append("개, 견적 미등록 ")
                 .append(noEstimateSites.size()).append("개, 수주 전 ").append(biddingSites.size()).append("개\n\n");
         sb.append("### 2. 손익\n\n");
-        sb.append("- 합계(수주 전 제외): 견적 ").append(totalEstimate).append(", 매입 ").append(totalPurchase)
-                .append(", 마진 ").append(totalMargin).append(", 마진율 ").append(averageMarginRate).append('\n');
+        sb.append("- 합계(수주 전 제외): 견적 ").append(totalEstimate).append(", 매입 ").append(totalPurchase).append('\n');
+        sb.append("- ").append(marginLine()).append('\n');
+        if (!noPurchaseSites.isEmpty()) {
+            sb.append("- ").append(noPurchaseExclusion()).append('\n');
+        }
         if (!noEstimateSites.isEmpty()) {
             sb.append("- 견적 미등록 현장은 손실이 아니라 아직 데이터가 없는 상태라 손익 평가에서 뺐습니다.\n");
         }
@@ -146,10 +184,26 @@ public record DashboardSummaryFacts(
         }
         sb.append('\n');
         sb.append("### 3. 주의 현장\n\n");
-        bullets(sb, warningSites, "주의할 현장이 없습니다.");
+        bullets(sb, warningSites, noPurchaseSites.isEmpty()
+                ? "주의할 현장이 없습니다."
+                : "적자·저마진으로 판정된 현장은 없습니다. 매입 미입력 " + noPurchaseSites.size()
+                        + "개 현장은 매입을 입력해야 손익을 판단할 수 있습니다.");
         sb.append("### 4. 다음 할 일\n\n");
         bullets(sb, nextActions, "지금 따로 조치할 일은 없습니다.");
         return sb.toString().strip();
+    }
+
+    /** 마진·마진율 문장. 손익 평가 대상(매입 입력 현장)이 없으면 계산하지 않았다는 사실만 적는다. */
+    private String marginLine() {
+        if (evaluatedSites.isEmpty()) {
+            return "마진율: " + averageMarginRate;
+        }
+        return "마진(매입 입력 현장 " + evaluatedSites.size() + "개 기준): 견적 " + evaluatedEstimate
+                + ", 매입 " + evaluatedPurchase + ", 마진 " + totalMargin + ", 마진율 " + averageMarginRate;
+    }
+
+    private String noPurchaseExclusion() {
+        return "매입 미입력 " + noPurchaseSites.size() + "개 현장은 마진율 계산에서 제외";
     }
 
     private static void bullets(StringBuilder sb, List<String> lines, String emptyLine) {
@@ -170,13 +224,20 @@ public record DashboardSummaryFacts(
         sb.append("- 전체 현장 수: ").append(totalSites).append("개\n");
         sb.append("- 상태별: ").append(statusCounts).append('\n');
         sb.append("- 손익 평가 대상 현장: ").append(evaluatedSites.size()).append("개")
-                .append(" (견적 미등록 ").append(noEstimateSites.size()).append("개, 수주 전 ")
+                .append(" (매입 미입력 ").append(noPurchaseSites.size()).append("개, 견적 미등록 ")
+                .append(noEstimateSites.size()).append("개, 수주 전 ")
                 .append(biddingSites.size()).append("개는 평가 제외)\n");
         sb.append("- 합계(수주 전 제외, 견적 미등록 현장의 매입 포함): 견적 ").append(totalEstimate).append(", 매입 ").append(totalPurchase)
-                .append(", 마진 ").append(totalMargin).append(", 마진율 ").append(averageMarginRate).append("\n\n");
+                .append('\n');
+        sb.append("- ").append(marginLine()).append('\n');
+        if (!noPurchaseSites.isEmpty()) {
+            sb.append("- ").append(noPurchaseExclusion()).append('\n');
+        }
+        sb.append('\n');
 
         section(sb, "손익 평가 대상 현장", evaluatedSites);
         section(sb, "주의 현장 (서버 판정: 적자 또는 마진율 10% 미만)", warningSites);
+        section(sb, "매입 미입력 현장 (견적만 등록, 마진율 계산 제외)", noPurchaseSites);
         section(sb, "견적 미등록 현장 (손실 아님, 데이터 없음)", noEstimateSites);
         section(sb, "수주 전 현장 (계약 전, 손익 평가 제외)", biddingSites);
         section(sb, "다음 할 일 (서버 판정, 이 목록만 옮길 것)", nextActions);
