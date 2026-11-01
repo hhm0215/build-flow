@@ -262,6 +262,16 @@ develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에�
 - 검증: 프론트 `bun run lint`(경고 0)·`bun run test`·`bun run build` 로컬 PASS. 세액 계산·덮어쓰기 규칙, KST 오늘, 현장명 매핑, 대시보드 빈 상태, 현장 상세 추가 버튼(보관 현장 비활성 포함)을 Vitest로 고정했다.
 - 브라우저 재실측(같은 날, `bfqaui` 격리 스택의 프론트만 수리본 이미지로 교체, 데이터 유지): 현장 상세 탭별 추가 버튼 노출, 세금계산서 추가 시 현장 미리 선택·공급가액 123,457 → 세액 12,345 자동 채움, 매입 목록 현장 열·매입 등록 매입일 기본 2026-11-01, 세금계산서 목록 현장·발행일 열 PASS. 빈 대시보드 배지는 데이터가 있어 화면 미확인(컴포넌트 테스트로 고정). `main`·공개 VPS 미반영, 실데이터 미사용.
 
+### 2026-11-01 30분 뒤 로그인 화면으로 튕김 — access 재발급 미구현 수리
+
+- **현상**: 로그인 후 약 1시간 다른 일을 하다 `/taxes`로 이동하자 로그인 화면으로 튕겼다(브라우저 실측). auth-service 설정은 access 30분·refresh 7일이다.
+- **원인(프론트)**: 백엔드 `/api/v1/auth/refresh`(본문 `{refreshToken}` → 회전 발급, Gateway 인증 필터 밖, auth `permitAll`, Nginx 로그인 rate limit은 `= /api/v1/auth/login`만 적용)는 정상인데 프론트가 쓰지 않았다. `LoginPage.tsx`가 로그인 응답의 `accessToken`만 저장하고 `refreshToken`을 버렸고(`authStore`에 필드 없음), `axiosInstance.ts` 응답 인터셉터는 보호 API 401이면 곧바로 `logout()` + `/login` 이동만 했다. 라우트 가드(`App.tsx` `PrivateRoute`)는 저장된 `isAuthenticated`만 보므로 재진입 자체는 통과하고, 만료된 access로 나간 첫 API 401에서 튕긴 것이다. `docs/STUDY_GUIDE.md`의 설계(refresh는 Redis + 클라이언트 보관, 401 시 자동 갱신, 실패 시 로그인)가 프론트에 구현되지 않은 상태였다.
+- **수리(프론트만, 백엔드·DTO 변경 없음)**: 로그인 응답의 refresh 토큰을 access와 같은 저장소(`buildflow-auth`)에 보관. 보호 API 401 → refresh 1회 → 새 access로 원 요청 1회 재시도. 동시 401은 refresh 호출 하나를 공유(서버가 refresh를 회전하므로 병렬 호출은 두 번째가 거부돼 세션이 끊김). refresh가 400/401/403/404로 거부되면 로그인으로, 네트워크·5xx는 일시 장애로 보고 세션 유지. 재시도도 401이면 반복 없이 로그인으로. 다른 탭이 먼저 회전한 경우 저장소 새 토큰을 사용하고, `storage` 이벤트로 탭 간 토큰·로그아웃을 동기화. 만료 access로 로그아웃하면 재발급 후 서버 폐기를 재시도(기존 계약대로 폐기 미확인 시 토큰 보존·실패 안내). 채팅 스트림(fetch)도 같은 재발급 경로. MSW에 refresh 핸들러 추가.
+- **함께**: 세금계산서 입금 관리 모달의 입금액 기본값이 `660000.00`으로 보이던 것을 `₩ 660,000`(₩·천 단위 쉼표·정수, 센트가 있으면 그대로)으로. `precision={2}` 대신 반올림 없는 표시/파서를 쓰고 소수 자릿수는 기존 `validatePaymentAmount`가 검증한다.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`·`bun run build` PASS. Vitest로 401→refresh→재시도, 동시 401 단일 refresh, 재진입(만료 access + 유효 refresh) 유지, refresh 거부 시 로그아웃, 일시 장애 시 유지, 재시도 401 루프 방지, 다른 탭 회전, 만료 access 로그아웃 재시도, 채팅 스트림 재시도, MSW refresh 계약, 입금액 형식을 고정했다.
+- **실측(로컬 임시 격리 스택 `bfqasess`, 루프백 13180/18181, auth `JWT_ACCESS_TOKEN_EXPIRATION=60000`, 백엔드는 기존 `bfqaui-*:local` 이미지 재사용·frontend만 수리본 빌드, notification·tax 등 제외, 끝난 뒤 컨테이너·볼륨·자격 파일 삭제)**: Gateway 직접 — 로그인 `expiresIn` 60000, 65초 뒤 만료 access 401, refresh 200·회전, 새 access 200, 이전 refresh 재사용 401, 로그아웃 200 후 그 access 401·refresh 401. 브라우저 — 로그인 후 access 만료 시각을 지나 `/sites`를 새로 고침(앱 재진입)해도 로그인 화면으로 가지 않고, 네트워크에 `401 → POST /auth/refresh 200 → 재시도`가 남고 저장 access 만료 시각이 갱신, 현장 목록 200. 로그아웃 버튼 후 저장소 토큰 null, 직전 refresh로 재발급 시도 401. 입금 관리 모달은 tax-service를 띄우지 않아 컴포넌트 테스트로만 확인.
+- **남은 위험**: refresh 토큰(7일)이 access와 같이 `localStorage`에 있어 XSS 시 탈취 창이 30분 → 최대 7일로 늘어난다(실데이터 승격 게이트의 "세션 저장소/XSS 방어"에 해당). HttpOnly 쿠키 전환은 별도 설계 결정. auth-service는 refresh를 사용자당 키 1개(`auth:refresh:{userId}`)로 두므로 두 기기 이상 동시 사용 시 한 기기의 로그인·재발급이 다른 기기의 refresh를 무효화해 그 기기는 access 만료 때 로그인으로 간다(기기별 키는 Redis 키·로그아웃 범위 설계 결정). 서버 refresh 대조·교체가 원자적이지 않다(동시 같은 토큰 2회 성공 가능).
+
 ## 업무 흐름 적합성 점검
 
 | 단계 | 현재 구현·확인 | 다음 확인/결정 |

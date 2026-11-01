@@ -1,6 +1,5 @@
 import { useAuthStore } from '../stores/authStore'
-import { handleSessionExpired } from './axiosInstance'
-import axiosInstance from './axiosInstance'
+import axiosInstance, { handleSessionExpired, refreshAccessToken } from './axiosInstance'
 import { CHAT_STREAM_EVENTS } from '../types/chat.types'
 import type { ChatStreamEvent } from '../types/chat.types'
 
@@ -54,8 +53,7 @@ export async function streamChat(
   signal: AbortSignal,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
-  const token = useAuthStore.getState().accessToken
-  const response = await fetch('/api/v1/chat/stream', {
+  const send = (token: string | null) => fetch('/api/v1/chat/stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -65,9 +63,20 @@ export async function streamChat(
     signal,
   })
 
+  let response = await send(useAuthStore.getState().accessToken)
   if (response.status === 401) {
-    handleSessionExpired()
-    throw new Error('인증이 만료되었습니다.')
+    // axios 인터셉터와 같은 재발급 경로 — access 만료면 한 번 갱신 후 재시도한다.
+    let refreshed: string | null
+    try {
+      refreshed = await refreshAccessToken()
+    } catch {
+      throw new Error('인증 갱신에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    }
+    if (refreshed) response = await send(refreshed)
+    if (!refreshed || response.status === 401) {
+      handleSessionExpired()
+      throw new Error('인증이 만료되었습니다.')
+    }
   }
   if (!response.ok || !response.body) throw new Error('채팅 서비스에 연결할 수 없습니다.')
   await consumeSseStream(response.body, onEvent)

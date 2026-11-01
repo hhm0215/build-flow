@@ -13,6 +13,22 @@ export function centsToAmount(cents: bigint): number {
   return Number(cents) / 100
 }
 
+/**
+ * 입금액 InputNumber 표시 형식 — 다른 금액 입력(보증금액 등)과 같은 `₩ 660,000`.
+ * 정수는 소수점 없이, 센트가 있으면 그대로(`₩ 1,234.5`) 보여준다. 쉼표는 정수부에만 넣는다.
+ */
+export function formatWonInput(value: number | string | undefined): string {
+  if (value == null || `${value}` === '') return ''
+  const [integer, fraction] = `${value}`.split('.')
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `₩ ${grouped}${fraction !== undefined ? `.${fraction}` : ''}`
+}
+
+/** formatWonInput의 역변환. 반올림하지 않으므로 소수 3자리 이상은 validatePaymentAmount가 거부한다. */
+export function parseWonInput(value: string | undefined): number {
+  return (value ?? '').replace(/₩\s?|,/g, '') as unknown as number
+}
+
 /** 매출 수금 상태. 매입은 null. 구버전 응답(paymentStatus 없음)은 완료 여부로 대체한다. */
 export function paymentStatusOf(invoice: TaxInvoice): TaxPaymentStatus | null {
   if (invoice.type !== 'SALES') return null

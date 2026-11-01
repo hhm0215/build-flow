@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import type { TaxInvoice } from '../types'
-import { hasActivePayment, paymentStatusOf, remainingOf, validatePaymentAmount } from './taxPayment'
+import {
+  formatWonInput, hasActivePayment, parseWonInput, paymentStatusOf, remainingOf, validatePaymentAmount,
+} from './taxPayment'
+
+describe('입금액 입력 형식', () => {
+  it('₩·천 단위 쉼표·정수 표시로 기본값을 보여주고 센트는 보존한다', () => {
+    expect(formatWonInput(660000)).toBe('₩ 660,000')
+    expect(formatWonInput('660000')).toBe('₩ 660,000')
+    expect(formatWonInput(1234567.5)).toBe('₩ 1,234,567.5')
+    expect(formatWonInput('1234.5678')).toBe('₩ 1,234.5678')
+    expect(formatWonInput(undefined)).toBe('')
+    expect(formatWonInput('')).toBe('')
+  })
+
+  it('표시 문자열을 반올림 없이 숫자 문자열로 되돌린다', () => {
+    expect(`${parseWonInput('₩ 660,000')}`).toBe('660000')
+    expect(`${parseWonInput('₩ 1,234.567')}`).toBe('1234.567')
+    expect(`${parseWonInput(undefined)}`).toBe('')
+  })
+})
 
 const base: TaxInvoice = {
   id: 1, siteId: 1, type: 'SALES', supplyAmount: 100, taxAmount: 10, totalAmount: 110,
