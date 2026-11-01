@@ -5,6 +5,10 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 경로·쿼리 타입 오류 400 처리 (2026-11-01, `claude/type-mismatch-400`)
+
+- 7개 서비스 `GlobalExceptionHandler`에 `MethodArgumentTypeMismatchException`·`MissingServletRequestParameterException` → 400(파라미터명만 노출, 입력값 미반사), 서비스별 MockMvc 테스트 3건. 로컬 `./gradlew test` PASS, develop 대상 PR.
+
 ## 검증된 작업 — 404·거래처 관리·채팅 멈춤·AI 파싱·CI Kafka OOM, 진행률 69/100 (2026-11-01, PR #269~#276)
 
 - #269 없는 주소·없는 현장 404 안내, #271 거래처 관리 화면, #273 현장 목록 거래처 필터, #272 main 릴리스 `287118e`.
