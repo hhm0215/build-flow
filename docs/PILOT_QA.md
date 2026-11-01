@@ -330,7 +330,7 @@ develop `a3b35ee`를 기준으로 한 브랜치 `claude/warranty-ocr-local`에�
 - **현상(로컬 격리 스택 브라우저 실측, 실제 Ollama)**: 채팅에 "안녕하세요"를 보내면 `/api/v1/chat/stream`이 200으로 시작한 뒤 화면 전체가 비었다(본문 텍스트 0). 콘솔 `TypeError: c is not a function`, 압축 안 한 빌드에서 React `commitHookEffectListUnmount`의 `destroy()` 호출 지점.
 - **원인**: `ChatPanel` 자동 스크롤 effect가 식 본문 화살표라 `scrollIntoView` 반환값을 그대로 돌려줬다. 최신 Chromium의 `scrollIntoView`는 Promise를 반환하므로 React가 그 값을 정리 함수로 호출하다 실패했고, 에러 바운더리가 없어 루트 전체가 언마운트됐다.
 - **수리(프론트만, API 계약 변경 없음)**: effect를 블록 본문으로 바꿔 아무것도 반환하지 않는다. 같은 패턴은 저장소에 이 1곳뿐이었다. 재발 방지로 ESLint `no-restricted-syntax` 규칙을 추가해 `useEffect`·`useLayoutEffect`·`useInsertionEffect`(및 `React.` 접두) 콜백의 식 본문을 오류로 막는다(정리 함수를 바로 반환하는 `() => () => ...`는 허용, 새 의존성 없음). 레이아웃의 페이지 영역(라우트 출력, 경로가 바뀌면 자동 해제)과 채팅 패널을 각각 `ErrorBoundary`로 감싸 오류 시 antd `Result` 안내 "문제가 생겼습니다. 다시 시도해 주세요."와 `다시 시도` 버튼을 보인다. 채팅 오류는 페이지를 지우지 않는다. 오류 원문·스택(토큰이 섞일 수 있음)은 화면과 콘솔 기록에 남기지 않고 영역 이름·오류 종류만 기록한다.
-- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(66파일 306테스트)·`bun run build` PASS. Vitest로 `scrollIntoView`가 Promise를 반환하는 목에서 스트리밍 렌더·완료·언마운트가 예외 없이 동작함(수리 전 코드에서는 `destroy is not a function`으로 실패 재현), 에러 바운더리의 안내 표시·토큰 비노출·다시 시도 리셋·경로 변경 리셋·형제 영역 보존을 고정했다. 브라우저 재확인(실제 Ollama로 채팅 질문 후 화면 유지)은 **PENDING**.
+- **검증**: 프론트 `bun run lint`(경고 0)·`bun run test`(66파일 306테스트)·`bun run build` PASS. Vitest로 `scrollIntoView`가 Promise를 반환하는 목에서 스트리밍 렌더·완료·언마운트가 예외 없이 동작함(수리 전 코드에서는 `destroy is not a function`으로 실패 재현), 에러 바운더리의 안내 표시·토큰 비노출·다시 시도 리셋·경로 변경 리셋·형제 영역 보존을 고정했다. 브라우저 재확인 PASS(2026-11-01, `bfqaui` 격리 스택·실제 Ollama qwen2.5:7b: 질문 후 앱 유지, 손익 답변 견적 600,000·매입 260,000·마진 340,000·56.67% 정확).
 
 ## 업무 흐름 적합성 점검
 
