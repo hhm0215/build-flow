@@ -153,4 +153,30 @@ class DashboardServiceTest {
         assertThat(facts.warningSites()).containsExactly("적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)");
         assertThat(facts.noEstimateSites()).containsExactly("빈현장 (시공 중): 견적·매입 미등록");
     }
+
+    @Test
+    void 모델_출력이_검증에_걸리면_서버_결정_문구로_바꾼다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "적자현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "1200")));
+        when(ollama.generateSummary(any())).thenReturn("적자현장은 마argin율 -20.00%입니다. 지금 따로 조치할 일은 없습니다.");
+
+        DashboardSummaryResponse summary = service.getSummary();
+
+        assertThat(summary.getSummary())
+                .startsWith("### 1. 전체 현황")
+                .contains("- 적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)")
+                .contains("- 적자현장: 매입 내역과 추가공사 견적 누락 여부 확인")
+                .doesNotContain("argin")
+                .doesNotContain("조치할 일은 없습니다");
+    }
+
+    @Test
+    void 모델_출력이_검증을_통과하면_그대로_쓴다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "Alpha현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "600")));
+        String output = "Alpha현장 (시공 중)은 마진 400원, 마진율 40.00%로 정상입니다. 지금 따로 조치할 일은 없습니다.";
+        when(ollama.generateSummary(any())).thenReturn(output);
+
+        assertThat(service.getSummary().getSummary()).isEqualTo(output);
+    }
 }

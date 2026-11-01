@@ -37,7 +37,8 @@ public record DashboardSummaryFacts(
         String totalPurchase,
         String totalMargin,
         String averageMarginRate,
-        boolean hasData
+        boolean hasData,
+        List<String> siteNames
 ) {
 
     static final BigDecimal LOW_MARGIN_RATE = BigDecimal.TEN;
@@ -55,6 +56,7 @@ public record DashboardSummaryFacts(
         List<String> lossActions = new ArrayList<>();
         List<String> lowMarginActions = new ArrayList<>();
         List<String> estimateActions = new ArrayList<>();
+        List<String> names = new ArrayList<>();
         boolean hasData = false;
 
         for (SiteProfitSummary site : sites) {
@@ -64,6 +66,9 @@ public record DashboardSummaryFacts(
             BigDecimal rate = orZero(site.getMarginRate());
             if (estimate.signum() != 0 || purchase.signum() != 0) {
                 hasData = true;
+            }
+            if (site.getSiteName() != null && !site.getSiteName().isBlank()) {
+                names.add(site.getSiteName());
             }
             String label = site.getSiteName() + " (" + SiteStatus.labelOf(site.getStatus()) + ")";
 
@@ -107,7 +112,8 @@ public record DashboardSummaryFacts(
                 won(orZero(stats.getTotalPurchaseAmount())),
                 won(orZero(stats.getTotalMargin())),
                 anyEvaluated ? percent(orZero(stats.getAverageMarginRate())) : "평가 대상 없음",
-                hasData);
+                hasData,
+                List.copyOf(names));
     }
 
     /** 견적·매입이 하나도 없을 때 모델 대신 돌려줄 결정적 안내. */
@@ -117,6 +123,44 @@ public record DashboardSummaryFacts(
         }
         return NO_DATA_MESSAGE_PREFIX + " 등록된 현장 " + totalSites + "개는 손실이 아니라 아직 데이터가 없는 상태입니다."
                 + " 견적을 등록하면 손익 요약을 볼 수 있습니다.";
+    }
+
+    /**
+     * 모델 출력이 사후 검증에 걸렸을 때 대신 돌려줄 결정적 요약. 사실 목록을 템플릿 문장으로만 옮긴다.
+     * 구성은 시스템 프롬프트와 같은 1. 전체 현황 2. 손익 3. 주의 현장 4. 다음 할 일.
+     */
+    public String deterministicSummary() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("### 1. 전체 현황\n\n");
+        sb.append("- 전체 현장 ").append(totalSites).append("개 (").append(statusCounts).append(")\n");
+        sb.append("- 손익 평가 대상 ").append(evaluatedSites.size()).append("개, 견적 미등록 ")
+                .append(noEstimateSites.size()).append("개, 수주 전 ").append(biddingSites.size()).append("개\n\n");
+        sb.append("### 2. 손익\n\n");
+        sb.append("- 합계(수주 전 제외): 견적 ").append(totalEstimate).append(", 매입 ").append(totalPurchase)
+                .append(", 마진 ").append(totalMargin).append(", 마진율 ").append(averageMarginRate).append('\n');
+        if (!noEstimateSites.isEmpty()) {
+            sb.append("- 견적 미등록 현장은 손실이 아니라 아직 데이터가 없는 상태라 손익 평가에서 뺐습니다.\n");
+        }
+        if (!biddingSites.isEmpty()) {
+            sb.append("- 수주 전 현장은 계약 전 견적이라 손익 평가에서 뺐습니다.\n");
+        }
+        sb.append('\n');
+        sb.append("### 3. 주의 현장\n\n");
+        bullets(sb, warningSites, "주의할 현장이 없습니다.");
+        sb.append("### 4. 다음 할 일\n\n");
+        bullets(sb, nextActions, "지금 따로 조치할 일은 없습니다.");
+        return sb.toString().strip();
+    }
+
+    private static void bullets(StringBuilder sb, List<String> lines, String emptyLine) {
+        if (lines.isEmpty()) {
+            sb.append("- ").append(emptyLine).append("\n\n");
+            return;
+        }
+        for (String line : lines) {
+            sb.append("- ").append(line).append('\n');
+        }
+        sb.append('\n');
     }
 
     /** 모델에 넘길 사실 목록. 판단은 모두 여기서 끝나 있다. */
