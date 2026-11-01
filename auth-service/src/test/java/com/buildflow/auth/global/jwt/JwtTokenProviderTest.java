@@ -18,6 +18,18 @@ class JwtTokenProviderTest {
     private final JwtTokenProvider tokens = new JwtTokenProvider(SECRET, 1_800_000L, 604_800_000L, 604_800_000L, 30_000L);
 
     @Test
+    void reuseGraceMustBeNonNegativeAndShorterThanRefreshTtl() {
+        assertEquals(0L, new JwtTokenProvider(SECRET, 1_800_000L, 60_000L, 60_000L, 0L).getRefreshReuseGrace());
+        assertEquals(59_999L, new JwtTokenProvider(SECRET, 1_800_000L, 60_000L, 60_000L, 59_999L).getRefreshReuseGrace());
+        assertThrows(IllegalArgumentException.class,
+                () -> new JwtTokenProvider(SECRET, 1_800_000L, 60_000L, 60_000L, 60_000L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new JwtTokenProvider(SECRET, 1_800_000L, 60_000L, 60_000L, 120_000L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new JwtTokenProvider(SECRET, 1_800_000L, 60_000L, 60_000L, -1L));
+    }
+
+    @Test
     void accessTokenUsesAdminLoginIdAndVersionTwo() {
         String token = tokens.generateAccessToken(1L, "admin");
 

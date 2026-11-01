@@ -1,14 +1,18 @@
 package com.buildflow.notification.global.kafka;
 
+import com.buildflow.notification.domain.notification.service.NotificationMessageFormatter;
 import com.buildflow.notification.domain.notification.service.NotificationService;
+import com.buildflow.notification.domain.notification.service.SiteNameResolver;
 import com.buildflow.notification.domain.warranty.service.WarrantyExpiryNotificationService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.UUID;
@@ -20,21 +24,22 @@ public class KafkaConsumerService {
     private final NotificationService notificationService;
     private final WarrantyExpiryNotificationService warrantyExpiryNotificationService;
     private final ObjectMapper objectMapper;
+    private final SiteNameResolver siteNameResolver;
 
     @KafkaListener(topics = "estimate.parsed", groupId = "notification-service-group")
     public void consumeEstimateParsed(String message) {
         Event event = parse(message, "ESTIMATE_PARSED");
+        Long estimateId = requiredId(event.payload(), "estimateId");
+        Long siteId = requiredId(event.payload(), "siteId");
         notificationService.createNotification(event.eventId(), "ESTIMATE_PARSED",
-                String.format("견적서(ID: %d)가 확정되었습니다.", requiredId(event.payload(), "estimateId")),
-                requiredId(event.payload(), "siteId"));
+                NotificationMessageFormatter.estimateConfirmed(siteNameResolver.resolve(siteId), estimateId,
+                        displayText(event.payload(), "title")),
+                siteId);
     }
 
     @KafkaListener(topics = "purchase.registered", groupId = "notification-service-group")
     public void consumePurchaseRegistered(String message) {
-        Event event = parse(message, "PURCHASE_REGISTERED");
-        notificationService.createNotification(event.eventId(), "PURCHASE_REGISTERED",
-                String.format("매입(ID: %d)이 등록되었습니다.", requiredId(event.payload(), "purchaseId")),
-                requiredId(event.payload(), "siteId"));
+        consumePurchase(parse(message, "PURCHASE_REGISTERED"), "PURCHASE_REGISTERED", "등록");
     }
 
     @KafkaListener(topics = "tax.registered", groupId = "notification-service-group")
@@ -44,64 +49,96 @@ public class KafkaConsumerService {
         if (!"SALES".equals(type) && !"PURCHASE".equals(type)) {
             throw new IllegalArgumentException("유효하지 않은 세금계산서 구분입니다.");
         }
+        Long taxInvoiceId = requiredId(event.payload(), "taxInvoiceId");
+        Long siteId = requiredId(event.payload(), "siteId");
         notificationService.createNotification(event.eventId(), "TAX_REGISTERED",
-                String.format("%s 세금계산서(ID: %d)가 등록되었습니다.",
-                        "SALES".equals(type) ? "매출" : "매입", requiredId(event.payload(), "taxInvoiceId")),
-                requiredId(event.payload(), "siteId"));
+                NotificationMessageFormatter.taxRegistered(siteNameResolver.resolve(siteId), "SALES".equals(type),
+                        taxInvoiceId, displayText(event.payload(), "counterparty"),
+                        displayAmount(event.payload(), "totalAmount")),
+                siteId);
     }
 
     @KafkaListener(topics = "tax.payment.confirmed", groupId = "notification-service-group")
     public void consumeTaxPaymentConfirmed(String message) {
         Event event = parse(message, "TAX_PAYMENT_CONFIRMED");
+        Long taxInvoiceId = requiredId(event.payload(), "taxInvoiceId");
+        Long siteId = requiredId(event.payload(), "siteId");
         notificationService.createNotification(event.eventId(), "TAX_PAYMENT_CONFIRMED",
-                String.format("세금계산서(ID: %d) 입금이 확인되었습니다.", requiredId(event.payload(), "taxInvoiceId")),
-                requiredId(event.payload(), "siteId"));
+                NotificationMessageFormatter.taxPaymentConfirmed(siteNameResolver.resolve(siteId), taxInvoiceId,
+                        displayText(event.payload(), "counterparty"),
+                        displayAmount(event.payload(), "totalAmount")),
+                siteId);
     }
 
     @KafkaListener(topics = "estimate.deleted", groupId = "notification-service-group")
     public void consumeEstimateDeleted(String message) {
         Event event = parse(message, "ESTIMATE_DELETED");
         Long estimateId = requiredId(event.payload(), "estimateId");
-        String content = "SUPERSEDED".equals(optionalText(event.payload(), "reason"))
-                ? String.format("견적서(ID: %d)가 수정본(ID: %d) 확정으로 대체되었습니다.",
-                        estimateId, requiredId(event.payload(), "supersededById"))
-                : String.format("견적서(ID: %d)가 삭제되었습니다.", estimateId);
-        notificationService.createNotification(event.eventId(), "ESTIMATE_DELETED", content,
-                requiredId(event.payload(), "siteId"));
+        Long siteId = requiredId(event.payload(), "siteId");
+        boolean superseded = "SUPERSEDED".equals(optionalText(event.payload(), "reason"));
+        Long supersededById = superseded ? requiredId(event.payload(), "supersededById") : null;
+        String siteName = siteNameResolver.resolve(siteId);
+        String title = displayText(event.payload(), "title");
+        String content = superseded
+                ? NotificationMessageFormatter.estimateSuperseded(siteName, estimateId, title, supersededById)
+                : NotificationMessageFormatter.estimateDeleted(siteName, estimateId, title);
+        notificationService.createNotification(event.eventId(), "ESTIMATE_DELETED", content, siteId);
     }
 
     @KafkaListener(topics = "purchase.updated", groupId = "notification-service-group")
     public void consumePurchaseUpdated(String message) {
-        Event event = parse(message, "PURCHASE_UPDATED");
-        notificationService.createNotification(event.eventId(), "PURCHASE_UPDATED",
-                String.format("매입(ID: %d)이 수정되었습니다.", requiredId(event.payload(), "purchaseId")),
-                requiredId(event.payload(), "siteId"));
+        consumePurchase(parse(message, "PURCHASE_UPDATED"), "PURCHASE_UPDATED", "수정");
     }
 
     @KafkaListener(topics = "purchase.deleted", groupId = "notification-service-group")
     public void consumePurchaseDeleted(String message) {
-        Event event = parse(message, "PURCHASE_DELETED");
-        notificationService.createNotification(event.eventId(), "PURCHASE_DELETED",
-                String.format("매입(ID: %d)이 삭제되었습니다.", requiredId(event.payload(), "purchaseId")),
-                requiredId(event.payload(), "siteId"));
+        consumePurchase(parse(message, "PURCHASE_DELETED"), "PURCHASE_DELETED", "삭제");
     }
 
     @KafkaListener(topics = "warranty.expiring", groupId = "notification-service-group")
     public void consumeWarrantyExpiring(String message) {
         Event event = parse(message, "WARRANTY_EXPIRING");
         requiredNonNegativeLong(event.payload(), "daysUntilExpiry");
-        warrantyExpiryNotificationService.consume(event.eventId(),
-                requiredId(event.payload(), "warrantyId"),
-                requiredId(event.payload(), "siteId"),
-                requiredText(event.payload(), "insuranceCompany"),
-                requiredDate(event.payload(), "endDate"),
-                optionalText(event.payload(), "expiryConfirmationRef"));
+        Long warrantyId = requiredId(event.payload(), "warrantyId");
+        Long siteId = requiredId(event.payload(), "siteId");
+        String insuranceCompany = requiredText(event.payload(), "insuranceCompany");
+        LocalDate endDate = requiredDate(event.payload(), "endDate");
+        String expiryConfirmationRef = optionalText(event.payload(), "expiryConfirmationRef");
+        // 현장명 조회는 행 잠금·트랜잭션 밖에서 끝낸다
+        warrantyExpiryNotificationService.consume(event.eventId(), warrantyId, siteId,
+                insuranceCompany, endDate, expiryConfirmationRef, siteNameResolver.resolve(siteId));
+    }
+
+    private void consumePurchase(Event event, String eventType, String action) {
+        Long purchaseId = requiredId(event.payload(), "purchaseId");
+        Long siteId = requiredId(event.payload(), "siteId");
+        notificationService.createNotification(event.eventId(), eventType,
+                NotificationMessageFormatter.purchase(action, siteNameResolver.resolve(siteId), purchaseId,
+                        displayText(event.payload(), "itemName"), displayText(event.payload(), "supplier")),
+                siteId);
+    }
+
+    /** 알림 문구 보강용 선택 필드. 없거나 형식이 달라도(구 이벤트) 소비를 실패시키지 않고 null로 폴백한다. */
+    private String displayText(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private BigDecimal displayAmount(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || !value.isNumber()) {
+            return null;
+        }
+        return value.decimalValue();
     }
 
     private Event parse(String message, String expectedType) {
         final JsonNode root;
         try {
-            root = objectMapper.readTree(message);
+            // 금액 표시가 double 반올림을 거치지 않도록 실수는 BigDecimal로 읽는다
+            root = objectMapper.reader()
+                    .with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+                    .readTree(message);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Kafka 이벤트 JSON을 읽을 수 없습니다.", e);
         }

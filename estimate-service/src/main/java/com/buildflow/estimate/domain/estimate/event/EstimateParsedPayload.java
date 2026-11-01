@@ -26,4 +26,7 @@ public class EstimateParsedPayload {
 
     /** reason=SUPERSEDED일 때 이 견적을 대체한 수정본 id. */
     private Long supersededById;
+
+    /** 알림 문구용 선택 필드(2026-11-01 추가). 구 소비자는 무시하고, 없는 구 이벤트는 ID 문구로 폴백한다. */
+    private String title;
 }
