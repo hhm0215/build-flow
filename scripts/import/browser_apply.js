@@ -170,7 +170,13 @@
       const siteIdOf = async (entry, clientId) => {
         const name = entry.siteName
         const found = matchByName(sites, 'siteName', name, '현장')
-        if (found) return [Number(found.id), false]
+        if (found) {
+          const linked = found.client && found.client.id != null ? Number(found.client.id) : null
+          if (clientId != null && linked != null && linked !== clientId) {
+            throw new StopError(`기존 현장 '${name}'의 거래처가 견적 수신처와 다름 — --site-alias로 이름을 나눠 다시 내보내세요`)
+          }
+          return [Number(found.id), false]
+        }
         const key = siteKey(name)
         const near = sites.find((row) => siteKey(row?.siteName) === key)
         if (near) throw new StopError(`기존 현장 '${near.siteName}'과 띄어쓰기·기호만 다름 — --site-alias로 적재 이름을 확정한 뒤 다시 내보내세요`)

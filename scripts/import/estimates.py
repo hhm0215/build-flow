@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
@@ -63,11 +64,30 @@ def folder_year_of(path: Path) -> Optional[int]:
     return None
 
 
-def folder_site_candidate(path: Path) -> Optional[str]:
-    """파일이 든 폴더 이름. 연도 폴더(2026 등)·빈 이름은 후보가 아니다."""
-    name = re.sub(r"\s+", " ", path.resolve().parent.name).strip()
+FOLDER_DATE = re.compile(r"(\d{4}\s*년\s*)?\d{1,2}\s*월\s*\d{1,2}\s*일|\d{4}[.\-]\d{1,2}[.\-]\d{1,2}|\d{1,2}[.\-]\d{1,2}")
+
+
+def _folder_name(folder: Path) -> str:
+    # 제어·사용자 정의 영역 글자(엑셀/메신저에서 섞여 온  등)는 버린다
+    cleaned = "".join(ch for ch in folder.name if unicodedata.category(ch) not in {"Cc", "Cf", "Co", "Cs"})
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def folder_site_candidate(path: Path, client_name: str = "") -> Optional[str]:
+    """파일이 든 폴더 이름. 연도 폴더(2026 등)·빈 이름은 후보가 아니다.
+
+    날짜 폴더(예: '거래처/11월 6일/')는 날짜만으로 현장을 가릴 수 없으므로 위 폴더 이름을 앞에 붙인다.
+    위 폴더가 '2025년 견적서'처럼 연도가 든 모음 폴더면 견적 수신처(거래처) 이름을 대신 붙인다.
+    """
+    folder = path.resolve().parent
+    name = _folder_name(folder)
     if not name or FOLDER_YEAR.fullmatch(name):
         return None
+    if FOLDER_DATE.fullmatch(name):
+        upper = _folder_name(folder.parent)
+        prefix = upper if upper and not re.search(r"\d{4}", upper) else client_name.strip()
+        if prefix:
+            name = f"{prefix} {name}"
     return name[:200]
 
 
@@ -123,7 +143,7 @@ def build_plan(path: Path, ledger: Ledger, base_url: str, args: argparse.Namespa
 
     plan.raw_site_name = parsed.site_name
     if not parsed.site_name:
-        candidate = folder_site_candidate(path)
+        candidate = folder_site_candidate(path, parsed.client_name)
         if candidate and args.site_from_folder:
             plan.raw_site_name, plan.site_source = candidate, "folder"
             plan.errors = [e for e in plan.errors if e != SITE_MISSING_ERROR]
@@ -184,6 +204,13 @@ def analyze_site_names(plans: list[Plan], aliases: dict[str, tuple[str, str]]) -
                 for plan in plans:
                     if plan.raw_site_name in names and plan.parsed is not None:
                         plan.blockers.append("같은 현장 후보(띄어쓰기·기호만 다름) 미확정 — --site-alias로 적재 이름 확정")
+    clients_of: dict[str, set[str]] = {}
+    for plan in plans:
+        if plan.parsed is not None and plan.site_name and not plan.duplicate_of and plan.parsed.client_name:
+            clients_of.setdefault(plan.site_name, set()).add(plan.parsed.client_name)
+    for plan in plans:
+        if plan.parsed is not None and len(clients_of.get(plan.site_name, ())) > 1:
+            plan.blockers.append("같은 현장명에 거래처가 여럿 — 다른 현장이면 --site-alias로 이름을 나눠 확정")
     similar = []
     keys = sorted(k for k in by_key if len(k) >= 3)
     for i, left in enumerate(keys):
@@ -318,7 +345,8 @@ class Resolver:
             linked = (found.get("client") or {}).get("id")
             note = None
             if client_id is not None and linked is not None and int(linked) != client_id:
-                note = "기존 현장의 거래처가 견적 수신처와 다름(현장은 그대로 둠)"
+                # 날짜 폴더처럼 흔한 이름은 다른 거래처의 다른 현장일 수 있어 합치지 않는다
+                raise ApiError(409, f"기존 현장 '{name}'의 거래처가 견적 수신처와 다름 — --site-alias로 이름을 나눠 다시 실행")
             return int(found["id"]), False, note
         key = site_key(name)
         near = [str(row.get("siteName")) for row in self.sites if site_key(str(row.get("siteName") or "")) == key]
