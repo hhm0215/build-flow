@@ -9,15 +9,21 @@ import com.buildflow.site.domain.site.entity.Site;
 import com.buildflow.site.domain.site.entity.SiteStatus;
 import com.buildflow.site.domain.site.repository.SiteRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** 대시보드 전체 손익은 현장별 손익 합계로 계산하고, 손익 기록이 없는 현장은 0으로 보여 준다. */
@@ -32,6 +38,12 @@ class DashboardServiceTest {
         Site site = Site.builder().siteName(name).build();
         ReflectionTestUtils.setField(site, "id", id);
         site.changeStatus(status);
+        return site;
+    }
+
+    private static Site archived(long id, String name, SiteStatus status) {
+        Site site = site(id, name, status);
+        site.archive(LocalDateTime.of(2026, 11, 1, 9, 0));
         return site;
     }
 
@@ -110,14 +122,139 @@ class DashboardServiceTest {
     }
 
     @Test
-    void 요약은_집계를_모델에_넘기고_생성_시각을_붙인다() {
+    void 현장이_없으면_모델을_부르지_않고_결정적_안내를_준다() {
         when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
         when(profits.findBySiteIdIn(any())).thenReturn(List.of());
+
+        DashboardSummaryResponse summary = service.getSummary();
+
+        assertThat(summary.getSummary()).isEqualTo(DashboardSummaryFacts.NO_SITE_MESSAGE);
+        assertThat(summary.getGeneratedAt()).isNotNull();
+        verifyNoInteractions(ollama);
+    }
+
+    @Test
+    void 견적_매입이_없는_현장만_있으면_모델을_부르지_않고_손실로_말하지_않는다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "[QA] AI 요약 현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of());
+
+        DashboardSummaryResponse summary = service.getSummary();
+
+        assertThat(summary.getSummary()).startsWith(DashboardSummaryFacts.NO_DATA_MESSAGE_PREFIX).doesNotContain("적자");
+        verifyNoInteractions(ollama);
+    }
+
+    @Test
+    void 데이터가_있으면_서버가_분류한_사실을_모델에_넘기고_생성_시각을_붙인다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                site(2, "빈현장", SiteStatus.IN_PROGRESS),
+                site(1, "적자현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "1200")));
         when(ollama.generateSummary(any())).thenReturn("요약");
 
         DashboardSummaryResponse summary = service.getSummary();
 
         assertThat(summary.getSummary()).isEqualTo("요약");
         assertThat(summary.getGeneratedAt()).isNotNull();
+        ArgumentCaptor<DashboardSummaryFacts> captor = ArgumentCaptor.forClass(DashboardSummaryFacts.class);
+        verify(ollama).generateSummary(captor.capture());
+        DashboardSummaryFacts facts = captor.getValue();
+        assertThat(facts.warningSites()).containsExactly("적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)");
+        assertThat(facts.noEstimateSites()).containsExactly("빈현장 (시공 중): 견적·매입 미등록");
+    }
+
+    @Test
+    void 모델_출력이_검증에_걸리면_서버_결정_문구로_바꾼다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "적자현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "1200")));
+        when(ollama.generateSummary(any())).thenReturn("적자현장은 마argin율 -20.00%입니다. 지금 따로 조치할 일은 없습니다.");
+
+        DashboardSummaryResponse summary = service.getSummary();
+
+        assertThat(summary.getSummary())
+                .startsWith("### 1. 전체 현황")
+                .contains("- 적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)")
+                .contains("- 적자현장: 매입 내역과 추가공사 견적 누락 여부 확인")
+                .doesNotContain("argin")
+                .doesNotContain("조치할 일은 없습니다");
+    }
+
+    @Test
+    void 모델_출력이_검증을_통과하면_그대로_쓴다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(site(1, "Alpha현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(1, "1000", "600")));
+        String output = "Alpha현장 (시공 중)은 마진 400원, 마진율 40.00%로 정상입니다. 지금 따로 조치할 일은 없습니다.";
+        when(ollama.generateSummary(any())).thenReturn(output);
+
+        assertThat(service.getSummary().getSummary()).isEqualTo(output);
+    }
+    @Test
+    void 보관_현장은_기본_대시보드_집계와_현장별_목록에서_빠진다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                archived(2, "테스트현장", SiteStatus.COMPLETED),
+                site(1, "A현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenAnswer(inv -> {
+            Collection<Long> ids = inv.getArgument(0);
+            return Stream.of(profit(2, "9000", "1000"), profit(1, "1000", "800"))
+                    .filter(p -> ids.contains(p.getSiteId()))
+                    .toList();
+        });
+
+        DashboardStatsResponse stats = service.getStats();
+
+        assertThat(stats.getTotalSites()).isEqualTo(1);
+        assertThat(stats.getSitesByStatus()).isEqualTo(Map.of("IN_PROGRESS", 1));
+        assertThat(stats.getTotalEstimateAmount()).isEqualByComparingTo("1000");
+        assertThat(stats.getTotalPurchaseAmount()).isEqualByComparingTo("800");
+        assertThat(stats.getAverageMarginRate()).isEqualByComparingTo("20.00");
+        assertThat(stats.getSiteProfits()).extracting(SiteProfitSummary::getSiteName).containsExactly("A현장");
+        assertThat(service.getStats(false).getTotalSites()).isEqualTo(1);
+    }
+
+    @Test
+    void 보관_포함_파라미터면_보관_현장도_집계한다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                archived(2, "테스트현장", SiteStatus.COMPLETED),
+                site(1, "A현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of(profit(2, "9000", "1000"), profit(1, "1000", "800")));
+
+        DashboardStatsResponse stats = service.getStats(true);
+
+        assertThat(stats.getTotalSites()).isEqualTo(2);
+        assertThat(stats.getSitesByStatus()).isEqualTo(Map.of("COMPLETED", 1, "IN_PROGRESS", 1));
+        assertThat(stats.getTotalEstimateAmount()).isEqualByComparingTo("10000");
+        assertThat(stats.getTotalPurchaseAmount()).isEqualByComparingTo("1800");
+        assertThat(stats.getSiteProfits()).extracting(SiteProfitSummary::getSiteName).containsExactly("테스트현장", "A현장");
+    }
+
+    @Test
+    void AI_요약_사실에서_보관_현장을_뺀다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(
+                archived(2, "보관적자현장", SiteStatus.IN_PROGRESS),
+                site(1, "적자현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenAnswer(inv -> {
+            Collection<Long> ids = inv.getArgument(0);
+            return Stream.of(profit(2, "1000", "5000"), profit(1, "1000", "1200"))
+                    .filter(p -> ids.contains(p.getSiteId()))
+                    .toList();
+        });
+        when(ollama.generateSummary(any())).thenReturn("요약");
+
+        service.getSummary();
+
+        ArgumentCaptor<DashboardSummaryFacts> captor = ArgumentCaptor.forClass(DashboardSummaryFacts.class);
+        verify(ollama).generateSummary(captor.capture());
+        DashboardSummaryFacts facts = captor.getValue();
+        assertThat(facts.warningSites()).containsExactly("적자현장 (시공 중): 적자 (마진 -200원, 마진율 -20.00%)");
+        assertThat(facts.toString()).doesNotContain("보관적자현장");
+    }
+
+    @Test
+    void 보관_현장만_있으면_현장_없음_안내를_주고_모델을_부르지_않는다() {
+        when(sites.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(archived(1, "테스트현장", SiteStatus.IN_PROGRESS)));
+        when(profits.findBySiteIdIn(any())).thenReturn(List.of());
+
+        assertThat(service.getSummary().getSummary()).isEqualTo(DashboardSummaryFacts.NO_SITE_MESSAGE);
+        verifyNoInteractions(ollama);
     }
 }

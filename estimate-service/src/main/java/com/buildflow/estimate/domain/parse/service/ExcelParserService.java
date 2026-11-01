@@ -17,6 +17,7 @@ import java.util.List;
 public class ExcelParserService {
 
     private static final int MAX_ROWS = 300;
+    private static final int MAX_COLUMNS = 50;
 
     public String extractText(MultipartFile file) {
         validateFile(file);
@@ -48,8 +49,12 @@ public class ExcelParserService {
             List<String> cells = new ArrayList<>();
             boolean hasData = false;
 
-            for (Cell cell : row) {
-                String value = formatter.formatCellValue(cell).trim();
+            // 엑셀은 빈 셀을 파일에 쓰지 않으므로 `for (Cell cell : row)`는 빈 칸을 건너뛰어 뒤 열이 앞으로 당겨진다
+            // (예: 규격이 빈 '식' 항목의 단위가 규격 열로 감). 열 위치를 보존하도록 0번부터 마지막 셀까지 빈 칸을 채운다.
+            int lastCell = Math.min(row.getLastCellNum(), MAX_COLUMNS);
+            for (int c = 0; c < lastCell; c++) {
+                Cell cell = row.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                String value = cell == null ? "" : formatter.formatCellValue(cell).trim();
                 cells.add(value);
                 if (!value.isEmpty()) hasData = true;
             }

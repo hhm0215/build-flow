@@ -9,6 +9,7 @@ const SCHEMA = {
   status: { type: 'enum', values: ['IN_PROGRESS', 'COMPLETED'] },
   min: { type: 'number' },
   from: { type: 'date' },
+  clientId: { type: 'id' },
 } as const
 
 function setup(initialUrl: string) {
@@ -41,6 +42,16 @@ describe('useFilterParams', () => {
     expect(params.get('from')).toBeNull()
     expect(params.get('q')).toBe('ok')
     expect(params.get('page')).toBe('3')
+  })
+
+  it('id 필드는 양의 정수만 받고 나머지는 URL에서 지운다', () => {
+    expect(setup('/sites?clientId=42').result.current.filters).toEqual({ clientId: 42 })
+
+    for (const bad of ['0', '-3', '1.5', '1e3', '007', 'abc', '99999999999999999999']) {
+      const { result } = setup(`/sites?clientId=${bad}`)
+      expect(result.current.filters).toEqual({})
+      expect(new URLSearchParams(result.current.search).get('clientId')).toBeNull()
+    }
   })
 
   it('빈 문자열 값은 필터로 보지 않는다', () => {

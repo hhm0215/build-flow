@@ -31,8 +31,19 @@ public class DashboardService {
     private final SiteProfitRepository siteProfitRepository;
     private final OllamaService ollamaService;
 
+    /** 기본 대시보드 집계. 보관 현장은 빼고 센다(ADR-021: 보관은 자료·손익을 유지하되 기본 집계에서 제외). */
     public DashboardStatsResponse getStats() {
-        List<Site> sites = siteRepository.findAllByOrderByCreatedAtDesc();
+        return getStats(false);
+    }
+
+    /**
+     * @param includeArchived true면 보관 현장도 현장 수·상태별 수·합계·현장별 목록에 포함한다.
+     *                        현장 상세의 개별 손익은 이 값과 무관하게 보관 현장도 그대로 조회된다.
+     */
+    public DashboardStatsResponse getStats(boolean includeArchived) {
+        List<Site> sites = siteRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(site -> includeArchived || !site.isArchived())
+                .toList();
 
         Set<Long> siteIds = sites.stream()
                 .map(Site::getId)
@@ -100,12 +111,30 @@ public class DashboardService {
     }
 
     public DashboardSummaryResponse getSummary() {
-        DashboardStatsResponse stats = getStats();
-        String summary = ollamaService.generateSummary(stats);
+        // AI 요약 사실은 항상 기본 집계(보관 현장 제외)에서 만든다.
+        DashboardSummaryFacts facts = DashboardSummaryFacts.from(getStats(false));
+        // 견적·매입이 하나도 없으면 모델을 부르지 않는다(빈 현장을 손실로 오판하는 환각 방지).
+        String summary = facts.hasData() ? guardedSummary(facts) : facts.noDataMessage();
 
         return DashboardSummaryResponse.builder()
                 .summary(summary)
                 .generatedAt(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * 모델 출력을 사실 목록과 대조해 외국 문자·모르는 현장명·새 금액·할 일 모순이 있으면 서버 결정 문구로 바꾼다.
+     * 모델 호출 실패(503)는 그대로 전파한다. 화면이 오류·재시도를 보여 주므로 장애를 정상 요약으로 숨기지 않는다.
+     */
+    private String guardedSummary(DashboardSummaryFacts facts) {
+        String output = ollamaService.generateSummary(facts);
+        List<String> violations = SummaryOutputGuard.violations(output, facts);
+        if (violations.isEmpty()) {
+            return output;
+        }
+        // 출력 원문은 사용자 입력(현장명)이 섞일 수 있어 남기지 않는다. 길이와 위반 종류만.
+        log.warn("AI 요약 출력 검증 실패, 서버 결정 문구로 대체: 사유={}, 출력길이={}",
+                violations, output == null ? 0 : output.length());
+        return facts.deterministicSummary();
     }
 }

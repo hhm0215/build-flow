@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Archive, ArchiveRestore, Building2, Pencil, Plus } from 'lucide-react'
 import { Button, Popconfirm, message } from 'antd'
@@ -15,6 +16,7 @@ import { useSites } from '../../api/sites.api'
 import ClientCreateModal from '../site/ClientCreateModal'
 import ClientEditModal from '../site/ClientEditModal'
 import type { Client } from '../../types'
+import { sitesOfClientPath } from '../../utils/siteClientFilter'
 
 // 현장 목록과 같은 규칙: 미지정이면 보관되지 않은 거래처만 보여준다
 type ArchiveView = 'ARCHIVED' | 'ALL'
@@ -44,6 +46,7 @@ function errorMessageOf(cause: unknown, fallback: string) {
 }
 
 const cellStyle = { padding: '14px 20px', fontSize: 13, color: 'var(--text-secondary)' } as const
+const siteLinkStyle = { color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3 } as const
 
 export default function ClientListPage() {
   const { isMobile } = useViewport()
@@ -197,6 +200,7 @@ export default function ClientListPage() {
                 const linked = linkedSites.get(client.id) ?? { total: 0, archived: 0 }
                 const contact = [client.phone, client.email].filter(Boolean).join(' · ') || '-'
                 const busy = pendingId === client.id
+                const sitesPath = sitesOfClientPath(client.id, linked.archived)
                 // 보관 거래처는 내용만 흐리게 — 처리 버튼(복원)은 또렷하게 둔다
                 const cell = archived ? { ...cellStyle, opacity: 0.5 } : cellStyle
                 return (
@@ -207,7 +211,13 @@ export default function ClientListPage() {
                   >
                     <td style={{ ...cell, color: 'var(--text-primary)', fontWeight: 600 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                        {client.companyName}
+                        <Link
+                          to={sitesPath}
+                          title="이 거래처의 현장 보기"
+                          style={{ color: 'inherit', textDecoration: 'none' }}
+                        >
+                          {client.companyName}
+                        </Link>
                         {archived && (
                           <span
                             style={{
@@ -230,9 +240,13 @@ export default function ClientListPage() {
                     {!isMobile && <td style={cell}>{client.businessNo || '-'}</td>}
                     <td style={cell}>{contact}</td>
                     <td style={cell} data-testid={`linked-sites-${client.id}`}>
-                      {sitesKnown
-                        ? `${linked.total}곳${linked.archived > 0 ? ` (보관 ${linked.archived})` : ''}`
-                        : '-'}
+                      {sitesKnown ? (
+                        <Link to={sitesPath} title="이 거래처의 현장 보기" style={siteLinkStyle}>
+                          {`${linked.total}곳${linked.archived > 0 ? ` (보관 ${linked.archived})` : ''}`}
+                        </Link>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td style={{ padding: '14px 20px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>

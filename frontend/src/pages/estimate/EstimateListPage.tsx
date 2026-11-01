@@ -564,7 +564,7 @@ export default function EstimateListPage() {
                     {est.items.length}건
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 12, color: 'var(--text-muted)' }}>
-                    {est.estimateDate}
+                    {est.estimateDate || '-'}
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

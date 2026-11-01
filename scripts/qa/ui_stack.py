@@ -106,6 +106,8 @@ def build_compose(repo: Path, frontend_port: int = FRONTEND_PORT, gateway_port: 
                                        {"mysql": healthy, "redis": healthy})
     for name in ("auth-service", "site-service"):
         services[name]["environment"].update({"SPRING_CLOUD_CONFIG_ENABLED": "false", "JAVA_TOOL_OPTIONS": JAVA_OPTS})
+    # site-service의 대시보드 AI 요약도 호스트 Ollama를 쓴다(기본값 localhost는 컨테이너 안에서 닿지 않음).
+    services["site-service"]["environment"].update(ollama)
     services["notification-service"]["environment"]["SPRING_CLOUD_CONFIG_ENABLED"] = "false"
     services["gateway-server"]["environment"].update({
         "JAVA_TOOL_OPTIONS": JAVA_OPTS,

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { Estimate, Purchase } from '../types'
 import {
   additionsOfChain,
+  compareEstimatesByDateDesc,
+  formatDocumentDate,
   calculateDocumentProfit,
   estimateChain,
   estimateSupersededByConfirming,
@@ -90,5 +92,34 @@ describe('estimateTitleFromFileName', () => {
     const value = `${'가'.repeat(199)}😀`
     expect(truncateUtf16(value, 200)).toBe('가'.repeat(199))
     expect(truncateUtf16(value, 201)).toBe(value)
+  })
+})
+
+describe('견적 날짜 표시·정렬', () => {
+  const est = (id: number, estimateDate: string, createdAt: string) => ({ id, estimateDate, createdAt })
+
+  it('등록일이 아니라 견적일 최신순으로 정렬한다', () => {
+    const imported = est(3, '2026-01-02', '2026-11-01T09:00:00')
+    const recent = est(1, '2026-10-20', '2026-10-20T10:00:00')
+    const sorted = [imported, recent].sort(compareEstimatesByDateDesc)
+    expect(sorted.map((e) => e.id)).toEqual([1, 3])
+  })
+
+  it('같은 견적일이면 등록 시각, 그다음 id 역순이며 견적일 없는 항목은 맨 뒤', () => {
+    const sorted = [
+      est(1, '2026-03-01', '2026-03-01T00:00:00'),
+      est(2, '', '2026-12-01T00:00:00'),
+      est(3, '2026-03-01', '2026-03-02T00:00:00'),
+      est(4, '2026-03-01', '2026-03-02T00:00:00'),
+    ].sort(compareEstimatesByDateDesc)
+    expect(sorted.map((e) => e.id)).toEqual([4, 3, 1, 2])
+  })
+
+  it('날짜가 없으면 다른 날짜로 대체하지 않고 - 로 표시한다', () => {
+    expect(formatDocumentDate('2026-01-02T08:00:00')).toBe('2026-01-02')
+    expect(formatDocumentDate('2026-01-02')).toBe('2026-01-02')
+    expect(formatDocumentDate(null)).toBe('-')
+    expect(formatDocumentDate(undefined)).toBe('-')
+    expect(formatDocumentDate('')).toBe('-')
   })
 })

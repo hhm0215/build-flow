@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
+import { Select } from 'antd'
 import {
   ArrowUpRight,
   Building2,
@@ -11,6 +12,7 @@ import {
   Receipt,
   ShoppingBag,
   TrendingUp,
+  X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import PageHeader from '../../components/PageHeader'
@@ -20,13 +22,15 @@ import FilterSelect from '../../components/filters/FilterSelect'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
 import { useSites } from '../../api/sites.api'
+import { useClients } from '../../api/clients.api'
 import { useEstimates } from '../../api/estimates.api'
 import { usePurchases } from '../../api/purchases.api'
 import { useTaxes } from '../../api/taxes.api'
 import { Site, SiteStatus } from '../../types'
-import { sumConfirmedEstimateAmount } from '../../utils/estimate'
+import { compareEstimatesByDateDesc, formatDocumentDate, sumConfirmedEstimateAmount } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
 import { SITE_STATUSES } from '../../utils/siteStatus'
+import { buildClientFilterOptions, matchesClientFilter } from '../../utils/siteClientFilter'
 import SiteCreateModal from './SiteCreateModal'
 
 const STATUS_LABEL: Record<SiteStatus, string> = {
@@ -62,10 +66,12 @@ interface SiteFilters {
   q: string
   status: SiteStatus
   archive: ArchiveView
+  clientId: number
 }
 
 const FILTER_SCHEMA: FilterSchema = {
   q: { type: 'string' },
+  clientId: { type: 'id' },
   status: { type: 'enum', values: SITE_STATUSES },
   archive: { type: 'enum', values: ['ARCHIVED', 'ALL'] },
 }
@@ -255,6 +261,7 @@ function EmptyRelation({ message }: { message: string }) {
 export default function SiteListPage() {
   const navigate = useNavigate()
   const { data: sitesData, isLoading: sitesLoading, isError: sitesError, refetch: sitesRefetch } = useSites()
+  const { data: clientsData, isLoading: clientsLoading } = useClients()
   const { data: estimatesData, isLoading: estimatesLoading, isError: estimatesError, refetch: estimatesRefetch } = useEstimates()
   const { data: purchasesData, isLoading: purchasesLoading, isError: purchasesError, refetch: purchasesRefetch } = usePurchases()
   const { data: taxesData, isLoading: taxesLoading, isError: taxesError, refetch: taxesRefetch } = useTaxes()
@@ -267,18 +274,30 @@ export default function SiteListPage() {
   const purchases = useMemo(() => purchasesData ?? [], [purchasesData])
   const taxes = useMemo(() => taxesData ?? [], [taxesData])
 
-  const { filters, setFilters, filtered: filteredSites } = useListFilters({
+  const { filters, setFilters, filtered: filteredSites, activeCount, resetFilters } = useListFilters({
     schema: FILTER_SCHEMA,
     items: sites,
     filterFn: (site, f: Partial<SiteFilters>, rawQ) => {
       const q = rawQ.trim().toLowerCase()
       if (q && !`${site.siteName} ${site.client?.companyName ?? ''}`.toLowerCase().includes(q)) return false
+      if (!matchesClientFilter(site, f.clientId)) return false
       if (f.status && site.status !== f.status) return false
       if (f.archive === 'ARCHIVED' && !site.archivedAt) return false
       if (!f.archive && site.archivedAt) return false
       return true
     },
   })
+  const clientOptions = useMemo(() => {
+    const options = buildClientFilterOptions(clientsData, sites, filters.clientId)
+    const active = options.filter((o) => !o.archived).map((o) => ({ value: o.value, label: o.label }))
+    const archived = options.filter((o) => o.archived).map((o) => ({ value: o.value, label: `${o.label} (보관)` }))
+    return archived.length > 0
+      ? [
+          { label: '거래처', options: active },
+          { label: '보관된 거래처', options: archived },
+        ]
+      : active
+  }, [clientsData, sites, filters.clientId])
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -302,7 +321,7 @@ export default function SiteListPage() {
         ? []
         : estimates
             .filter((estimate) => estimate.siteId === selectedSiteIdResolved)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+            .sort(compareEstimatesByDateDesc),
     [estimates, selectedSiteIdResolved],
   )
 
@@ -401,12 +420,26 @@ export default function SiteListPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="bf-filter-fields" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <FilterSearch
                 value={filters.q ?? ''}
                 onChange={(v) => setFilters({ q: v })}
                 placeholder="현장명, 발주처 검색"
                 width={288}
+              />
+              <Select<number>
+                aria-label="거래처 필터"
+                placeholder="거래처 전체"
+                value={filters.clientId}
+                options={clientOptions}
+                onChange={(v) => setFilters({ clientId: v ?? undefined })}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                loading={clientsLoading}
+                notFoundContent="일치하는 거래처가 없습니다"
+                style={{ width: 288 }}
+                size="middle"
               />
               <FilterSelect<SiteStatus>
                 placeholder="상태"
@@ -422,6 +455,29 @@ export default function SiteListPage() {
                 onChange={(v) => setFilters({ archive: v })}
                 width={288}
               />
+              {activeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  style={{
+                    alignSelf: 'flex-start',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '6px 10px',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={12} strokeWidth={2.5} />
+                  필터 {activeCount}개 초기화
+                </button>
+              )}
             </div>
 
             <div
@@ -680,7 +736,7 @@ export default function SiteListPage() {
                                 {estimate.title}
                               </div>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                                작성일 {formatDate(estimate.createdAt)} · 항목 {estimate.items.length}건
+                                견적일 {formatDocumentDate(estimate.estimateDate)} · 항목 {estimate.items.length}건 · 등록일 {formatDocumentDate(estimate.createdAt)}
                               </div>
                             </div>
                             <InfoBadge color={ESTIMATE_STATUS_COLOR[estimate.status]}>

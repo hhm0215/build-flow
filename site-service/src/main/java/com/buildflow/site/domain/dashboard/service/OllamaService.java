@@ -1,8 +1,5 @@
 package com.buildflow.site.domain.dashboard.service;
 
-import com.buildflow.site.domain.dashboard.dto.DashboardStatsResponse;
-import com.buildflow.site.domain.dashboard.dto.DashboardStatsResponse.SiteProfitSummary;
-import com.buildflow.site.domain.site.entity.SiteStatus;
 import com.buildflow.site.global.exception.BusinessException;
 import com.buildflow.site.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,26 +12,27 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class OllamaService {
 
-    private static final String SYSTEM_PROMPT =
-            "당신은 건설 현장 관리 전문가입니다. " +
-            "주어진 현장 데이터를 분석하여 한국어로 간결한 경영 요약을 작성하세요. " +
-            "포함할 내용: " +
-            "1. 전체 현황 요약 (현장 수, 진행 상태. '수주 전'은 아직 계약 전인 견적 단계라 손익 평가에서 구분한다) " +
-            "2. 손익 분석 (총 마진, 마진율, 수익성 평가) " +
-            "3. 주의 현장 (마진율 10% 미만 또는 적자 현장 경고) " +
-            "4. 액션 아이템 (구체적 개선 제안 1~3개) " +
-            "형식: 마크다운 사용, 핵심만 간결하게. 500자 이내.";
+    static final String SYSTEM_PROMPT =
+            "당신은 건설 현장 손익 보고서를 한국어 문장으로 옮기는 도우미입니다. " +
+            "사용자 메시지의 '확정 사실'만 사용하세요. 제공된 사실 외의 판단·추정·새 계산을 하지 마세요. " +
+            "규칙: " +
+            "1. 적자·저마진 경고는 '주의 현장' 목록에 있는 현장에만 하고, 목록이 '없음'이면 경고하지 마세요. " +
+            "2. '견적 미등록' 현장은 손실이 아니라 아직 데이터가 없는 현장입니다. 손익·마진율을 평가하지 말고 견적 등록이 필요하다고만 안내하세요. " +
+            "견적 등록 안내는 '견적 미등록' 목록에 있는 현장에만 하세요. " +
+            "3. '수주 전' 현장은 계약 전 견적이라 손익 평가에서 제외합니다. " +
+            "4. 금액·비율은 제공된 표기 그대로 옮기고, 용어는 '마진', '마진율'처럼 사실 목록의 한국어 표기를 그대로 쓰세요. " +
+            "5. 한국어(한글)로만 쓰고 영어 단어·한자를 섞지 마세요. 현장 이름은 그대로 옮기세요. " +
+            "6. '다음 할 일'은 사실 목록의 '다음 할 일' 항목만 옮기고 새로 만들지 마세요. 목록이 '없음'이면 '지금 따로 조치할 일은 없습니다'라고 쓰세요. " +
+            "구성: 1. 전체 현황 2. 손익 3. 주의 현장 4. 다음 할 일. " +
+            "형식: 마크다운, 핵심만 간결하게, 500자 이내.";
 
     private final WebClient ollamaWebClient;
     private final ObjectMapper objectMapper;
@@ -45,66 +43,18 @@ public class OllamaService {
     @Value("${ollama.api.timeout}")
     private int timeoutSeconds;
 
-    public String generateSummary(DashboardStatsResponse stats) {
-        String dataPrompt = buildDataPrompt(stats);
-
+    /** 서버가 분류를 끝낸 사실 목록을 문장으로만 옮기게 한다. */
+    public String generateSummary(DashboardSummaryFacts facts) {
         Map<String, Object> requestBody = Map.of(
                 "model", model,
                 "stream", false,
                 "messages", List.of(
                         Map.of("role", "system", "content", SYSTEM_PROMPT),
-                        Map.of("role", "user", "content", dataPrompt)
+                        Map.of("role", "user", "content", facts.toPrompt())
                 )
         );
 
         return callOllama(requestBody);
-    }
-
-    private String buildDataPrompt(DashboardStatsResponse stats) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("## 현장 데이터\n\n");
-        sb.append(String.format("- 전체 현장 수: %d개\n", stats.getTotalSites()));
-        sb.append(String.format("- 상태별: %s\n", statusCounts(stats.getSitesByStatus())));
-        sb.append(String.format("- 총 견적액: %s원\n", stats.getTotalEstimateAmount().toPlainString()));
-        sb.append(String.format("- 총 매입액: %s원\n", stats.getTotalPurchaseAmount().toPlainString()));
-        sb.append(String.format("- 총 마진: %s원\n", stats.getTotalMargin().toPlainString()));
-        sb.append(String.format("- 평균 마진율: %s%%\n\n", stats.getAverageMarginRate().toPlainString()));
-
-        if (stats.getSiteProfits() != null && !stats.getSiteProfits().isEmpty()) {
-            sb.append("## 현장별 손익\n\n");
-            for (SiteProfitSummary site : stats.getSiteProfits()) {
-                sb.append(String.format("- %s (%s): 견적 %s원, 매입 %s원, 마진 %s원 (마진율 %s%%)\n",
-                        site.getSiteName(),
-                        SiteStatus.labelOf(site.getStatus()),
-                        site.getEstimateAmount().toPlainString(),
-                        site.getPurchaseAmount().toPlainString(),
-                        site.getMargin().toPlainString(),
-                        site.getMarginRate().toPlainString()
-                ));
-            }
-        }
-
-        sb.append("\n위 데이터를 분석하여 경영 요약을 작성해주세요.");
-        return sb.toString();
-    }
-
-    /** 상태별 건수를 enum 순서(수주 전→완료)의 한국어 라벨로 적는다. */
-    static String statusCounts(Map<String, Integer> byStatus) {
-        if (byStatus == null || byStatus.isEmpty()) {
-            return "없음";
-        }
-        List<String> parts = new ArrayList<>();
-        for (SiteStatus status : SiteStatus.values()) {
-            Integer count = byStatus.get(status.name());
-            if (count != null) {
-                parts.add(status.getLabel() + " " + count + "개");
-            }
-        }
-        byStatus.keySet().stream()
-                .filter(name -> Arrays.stream(SiteStatus.values()).noneMatch(s -> s.name().equals(name)))
-                .sorted()
-                .forEach(name -> parts.add(name + " " + byStatus.get(name) + "개"));
-        return String.join(", ", parts);
     }
 
     private String callOllama(Map<String, Object> requestBody) {
