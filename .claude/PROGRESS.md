@@ -5,6 +5,13 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 로컬 USB 견적 적재·가져오기 도구 실데이터 보강 (2026-11-01, PR #281~#287)
+
+- 로컬 개발 DB에만 2025·2026 견적 적재(현장별 최신 견적 확정·현장 완료, 적재 전 mysqldump 백업, 기록은 저장소 밖 ledger). 운영 VPS DB에는 넣지 않음. 실데이터는 Git·PR·문서에 없음.
+- #284 실데이터 양식 대응(병합 셀·수식 합계·현장명 별칭·폴더 현장명·브라우저 적용·결과 기록), #285 날짜 폴더 현장명·다른 거래처 같은 현장명 합침 차단, #287 수량 산출식 계산. 도구 테스트 61개.
+- 적재 중 발견한 거래처 혼합 현장 3곳은 거래처별 현장으로 분리. 연도 넘어 같은 거래처·같은 이름 현장은 기존 현장에 붙이고 옛 견적은 미확정으로 둠.
+- 보류: 합계 불일치·합계 빈칸 2026 4건, 내역서형 양식 2025 18건(양식 해석 작업 진행 중). 진행률은 운영 게이트 변동 없어 69/100 유지(2026-11-01 채점).
+
 ## 완료된 작업 — 경로·쿼리 타입 오류 400 처리 (2026-11-01, `claude/type-mismatch-400`)
 
 - 7개 서비스 `GlobalExceptionHandler`에 `MethodArgumentTypeMismatchException`·`MissingServletRequestParameterException` → 400(파라미터명만 노출, 입력값 미반사), 서비스별 MockMvc 테스트 3건. 로컬 `./gradlew test` PASS, develop 대상 PR.
@@ -1143,15 +1150,18 @@
 | estimate.parsed | estimate-service | site-service | ✅ 발행+소비 구현 |
 | purchase.registered | purchase-service | site-service | ✅ 발행+소비 구현 |
 
-## 다음 세션 진입점 (2026-10-31 갱신)
+## 다음 세션 진입점 (2026-11-01 갱신)
 
-**Git 상태**: `main`은 PR #256 병합 `4b3d795`(develop `5356b1c`까지 릴리스, 운영 서비스 코드 변경 없음). 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. 메인 체크아웃은 오래된 브랜치 `codex/workspace-checkpoint-safety`에 있으므로 스크립트는 `origin/develop` 기준 별도 작업 폴더에서 실행한다.
+**Git 상태**: `main`은 PR #272 병합 `287118e`. `develop`은 PR #287 병합 `534bd70`까지(그 뒤 기록 PR). 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
+
+**로컬 실데이터**: 로컬 스택은 `bf-audit`(origin/develop 작업 폴더)에서 `.local/local-gateway-port.yml` override(gateway 18080, redis 16379)로 기동, 프론트 http://localhost:3000. 적재 도구 `scripts/import/`, 백업·ledger는 저장소 밖 `Documents/Dev/build-flow-backups/`.
 
 **VPS 상태**: 마지막 배포 SHA `4c4ca8c`(2026-10-29). 2026-10-31 사용자가 VPS를 다른 프로젝트에 쓰기 위해 BuildFlow 컨테이너를 내렸고, 에이전트 VPS 접근은 금지(사용자 요청 1건 단위로만 읽기 전용 확인). 같은 날 요청 1건으로 읽기 전용 조회: 공개 포트 22·80·443만 열림, 80·443은 다른 프로젝트 Caddy가 사용(응답 헤더 `Server: Caddy`), 가용 RAM 약 6.8GB·스왑 없음·디스크 53GB 여유. BuildFlow 공개 스택 Caddy도 80·443을 쓰므로 **그대로 배포하면 충돌**한다. 공존하려면 기존 Caddy에 BuildFlow 도메인 블록을 추가하고 BuildFlow 쪽 Caddy를 빼는 방식이 추천안(사용자 결정 대기). 배포 계정은 Docker 소켓 권한이 없어 다른 프로젝트 컨테이너 구성은 미확인.
 
-**다음 작업**: `.claude/BACKLOG.md`. 실데이터 입력 전 게이트(실제 운영 백업 외부 복원, 운영 DDL 대조, 롤백 훈련, 보안 게이트)는 모두 VPS가 필요해 보류 중이다. 진행률 63/100(2026-10-31 채점).
+**다음 작업**: `.claude/BACKLOG.md`. 실데이터 입력 전 게이트(실제 운영 백업 외부 복원, 운영 DDL 대조, 롤백 훈련, 보안 게이트)는 모두 VPS가 필요해 보류 중이다. 진행률 69/100(2026-11-01 채점).
 
-**로컬 Docker**: 2026-10-31 남은 소켓 폴더(`%LOCALAPPDATA%\Dockerun`, `%LOCALAPPDATA%\docker-secrets-engine`)를 이름만 바꿔 비켜 두고 복구했다(볼륨 유지, 공장 초기화 금지). 격리 테스트 스크립트는 푸시 전에 로컬에서 먼저 실행한다.
+**로컬 Docker**: 2026-10-31 남은 소켓 폴더(`%LOCALAPPDATA%\Docker
+un`, `%LOCALAPPDATA%\docker-secrets-engine`)를 이름만 바꿔 비켜 두고 복구했다(볼륨 유지, 공장 초기화 금지). 격리 테스트 스크립트는 푸시 전에 로컬에서 먼저 실행한다.
 
 ## 능동 발의 로그 (실험 종료 — 2026-07-04 확정, 아카이브)
 
