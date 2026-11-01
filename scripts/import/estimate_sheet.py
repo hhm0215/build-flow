@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import ast
 import datetime as dt
 import io
 import re
@@ -308,6 +309,39 @@ def quantity_with_unit(value: Any) -> Optional[Decimal]:
     return _plain(Decimal(match.group(1))) if match else None
 
 
+_EXPR_OPS = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b,
+             ast.Mult: lambda a, b: a * b, ast.Div: lambda a, b: a / b}
+
+
+def _eval_expr(node: ast.AST) -> Decimal:
+    if isinstance(node, ast.Expression):
+        return _eval_expr(node.body)
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
+        return Decimal(str(node.value))
+    if isinstance(node, ast.BinOp) and type(node.op) in _EXPR_OPS:
+        return _EXPR_OPS[type(node.op)](_eval_expr(node.left), _eval_expr(node.right))
+    raise NumberError("식")
+
+
+def quantity_from_text(value: Any) -> tuple[Optional[Decimal], Optional[str]]:
+    """수량 셀: 숫자, '½', 또는 '(12.3*0.9)*2'처럼 사칙연산만 든 산출식 글자 → (값, 원래 식)."""
+    try:
+        return to_decimal(value), None
+    except NumberError:
+        pass
+    raw = str(value).strip()
+    if raw == "½":
+        return Decimal("0.5"), None
+    expr = raw.replace("×", "*").replace("x", "*").replace("X", "*").replace(",", "")
+    if len(expr) > 100 or not re.fullmatch(r"[\d.\s+\-*/()]+", expr):
+        raise NumberError(raw)
+    try:
+        result = _eval_expr(ast.parse(expr, mode="eval"))
+    except (SyntaxError, InvalidOperation, ZeroDivisionError, NumberError):
+        raise NumberError(raw) from None
+    return _plain(result.quantize(Decimal("0.000001"))), raw
+
+
 def amount_from_text(value: Any) -> Optional[Decimal]:
     """합계 셀: 숫자이거나 '일금 ... (₩1,234,000)' 같은 글자 안의 마지막 숫자 묶음."""
     try:
@@ -448,7 +482,7 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
     for r in range(header_row + 1, len(grid)):
         name = text(cell(grid, r, mapping["name"]))
         try:
-            qty = to_decimal(cell(grid, r, mapping["qty"]))
+            qty, qty_expr = quantity_from_text(cell(grid, r, mapping["qty"]))
             total_qty = quantity_with_unit(cell(grid, r, mapping["total_qty"])) if "total_qty" in mapping else None
             price = to_decimal(cell(grid, r, mapping["price"]))
             amount = to_decimal(cell(grid, r, mapping["amount"]))
@@ -471,6 +505,9 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
 
         unit = text(cell(grid, r, mapping["spec"]))
         detail: list[str] = []
+        if qty_expr:
+            detail.append(f"산출 {qty_expr}")
+            warnings.append(f"{r + 1}행: 수량 산출식 '{qty_expr[:40]}'을 계산해 {format_amount(qty)}로 넣음")
         if price not in (None, Decimal(0)) and qty not in (None, Decimal(0)):
             quantity, unit_price = qty, price
             if amount is not None and quantity * unit_price != amount:
@@ -489,6 +526,11 @@ def parse_estimate(data: bytes, *, append_size: bool = False, append_note: bool 
         else:
             quantity, unit_price, unit = Decimal(1), price or Decimal(0), LUMP_UNIT
 
+        if (not fits_scale(quantity) or not fits_scale(quantity * unit_price)) and amount not in (None, Decimal(0))                 and fits_scale(amount):
+            # 산출식·소수 수량이 소수 2자리를 넘으면 견적서 금액 셀을 1식으로 넣고 원래 수량은 품명에 남긴다
+            detail.append(f"{format_amount(quantity)}{unit} × {format_amount(unit_price)}")
+            warnings.append(f"{r + 1}행: 수량이 소수 2자리를 넘어 금액 셀 기준 1식으로 넣음")
+            quantity, unit_price, unit = Decimal(1), amount, LUMP_UNIT
         if not unit:
             unit = LUMP_UNIT
         if len(unit) > 20:

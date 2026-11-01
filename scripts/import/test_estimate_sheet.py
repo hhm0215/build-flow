@@ -125,9 +125,25 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(parsed.items[1].unit_price, Decimal(80000))
 
     def test_scale_over_two_places_is_error(self):
-        items = [{"no": 1, "name": "소수 품목", "spec": "EA", "qty": 0.333, "price": 3, "amount": 1}]
+        items = [{"no": 1, "name": "소수 품목", "spec": "EA", "qty": 0.333, "price": 3}]
         parsed = parse_estimate(xlsx_bytes(sample_cells(items, 1)))
         self.assertTrue(any("소수 2자리" in e for e in parsed.errors))
+
+    def test_scale_over_two_places_uses_amount_cell(self):
+        items = [{"no": 1, "name": "소수 품목", "spec": "EA", "qty": 0.333, "price": 3, "amount": 1}]
+        parsed = parse_estimate(xlsx_bytes(sample_cells(items, 1)))
+        self.assertEqual(parsed.errors, [])
+        self.assertEqual((parsed.items[0].quantity, parsed.items[0].unit_price), (Decimal(1), Decimal(1)))
+
+    def test_quantity_formula_text_is_calculated(self):
+        items = [{"no": 1, "name": "판넬", "spec": "M2", "qty": "(1.5*2)+1", "price": 1000, "amount": 4000},
+                 {"no": 2, "name": "반 자재", "spec": "EA", "qty": "½", "price": 2000, "amount": 1000},
+                 {"no": 3, "name": "위험 식", "spec": "EA", "qty": "__import__('os')", "price": 1, "amount": 1}]
+        parsed = parse_estimate(xlsx_bytes(sample_cells(items, 5001)))
+        self.assertEqual(parsed.items[0].quantity, Decimal(4))
+        self.assertEqual(parsed.items[0].name, "판넬 (산출 (1.5*2)+1)")
+        self.assertEqual(parsed.items[1].quantity, Decimal("0.5"))
+        self.assertTrue(any("숫자가 아닌 값" in e for e in parsed.errors))
 
     def test_negative_amount_is_error(self):
         items = ITEMS + [{"no": 5, "name": "할인", "amount": -1000}]
