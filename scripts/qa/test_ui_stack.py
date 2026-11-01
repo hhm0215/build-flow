@@ -54,6 +54,11 @@ class ComposeTests(unittest.TestCase):
                 with self.subTest(service=name):
                     self.assertEqual(svc["environment"].get("SPRING_CLOUD_CONFIG_ENABLED"), "false")
 
+    def test_ollama_users_reach_host_ollama(self):
+        services = ui.build_compose(REPO)["services"]
+        for name in ("site-service", "estimate-service", "chat-service"):
+            self.assertEqual(services[name]["environment"].get("OLLAMA_URL"), "http://host.docker.internal:11434", name)
+
     def test_frontend_proxies_to_gateway_service_name(self):
         spec = ui.build_compose(REPO, frontend_port=13999)
         self.assertEqual(spec["services"]["frontend"]["build"]["context"], "C:/repo/frontend")
