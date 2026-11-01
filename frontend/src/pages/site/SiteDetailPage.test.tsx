@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SiteDetailPage from './SiteDetailPage'
 
@@ -16,13 +16,14 @@ const query = vi.hoisted(() => ({
   purchasesRefetch: vi.fn(),
   taxesRefetch: vi.fn(),
   warrantiesRefetch: vi.fn(),
+  archivedAt: null as string | null,
 }))
 
 vi.mock('../../api/sites.api', () => ({
   useSite: () => ({
     data: {
       id: 4, siteName: '합성 현장', client: null, address: null, status: 'IN_PROGRESS',
-      startDate: null, endDate: null, memo: null, archivedAt: null,
+      startDate: null, endDate: null, memo: null, archivedAt: query.archivedAt,
       createdAt: '2026-10-19T00:00:00', updatedAt: '2026-10-19T00:00:00',
     },
     isLoading: false, isError: false, refetch: vi.fn(),
@@ -46,6 +47,15 @@ vi.mock('../../api/warranties.api', () => ({
 }))
 vi.mock('./SiteEditModal', () => ({ default: () => null }))
 vi.mock('./ClientEditModal', () => ({ default: () => null }))
+vi.mock('../purchase/PurchaseCreateModal', () => ({
+  default: ({ initialSiteId }: { initialSiteId?: number }) => <div data-testid="purchase-create">{initialSiteId}</div>,
+}))
+vi.mock('../tax/TaxCreateModal', () => ({
+  default: ({ initialSiteId }: { initialSiteId?: number }) => <div data-testid="tax-create">{initialSiteId}</div>,
+}))
+vi.mock('../warranty/WarrantyUploadModal', () => ({
+  default: ({ initialSiteId }: { initialSiteId?: number }) => <div data-testid="warranty-create">{initialSiteId}</div>,
+}))
 
 beforeEach(() => {
   query.estimatesError = false
@@ -56,6 +66,7 @@ beforeEach(() => {
   query.purchases = []
   query.taxes = []
   query.warranties = []
+  query.archivedAt = null
   for (const refetch of [query.estimatesRefetch, query.purchasesRefetch, query.taxesRefetch, query.warrantiesRefetch]) refetch.mockReset()
   vi.stubGlobal('matchMedia', (media: string) => ({
     matches: false, media, addListener: vi.fn(), removeListener: vi.fn(),
@@ -109,5 +120,42 @@ describe('SiteDetailPage relation failures', () => {
     expect(screen.getByRole('tab', { name: '견적서 (조회 실패)' })).toBeInTheDocument()
     expect(screen.getByText('견적서를 불러오지 못했습니다.')).toBeInTheDocument()
     expect(screen.queryByText('오래된 합성 견적')).not.toBeInTheDocument()
+  })
+})
+
+describe('SiteDetailPage tab add actions', () => {
+  it.each([
+    ['매입', '매입 추가', 'purchase-create'],
+    ['세금계산서', '세금계산서 추가', 'tax-create'],
+    ['보증보험', '보증보험 추가', 'warranty-create'],
+  ] as const)('%s 탭의 추가 버튼은 이 현장이 선택된 등록 모달을 연다', (tab, button, testId) => {
+    renderPage()
+    fireEvent.click(screen.getByRole('tab', { name: `${tab} (0)` }))
+    fireEvent.click(screen.getByRole('button', { name: button }))
+    expect(screen.getByTestId(testId)).toHaveTextContent('4')
+  })
+
+  it('견적서 추가는 견적서 화면으로 현장 ID를 넘긴다', () => {
+    function EstimatesProbe() {
+      const state = useLocation().state as { createForSiteId?: number } | null
+      return <div data-testid="estimate-target">{state?.createForSiteId}</div>
+    }
+    render(
+      <MemoryRouter initialEntries={['/sites/4']}>
+        <Routes>
+          <Route path="/sites/:id" element={<SiteDetailPage />} />
+          <Route path="/estimates" element={<EstimatesProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '견적서 추가' }))
+    expect(screen.getByTestId('estimate-target')).toHaveTextContent('4')
+  })
+
+  it('보관된 현장은 추가 버튼을 막고 이유를 보여준다', () => {
+    query.archivedAt = '2026-10-30T00:00:00'
+    renderPage()
+    expect(screen.getByRole('button', { name: '견적서 추가' })).toBeDisabled()
+    expect(screen.getByText('보관된 현장에는 새 자료를 등록할 수 없습니다. 복원 후 등록하세요.')).toBeInTheDocument()
   })
 })

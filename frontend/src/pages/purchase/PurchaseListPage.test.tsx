@@ -10,6 +10,9 @@ vi.mock('../../api/purchases.api', () => ({
   usePurchases: () => ({ data: purchases.items, isLoading: false, isError: false, refetch: vi.fn() }),
   useCreatePurchase: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
+vi.mock('../../api/sites.api', () => ({
+  useSites: () => ({ data: [{ id: 3, siteName: '보관된 현장', archivedAt: '2026-10-01T00:00:00' }] }),
+}))
 vi.mock('./PurchaseEditModal', () => ({
   default: ({ purchase }: { purchase: Purchase }) => <div data-testid="edit-target">{purchase.itemName}</div>,
 }))
@@ -37,6 +40,14 @@ afterEach(() => {
 })
 
 describe('PurchaseListPage', () => {
+  it('현장 열과 통일된 거래처 용어를 보여준다', () => {
+    render(<MemoryRouter><PurchaseListPage /></MemoryRouter>)
+    expect(screen.getByRole('columnheader', { name: '현장' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: '거래처' })).toBeInTheDocument()
+    expect(screen.getAllByText('보관된 현장')).toHaveLength(2)
+    expect(screen.getByPlaceholderText('품목명, 거래처 검색')).toBeInTheDocument()
+  })
+
   it('nullable 날짜를 안전하게 표시하고 행별 수정·삭제 대상을 연다', () => {
     render(<MemoryRouter><PurchaseListPage /></MemoryRouter>)
 

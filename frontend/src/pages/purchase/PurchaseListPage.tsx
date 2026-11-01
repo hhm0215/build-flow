@@ -1,9 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShoppingBag, Pencil, Plus, Trash2, FileCheck } from 'lucide-react'
-import { Alert, Button, Modal, Form, Input, InputNumber, DatePicker } from 'antd'
-import SiteSelect from '../../components/SiteSelect'
-import dayjs from 'dayjs'
+import { Button } from 'antd'
+import SiteNameCell from '../../components/SiteNameCell'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
 import FilterBar from '../../components/filters/FilterBar'
@@ -12,12 +11,14 @@ import FilterDateRange from '../../components/filters/FilterDateRange'
 import FilterAmountRange from '../../components/filters/FilterAmountRange'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
-import { usePurchases, useCreatePurchase } from '../../api/purchases.api'
+import { usePurchases } from '../../api/purchases.api'
+import { useSites } from '../../api/sites.api'
 import PurchaseEditModal from './PurchaseEditModal'
 import PurchaseDeleteModal from './PurchaseDeleteModal'
 import PurchaseEvidenceModal from './PurchaseEvidenceModal'
-import type { Purchase, PurchaseCreateRequest } from '../../types'
-import { validatePurchaseAmount } from '../../utils/purchase'
+import PurchaseCreateModal from './PurchaseCreateModal'
+import type { Purchase } from '../../types'
+import { buildSiteDisplayMap } from '../../utils/siteName'
 
 interface PurchaseFilters {
   q: string
@@ -37,6 +38,8 @@ const FILTER_SCHEMA: FilterSchema = {
 
 export default function PurchaseListPage() {
   const { data, isLoading, isError, refetch } = usePurchases()
+  const { data: sites } = useSites()
+  const siteDisplay = useMemo(() => buildSiteDisplayMap(sites), [sites])
   const purchases = useMemo(() => data ?? [], [data])
 
   const { filters, setFilters, filtered, activeCount, resetFilters } =
@@ -65,49 +68,6 @@ export default function PurchaseListPage() {
   const [editTarget, setEditTarget] = useState<Purchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null)
   const [evidenceTarget, setEvidenceTarget] = useState<Purchase | null>(null)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const createInFlight = useRef(false)
-  const [form] = Form.useForm()
-  const createMutation = useCreatePurchase()
-
-  const closeCreate = () => {
-    if (createInFlight.current || createMutation.isPending) return
-    setOpen(false)
-    setCreateError(null)
-    form.resetFields()
-  }
-
-  const handleOk = async () => {
-    if (createInFlight.current || createMutation.isPending) return
-    createInFlight.current = true
-    try {
-      const values = await form.validateFields()
-      const amountError = validatePurchaseAmount(values.quantity, values.unitPrice)
-      if (amountError) {
-        setCreateError(amountError)
-        return
-      }
-      const body: PurchaseCreateRequest = {
-        ...values,
-        itemName: values.itemName.trim(),
-        supplier: values.supplier?.trim() || undefined,
-        memo: values.memo?.trim() || undefined,
-        purchaseDate: values.purchaseDate
-          ? dayjs(values.purchaseDate).format('YYYY-MM-DD')
-          : undefined,
-      }
-      setCreateError(null)
-      await createMutation.mutateAsync(body)
-      setOpen(false)
-      form.resetFields()
-    } catch (cause: unknown) {
-      if (cause && typeof cause === 'object' && 'errorFields' in cause) return
-      const responseError = (cause as { response?: { data?: { error?: string } } })?.response?.data?.error
-      setCreateError(responseError ?? '매입 내역을 등록하지 못했습니다. 다시 시도해 주세요.')
-    } finally {
-      createInFlight.current = false
-    }
-  }
 
   return (
     <div>
@@ -139,78 +99,13 @@ export default function PurchaseListPage() {
       {deleteTarget && <PurchaseDeleteModal purchase={deleteTarget} onClose={() => setDeleteTarget(null)} />}
       {evidenceTarget && <PurchaseEvidenceModal purchase={evidenceTarget} onClose={() => setEvidenceTarget(null)} />}
 
-      <Modal
-        title="매입 등록"
-        open={open}
-        onOk={handleOk}
-        onCancel={closeCreate}
-        okText="등록"
-        cancelText="취소"
-        okButtonProps={{ disabled: createMutation.isPending }}
-        cancelButtonProps={{ disabled: createMutation.isPending }}
-        confirmLoading={createMutation.isPending}
-        closable={!createMutation.isPending}
-        maskClosable={!createMutation.isPending}
-        keyboard={!createMutation.isPending}
-        destroyOnHidden
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          {createError && <Alert type="error" message={createError} showIcon style={{ marginBottom: 16 }} />}
-          <Form.Item
-            name="siteId"
-            label="현장"
-            rules={[{ required: true, message: '현장을 선택하세요' }]}
-          >
-            <SiteSelect placeholder="현장 검색 / 선택" />
-          </Form.Item>
-          <Form.Item
-            name="itemName"
-            label="품목명"
-            rules={[{ required: true, whitespace: true, message: '품목명을 입력하세요' }]}
-          >
-            <Input placeholder="품목명" maxLength={200} />
-          </Form.Item>
-          <Form.Item
-            name="quantity"
-            label="수량"
-            rules={[{ required: true, message: '수량을 입력하세요' }]}
-          >
-            <InputNumber<number>
-              style={{ width: '100%' }} min={1} max={2_147_483_647} precision={0} placeholder="수량"
-            />
-          </Form.Item>
-          <Form.Item
-            name="unitPrice"
-            label="단가"
-            rules={[{ required: true, message: '단가를 입력하세요' }]}
-          >
-            <InputNumber<number>
-              style={{ width: '100%' }}
-              min={0}
-              max={9_999_999_999.99}
-              precision={2}
-              placeholder="단가"
-              formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(v) => Number(v?.replace(/,/g, '') ?? 0)}
-            />
-          </Form.Item>
-          <Form.Item name="supplier" label="공급업체">
-            <Input placeholder="공급업체명" maxLength={200} />
-          </Form.Item>
-          <Form.Item name="purchaseDate" label="매입일">
-            <DatePicker style={{ width: '100%' }} placeholder="매입일 선택" />
-          </Form.Item>
-          <Form.Item name="memo" label="메모">
-            <Input.TextArea rows={3} placeholder="메모" maxLength={16000} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {open && <PurchaseCreateModal onClose={() => setOpen(false)} />}
 
       <FilterBar activeCount={activeCount} onReset={resetFilters}>
         <FilterSearch
           value={filters.q ?? ''}
           onChange={(v) => setFilters({ q: v })}
-          placeholder="품목명, 공급업체 검색"
+          placeholder="품목명, 거래처 검색"
         />
         <FilterDateRange
           startDate={filters.startDate}
@@ -280,7 +175,7 @@ export default function PurchaseListPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {['품목명', '수량', '단가', '금액', '거래처', '매입일', '증빙', '처리'].map((h) => (
+                {['현장', '품목명', '수량', '단가', '금액', '거래처', '매입일', '증빙', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
                     fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
@@ -300,6 +195,9 @@ export default function PurchaseListPage() {
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
+                  <td style={{ padding: '14px 20px', fontSize: 13 }}>
+                    <SiteNameCell site={siteDisplay(p.siteId)} />
+                  </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                     {p.itemName}
                   </td>

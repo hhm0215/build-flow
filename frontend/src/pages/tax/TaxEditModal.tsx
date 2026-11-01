@@ -4,7 +4,8 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useUpdateTax } from '../../api/taxes.api'
 import type { TaxInvoice, TaxInvoiceType, TaxInvoiceUpdateRequest } from '../../types'
-import { validateTaxAmounts } from '../../utils/tax'
+import { useAutoTaxAmount } from '../../hooks/useAutoTaxAmount'
+import { TAX_AUTO_HINT, isCustomTaxAmount, validateTaxAmounts } from '../../utils/tax'
 
 interface FormValues {
   type: TaxInvoiceType
@@ -36,6 +37,8 @@ export default function TaxEditModal({ invoice, onClose }: Props) {
   const updateTax = useUpdateTax()
   const [error, setError] = useState<string | null>(null)
   const inFlight = useRef(false)
+  // 저장된 세액이 10% 기본값과 다르면 사용자가 정한 값이므로 공급가액을 바꿔도 덮어쓰지 않는다.
+  const handleValuesChange = useAutoTaxAmount(form, isCustomTaxAmount(invoice.supplyAmount, invoice.taxAmount))
 
   const close = () => {
     if (!inFlight.current && !updateTax.isPending) onClose()
@@ -91,6 +94,7 @@ export default function TaxEditModal({ invoice, onClose }: Props) {
           issueDate: invoice.issueDate ? dayjs(invoice.issueDate) : null,
           memo: invoice.memo ?? '',
         }}
+        onValuesChange={handleValuesChange}
       >
         {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} />}
         <Form.Item name="type" label="구분" rules={[{ required: true, message: '구분을 선택해주세요' }]}>
@@ -102,7 +106,7 @@ export default function TaxEditModal({ invoice, onClose }: Props) {
         <Form.Item name="supplyAmount" label="공급가액" rules={[{ required: true, message: '공급가액을 입력해주세요' }, { type: 'number', min: 0, max: 9_999_999_999_999.99, message: '공급가액 범위를 확인해주세요' }]}>
           <InputNumber<number> style={{ width: '100%' }} min={0} max={9_999_999_999_999.99} precision={2} placeholder="공급가액" />
         </Form.Item>
-        <Form.Item name="taxAmount" label="세액" rules={[{ required: true, message: '세액을 입력해주세요' }, { type: 'number', min: 0, max: 9_999_999_999_999.99, message: '세액 범위를 확인해주세요' }]}>
+        <Form.Item name="taxAmount" label="세액" extra={TAX_AUTO_HINT} rules={[{ required: true, message: '세액을 입력해주세요' }, { type: 'number', min: 0, max: 9_999_999_999_999.99, message: '세액 범위를 확인해주세요' }]}>
           <InputNumber<number> style={{ width: '100%' }} min={0} max={9_999_999_999_999.99} precision={2} placeholder="세액" />
         </Form.Item>
         <Form.Item name="issueDate" label="발행일">

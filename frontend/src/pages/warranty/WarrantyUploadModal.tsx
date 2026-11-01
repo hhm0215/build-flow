@@ -1,27 +1,30 @@
 import { useState } from 'react'
-import { Modal, Upload, message, Button, InputNumber } from 'antd'
+import { Modal, Upload, message, Button } from 'antd'
 import type { RcFile } from 'antd/es/upload'
 import { isAxiosError } from 'axios'
 import { FileText, Sparkles, RotateCcw } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useUploadWarranty } from '../../api/warranties.api'
+import SiteSelect from '../../components/SiteSelect'
 
 interface WarrantyUploadModalProps {
   open: boolean
   onClose: () => void
   onUploaded?: () => void
+  /** 현장 상세에서 열 때 미리 선택할 현장 */
+  initialSiteId?: number
 }
 
 const ACCEPT = '.pdf'
 const MAX_BYTES = 20 * 1024 * 1024
 
-export default function WarrantyUploadModal({ open, onClose, onUploaded }: WarrantyUploadModalProps) {
-  const [siteId, setSiteId] = useState<number | null>(null)
+export default function WarrantyUploadModal({ open, onClose, onUploaded, initialSiteId }: WarrantyUploadModalProps) {
+  const [siteId, setSiteId] = useState<number | null>(initialSiteId ?? null)
   const [step, setStep] = useState<'input' | 'done'>('input')
   const uploadMutation = useUploadWarranty()
 
   const reset = () => {
-    setSiteId(null)
+    setSiteId(initialSiteId ?? null)
     setStep('input')
     uploadMutation.reset()
   }
@@ -33,7 +36,7 @@ export default function WarrantyUploadModal({ open, onClose, onUploaded }: Warra
 
   const handleBeforeUpload = (file: RcFile) => {
     if (siteId == null) {
-      message.error('현장 ID를 먼저 입력해 주세요.')
+      message.error('현장을 먼저 선택해 주세요.')
       return Upload.LIST_IGNORE
     }
     if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -102,14 +105,13 @@ export default function WarrantyUploadModal({ open, onClose, onUploaded }: Warra
           >
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                현장 ID
+                현장
               </label>
-              <InputNumber
-                value={siteId}
+              <SiteSelect
+                aria-label="현장"
+                value={siteId ?? undefined}
                 onChange={(v) => setSiteId(v ?? null)}
-                min={1}
-                placeholder="현장 ID 입력"
-                style={{ width: '100%' }}
+                placeholder="현장 검색 / 선택"
               />
             </div>
 
@@ -128,7 +130,7 @@ export default function WarrantyUploadModal({ open, onClose, onUploaded }: Warra
                   {uploadMutation.isPending
                     ? '업로드 중…'
                     : siteId == null
-                      ? '현장 ID 입력 후 PDF 드래그/클릭'
+                      ? '현장 선택 후 PDF 드래그/클릭'
                       : 'PDF 파일을 드래그하거나 클릭하세요'}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.6 }}>

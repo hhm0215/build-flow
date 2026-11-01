@@ -188,7 +188,7 @@ function StatCard({ title, value, change, changeType, icon: Icon, accentColor, i
 
 // ── Helpers: build stat cards from API data ──────
 
-function buildStatCards(stats: {
+export function buildStatCards(stats: {
   sitesByStatus: Record<string, number>
   totalEstimateAmount: number
   totalPurchaseAmount: number
@@ -197,6 +197,9 @@ function buildStatCards(stats: {
   totalSites: number
 }): Omit<StatCardProps, 'index'>[] {
   const inProgress = stats.sitesByStatus['IN_PROGRESS'] || 0
+  // 현장·견적·매입이 하나도 없으면 흑자/주의 같은 평가 배지는 의미가 없으므로 숨긴다.
+  const hasProfitData = stats.totalSites > 0 && (stats.totalEstimateAmount > 0 || stats.totalPurchaseAmount > 0)
+  const hasMarginRate = stats.totalSites > 0 && stats.totalEstimateAmount > 0
 
   return [
     {
@@ -226,16 +229,16 @@ function buildStatCards(stats: {
     {
       title: '총 마진',
       value: `\u20A9${formatAmount(stats.totalMargin)}`,
-      change: stats.totalMargin >= 0 ? '흑자' : '적자',
-      changeType: stats.totalMargin >= 0 ? 'up' : 'down',
+      change: hasProfitData ? (stats.totalMargin >= 0 ? '흑자' : '적자') : '',
+      changeType: hasProfitData ? (stats.totalMargin >= 0 ? 'up' : 'down') : 'neutral',
       icon: TrendingUp,
       accentColor: stats.totalMargin >= 0 ? '#22c55e' : '#ef4444',
     },
     {
       title: '평균 마진율',
-      value: `${stats.averageMarginRate.toFixed(1)}%`,
-      change: stats.averageMarginRate >= 20 ? '양호' : '주의',
-      changeType: stats.averageMarginRate >= 20 ? 'up' : 'down',
+      value: hasMarginRate ? `${stats.averageMarginRate.toFixed(1)}%` : '-',
+      change: hasMarginRate ? (stats.averageMarginRate >= 20 ? '양호' : '주의') : '',
+      changeType: hasMarginRate ? (stats.averageMarginRate >= 20 ? 'up' : 'down') : 'neutral',
       icon: Percent,
       accentColor: '#8b5cf6',
     },
