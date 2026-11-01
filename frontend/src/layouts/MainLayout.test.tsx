@@ -31,6 +31,7 @@ function renderLayout(path = '/dashboard') {
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<p>대시보드 본문</p>} />
           <Route path="/sites" element={<p>현장 본문</p>} />
+          <Route path="/clients" element={<p>거래처 본문</p>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -83,5 +84,18 @@ describe('MainLayout 반응형 내비게이션', () => {
     const reopened = await screen.findByRole('navigation', { name: '주 메뉴' })
     expect(within(reopened).getByRole('button', { name: '현장 관리' })).toHaveAttribute('aria-current', 'page')
     expect(within(reopened).getByRole('button', { name: '대시보드' })).not.toHaveAttribute('aria-current')
+  })
+
+  it.each([1440, 375])('%ipx 메뉴에 거래처 항목이 있고 /clients로 이동한다', async (width) => {
+    stubWidth(width)
+    renderLayout()
+
+    if (width < 1024) fireEvent.click(screen.getByRole('button', { name: '메뉴 열기' }))
+    const nav = await screen.findByRole('navigation', { name: '주 메뉴' })
+    const labels = within(nav).getAllByRole('button').map((b) => b.getAttribute('aria-label'))
+    expect(labels.indexOf('거래처')).toBe(labels.indexOf('현장 관리') + 1)
+
+    fireEvent.click(within(nav).getByRole('button', { name: '거래처' }))
+    expect(await screen.findByText('거래처 본문')).toBeInTheDocument()
   })
 })

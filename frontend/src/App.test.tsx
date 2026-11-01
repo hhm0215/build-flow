@@ -34,7 +34,7 @@ afterEach(() => {
 describe('App 라우트 — 없는 주소', () => {
   it('로그인 상태면 레이아웃 안에서 404 안내와 대시보드 버튼을 보여 준다', async () => {
     useAuthStore.setState({ accessToken: 'a', refreshToken: 'r', sessionId: 's', isAuthenticated: true })
-    renderApp('/clients')
+    renderApp('/no-such-page')
 
     expect(screen.getByText('페이지를 찾을 수 없습니다')).toBeInTheDocument()
     // 레이아웃(주 메뉴)이 함께 렌더돼 메뉴로 바로 이동할 수 있다
@@ -46,7 +46,7 @@ describe('App 라우트 — 없는 주소', () => {
   })
 
   it('로그인 안 된 상태면 없는 주소도 로그인 화면으로 보낸다', () => {
-    renderApp('/clients')
+    renderApp('/no-such-page')
 
     expect(screen.getByTestId('location')).toHaveTextContent('/login')
     expect(screen.getByText('로그인 화면')).toBeInTheDocument()
