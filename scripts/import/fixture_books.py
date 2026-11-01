@@ -33,6 +33,36 @@ def sample_cells(items: list[dict[str, Any]], total: Any, *, client="합성거�
     return {key: value for key, value in cells.items() if value is not None}
 
 
+BILL_HEADER = [
+    {2: "번호", 3: "명     칭", 4: "규   격", 5: "단위", 6: "수량", 7: "재 료 비", 9: "노 무 비", 11: "합   계",
+     13: "비  고"},
+    {2: "NO", 3: "DESCRIPTION", 4: "SIZE", 5: "UNIT", 6: "QT'Y", 7: "단 가", 8: "금 액", 9: "단 가", 10: "금 액",
+     11: "단 가", 12: "금 액", 13: "REMARK"},
+]
+BILL_COLUMNS = {"mark": 0, "no": 2, "name": 3, "spec": 4, "unit": 5, "qty": 6, "price": 11, "amount": 12,
+                "note": 13, "label": 11}
+
+
+def bill_cells(rows: list[dict[str, Any]], *, header: list[dict[int, str]] | None = None, header_row: int = 1,
+               columns: dict[str, int] | None = None) -> dict[tuple[int, int], Any]:
+    """내역서형 양식(2~3행 머리글, 재료비·노무비·합계 묶음). rows: {mark,no,name,spec,unit,qty,price,amount,note,label}.
+
+    label은 머리글 없는 칸(기본 합계 단가 열)에 적는 합계금액·공과잡비 같은 글자다.
+    """
+    cols = {**BILL_COLUMNS, **(columns or {})}
+    cells: dict[tuple[int, int], Any] = {(0, 5): "합성 내역서"}
+    head = header or BILL_HEADER
+    for offset, labels in enumerate(head):
+        for col, label in labels.items():
+            cells[(header_row + offset, col)] = label
+    start = header_row + len(head)
+    for offset, row in enumerate(rows):
+        for key, value in row.items():
+            if value is not None:
+                cells[(start + offset, cols[key])] = value
+    return cells
+
+
 Merge = tuple[int, int, int, int]  # 0-based (r0, c0, r1, c1), 끝 포함
 
 
