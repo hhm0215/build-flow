@@ -22,10 +22,47 @@ describe('buildStatCards', () => {
     const cards = buildStatCards({
       ...empty, sitesByStatus: { IN_PROGRESS: 1 }, totalSites: 1,
       totalEstimateAmount: 600_000, totalPurchaseAmount: 273_000, totalMargin: 327_000, averageMarginRate: 54.5,
+      siteProfits: [
+        { siteId: 1, siteName: '현장 A', status: 'IN_PROGRESS', estimateAmount: 600_000, purchaseAmount: 273_000, margin: 327_000, marginRate: 54.5 },
+      ],
     })
     expect(card(cards, '총 마진').change).toBe('흑자')
     expect(card(cards, '평균 마진율').value).toBe('54.5%')
     expect(card(cards, '평균 마진율').change).toBe('양호')
+    expect(card(cards, '평균 마진율').note).toBe('매입 입력된 1개 현장 기준')
+  })
+
+  it('매입이 모두 0원이면 100% 양호·흑자 대신 매입 입력 후 계산을 안내한다', () => {
+    const cards = buildStatCards({
+      ...empty, sitesByStatus: { COMPLETED: 2 }, totalSites: 2,
+      totalEstimateAmount: 1_000_000, totalPurchaseAmount: 0, totalMargin: 1_000_000, averageMarginRate: 100,
+      siteProfits: [
+        { siteId: 1, siteName: '현장 A', status: 'COMPLETED', estimateAmount: 600_000, purchaseAmount: 0, margin: 600_000, marginRate: 100 },
+        { siteId: 2, siteName: '현장 B', status: 'COMPLETED', estimateAmount: 400_000, purchaseAmount: 0, margin: 400_000, marginRate: 100 },
+      ],
+    })
+    expect(card(cards, '총 매출 (견적)').value).toBe('₩100만')
+    expect(card(cards, '총 마진').value).toBe('-')
+    expect(card(cards, '총 마진').change).toBe('')
+    expect(card(cards, '총 마진').note).toBe('매입 입력 후 계산')
+    expect(card(cards, '평균 마진율').value).toBe('-')
+    expect(card(cards, '평균 마진율').change).toBe('')
+    expect(card(cards, '평균 마진율').note).toBe('매입 입력 후 계산')
+  })
+
+  it('매입 입력 현장만으로 평균 마진율을 다시 계산한다', () => {
+    const cards = buildStatCards({
+      ...empty, sitesByStatus: { COMPLETED: 2 }, totalSites: 2,
+      totalEstimateAmount: 2_000_000, totalPurchaseAmount: 900_000, totalMargin: 1_100_000, averageMarginRate: 55,
+      siteProfits: [
+        { siteId: 1, siteName: '현장 A', status: 'COMPLETED', estimateAmount: 1_000_000, purchaseAmount: 900_000, margin: 100_000, marginRate: 10 },
+        { siteId: 2, siteName: '현장 B', status: 'COMPLETED', estimateAmount: 1_000_000, purchaseAmount: 0, margin: 1_000_000, marginRate: 100 },
+      ],
+    })
+    expect(card(cards, '총 매입').value).toBe('₩90만')
+    expect(card(cards, '총 마진').value).toBe('₩10만')
+    expect(card(cards, '평균 마진율').value).toBe('10.0%')
+    expect(card(cards, '평균 마진율').change).toBe('주의')
   })
 })
 

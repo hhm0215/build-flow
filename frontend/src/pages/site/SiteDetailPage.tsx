@@ -36,6 +36,7 @@ import type { Site, SiteStatus } from '../../types'
 import { SITE_STATUSES, canTransitionSiteStatus } from '../../utils/siteStatus'
 import { calculateDocumentProfit, compareEstimatesByDateDesc, formatDocumentDate } from '../../utils/estimate'
 import { PAYMENT_STATUS_META, paymentStatusOf, remainingOf } from '../../utils/taxPayment'
+import { hasPurchaseInput, siteMarginRateCaption } from '../../utils/marginEvaluation'
 import SiteEditModal from './SiteEditModal'
 import ClientEditModal from './ClientEditModal'
 import PurchaseEvidenceSummaryCard from './PurchaseEvidenceSummaryCard'
@@ -300,7 +301,6 @@ export default function SiteDetailPage() {
     totalEstimateAmount: estimateTotal,
     totalPurchaseAmount: purchaseTotal,
     margin,
-    marginRate,
   } = calculateDocumentProfit(estimates, purchases)
   const unpaidTotal = taxes.reduce((sum, t) => sum + remainingOf(t), 0)
   const estimateReady = !estimatesLoading && !estimatesError && !!estimatesData
@@ -422,9 +422,9 @@ export default function SiteDetailPage() {
           title="마진"
           value={financialValue(estimateReady && purchaseReady, estimatesError || purchasesError, margin)}
           description={estimateReady && purchaseReady
-            ? (estimateTotal > 0 ? `마진율 ${marginRate.toFixed(1)}%` : '아직 산출 전')
+            ? siteMarginRateCaption(estimateTotal, purchaseTotal)
             : '견적서·매입 조회 후 산출'}
-          color={estimateReady && purchaseReady && margin < 0 ? '#ef4444' : '#22c55e'}
+          color={estimateReady && purchaseReady && margin < 0 ? '#ef4444' : estimateReady && purchaseReady && !hasPurchaseInput(purchaseTotal) ? '#a1a1aa' : '#22c55e'}
         />
         <SummaryCard
           icon={Wallet}
