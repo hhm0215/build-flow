@@ -10,6 +10,7 @@ import {
   Receipt,
   Bell,
   ShieldCheck,
+  Building2,
   Zap,
   ChevronRight,
   Menu,
@@ -23,6 +24,7 @@ import { useViewport } from '../hooks/useViewport'
 const menuItems = [
   { key: '/dashboard', icon: LayoutDashboard, label: '대시보드' },
   { key: '/sites', icon: HardHat, label: '현장 관리' },
+  { key: '/clients', icon: Building2, label: '거래처' },
   { key: '/estimates', icon: FileText, label: '견적서' },
   { key: '/purchases', icon: ShoppingBag, label: '매입 관리' },
   { key: '/taxes', icon: Receipt, label: '세금계산서' },

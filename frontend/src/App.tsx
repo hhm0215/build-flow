@@ -10,6 +10,7 @@ import { useAuthStore } from './stores/authStore'
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const SiteListPage = lazy(() => import('./pages/site/SiteListPage'))
 const SiteDetailPage = lazy(() => import('./pages/site/SiteDetailPage'))
+const ClientListPage = lazy(() => import('./pages/client/ClientListPage'))
 const EstimateListPage = lazy(() => import('./pages/estimate/EstimateListPage'))
 const PurchaseListPage = lazy(() => import('./pages/purchase/PurchaseListPage'))
 const TaxListPage = lazy(() => import('./pages/tax/TaxListPage'))
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="dashboard" element={<Page><DashboardPage /></Page>} />
         <Route path="sites" element={<Page><SiteListPage /></Page>} />
         <Route path="sites/:id" element={<Page><SiteDetailPage /></Page>} />
+        <Route path="clients" element={<Page><ClientListPage /></Page>} />
         <Route path="estimates" element={<Page><EstimateListPage /></Page>} />
         <Route path="purchases" element={<Page><PurchaseListPage /></Page>} />
         <Route path="taxes" element={<Page><TaxListPage /></Page>} />
