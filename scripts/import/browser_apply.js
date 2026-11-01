@@ -11,6 +11,14 @@
  * 띄어쓰기·기호만 다른 기존 현장이 있으면 멈춤, 견적 메모의 sha256 표식으로 중복 생성 방지,
  * 확정 대상만 DRAFT일 때 확정, 선택 시 현장 상태를 COMPLETED로 변경(수주 전·보관 현장은 건너뜀).
  *
+ * 매출 세금계산서 계획(taxes.py --emit-plan)은 같은 방법으로 붙여 넣은 뒤
+ *   const result = await buildflowApplyTaxPlan(<계획 JSON>) → 결과 JSON을 taxes.py --record-result로 기록.
+ * 현장 연결 규칙(보수적): 상호를 정규화(주식회사·(주)·㈜·공백·기호 제거)해 활성 거래처와 정확히 1곳 일치하고,
+ * 그 거래처의 활성 현장 중 현장명 정규화 키가 품목명 정규화 키에 들어 있는 현장이 정확히 1개일 때만 연결한다.
+ * 0개·여러 개면 만들지 않고 skipped에 사유(거래처 없음/현장 없음/후보 여럿)를 남긴다. 거래처·현장은 만들지 않는다.
+ * 메모의 출처 표식이 이미 있는 세금계산서는 다시 만들지 않고, 다른 파일·수동 입력으로 같은 내용(작성일자·상호·
+ * 공급가액·세액)이 이미 있으면 건너뛴다. 입금 확인은 하지 않는다.
+ *
  * 토큰은 페이지 localStorage('buildflow-auth')에서 요청마다 읽어 Authorization 헤더에만 쓴다.
  * 반환값·오류 메시지·콘솔 출력에는 토큰을 넣지 않는다. 다른 출처(origin)로는 요청하지 않는다.
  */
@@ -20,6 +28,7 @@
     module.exports = api
   } else {
     root.buildflowApplyPlan = api.applyPlan
+    root.buildflowApplyTaxPlan = api.applyTaxPlan
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   'use strict'
@@ -257,5 +266,160 @@
     return result
   }
 
-  return { applyPlan, siteKey }
+  // ─────────────────────────────────────────
+  // 매출 세금계산서 계획(taxes.py --emit-plan)
+  // ─────────────────────────────────────────
+
+  const TAX_PLAN_FORMAT = 'buildflow-tax-import-plan'
+  const TAX_RESULT_FORMAT = 'buildflow-tax-import-result'
+  const TAX_LEDGER_FIELDS = ['entry', 'sha256', 'sheet', 'row', 'fileName', 'issueDate', 'supplyAmount', 'taxAmount']
+  const REASON_NO_CLIENT = '거래처 없음'
+  const REASON_NO_SITE = '현장 없음'
+  const REASON_MANY = '후보 여럿'
+  const REASON_SAME_CONTENT = '같은 내용 이미 있음'
+  /** taxes.py marker_of와 같은 형식: [가져오기 매출 sha256:<16자> 행:<n>] */
+  const TAX_MARKER = /\[가져오기 매출 sha256:([0-9a-f]{16}) 행:\d+\]/
+
+  /** 상호 비교 키: 주식회사·(주)·㈜ 표기를 없앤 뒤 siteKey(공백·기호 제거, 전각→반각, 소문자). */
+  function companyKey(name) {
+    const stripped = String(name == null ? '' : name)
+      .replace(/주식회사/g, '')
+      .replace(/[(（]\s*주\s*[)）]/g, '')
+      .replace(/㈜/g, '')
+    return siteKey(stripped)
+  }
+
+  /** 금액 문자열 비교용: '1000', '1000.0', 1000 → '1000'. */
+  function amountKey(value) {
+    const n = Number(value)
+    return Number.isFinite(n) ? n.toFixed(2) : String(value)
+  }
+
+  function contentKey(issueDate, counterparty, supplyAmount, taxAmount) {
+    return [String(issueDate || ''), companyKey(counterparty), amountKey(supplyAmount), amountKey(taxAmount)].join('|')
+  }
+
+  function validateTaxPlan(plan, origin) {
+    if (!plan || typeof plan !== 'object' || plan.format !== TAX_PLAN_FORMAT || plan.version !== FORMAT_VERSION) {
+      throw new StopError('taxes.py --emit-plan 계획 형식이 아닙니다(format/version)')
+    }
+    if (plan.baseUrl !== origin) {
+      throw new StopError(`계획 대상(${plan.baseUrl})과 이 페이지 주소(${origin})가 다릅니다 — --base-url을 맞춰 다시 내보내세요`)
+    }
+    if (!Array.isArray(plan.entries)) throw new StopError('계획에 entries 목록이 없습니다')
+    for (const entry of plan.entries) {
+      const invoice = entry && entry.invoice
+      if (!entry || !entry.marker || !entry.counterparty || !invoice || invoice.type !== 'SALES' ||
+          !String(invoice.memo || '').includes(entry.marker)) {
+        throw new StopError('계획 항목 형식이 올바르지 않습니다')
+      }
+    }
+  }
+
+  /** 거래처·현장 후보 결정. 반환: { site, client } 또는 { reason, candidates }. */
+  function matchSite(entry, clients, sites) {
+    const key = companyKey(entry.counterparty)
+    const matchedClients = key ? clients.filter((c) => !c?.archivedAt && companyKey(c?.companyName) === key) : []
+    if (!matchedClients.length) return { reason: REASON_NO_CLIENT, candidates: [] }
+    if (matchedClients.length > 1) return { reason: REASON_MANY, candidates: matchedClients.map((c) => Number(c.id)), of: 'client' }
+    const client = matchedClients[0]
+    const itemKey = siteKey(entry.itemName)
+    const matchedSites = itemKey
+      ? sites.filter((s) => {
+        if (s?.archivedAt || !s?.client || Number(s.client.id) !== Number(client.id)) return false
+        const k = siteKey(s.siteName)
+        return k && itemKey.includes(k)
+      })
+      : []
+    if (!matchedSites.length) return { reason: REASON_NO_SITE, candidates: [], clientId: Number(client.id) }
+    if (matchedSites.length > 1) {
+      return { reason: REASON_MANY, candidates: matchedSites.map((s) => Number(s.id)), of: 'site', clientId: Number(client.id) }
+    }
+    return { site: matchedSites[0], client }
+  }
+
+  async function applyTaxPlan(plan, options) {
+    const opts = options || {}
+    const env = {
+      fetch: opts.fetch || (root.fetch && root.fetch.bind(root)),
+      storage: opts.storage || root.localStorage,
+      origin: null,
+    }
+    const result = {
+      format: TAX_RESULT_FORMAT,
+      version: FORMAT_VERSION,
+      kind: 'tax',
+      baseUrl: null,
+      planGeneratedAt: plan && plan.generatedAt ? String(plan.generatedAt) : null,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      ok: false,
+      error: null,
+      entries: [],
+      skipped: [],
+    }
+    try {
+      env.origin = checkOrigin(opts.origin || (root.location && root.location.origin))
+      result.baseUrl = env.origin
+      validateTaxPlan(plan, env.origin)
+      readToken(env.storage)
+      const request = makeApi(env)
+      const clients = (await request('GET', '/api/v1/clients')) || []
+      const sites = (await request('GET', '/api/v1/sites')) || []
+      const invoices = (await request('GET', '/api/v1/taxes?type=SALES')) || []
+
+      // 이 계획의 표식이 없는 기존 매출 세금계산서(다른 파일·수동 입력). 같은 파일에서 앞서 넣은 행은
+      // 같은 내용이어도 서로 다른 세금계산서일 수 있으므로 비교 대상에서 뺀다(행 표식으로만 판단).
+      const planMarkers = new Set(plan.entries.map((e) => e.marker))
+      const others = []
+      for (const row of invoices) {
+        const memo = String(row?.memo ?? '')
+        const tag = TAX_MARKER.exec(memo)
+        if (tag && planMarkers.has(tag[0])) continue
+        others.push({
+          key: contentKey(row?.issueDate, row?.counterparty, row?.supplyAmount, row?.taxAmount),
+          file: tag ? tag[1] : null,
+          used: false,
+        })
+      }
+
+      for (const entry of plan.entries) {
+        const base = {}
+        for (const field of TAX_LEDGER_FIELDS) base[field] = entry[field] ?? null
+        const existing = invoices.find((row) => String(row?.memo ?? '').includes(entry.marker))
+        if (existing) {
+          result.entries.push({ ...base, taxInvoiceId: Number(existing.id), siteId: Number(existing.siteId), clientId: null, action: 'linked' })
+          continue
+        }
+        const k = contentKey(entry.invoice.issueDate, entry.invoice.counterparty, entry.invoice.supplyAmount, entry.invoice.taxAmount)
+        const fileTag = String(entry.sha256 || '').slice(0, 16)
+        const same = others.find((o) => !o.used && o.key === k && o.file !== fileTag)
+        if (same) {
+          same.used = true
+          result.skipped.push({ ...base, reason: REASON_SAME_CONTENT, detail: '다른 파일·수동 입력으로 같은 작성일자·상호·금액이 이미 있음' })
+          continue
+        }
+        const match = matchSite(entry, clients, sites)
+        if (!match.site) {
+          const skip = { ...base, reason: match.reason, candidates: match.candidates }
+          if (match.of) skip.of = match.of === 'client' ? '거래처' : '현장'
+          if (match.clientId != null) skip.clientId = match.clientId
+          result.skipped.push(skip)
+          continue
+        }
+        const siteId = Number(match.site.id)
+        const created = await request('POST', '/api/v1/taxes', { siteId, ...entry.invoice })
+        invoices.push(created)
+        result.entries.push({ ...base, taxInvoiceId: Number(created.id), siteId, clientId: Number(match.client.id), action: 'created' })
+      }
+      result.ok = true
+    } catch (error) {
+      result.ok = false
+      result.error = error instanceof StopError ? error.message : `예상하지 못한 오류(${error && error.name ? error.name : 'Error'})`
+    }
+    result.finishedAt = new Date().toISOString()
+    return result
+  }
+
+  return { applyPlan, applyTaxPlan, siteKey, companyKey }
 })
