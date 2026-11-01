@@ -203,6 +203,43 @@ class RealDataCliTest(cli_base.CliBase):
             self.assertIn("(출처: 폴더 이름)", out)
             self.assertEqual([s["siteName"] for s in gateway.sites], ["합성폴더현장"])
 
+    def test_date_folder_takes_upper_folder_name(self):
+        folder = self.tmp / "2025" / "합성거래처폴더" / "11월 6일"
+        folder.mkdir(parents=True)
+        (folder / "a.xlsx").write_bytes(xlsx_bytes(self.item_cells(site=None)))
+        code, out, _ = self.run_cli(folder, "--site-from-folder")
+        self.assertEqual(code, 0, out)
+        self.assertIn("폴더 이름 '합성거래처폴더 11월 6일'", out)
+
+    def test_date_folder_under_collection_folder_takes_client_name(self):
+        folder = self.tmp / "2025" / "2025년 합성 견적서" / "1월 4일"
+        folder.mkdir(parents=True)
+        (folder / "a.xlsx").write_bytes(xlsx_bytes(self.item_cells(site=None)))
+        code, out, _ = self.run_cli(folder, "--site-from-folder")
+        self.assertEqual(code, 0, out)
+        self.assertIn("폴더 이름 '합성거래처 1월 4일'", out)
+
+    def test_same_site_name_with_different_clients_blocks(self):
+        self.write("a.xlsx", xlsx_bytes(self.item_cells(site="합성공통현장")))
+        other = sample_cells([{"no": 1, "name": "자재", "spec": "EA", "qty": 1, "price": 1000, "amount": 1000}],
+                             1000, client="다른거래처 귀하", site="합성공통현장")
+        self.write("b.xlsx", xlsx_bytes(other))
+        code, out, _ = self.run_cli(self.site_dir)
+        self.assertIn("같은 현장명에 거래처가 여럿", out)
+        code, _, _ = self.run_cli(self.site_dir, "--emit-plan", str(self.tmp / "plan.json"))
+        self.assertEqual(code, 1)
+        self.assertFalse((self.tmp / "plan.json").exists())
+
+    def test_existing_site_of_other_client_stops_apply(self):
+        self.write("a.xlsx", xlsx_bytes(self.item_cells(site="합성기존현장")))
+        with FakeGateway() as gateway:
+            gateway.sites.append({"id": 9, "siteName": "합성기존현장", "client": {"id": 777, "companyName": "남의거래처"},
+                                  "status": "IN_PROGRESS", "archivedAt": None})
+            code, _, err = self.run_cli(self.site_dir, "--apply", "--base-url", gateway.base_url, env=self.env())
+            self.assertEqual(code, 1)
+            self.assertIn("거래처가 견적 수신처와 다름", err)
+            self.assertEqual(gateway.posts("/api/v1/estimates"), [])
+
     def test_year_folder_is_not_site_candidate(self):
         path = self.tmp / "2025" / "a.xlsx"
         path.write_bytes(xlsx_bytes(self.item_cells(site=None)))
@@ -372,6 +409,20 @@ class BrowserPlanTest(cli_base.CliBase):
             self.assertEqual(code, 0)
             self.assertIn("이미 적재", out)
             self.assertEqual(json.loads((self.tmp / "plan2.json").read_text(encoding="utf-8"))["entries"], [])
+
+    @unittest.skipUnless(NODE, "node 없음")
+    def test_browser_apply_stops_on_existing_site_of_other_client(self):
+        self.write("견적1.xlsx", xlsx_bytes(sample_cells(MERGED_ITEMS[3:], 300, site="합성기존현장")))
+        plan_path = self.tmp / "plan.json"
+        with FakeGateway() as gateway:
+            gateway.clients.append({"id": 5, "companyName": "합성거래처"})
+            gateway.sites.append({"id": 9, "siteName": "합성기존현장", "client": {"id": 777, "companyName": "남의거래처"},
+                                  "status": "IN_PROGRESS", "archivedAt": None})
+            self.assertEqual(self.emit(plan_path, base_url=gateway.base_url)[0], 0)
+            _, result = self.run_node(plan_path, gateway.base_url)
+            self.assertFalse(result["ok"])
+            self.assertIn("거래처가 견적 수신처와 다름", result["error"])
+            self.assertEqual(gateway.posts("/api/v1/estimates"), [])
 
     @unittest.skipUnless(NODE, "node 없음")
     def test_browser_apply_refuses_mismatched_origin_and_bad_token(self):
