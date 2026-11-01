@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Client, Site } from '../../types'
 import ClientListPage from './ClientListPage'
@@ -146,5 +146,30 @@ describe('ClientListPage', () => {
     fireEvent.click(within(popover).getByRole('button', { name: '복원' }))
     await waitFor(() => expect(state.restore).toHaveBeenCalledWith(3, expect.any(Object)))
     expect(state.archive).not.toHaveBeenCalled()
+  })
+
+  it('업체명이나 연결 현장 수를 누르면 그 거래처의 현장 목록으로 이동한다', () => {
+    function SitesProbe() {
+      const location = useLocation()
+      return <div data-testid="sites-location">{`${location.pathname}${location.search}`}</div>
+    }
+    const renderRoutes = () => render(
+      <MemoryRouter initialEntries={['/clients']}>
+        <Routes>
+          <Route path="/clients" element={<ClientListPage />} />
+          <Route path="/sites" element={<SitesProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const first = renderRoutes()
+    fireEvent.click(screen.getByRole('link', { name: '현장 없는 거래처' }))
+    expect(screen.getByTestId('sites-location')).toHaveTextContent('/sites?clientId=2')
+    first.unmount()
+
+    // 보관 현장이 섞인 거래처는 연결 현장 수와 결과가 같도록 보관 포함으로 연다
+    renderRoutes()
+    fireEvent.click(within(screen.getByTestId('linked-sites-1')).getByRole('link'))
+    expect(screen.getByTestId('sites-location')).toHaveTextContent('/sites?clientId=1&archive=ALL')
   })
 })
