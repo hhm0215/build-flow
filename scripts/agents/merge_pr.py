@@ -7,7 +7,8 @@
 - 모든 체크가 끝났고 결과가 성공·건너뜀·중립뿐일 때만 진행한다. 실패·취소·대기 중이 하나라도 있으면 멈춘다.
 - PR 커밋 목록과 `origin/<base>..origin/<head>`가 같아야 한다.
 - 병합은 `gh pr merge --merge`(병합 커밋)만 쓴다. 우회 옵션은 없다.
-- `--wait`는 체크가 모두 끝날 때까지 기다린다(실패해도 끝까지 기다린 뒤 판정).
+- `--wait`는 체크가 모두 끝날 때까지 기다린다(실패해도 끝까지 기다린 뒤 판정). `--timeout`(기본 60분)을 넘기면
+  병합하지 않고 멈춘다 — GitHub 장애 중 푸시로 CI가 아예 안 뜬 PR을 무한정 기다리지 않게(2026-11-04 #301).
 """
 
 from __future__ import annotations
@@ -60,12 +61,18 @@ def main() -> int:
     parser.add_argument("pr", type=int)
     parser.add_argument("--wait", action="store_true", help="체크가 모두 끝날 때까지 기다림")
     parser.add_argument("--interval", type=int, default=30)
+    parser.add_argument("--timeout", type=int, default=3600, help="--wait 최대 대기 초(기본 3600)")
     args = parser.parse_args()
 
+    deadline = time.monotonic() + args.timeout
     while True:
         verdict, problems = judge(check_states(args.pr))
         if verdict != "pending" or not args.wait:
             break
+        if time.monotonic() >= deadline:
+            print(f"병합 중단: {args.timeout}초 안에 CI가 끝나지 않음 — {', '.join(problems)}"
+                  " (체크 없음이면 새 커밋을 푸시해 CI를 다시 시작)")
+            return 1
         time.sleep(args.interval)
     if verdict != "pass":
         print(f"병합 중단: CI {'실패' if verdict == 'fail' else '미완료'} — {', '.join(problems)}")
