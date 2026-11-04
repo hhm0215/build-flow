@@ -1162,7 +1162,7 @@
 
 **로컬 실데이터**: 로컬 스택은 `bf-audit`(origin/develop 작업 폴더)에서 `.local/local-gateway-port.yml` override(gateway 18080, redis 16379)로 기동, 프론트 http://localhost:3000. 적재 도구 `scripts/import/`, 백업·ledger는 저장소 밖 `Documents/Dev/build-flow-backups/`.
 
-**VPS 상태**: 마지막 배포 SHA `4c4ca8c`(2026-10-29). 2026-10-31 사용자가 VPS를 다른 프로젝트에 쓰기 위해 BuildFlow 컨테이너를 내렸고, 에이전트 VPS 접근은 금지(사용자 요청 1건 단위로만 읽기 전용 확인). 같은 날 요청 1건으로 읽기 전용 조회: 공개 포트 22·80·443만 열림, 80·443은 다른 프로젝트 Caddy가 사용(응답 헤더 `Server: Caddy`), 가용 RAM 약 6.8GB·스왑 없음·디스크 53GB 여유. BuildFlow 공개 스택 Caddy도 80·443을 쓰므로 **그대로 배포하면 충돌**한다. 공존하려면 기존 Caddy에 BuildFlow 도메인 블록을 추가하고 BuildFlow 쪽 Caddy를 빼는 방식이 추천안(사용자 결정 대기). 배포 계정은 Docker 소켓 권한이 없어 다른 프로젝트 컨테이너 구성은 미확인.
+**VPS 상태**: 2026-11-04 사용자 요청으로 BuildFlow 재가동 확인 후 `sudo buildflow-release deploy ddae48a…` EXIT 0(4c4ca8c→ddae48a, DB 마이그레이션 없음, 공개 / 200·무인증 API 401, 16개 컨테이너 Up). 되돌리기: `sudo buildflow-release rollback 4c4ca8c69bbc6c1f2741e5ec519b3394ce612ad0`. 다른 프로젝트 봇은 이미 내려가 있었고 80/443은 BuildFlow Caddy가 사용. Caddy 컨테이너는 래퍼가 재생성하지 않아 #265 HSTS·중복 헤더 제거 Caddyfile 변경은 Caddy 재적재(root) 전까지 미반영. 운영 DB 실데이터 입력은 여전히 보류(로컬 개발 DB만).
 
 **다음 작업**: `.claude/BACKLOG.md`. 실데이터 입력 전 게이트(실제 운영 백업 외부 복원, 운영 DDL 대조, 롤백 훈련, 보안 게이트)는 모두 VPS가 필요해 보류 중이다. 진행률 69/100(2026-11-01 채점).
 
