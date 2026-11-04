@@ -8,9 +8,11 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/ko'
 import App from './App'
 import { enableMocking, isMockMode } from './mocks/mockMode'
+import { installChunkReloadHandler } from './utils/chunkReload'
 import './index.css'
 
 dayjs.locale('ko')
+installChunkReloadHandler()
 
 const queryClient = new QueryClient({
   defaultOptions: {

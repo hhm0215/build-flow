@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button, Result } from 'antd'
+import { isChunkLoadError, reloadOnceForChunkError } from '../utils/chunkReload'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -15,6 +16,8 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean
+  /** 새 배포로 옛 청크를 받지 못한 경우 — 새로고침 안내 */
+  chunkError?: boolean
 }
 
 /**
@@ -24,13 +27,15 @@ interface ErrorBoundaryState {
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false }
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
-    return { hasError: true }
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    return { hasError: true, chunkError: isChunkLoadError(error) }
   }
 
   componentDidCatch(error: Error, _info: ErrorInfo) {
     // 원문 메시지는 남기지 않고 오류 종류만 기록한다
     console.error(`[ErrorBoundary:${this.props.area}] ${error?.name ?? 'Error'}`)
+    // 새 버전 배포 직후 옛 청크 요청 실패는 한 번만 자동 새로고침한다(반복되면 아래 안내를 보여 준다)
+    if (isChunkLoadError(error)) reloadOnceForChunkError()
   }
 
   componentDidUpdate(prevProps: ErrorBoundaryProps) {
@@ -39,11 +44,21 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     }
   }
 
-  reset = () => this.setState({ hasError: false })
+  reset = () => this.setState({ hasError: false, chunkError: false })
+
+  reloadPage = () => window.location.reload()
 
   render() {
     if (!this.state.hasError) return this.props.children
-    const result = (
+    const result = this.state.chunkError ? (
+      <Result
+        status="warning"
+        title="새 버전이 배포되어 새로고침이 필요합니다."
+        subTitle={this.props.compact ? undefined : '새로고침하면 최신 화면을 불러옵니다.'}
+        style={this.props.compact ? { padding: '24px 12px' } : undefined}
+        extra={<Button type="primary" onClick={this.reloadPage}>새로고침</Button>}
+      />
+    ) : (
       <Result
         status="error"
         title="문제가 생겼습니다. 다시 시도해 주세요."

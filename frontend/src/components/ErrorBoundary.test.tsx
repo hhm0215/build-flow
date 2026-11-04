@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ErrorBoundary from './ErrorBoundary'
+import { CHUNK_RELOAD_KEY } from '../utils/chunkReload'
 
 const SECRET = 'Bearer eyJhbGciOiJIUzI1NiJ9.secret-token'
 
@@ -67,5 +68,20 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('페이지 본문')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveClass('chat-panel')
     expect(screen.getByText('문제가 생겼습니다. 다시 시도해 주세요.')).toBeInTheDocument()
+  })
+  it('청크 로드 실패면 새 버전 안내와 새로고침 버튼을 보여 주고, 이미 새로고침했으면 다시 새로고침하지 않는다', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // 방금 자동 새로고침을 한 상태 — 다시 새로고침하지 않고 안내만 보여야 한다
+    const recent = String(Date.now())
+    window.sessionStorage.setItem(CHUNK_RELOAD_KEY, recent)
+    function ChunkBomb(): never {
+      throw new TypeError('Failed to fetch dynamically imported module: /assets/DashboardPage-old.js')
+    }
+    render(<ErrorBoundary area="page"><ChunkBomb /></ErrorBoundary>)
+
+    expect(screen.getByText('새 버전이 배포되어 새로고침이 필요합니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument()
+    expect(window.sessionStorage.getItem(CHUNK_RELOAD_KEY)).toBe(recent)
+    window.sessionStorage.removeItem(CHUNK_RELOAD_KEY)
   })
 })
