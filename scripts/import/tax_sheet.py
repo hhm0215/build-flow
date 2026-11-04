@@ -1,4 +1,4 @@
-"""홈택스 '매출전자세금계산서목록' 엑셀(.xls/.xlsx) 파서. 순수 함수만 둔다(API·파일 쓰기 없음).
+"""홈택스 '매출·매입전자세금계산서목록' 엑셀(.xls/.xlsx) 파서(두 양식이 같다). 순수 함수만 둔다(API·파일 쓰기 없음).
 
 양식(머리글 위치·열 순서는 글자로 찾는다):
   상단 요약: '사업자 등록번호 | … | 상호 | …', '총 합계금액 | 값 | 총 공급가액 | 값 | 총 세액 | 값'
@@ -75,22 +75,34 @@ class ParsedTaxList:
     summary: dict[str, Optional[Decimal]]
     errors: list[str]
     warnings: list[str]
+    # 머리글에 두 번 이상 나온 열(예: 공급자·공급받는자 '상호'가 모두 있는 양식). 첫 열을 쓴다
+    repeated: list[str] = field(default_factory=list)
 
     def sum_of(self, key: str) -> Decimal:
         return sum((getattr(r, key) or Decimal(0) for r in self.rows), Decimal(0))
 
 
-def find_header(grid: list[list[Any]]) -> tuple[int, dict[str, int]]:
+def find_header_columns(grid: list[list[Any]]) -> tuple[int, dict[str, int], list[str]]:
+    """(머리글 행, 열 위치, 두 번 이상 나온 열 키)."""
     for r, row in enumerate(grid[:HEADER_SCAN_ROWS]):
         labels = [label_key(v) for v in row]
         columns: dict[str, int] = {}
+        repeated: list[str] = []
         for c, label in enumerate(labels):
             for key, names in COLUMN_LABELS.items():
-                if label in names and key not in columns:
-                    columns[key] = c
+                if label in names:
+                    if key not in columns:
+                        columns[key] = c
+                    elif key not in repeated:
+                        repeated.append(key)
         if all(name in labels for name in REQUIRED_LABELS) and "date" in columns:
-            return r, columns
-    raise SheetFormatError("목록 머리글(작성일자·상호·공급가액)을 찾을 수 없습니다 — 홈택스 매출 세금계산서 목록인지 확인")
+            return r, columns, repeated
+    raise SheetFormatError("목록 머리글(작성일자·상호·공급가액)을 찾을 수 없습니다 — 홈택스 전자세금계산서 목록인지 확인")
+
+
+def find_header(grid: list[list[Any]]) -> tuple[int, dict[str, int]]:
+    header_row, columns, _ = find_header_columns(grid)
+    return header_row, columns
 
 
 def find_summary(grid: list[list[Any]], header_row: int) -> tuple[dict[str, Optional[Decimal]], list[str]]:
@@ -184,14 +196,14 @@ def _parse_row(r: int, values: list[Any], columns: dict[str, int]) -> Optional[T
 def parse_tax_list(data: bytes) -> ParsedTaxList:
     sheet = load_sheet(data)
     grid = sheet.grid
-    header_row, columns = find_header(grid)
+    header_row, columns, repeated = find_header_columns(grid)
     if "tax" not in columns and "total" not in columns:
         raise SheetFormatError("세액·합계금액 열이 모두 없어 세액을 알 수 없습니다")
     summary, errors = find_summary(grid, header_row)
     warnings: list[str] = []
     rows = [row for r in range(header_row + 1, len(grid))
             if (row := _parse_row(r, grid[r], columns)) is not None]
-    parsed = ParsedTaxList(sheet.title, header_row + 1, columns, rows, summary, errors, warnings)
+    parsed = ParsedTaxList(sheet.title, header_row + 1, columns, rows, summary, errors, warnings, repeated)
     if not rows:
         errors.append("데이터 행이 없음")
     if summary["supply"] is None:

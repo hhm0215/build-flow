@@ -25,6 +25,12 @@
  * 메모의 출처 표식이 이미 있는 세금계산서는 다시 만들지 않고, 다른 파일·수동 입력으로 같은 내용(작성일자·상호·
  * 공급가액·세액)이 이미 있으면 건너뛴다. 입금 확인은 하지 않는다.
  *
+ * 매입 세금계산서 계획(purchases.py --emit-plan)은 같은 방법으로 붙여 넣은 뒤
+ *   const result = await buildflowApplyPurchasePlan(<계획 JSON>) → 결과 JSON을 purchases.py --record-result로 기록.
+ * 현장 미배정 매입으로 만들기만 한다(siteId를 보내지 않음, 현장 배정 PATCH도 부르지 않음 — 가족이 화면에서 배정).
+ * 기존 매입 목록(GET /api/v1/purchases)에서 메모의 출처 표식이 이미 있으면 다시 만들지 않고, 다른 목록 파일에서
+ * 가져온 매입(표식 있음)과 매입일·공급업체·단가·품목명이 같으면 '같은 내용 이미 있음'으로 건너뛴다.
+ *
  * 토큰은 페이지 localStorage('buildflow-auth')에서 요청마다 읽어 Authorization 헤더에만 쓴다.
  * 반환값·오류 메시지·콘솔 출력에는 토큰을 넣지 않는다. 다른 출처(origin)로는 요청하지 않는다.
  */
@@ -35,6 +41,7 @@
   } else {
     root.buildflowApplyPlan = api.applyPlan
     root.buildflowApplyTaxPlan = api.applyTaxPlan
+    root.buildflowApplyPurchasePlan = api.applyPurchasePlan
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   'use strict'
@@ -480,5 +487,121 @@
     return result
   }
 
-  return { applyPlan, applyTaxPlan, siteKey, companyKey, stripGenericWords }
+  // ─────────────────────────────────────────
+  // 매입 세금계산서 → 현장 미배정 매입 계획(purchases.py --emit-plan)
+  // ─────────────────────────────────────────
+
+  const PURCHASE_PLAN_FORMAT = 'buildflow-purchase-import-plan'
+  const PURCHASE_RESULT_FORMAT = 'buildflow-purchase-import-result'
+  const PURCHASE_LEDGER_FIELDS = ['entry', 'sha256', 'sheet', 'row', 'fileName', 'issueDate', 'supplyAmount',
+    'taxAmount', 'hint']
+  const PURCHASE_BODY_FIELDS = new Set(['itemName', 'quantity', 'unitPrice', 'supplier', 'purchaseDate', 'memo'])
+  /** purchases.py marker_of와 같은 형식: [가져오기 매입 sha256:<16자> 행:<n>] */
+  const PURCHASE_MARKER = /\[가져오기 매입 sha256:([0-9a-f]{16}) 행:\d+\]/
+
+  function purchaseKey(date, supplier, unitPrice, itemName) {
+    return [String(date || ''), companyKey(supplier), amountKey(unitPrice), siteKey(itemName)].join('|')
+  }
+
+  function validatePurchasePlan(plan, origin) {
+    if (!plan || typeof plan !== 'object' || plan.format !== PURCHASE_PLAN_FORMAT || plan.version !== FORMAT_VERSION) {
+      throw new StopError('purchases.py --emit-plan 계획 형식이 아닙니다(format/version)')
+    }
+    if (plan.baseUrl !== origin) {
+      throw new StopError(`계획 대상(${plan.baseUrl})과 이 페이지 주소(${origin})가 다릅니다 — --base-url을 맞춰 다시 내보내세요`)
+    }
+    if (!Array.isArray(plan.entries)) throw new StopError('계획에 entries 목록이 없습니다')
+    for (const entry of plan.entries) {
+      const body = entry && entry.purchase
+      if (!entry || !entry.marker || !body || typeof body !== 'object' ||
+          Object.keys(body).some((k) => !PURCHASE_BODY_FIELDS.has(k)) ||
+          !String(body.memo || '').includes(entry.marker)) {
+        throw new StopError('계획 항목 형식이 올바르지 않습니다(미배정 매입 본문에는 siteId 등 다른 칸을 넣지 않음)')
+      }
+    }
+  }
+
+  async function applyPurchasePlan(plan, options) {
+    const opts = options || {}
+    const env = {
+      fetch: opts.fetch || (root.fetch && root.fetch.bind(root)),
+      storage: opts.storage || root.localStorage,
+      origin: null,
+    }
+    const result = {
+      format: PURCHASE_RESULT_FORMAT,
+      version: FORMAT_VERSION,
+      kind: 'purchase',
+      baseUrl: null,
+      amountBasis: 'supply',
+      planGeneratedAt: plan && plan.generatedAt ? String(plan.generatedAt) : null,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      ok: false,
+      error: null,
+      entries: [],
+      skipped: [],
+    }
+    try {
+      env.origin = checkOrigin(opts.origin || (root.location && root.location.origin))
+      result.baseUrl = env.origin
+      validatePurchasePlan(plan, env.origin)
+      readToken(env.storage)
+      const request = makeApi(env)
+      const purchases = (await request('GET', '/api/v1/purchases')) || []
+
+      // 다른 목록 파일에서 가져온 매입(표식 있음)만 같은 내용 비교 대상으로 둔다. 수동 입력 매입은 품목을 나눠
+      // 적는 경우가 많아 비교하지 않고, 같은 파일의 앞 행은 같은 내용이어도 서로 다른 세금계산서일 수 있어 뺀다.
+      const planMarkers = new Set(plan.entries.map((e) => e.marker))
+      const others = []
+      for (const row of purchases) {
+        const tag = PURCHASE_MARKER.exec(String(row?.memo ?? ''))
+        if (!tag || planMarkers.has(tag[0])) continue
+        others.push({
+          key: purchaseKey(row?.purchaseDate, row?.supplier, row?.unitPrice, row?.itemName),
+          file: tag[1],
+          used: false,
+        })
+      }
+
+      for (const entry of plan.entries) {
+        const base = {}
+        for (const field of PURCHASE_LEDGER_FIELDS) base[field] = entry[field] ?? null
+        const existing = purchases.find((row) => String(row?.memo ?? '').includes(entry.marker))
+        if (existing) {
+          result.entries.push({
+            ...base, purchaseId: Number(existing.id),
+            siteId: existing.siteId == null ? null : Number(existing.siteId), action: 'linked',
+          })
+          continue
+        }
+        const body = entry.purchase
+        const k = purchaseKey(body.purchaseDate, body.supplier, body.unitPrice, body.itemName)
+        const fileTag = String(entry.sha256 || '').slice(0, 16)
+        const same = others.find((o) => !o.used && o.key === k && o.file !== fileTag)
+        if (same) {
+          same.used = true
+          result.skipped.push({
+            ...base, counterparty: entry.counterparty ?? null, itemName: entry.itemName ?? null,
+            reason: REASON_SAME_CONTENT, detail: '다른 목록 파일에서 같은 매입일·공급업체·금액·품목명이 이미 들어옴',
+          })
+          continue
+        }
+        const created = await request('POST', '/api/v1/purchases', { ...body })
+        purchases.push(created)
+        result.entries.push({
+          ...base, purchaseId: Number(created.id),
+          siteId: created.siteId == null ? null : Number(created.siteId), action: 'created',
+        })
+      }
+      result.ok = true
+    } catch (error) {
+      result.ok = false
+      result.error = error instanceof StopError ? error.message : `예상하지 못한 오류(${error && error.name ? error.name : 'Error'})`
+    }
+    result.finishedAt = new Date().toISOString()
+    return result
+  }
+
+  return { applyPlan, applyTaxPlan, applyPurchasePlan, siteKey, companyKey, stripGenericWords }
 })
