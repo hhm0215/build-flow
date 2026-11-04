@@ -56,7 +56,7 @@ NEGATIVE_BLOCKER = "수정(음수) 세금계산서 — API가 음수 금액을 �
 
 
 # 별칭 파일 첫 줄 머리글로 볼 첫 칸(공백 제거·소문자)
-CLIENT_ALIAS_HEADERS = {"세금계산서상호", "상호", "원본", "source", "from"}
+CLIENT_ALIAS_HEADERS = {"세금계산서상호", "상호", "원본", "source", "from", "견적서수신처", "수신처"}  # estimates.py도 공유
 SITE_MAP_HEADERS = {"세금계산서상호", "세금계산서상호(또는*)", "상호", "source"}
 SITE_MAP_ANY = "*"
 UNMATCHED_HEADER = ["상호", "품목명", "작성일자", "공급가액", "사유", "후보"]
