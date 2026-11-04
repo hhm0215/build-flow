@@ -227,7 +227,7 @@ RelationProposal 1 ── N ReviewDecision
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | id | BIGINT PK | |
-| site_id | BIGINT | 현장 ID |
+| site_id | BIGINT NULL | 현장 ID. NULL = 현장 미배정(손익 이벤트 없음, 배정 시 `purchase.registered`) — 2026-11-01 V3·기동 패치로 NOT NULL 해제 |
 | item_name | VARCHAR(200) | 품명 |
 | quantity | INT | 수량 |
 | unit_price | DECIMAL(12,2) | 단가 |
@@ -235,7 +235,7 @@ RelationProposal 1 ── N ReviewDecision
 | supplier | VARCHAR(200) | 공급업체명 |
 | purchase_date | DATE | 매입일 |
 | memo | TEXT | 메모 |
-| event_revision | BIGINT NOT NULL | 생성 1, 수정·삭제 이벤트마다 행 잠금 아래 +1 |
+| event_revision | BIGINT NOT NULL | 생성 1, 수정·삭제·현장 배정마다 행 잠금 아래 +1(미배정 중 수정은 이벤트 없이 증가) |
 | created_at | DATETIME(6) | |
 | updated_at | DATETIME(6) | |
 
