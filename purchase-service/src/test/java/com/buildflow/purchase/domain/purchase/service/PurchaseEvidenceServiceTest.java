@@ -59,6 +59,18 @@ class PurchaseEvidenceServiceTest {
     }
 
     @Test
+    void unassignedPurchaseCannotLinkEvidenceBeforeSiteAssignment() {
+        Purchase purchase = purchase(1L, null, "1000.00");
+        when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(purchase));
+
+        assertError(ErrorCode.PURCHASE_SITE_UNASSIGNED, () -> service.link(1L, new PurchaseEvidenceLinkRequest(20L)));
+
+        assertEquals(400, ErrorCode.PURCHASE_SITE_UNASSIGNED.getStatus().value());
+        assertNull(purchase.getEvidenceTaxInvoiceId());
+        verifyNoInteractions(taxClient, siteValidator);
+    }
+
+    @Test
     void salesInvoiceOtherSiteAndMissingInvoiceAreRejectedWith400() {
         Purchase purchase = purchase(1L, 3L, "1000.00");
         when(repository.findByIdForUpdate(1L)).thenReturn(Optional.of(purchase));

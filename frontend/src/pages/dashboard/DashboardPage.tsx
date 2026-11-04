@@ -16,6 +16,8 @@ import {
 import ReactMarkdown from 'react-markdown'
 import ErrorState from '../../components/ErrorState'
 import { useDashboardStats, useDashboardSummary } from '../../api/dashboard.api'
+import { usePurchases } from '../../api/purchases.api'
+import { summarizeUnassigned } from '../../utils/purchase'
 import type { SiteProfitSummary } from '../../types'
 import { siteCountCaption } from '../../utils/siteStatus'
 import {
@@ -268,6 +270,35 @@ export function buildStatCards(stats: {
 
 // ── Main Component ───────────────────────────────
 
+const UNASSIGNED_PARAMS = { unassigned: 'true' }
+
+/** 현장 미배정 매입 안내 1줄. 배정 전에는 어느 현장 손익에도 들어가지 않으므로 대시보드에서 알린다. */
+function UnassignedPurchaseNotice() {
+  const navigate = useNavigate()
+  const { data } = usePurchases(UNASSIGNED_PARAMS)
+  const summary = summarizeUnassigned(data ?? [])
+  if (summary.count === 0) return null
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/purchases?assignment=unassigned')}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%',
+        padding: '10px 16px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+        color: 'var(--text-secondary)', fontSize: 13,
+      }}
+    >
+      <span>
+        현장 미배정 매입 {summary.count}건 · ₩{summary.totalAmount.toLocaleString('ko-KR')} — 아직 손익에 반영되지 않았습니다.
+      </span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--accent)', fontWeight: 500 }}>
+        배정하기 <ArrowUpRight size={12} strokeWidth={2.5} />
+      </span>
+    </button>
+  )
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: statsRefetch } = useDashboardStats()
@@ -312,6 +343,8 @@ export default function DashboardPage() {
             ))
         }
       </div>
+
+      <UnassignedPurchaseNotice />
 
       {/* Bottom section */}
       <div className="bf-dashboard-bottom">

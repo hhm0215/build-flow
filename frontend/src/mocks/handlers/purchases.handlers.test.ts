@@ -112,4 +112,47 @@ describe('매입 MSW 수정·삭제 계약', () => {
     })).status).toBe(404)
     expect((await fetch(itemUrl, { method: 'DELETE' })).status).toBe(404)
   })
+
+  it('siteId 없는 POST는 미배정으로 저장되고 ?unassigned=true 목록에만 보인다', async () => {
+    const response = await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({ itemName: '미배정 자재', quantity: 1, unitPrice: 1000 }),
+    })
+    expect(response.status).toBe(201)
+    const created = (await response.json() as ApiResponse<Purchase>).data
+    expect(created.siteId).toBeNull()
+
+    const unassignedUrl = new URL('/api/v1/purchases?unassigned=true', document.baseURI)
+    const unassigned = (await fetch(unassignedUrl).then((r) => r.json()) as ApiResponse<Purchase[]>).data
+    expect(unassigned.every((p) => p.siteId == null)).toBe(true)
+    expect(unassigned.some((p) => p.id === created.id)).toBe(true)
+    const bySite = (await fetch(new URL('/api/v1/purchases?siteId=3', document.baseURI))
+      .then((r) => r.json()) as ApiResponse<Purchase[]>).data
+    expect(bySite.some((p) => p.id === created.id)).toBe(false)
+
+    const combined = await fetch(new URL('/api/v1/purchases?unassigned=true&siteId=3', document.baseURI))
+    expect(combined.status).toBe(400)
+  })
+
+  it('PATCH /site는 미배정만 배정하고 같은 현장은 멱등, 다른 현장·없는 현장·증빙 선연결을 거절한다', async () => {
+    const created = (await fetch(url, {
+      method: 'POST', headers,
+      body: JSON.stringify({ itemName: '배정 대상', quantity: 1, unitPrice: 500 }),
+    }).then((r) => r.json()) as ApiResponse<Purchase>).data
+    const siteUrl = new URL(`/api/v1/purchases/${created.id}/site`, document.baseURI)
+    const evidenceUrl = new URL(`/api/v1/purchases/${created.id}/evidence`, document.baseURI)
+
+    const earlyEvidence = await fetch(evidenceUrl, { method: 'PUT', headers, body: JSON.stringify({ taxInvoiceId: 1 }) })
+    expect(earlyEvidence.status).toBe(400)
+    expect((await fetch(siteUrl, { method: 'PATCH', headers, body: '{}' })).status).toBe(400)
+    expect((await fetch(siteUrl, { method: 'PATCH', headers, body: JSON.stringify({ siteId: 999 }) })).status).toBe(400)
+
+    const assigned = await fetch(siteUrl, { method: 'PATCH', headers, body: JSON.stringify({ siteId: 3 }) })
+    expect(assigned.status).toBe(200)
+    expect((await assigned.json() as ApiResponse<Purchase>).data.siteId).toBe(3)
+    expect((await fetch(siteUrl, { method: 'PATCH', headers, body: JSON.stringify({ siteId: 3 }) })).status).toBe(200)
+    expect((await fetch(siteUrl, { method: 'PATCH', headers, body: JSON.stringify({ siteId: 2 }) })).status).toBe(409)
+    const missing = new URL('/api/v1/purchases/999999/site', document.baseURI)
+    expect((await fetch(missing, { method: 'PATCH', headers, body: JSON.stringify({ siteId: 3 }) })).status).toBe(404)
+  })
 })

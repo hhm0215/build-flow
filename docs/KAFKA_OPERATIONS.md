@@ -54,7 +54,7 @@ docker compose exec -T kafka kafka-console-consumer.sh --bootstrap-server localh
 
 ## 매입 revision/projection 운영 규칙
 
-`purchase.registered`, `purchase.updated`, `purchase.deleted`는 서로 다른 토픽이라 동일한 `purchaseId`를 record key로 사용해도 토픽 간 도착 순서는 보장되지 않는다. purchase-service는 생성 시 revision 1을 부여하고 수정·삭제마다 행 잠금 아래 1씩 증가시킨다. site-service는 `purchase_profit_projections`의 마지막 전체 상태와 `site_profits`의 기여분을 같은 트랜잭션으로 변경한다.
+`purchase.registered`, `purchase.updated`, `purchase.deleted`는 서로 다른 토픽이라 동일한 `purchaseId`를 record key로 사용해도 토픽 간 도착 순서는 보장되지 않는다. purchase-service는 생성 시 revision 1을 부여하고 수정·삭제마다 행 잠금 아래 1씩 증가시킨다. 현장 미배정 매입(`site_id` NULL, 2026-11-01)은 어떤 `purchase.*` 이벤트도 발행하지 않고, 현장 배정 시 증가한 revision의 `purchase.registered`를 처음 발행한다. 이미 배정된 매입의 현장 이동은 API에서 409이므로 projection의 현장 불변 규칙은 유지된다. site-service는 `siteId`가 없는 매입 이벤트를 재시도 없는 검증 오류(DLT)로 처리하고 손익을 바꾸지 않는다. site-service는 `purchase_profit_projections`의 마지막 전체 상태와 `site_profits`의 기여분을 같은 트랜잭션으로 변경한다.
 
 - 낮은 revision: 지연 이벤트로 간주해 `processed_profit_events`만 기록하고 손익은 바꾸지 않는다.
 - 같은 revision·같은 상태: 다른 eventId라도 no-op 처리한다.

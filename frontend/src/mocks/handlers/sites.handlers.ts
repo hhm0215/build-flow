@@ -40,6 +40,11 @@ export function archivedSiteCreateError(siteId: number | null | undefined) {
   )
 }
 
+/** 매입 현장 배정 등 다른 서비스의 site 참조 검증(Feign)에 해당. */
+export function mockSiteExists(siteId: number): boolean {
+  return sites.some((s) => s.id === siteId)
+}
+
 /** 보관 현장 소속 기존 자료의 수정·삭제 409 (백엔드 SITE_ARCHIVED_DOCUMENT_LOCKED). 입금 확인은 허용 */
 export function archivedSiteLockError(siteId: number | null | undefined) {
   if (siteId == null || !sites.some((s) => s.id === Number(siteId) && s.archivedAt)) return null

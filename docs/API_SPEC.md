@@ -103,9 +103,10 @@
 | 메서드 | 경로 | 설명 | 인증 |
 |--------|------|------|------|
 | POST | /api/v1/purchases | JSON `PurchaseCreateRequest` → `PurchaseResponse` (201) | O |
-| GET | /api/v1/purchases?siteId={id} | 선택적 현장 필터 → `PurchaseResponse[]` | O |
+| GET | /api/v1/purchases?siteId={id}&unassigned={bool} | 선택적 현장 필터 또는 `unassigned=true`(현장 미배정만) → `PurchaseResponse[]`; 두 필터 동시 지정 400 | O |
 | GET | /api/v1/purchases/{id} | `PurchaseResponse` | O |
 | PUT | /api/v1/purchases/{id} | JSON `PurchaseUpdateRequest` → `PurchaseResponse`; 현장 ID 변경 불가 | O |
+| PATCH | /api/v1/purchases/{id}/site | JSON `{siteId}` → `PurchaseResponse`; 현장 미배정 매입에 현장 배정(같은 현장 재요청 멱등, 다른 현장 이동 409) | O |
 | DELETE | /api/v1/purchases/{id} | 삭제 | O |
 | PUT | /api/v1/purchases/{id}/evidence | JSON `{taxInvoiceId}` → `PurchaseResponse`; 같은 현장 매입 세금계산서를 증빙으로 연결(재연결 시 교체) | O |
 | DELETE | /api/v1/purchases/{id}/evidence | 증빙 연결 해제 → `PurchaseResponse` | O |
@@ -113,7 +114,9 @@
 | GET | /api/v1/purchases/evidence-links?taxInvoiceId={id} | `{taxInvoiceId, linkedPurchaseCount}`; tax-service의 삭제·유형 변경 전 확인용 | O |
 | GET | /api/v1/purchases/profit-source?siteId={id} | 손익 재계산 원천(운영용, 프론트 미사용) → `{siteId, totalAmount, purchases[{purchaseId, revision, totalAmount}], profitEvents[{eventId, eventType}]}` (현재 행 + 삭제 매입을 포함한 보존 이벤트) | O |
 
-생성 본문은 필수 `siteId`, `itemName`, `quantity`(1 이상 정수), `unitPrice`(0 이상·정수 10자리/소수 2자리 이하)와 선택적 `supplier`, `purchaseDate`, `memo`이다. 수정에서는 `siteId`가 없다. 응답에는 `id`, `siteId`, 요청 필드, 계산된 `totalAmount`, 생성·수정 시각이 포함된다. 총액은 DECIMAL(15,2) 범위이며 검증 실패는 JSON 오류 래퍼의 400이다. 매입 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 매입/outbox를 저장하지 않는다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
+생성 본문은 선택 `siteId`(생략 시 현장 미배정, 아래 참조), 필수 `itemName`, `quantity`(1 이상 정수), `unitPrice`(0 이상·정수 10자리/소수 2자리 이하)와 선택적 `supplier`, `purchaseDate`, `memo`이다. 수정에서는 `siteId`가 없다. 응답에는 `id`, `siteId`, 요청 필드, 계산된 `totalAmount`, 생성·수정 시각이 포함된다. 총액은 DECIMAL(15,2) 범위이며 검증 실패는 JSON 오류 래퍼의 400이다. 매입 생성 전 site-service에서 현장 ID를 확인하며 없는 현장은 400, 현장 확인 서비스 장애나 불일치 응답은 503으로 거부하고 매입/outbox를 저장하지 않는다. 수정·삭제는 행 잠금으로 직렬화하고 증가한 revision의 outbox 이벤트를 남긴다.
+
+**현장 미배정 매입(2026-11-01, 사용자 결정)**: 생성 본문의 `siteId`는 선택이며 생략하면 현장 미배정 매입(`PurchaseResponse.siteId = null`)으로 저장한다(홈택스 매입 세금계산서를 일괄 적재한 뒤 화면에서 현장을 고르는 흐름). `siteId`를 보내면 기존처럼 양수·존재·미보관 검증을 한다. 미배정 매입은 어느 현장 손익에도 속하지 않으므로 생성·수정·삭제 모두 site-service 조회와 손익 outbox 이벤트(`purchase.*`)를 만들지 않는다(수정 시 revision만 증가). `PATCH /purchases/{id}/site`로 배정하면 site-service에서 현장을 확인(없는 현장 400, 보관 현장 400, 장애 503)한 뒤 증가한 revision의 `purchase.registered`를 처음 발행해 그 현장 손익에 반영하며, 저장·outbox 기록 뒤 커밋 직전 재확인에 실패하면 배정 전체를 롤백한다. 같은 현장 재요청은 변경·이벤트 없이 200, 이미 배정된 매입의 다른 현장 이동은 409(site 손익 projection이 매입 ID별 현장을 고정하므로 이동은 삭제 후 재등록), 없는 매입 404. 미배정 매입의 증빙 연결은 400(현장 배정 후 가능). `profit-source`·`evidence-summary`는 현장 기준이라 미배정 매입을 포함하지 않는다.
 
 **증빙 세금계산서 연결(2026-10-23)**: 원가의 단일 진실원은 매입 항목이며 매입 세금계산서는 원가에 더하지 않고 증빙으로만 연결한다. `PurchaseResponse.evidenceTaxInvoiceId`(nullable)로 매입 1건은 계산서 최대 1건, 계산서 1건은 같은 현장 매입 0..N건과 연결된다. 연결 시 purchase-service가 tax-service `GET /taxes/{id}`로 확인해 없는 계산서·매출 계산서·다른 현장 계산서는 400, tax-service 장애·불일치 응답은 503(fail-closed)이다. 보관 현장의 매입은 연결·해제 409. 연결·해제는 손익 이벤트를 만들지 않는다. `PurchaseEvidenceSummaryResponse`는 `purchaseCount/Amount`, `linkedPurchaseCount/Amount`, `unlinkedPurchaseCount/Amount`(끊어진 연결 포함), `brokenLinkCount`(연결 계산서가 삭제·유형 변경된 경합 잔여), `invoiceCount`, `invoiceSupplyAmount`, `invoiceTotalAmount`, `invoiceWithoutPurchaseCount`, `supplyDifference`/`totalDifference`(= 계산서 공급가/합계 − 연결 매입 합계), 계산서별 `invoices[]`이다. 요약은 tax-service `GET /taxes?siteId&type=PURCHASE`를 읽으며 장애 시 503.
 
@@ -201,5 +204,6 @@
 | v1.1 | 2026-10-03 | Controller·DTO·Gateway·프론트 기준 구현 경로/요청/응답/인증 동기화; 미구현 제안 분리 |
 | v1.2 | 2026-10-23 | 견적 수정본·추가공사 관계(`kind`·`revisionOfId`·`chainRootId`·`supersededById`)와 SUPERSEDED 상태 |
 | v1.3 | 2026-10-23 | 운영용 손익 재계산 `POST /sites/{id}/profit/reconcile`과 원천 조회 `GET /estimates/profit-source`·`GET /purchases/profit-source` |
+| v1.4 | 2026-11-01 | 현장 미배정 매입(`siteId` 선택·`unassigned` 필터)과 `PATCH /purchases/{id}/site` 배정 |
 
 2026-10-26: 매입 원천은 PENDING/CLAIMED/SENT 상태와 무관하게 삭제된 매입의 등록·수정·삭제 eventId까지 같은 스냅샷으로 반환한다. 원천 payload 소속·eventId·유형을 판별할 수 없으면 일반 503으로 중단한다. 기존 수신기록의 현장·유형 충돌은 409다. 합계가 같더라도 미수신 이벤트가 있으면 matched=false이며 apply 시 수신기록을 함께 저장한다. 원천·소비자에 보존 이력이 없는 Kafka 이벤트까지 안전하다고 보장하지 않으며, 복원본/브로커 범위 대조와 전체 토픽 재생 금지는 유지한다.

@@ -35,9 +35,9 @@ class PurchaseFlywayIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void freshMysqlRunsV1V2AndHibernateValidatesWithoutCreatingBusinessData() {
+    void freshMysqlRunsAllMigrationsAndHibernateValidatesWithoutCreatingBusinessData() {
         assertNotNull(flyway.info().current());
-        assertEquals("2", flyway.info().current().getVersion().toString());
+        assertEquals("3", flyway.info().current().getVersion().toString());
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '1' AND success = 1",
                 Integer.class));
@@ -52,6 +52,13 @@ class PurchaseFlywayIntegrationTest {
         assertTrue(purchasesDdl.contains("COLLATE=utf8mb4_unicode_ci"));
         assertTrue(purchasesDdl.contains("`evidence_tax_invoice_id` bigint DEFAULT NULL"));
         assertTrue(purchasesDdl.contains("KEY `idx_purchases_evidence_tax_invoice`"));
+        // V3: 현장 미배정 매입 허용
+        assertTrue(purchasesDdl.contains("`site_id` bigint DEFAULT NULL"));
+        assertEquals("YES", jdbc.queryForObject(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchases' "
+                        + "AND COLUMN_NAME = 'site_id'",
+                String.class));
 
         String outboxDdl = jdbc.queryForObject("SHOW CREATE TABLE outbox_events",
                 (resultSet, row) -> resultSet.getString(2));

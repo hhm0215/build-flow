@@ -71,6 +71,21 @@ class KafkaConsumerServiceTest {
         verifyNoInteractions(profitService);
     }
 
+    /**
+     * purchase-service는 현장 미배정 매입의 손익 이벤트를 발행하지 않는다(2026-11-01). 계약 위반으로 siteId가
+     * null·누락된 매입 이벤트가 와도 손익을 건드리지 않고 재시도 없는 IllegalArgumentException(→ DLT)으로 끝난다.
+     */
+    @Test
+    void purchaseEventWithoutSiteIsRejectedWithoutTouchingProfit() {
+        assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseRegistered(
+                message("PURCHASE_REGISTERED", "{\"purchaseId\":3,\"siteId\":null,\"revision\":1,\"totalAmount\":40}")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseUpdated(
+                message("PURCHASE_UPDATED", "{\"purchaseId\":3,\"revision\":2,\"oldTotalAmount\":40,\"newTotalAmount\":50}")));
+        assertThrows(IllegalArgumentException.class, () -> consumer.consumePurchaseDeleted(
+                message("PURCHASE_DELETED", "{\"purchaseId\":3,\"siteId\":null,\"revision\":3,\"totalAmount\":50}")));
+        verifyNoInteractions(profitService);
+    }
+
     @Test
     void domainFailurePropagatesToKafkaErrorHandler() {
         doThrow(new IllegalStateException("database unavailable"))

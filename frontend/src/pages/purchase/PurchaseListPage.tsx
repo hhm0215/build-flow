@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'motion/react'
 import { ShoppingBag, Pencil, Plus, Trash2, FileCheck } from 'lucide-react'
-import { Button } from 'antd'
+import { Button, Checkbox, Tooltip } from 'antd'
 import SiteNameCell from '../../components/SiteNameCell'
 import PageHeader from '../../components/PageHeader'
 import ErrorState from '../../components/ErrorState'
@@ -9,6 +9,7 @@ import FilterBar from '../../components/filters/FilterBar'
 import FilterSearch from '../../components/filters/FilterSearch'
 import FilterDateRange from '../../components/filters/FilterDateRange'
 import FilterAmountRange from '../../components/filters/FilterAmountRange'
+import FilterSelect from '../../components/filters/FilterSelect'
 import { FilterSchema } from '../../hooks/useFilterParams'
 import { useListFilters } from '../../hooks/useListFilters'
 import { usePurchases } from '../../api/purchases.api'
@@ -19,8 +20,18 @@ import PurchaseEvidenceModal from './PurchaseEvidenceModal'
 import PurchaseCreateModal from './PurchaseCreateModal'
 import type { Purchase } from '../../types'
 import { buildSiteDisplayMap } from '../../utils/siteName'
+import { summarizeUnassigned } from '../../utils/purchase'
+import { PurchaseBulkAssignBar, PurchaseSiteAssignCell } from './PurchaseSiteAssign'
+
+const ASSIGNMENT_VALUES = ['unassigned', 'assigned'] as const
+type Assignment = typeof ASSIGNMENT_VALUES[number]
+const ASSIGNMENT_OPTIONS = [
+  { value: 'unassigned' as const, label: '현장 미배정', color: '#f59e0b' },
+  { value: 'assigned' as const, label: '현장 배정됨' },
+]
 
 interface PurchaseFilters {
+  assignment: Assignment
   q: string
   startDate: string
   endDate: string
@@ -29,6 +40,7 @@ interface PurchaseFilters {
 }
 
 const FILTER_SCHEMA: FilterSchema = {
+  assignment: { type: 'enum', values: ASSIGNMENT_VALUES },
   q: { type: 'string' },
   startDate: { type: 'date' },
   endDate: { type: 'date' },
@@ -51,6 +63,8 @@ export default function PurchaseListPage() {
         ['minAmount', 'maxAmount'],
       ],
       filterFn: (p, f: Partial<PurchaseFilters>, rawQ) => {
+        if (f.assignment === 'unassigned' && p.siteId != null) return false
+        if (f.assignment === 'assigned' && p.siteId == null) return false
         const q = rawQ.trim().toLowerCase()
         if (q && !`${p.itemName} ${p.supplier ?? ''}`.toLowerCase().includes(q)) return false
         const dateKey = p.purchaseDate?.slice(0, 10) ?? ''
@@ -63,6 +77,16 @@ export default function PurchaseListPage() {
     })
 
   const totalAmount = filtered.reduce((sum, p) => sum + p.totalAmount, 0)
+  const unassignedSummary = useMemo(() => summarizeUnassigned(purchases), [purchases])
+  const visibleUnassignedIds = useMemo(
+    () => filtered.filter((p) => p.siteId == null).map((p) => p.id), [filtered])
+  const [selected, setSelected] = useState<number[]>([])
+  // 배정 완료·필터 변경으로 화면에서 사라진 행은 선택에서 뺀다
+  const selectedIds = selected.filter((id) => visibleUnassignedIds.includes(id))
+  const allVisibleSelected = visibleUnassignedIds.length > 0
+    && visibleUnassignedIds.every((id) => selectedIds.includes(id))
+  const toggleSelected = (id: number, checked: boolean) =>
+    setSelected((prev) => checked ? [...prev.filter((x) => x !== id), id] : prev.filter((x) => x !== id))
 
   const [open, setOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Purchase | null>(null)
@@ -102,6 +126,12 @@ export default function PurchaseListPage() {
       {open && <PurchaseCreateModal onClose={() => setOpen(false)} />}
 
       <FilterBar activeCount={activeCount} onReset={resetFilters}>
+        <FilterSelect<Assignment>
+          placeholder="현장 배정"
+          value={filters.assignment as Assignment | undefined}
+          options={ASSIGNMENT_OPTIONS}
+          onChange={(v) => setFilters({ assignment: v })}
+        />
         <FilterSearch
           value={filters.q ?? ''}
           onChange={(v) => setFilters({ q: v })}
@@ -122,6 +152,35 @@ export default function PurchaseListPage() {
           }
         />
       </FilterBar>
+
+      {!isLoading && unassignedSummary.count > 0 && (
+        <div
+          role="status"
+          style={{
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.25)',
+            borderRadius: 10,
+            padding: '10px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 12,
+          }}
+        >
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            현장 미배정 매입 {unassignedSummary.count}건 · ₩{unassignedSummary.totalAmount.toLocaleString('ko-KR')}
+            {' '}— 현장을 배정해야 손익에 반영됩니다.
+          </span>
+          {visibleUnassignedIds.length > 0 && (
+            <PurchaseBulkAssignBar
+              selectedIds={selectedIds}
+              onDone={(failedIds) => setSelected(failedIds)}
+            />
+          )}
+        </div>
+      )}
 
       {!isLoading && (
         <motion.div
@@ -176,6 +235,16 @@ export default function PurchaseListPage() {
           <table className="bf-list-table bf-list-table--sticky" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ padding: '11px 0 11px 16px', width: 32 }}>
+                  {visibleUnassignedIds.length > 0 && (
+                    <Checkbox
+                      aria-label="미배정 매입 전체 선택"
+                      checked={allVisibleSelected}
+                      indeterminate={selectedIds.length > 0 && !allVisibleSelected}
+                      onChange={(e) => setSelected(e.target.checked ? visibleUnassignedIds : [])}
+                    />
+                  )}
+                </th>
                 {['현장', '품목명', '수량', '단가', '금액', '거래처', '매입일', '증빙', '처리'].map((h) => (
                   <th key={h} style={{
                     padding: '11px 20px', textAlign: 'left',
@@ -196,8 +265,19 @@ export default function PurchaseListPage() {
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
+                  <td style={{ padding: '14px 0 14px 16px' }}>
+                    {p.siteId == null && (
+                      <Checkbox
+                        aria-label={`${p.itemName} 선택`}
+                        checked={selectedIds.includes(p.id)}
+                        onChange={(e) => toggleSelected(p.id, e.target.checked)}
+                      />
+                    )}
+                  </td>
                   <td style={{ padding: '14px 20px', fontSize: 13 }}>
-                    <SiteNameCell site={siteDisplay(p.siteId)} />
+                    {p.siteId == null
+                      ? <PurchaseSiteAssignCell purchaseId={p.id} />
+                      : <SiteNameCell site={siteDisplay(p.siteId)} />}
                   </td>
                   <td style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
                     {p.itemName}
@@ -226,7 +306,13 @@ export default function PurchaseListPage() {
                   </td>
                   <td style={{ padding: '14px 20px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <Button size="small" icon={<FileCheck size={12} />} onClick={() => setEvidenceTarget(p)}>증빙</Button>
+                      {p.siteId == null ? (
+                        <Tooltip title="현장을 먼저 배정해야 증빙을 연결할 수 있습니다">
+                          <Button size="small" icon={<FileCheck size={12} />} disabled>증빙</Button>
+                        </Tooltip>
+                      ) : (
+                        <Button size="small" icon={<FileCheck size={12} />} onClick={() => setEvidenceTarget(p)}>증빙</Button>
+                      )}
                       <Button size="small" icon={<Pencil size={12} />} onClick={() => setEditTarget(p)}>수정</Button>
                       <Button size="small" danger icon={<Trash2 size={12} />} onClick={() => setDeleteTarget(p)}>삭제</Button>
                     </div>

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class PurchaseResponse {
 
     private Long id;
+    /** 현장 ID. 미배정 매입이면 null. */
     private Long siteId;
     private String itemName;
     private Integer quantity;
