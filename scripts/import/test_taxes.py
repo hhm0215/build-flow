@@ -257,6 +257,132 @@ class TaxCliTest(TaxCliBase):
         self.assertEqual(self.run_taxes(self.site_dir, "--record-result", result_path)[0], 2)
 
 
+class TaxAliasFileTest(TaxCliBase):
+    """--client-alias·--site-map·--unmatched-csv(합성 이름만)."""
+
+    def csv_file(self, name, text):
+        path = self.tmp / "aliases" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(text.encode("utf-8-sig"))
+        return path
+
+    def test_company_key_matches_js_rule(self):
+        for name in ("(주)합성건설", "㈜ 합성건설", "합성건설 주식회사", "합성건설(주)", "（주）합성건설", "합성 건설"):
+            self.assertEqual(taxes.company_key(name), "합성건설", name)
+
+    def test_load_client_aliases(self):
+        path = self.csv_file("client.csv", "세금계산서 상호,DB 거래처명\n# 주석\n(주)가나합성디자인건설,가나 합성\n"
+                                           "가나합성디자인건설 주식회사,가나 합성\n\n합성상회 ,  합성 상사 \n")
+        aliases = taxes.load_client_aliases(path)
+        self.assertEqual(aliases, {"가나합성디자인건설": "가나 합성", "합성상회": "합성 상사"})
+        bad = {
+            "conflict.csv": "(주)가나합성,가나 합성\n가나합성 주식회사,다른 이름\n",
+            "one.csv": "가나합성\n",
+            "symbol.csv": "(주),가나 합성\n",
+        }
+        for name, text in bad.items():
+            with self.subTest(name=name), self.assertRaises(import_common.ImportSetupError):
+                taxes.load_client_aliases(self.csv_file(name, text))
+        inside = import_common.REPO_ROOT / "scripts" / "import" / "client-alias-should-not-exist.csv"
+        with self.assertRaises(import_common.ImportSetupError):
+            taxes.load_client_aliases(inside)
+
+    def test_load_site_map_precedence_and_conflict(self):
+        path = self.csv_file("site.csv", "세금계산서 상호(또는 *),품목명,DB 현장명\n"
+                                         "*,합성병원 잔금,인천 합성병원\n"
+                                         "(주)합성건설,합성병원 잔금,서울 합성병원\n"
+                                         "합성상사,합성 대전 주유소,대전 합성 주유소\n")
+        site_map = taxes.load_site_map(path)
+        self.assertEqual(site_map.lookup("합성건설 주식회사", "합성병원  잔금"), "서울 합성병원")  # 상호 지정 줄 우선
+        self.assertEqual(site_map.lookup("합성공업", "합성병원잔금"), "인천 합성병원")              # * 줄
+        self.assertEqual(site_map.lookup("합성상사", "합성대전주유소"), "대전 합성 주유소")
+        self.assertIsNone(site_map.lookup("합성공업", "합성대전주유소"))   # 다른 상호
+        self.assertIsNone(site_map.lookup("합성상사", "합성 대전 주유소 잔금"))  # 품목명은 같아야(포함 아님)
+        self.assertEqual(len(site_map.used), 3)
+        for text in ("*,합성병원,가\n*,합성 병원,나\n", "*,합성병원\n", "*,-,합성현장\n"):
+            with self.subTest(text=text), self.assertRaises(import_common.ImportSetupError):
+                taxes.load_site_map(self.csv_file("bad-site.csv", text))
+
+    def test_emit_plan_carries_client_name_and_site_name(self):
+        rows = [("2025-03-02", "(주)가나합성디자인건설", 100000, 10000, "합성병원 잔금"),
+                ("2025-03-03", "합성상사", 50000, 5000, "합성현장B 자재")]
+        self.write("매출.xlsx", xlsx_bytes(tax_cells(rows)))
+        client = self.csv_file("client.csv", "가나합성디자인건설 주식회사,가나 합성\n")
+        site = self.csv_file("site.csv", "*,합성병원잔금,인천 합성병원\n*,쓰이지않는품목,없는 현장\n")
+        plan_path = self.tmp / "plan.json"
+        code, out, err = self.emit(plan_path, "--client-alias", client, "--site-map", site)
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("거래처 별칭 적용: 1행", out)
+        self.assertIn("현장 지정 적용: 1행 / 지정 2줄(이번 계획에 안 걸린 줄 1)", out)
+        entries = json.loads(plan_path.read_text(encoding="utf-8"))["entries"]
+        self.assertEqual([(e["clientName"], e["clientAlias"], e["siteName"]) for e in entries],
+                         [("가나 합성", True, "인천 합성병원"), ("합성상사", False, None)])
+        self.assertEqual(entries[0]["invoice"]["counterparty"], "(주)가나합성디자인건설")  # 본문 상호는 원본 그대로
+        inside = import_common.REPO_ROOT / "scripts" / "import" / "site-map-should-not-exist.csv"
+        self.assertEqual(self.emit(plan_path, "--site-map", inside)[0], 2)
+
+    def result_with_skips(self):
+        return {
+            "format": "buildflow-tax-import-result", "version": 1, "kind": "tax", "baseUrl": "http://localhost:3000",
+            "ok": True, "error": None, "entries": [],
+            "skipped": [
+                {"entry": "1:7", "row": 7, "counterparty": "(주)합성건설", "itemName": "합성 대전 주유소",
+                 "issueDate": "2025-03-02", "supplyAmount": "100000", "reason": "후보 여럿", "of": "현장",
+                 "candidates": [11, 12], "candidateNames": ["대전 합성 주유소", "합성 주유소 2"]},
+                {"entry": "1:8", "row": 8, "counterparty": "=합성수식", "itemName": "-합성", "issueDate": "2025-03-03",
+                 "supplyAmount": "-5000", "reason": "지정 현장 없음", "siteName": "없는 현장",
+                 "candidates": [], "candidateNames": []},
+                {"entry": "1:9", "row": 9, "counterparty": "합성상사", "itemName": "합성", "issueDate": "2025-03-04",
+                 "supplyAmount": "1000", "reason": "같은 내용 이미 있음"},
+                {"estimateId": 3, "reason": "이미 CONFIRMED"},  # 행이 없는 항목은 무시
+            ],
+        }
+
+    def read_unmatched(self, path):
+        import csv as csv_module
+        raw = path.read_bytes()
+        self.assertTrue(raw.startswith(b"\xef\xbb\xbf"))
+        return list(csv_module.reader(io_text(raw.decode("utf-8-sig"))))
+
+    def test_unmatched_csv_from_result(self):
+        result_path = self.tmp / "result.json"
+        result_path.write_text(json.dumps(self.result_with_skips(), ensure_ascii=False), encoding="utf-8")
+        out_csv = self.tmp / "out" / "unmatched.csv"
+        code, out, err = self.run_taxes("--from-result", result_path, "--unmatched-csv", out_csv)
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("미연결 CSV: 2행 · 같은 내용 이미 있음 1행 제외", out)
+        self.assertEqual(self.read_unmatched(out_csv), [
+            ["상호", "품목명", "작성일자", "공급가액", "사유", "후보"],
+            ["(주)합성건설", "합성 대전 주유소", "2025-03-02", "100000", "후보 여럿", "대전 합성 주유소 / 합성 주유소 2"],
+            ["'=합성수식", "'-합성", "2025-03-03", "-5000", "지정 현장 없음(지정: 없는 현장)", ""],
+        ])
+        self.assertFalse(self.ledger.exists())  # --from-result는 적재 기록을 남기지 않는다
+
+    def test_unmatched_csv_rules(self):
+        result_path = self.tmp / "result.json"
+        result_path.write_text(json.dumps(self.result_with_skips(), ensure_ascii=False), encoding="utf-8")
+        inside = import_common.REPO_ROOT / "scripts" / "import" / "unmatched-should-not-exist.csv"
+        self.assertEqual(self.run_taxes("--from-result", result_path, "--unmatched-csv", inside)[0], 2)
+        self.assertFalse(inside.exists())
+        self.assertEqual(self.run_taxes("--from-result", result_path)[0], 2)               # 출력 경로 없음
+        self.assertEqual(self.run_taxes(self.site_dir, "--unmatched-csv", self.tmp / "u.csv")[0], 2)  # 결과 없음
+        self.assertEqual(self.run_taxes(self.site_dir, "--from-result", result_path,
+                                        "--unmatched-csv", self.tmp / "u.csv")[0], 2)
+        # --record-result와 함께: 기록 + CSV
+        out_csv = self.tmp / "u.csv"
+        code, out, err = self.run_taxes("--record-result", result_path, "--unmatched-csv", out_csv)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(len(self.read_unmatched(out_csv)), 3)
+        bad = {**self.result_with_skips(), "format": "buildflow-import-result"}
+        result_path.write_text(json.dumps(bad), encoding="utf-8")
+        self.assertEqual(self.run_taxes("--from-result", result_path, "--unmatched-csv", out_csv)[0], 2)
+
+
+def io_text(text):
+    import io
+    return io.StringIO(text)
+
+
 @unittest.skipUnless(NODE, "node 없음")
 class TaxBrowserApplyTest(TaxCliBase):
     def run_node(self, plan_path, origin, token=ACCESS):
@@ -397,8 +523,97 @@ class TaxBrowserApplyTest(TaxCliBase):
             self.assertFalse(result["ok"])
             self.assertIn("계획 형식이 아닙니다", result["error"])
 
+    def alias_seed(self, gateway):
+        gateway.clients += [
+            {"id": 6, "companyName": "가나 합성", "archivedAt": None},
+            {"id": 7, "companyName": "다라합성", "archivedAt": None},
+        ]
+        client = {c["id"]: c for c in gateway.clients}
+        gateway.sites += [
+            {"id": 61, "siteName": "인천 합성병원", "client": client[6], "archivedAt": None},
+            {"id": 62, "siteName": "대전 합성 주유소", "client": client[6], "archivedAt": None},
+            {"id": 63, "siteName": "합성타워", "client": client[6], "archivedAt": None},
+            {"id": 71, "siteName": "인천 합성의원", "client": client[7], "archivedAt": None},
+            {"id": 72, "siteName": "서울 합성의원", "client": client[7], "archivedAt": None},
+            {"id": 73, "siteName": "합성 학교", "client": client[7], "archivedAt": None},
+            {"id": 74, "siteName": "합성학교", "client": client[7], "archivedAt": None},   # 정규화하면 73과 같은 이름
+            {"id": 75, "siteName": "합성창고", "client": client[7], "archivedAt": None},
+        ]
+
+    def test_alias_site_map_and_loose_rule(self):
+        rows = [
+            ("2025-04-01", "(주)가나합성디자인건설", 100000, 10000, "합성병원 잔금"),       # 별칭 + 보조(품목 ⊂ 현장) → contains
+            ("2025-04-02", "(주)가나합성디자인건설", 200000, 20000, "합성 주유소 대전"),     # site-map → site-map
+            ("2025-04-03", "가나합성디자인건설 주식회사", 30000, 3000, "합성타워 금속공사"),  # 별칭 + 포함 → alias
+            ("2025-04-04", "다라합성", 40000, 4000, "합성의원 계약금"),                     # 보조 후보 둘 → 후보 여럿
+            ("2025-04-05", "다라합성", 50000, 5000, "합성 학교"),                           # site-map 이름이 둘 → 지정 현장 없음
+            ("2025-04-06", "다라합성", 60000, 6000, "창고 중도금"),                         # 일반어 뺀 키 2글자 → 현장 없음
+            ("2025-04-07", "다라합성", 70000, 7000, "합성 체육관"),                         # site-map 이름 없음 → 지정 현장 없음
+            ("2025-04-08", "(주)가나합성디자인건설", 80000, 8000, "합성창고 인테리어"),     # 다른 거래처 현장 → 현장 없음
+            ("2025-04-09", "가나합성디자인", 90000, 9000, "합성타워"),                      # 별칭 없는 상호 → 거래처 없음
+        ]
+        self.write("매출.xlsx", xlsx_bytes(tax_cells(rows)))
+        aliases = self.tmp / "aliases"
+        aliases.mkdir()
+        client_alias = aliases / "client.csv"
+        client_alias.write_text("세금계산서 상호,DB 거래처명\n(주)가나합성디자인건설,가나 합성\n", encoding="utf-8")
+        site_map = aliases / "site.csv"
+        site_map.write_text("세금계산서 상호,품목명,DB 현장명\n(주)가나합성디자인건설,합성 주유소 대전,대전 합성 주유소\n"
+                            "*,합성학교,합성학교\n다라합성,합성 체육관,합성 체육관\n", encoding="utf-8")
+        plan_path = self.tmp / "plan.json"
+        with TaxGateway() as gateway:
+            self.seed(gateway)
+            self.alias_seed(gateway)
+            code, out, err = self.emit(plan_path, "--client-alias", client_alias, "--site-map", site_map,
+                                       base_url=gateway.base_url)
+            self.assertEqual(code, 0, out + err)
+            result_path, result = self.run_node(plan_path, gateway.base_url)
+            self.assertTrue(result["ok"], result)
+            self.assertEqual([(e["row"], e["siteId"], e["matchRule"], e["clientRule"]) for e in result["entries"]],
+                             [(7, 61, "contains", "alias"), (8, 62, "site-map", "alias"), (9, 63, "alias", "alias")])
+            self.assertEqual([t["counterparty"] for t in gateway.taxes],
+                             ["(주)가나합성디자인건설"] * 2 + ["가나합성디자인건설 주식회사"])
+            skipped = {s["row"]: s for s in result["skipped"]}
+            self.assertEqual({r: s["reason"] for r, s in skipped.items()},
+                             {10: "후보 여럿", 11: "지정 현장 없음", 12: "현장 없음", 13: "지정 현장 없음",
+                              14: "현장 없음", 15: "거래처 없음"})
+            self.assertEqual(sorted(skipped[10]["candidateNames"]), ["서울 합성의원", "인천 합성의원"])
+            self.assertEqual(sorted(skipped[11]["candidates"]), [73, 74])
+            self.assertEqual((skipped[13]["siteName"], skipped[13]["candidates"]), ("합성 체육관", []))
+            self.assertEqual((skipped[10]["counterparty"], skipped[10]["itemName"]), ("다라합성", "합성의원 계약금"))
+
+            self.assertEqual(self.run_taxes("--record-result", result_path, "--unmatched-csv",
+                                            self.tmp / "u.csv")[0], 0)
+            self.assertEqual([r["matchRule"] for r in self.ledger_rows()], ["contains", "site-map", "alias"])
+            text = (self.tmp / "u.csv").read_bytes().decode("utf-8-sig")
+            self.assertEqual(len(text.strip().splitlines()), 7)
+            self.assertIn("다라합성,합성의원 계약금,2025-04-04,40000,후보 여럿,", text)
+
+    def test_exact_rule_recorded_and_plan_without_client_name(self):
+        self.write("매출.xlsx", xlsx_bytes(tax_cells(ROWS[:1])))
+        plan_path = self.tmp / "plan.json"
+        with TaxGateway() as gateway:
+            self.seed(gateway)
+            self.assertEqual(self.emit(plan_path, base_url=gateway.base_url)[0], 0)
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            for entry in plan["entries"]:  # 예전 계획(clientName·siteName 없음)도 상호로 찾는다
+                for key in ("clientName", "clientAlias", "siteName"):
+                    entry.pop(key)
+            plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+            _, result = self.run_node(plan_path, gateway.base_url)
+            self.assertTrue(result["ok"], result)
+            self.assertEqual([(e["siteId"], e["matchRule"]) for e in result["entries"]], [(11, "exact")])
+
+    def test_strip_generic_words(self):
+        samples = ["합성금속공사잔금", "합성인테리어공사", "합성계약금중도금", "공사"]
+        script = ("const m = require(process.argv[1]); const s = JSON.parse(process.argv[2]);"
+                  "process.stdout.write(JSON.stringify(s.map(m.stripGenericWords)))")
+        completed = subprocess.run([NODE, "-e", script, str(BROWSER_APPLY), json.dumps(samples)],
+                                   check=True, capture_output=True, timeout=60)
+        self.assertEqual(json.loads(completed.stdout.decode("utf-8")), ["합성", "합성", "합성", ""])
+
     def test_company_key(self):
-        samples = ["(주)합성건설", "㈜ 합성건설", "합성건설 주식회사", "합성건설(주)", "（주）합성건설", "합성 건설"]
+        samples =["(주)합성건설", "㈜ 합성건설", "합성건설 주식회사", "합성건설(주)", "（주）합성건설", "합성 건설"]
         script = ("const m = require(process.argv[1]); const s = JSON.parse(process.argv[2]);"
                   "process.stdout.write(JSON.stringify(s.map(m.companyKey)))")
         completed = subprocess.run([NODE, "-e", script, str(BROWSER_APPLY), json.dumps(samples)],
