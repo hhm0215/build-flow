@@ -14,8 +14,13 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -59,6 +64,46 @@ class PurchaseControllerValidationTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(evidenceService);
+    }
+
+    @Test
+    void siteAssignWithoutOrNonPositiveSiteIdIsRejectedWithHttp400() throws Exception {
+        mockMvc.perform(patch("/api/v1/purchases/{id}/site", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("siteId: 현장 ID는 필수입니다."));
+        mockMvc.perform(patch("/api/v1/purchases/{id}/site", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"siteId\":0}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void createWithoutSiteIdIsAcceptedAsUnassignedButNonPositiveSiteIdIs400() throws Exception {
+        mockMvc.perform(post("/api/v1/purchases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemName\":\"자재\",\"quantity\":1,\"unitPrice\":1000}"))
+                .andExpect(status().isCreated());
+        verify(service).create(any());
+
+        mockMvc.perform(post("/api/v1/purchases")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"siteId\":0,\"itemName\":\"자재\",\"quantity\":1,\"unitPrice\":1000}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void unassignedListParameterIsPassedToService() throws Exception {
+        mockMvc.perform(get("/api/v1/purchases").param("unassigned", "true"))
+                .andExpect(status().isOk());
+        verify(service).findAll(eq(null), eq(true));
+
+        mockMvc.perform(get("/api/v1/purchases").param("siteId", "3"))
+                .andExpect(status().isOk());
+        verify(service).findAll(eq(3L), eq(false));
     }
 
     @Test

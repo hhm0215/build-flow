@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class PurchaseCreateRequest {
 
-    @NotNull(message = "현장 ID는 필수입니다.")
+    /** 생략(null)하면 현장 미배정 매입으로 저장하고 손익 이벤트를 발행하지 않는다. */
     @Positive(message = "현장 ID는 양수여야 합니다.")
     private Long siteId;
 

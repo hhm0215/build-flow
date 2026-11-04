@@ -18,6 +18,8 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
 
     List<Purchase> findAllByOrderByCreatedAtDesc();
 
+    List<Purchase> findBySiteIdIsNullOrderByCreatedAtDesc();
+
     long countByEvidenceTaxInvoiceId(Long evidenceTaxInvoiceId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

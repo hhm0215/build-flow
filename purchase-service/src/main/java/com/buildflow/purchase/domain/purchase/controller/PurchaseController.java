@@ -5,6 +5,7 @@ import com.buildflow.purchase.domain.purchase.dto.PurchaseCreateRequest;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseEvidenceLinkRequest;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseEvidenceSummaryResponse;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseResponse;
+import com.buildflow.purchase.domain.purchase.dto.PurchaseSiteAssignRequest;
 import com.buildflow.purchase.domain.purchase.dto.PurchaseUpdateRequest;
 import com.buildflow.purchase.domain.purchase.service.PurchaseEvidenceService;
 import com.buildflow.purchase.domain.purchase.service.PurchaseService;
@@ -35,8 +36,9 @@ public class PurchaseController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<PurchaseResponse>>> findAll(
-            @RequestParam(required = false) Long siteId) {
-        return ResponseEntity.ok(ApiResponse.success(purchaseService.findAll(siteId)));
+            @RequestParam(required = false) Long siteId,
+            @RequestParam(defaultValue = "false") boolean unassigned) {
+        return ResponseEntity.ok(ApiResponse.success(purchaseService.findAll(siteId, unassigned)));
     }
 
     @GetMapping("/{id}")
@@ -49,6 +51,14 @@ public class PurchaseController {
             @PathVariable Long id,
             @Valid @RequestBody PurchaseUpdateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(purchaseService.update(id, request)));
+    }
+
+    /** 현장 미배정 매입에 현장을 배정한다(이미 배정된 다른 현장으로의 이동은 409). */
+    @PatchMapping("/{id}/site")
+    public ResponseEntity<ApiResponse<PurchaseResponse>> assignSite(
+            @PathVariable Long id,
+            @Valid @RequestBody PurchaseSiteAssignRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(purchaseService.assignSite(id, request)));
     }
 
     @DeleteMapping("/{id}")

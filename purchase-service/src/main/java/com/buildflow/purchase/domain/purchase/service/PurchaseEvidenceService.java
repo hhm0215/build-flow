@@ -34,6 +34,10 @@ public class PurchaseEvidenceService {
     @Transactional
     public PurchaseResponse link(Long purchaseId, PurchaseEvidenceLinkRequest request) {
         Purchase purchase = getPurchaseForUpdate(purchaseId);
+        if (purchase.isUnassigned()) {
+            // 증빙 계산서는 같은 현장 것만 연결하므로 현장 배정이 먼저다
+            throw new BusinessException(ErrorCode.PURCHASE_SITE_UNASSIGNED);
+        }
         siteReferenceValidator.requireSiteNotArchived(purchase.getSiteId());
         TaxInvoiceReference invoice = taxInvoiceReferenceReader
                 .requirePurchaseInvoiceOfSite(request.getTaxInvoiceId(), purchase.getSiteId());

@@ -31,7 +31,11 @@ public class Purchase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    /**
+     * 현장 ID. null이면 현장 미배정(홈택스 매입 세금계산서 일괄 적재 등) — 손익 이벤트를 발행하지 않고,
+     * 화면에서 현장을 배정하는 순간 purchase.registered로 처음 손익에 반영한다(2026-11-01 사용자 결정).
+     */
+    @Column
     private Long siteId;
 
     @Column(nullable = false, length = 200)
@@ -99,6 +103,22 @@ public class Purchase {
         this.purchaseDate = purchaseDate;
         this.memo = memo;
         this.eventRevision = Math.addExact(this.eventRevision, 1L);
+    }
+
+    public boolean isUnassigned() {
+        return siteId == null;
+    }
+
+    /**
+     * 미배정 매입에 현장을 처음 배정한다. 현장 존재·보관 검증은 서비스가 site-service 조회로 먼저 끝낸다.
+     * 손익 projection이 매입 ID별 현장을 고정하므로 이미 배정된 매입의 현장 이동은 허용하지 않는다.
+     */
+    public long assignSite(Long siteId) {
+        if (this.siteId != null) {
+            throw new BusinessException(ErrorCode.PURCHASE_SITE_ALREADY_ASSIGNED);
+        }
+        this.siteId = siteId;
+        return incrementEventRevision();
     }
 
     /** 연결 대상 검증(존재·매입 유형·같은 현장)은 서비스가 tax-service 조회로 먼저 끝낸다. */
