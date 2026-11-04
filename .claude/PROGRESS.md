@@ -5,6 +5,12 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 매입 미배정·세금계산서 가져오기 (2026-11-04, PR #295·#296·#299·#300)
+
+- 사용자 결정(2026-11-04): 현장 정보 없는 매입은 '미배정'으로 올리고 화면에서 현장 배정. #299 purchase `site_id` nullable(Flyway V3 + 기본 프로파일 기동 패치, 로컬 실사용 DB 적용 로그 확인·적용 전 백업), 미배정 중 손익 이벤트 없음·배정 시 `purchase.registered` 첫 발행, 다른 현장 이동 409, 목록 미배정 필터·일괄 배정·대시보드 안내. 전체 Gradle·프론트 lint/test/build PASS.
+- #295 매출 세금계산서 가져오기(거래처+품목명 현장 정확히 1곳만 연결), #296 거래처 별칭·현장 지정·미연결 CSV, #300 매입 세금계산서→미배정 매입 가져오기(공급가액 기준, 세액 필드 없음). 도구 테스트 112개.
+- 로컬 적재: 매출 76건 중 7건 연결(별칭 18행 적용 재계획 대기), 매입 165건 계획(음수 수정 계산서 든 파일 4개 보류). 적용은 로컬 로그인 후.
+
 ## 완료된 작업 — 매입 미입력 손익 표시·내역서형 양식·병합 가드 (2026-11-01, PR #289~#293)
 
 - #289 main 릴리스 `ddae48a`(VPS 자동 배포 없음). #290 내역서형 견적 양식 해석(보류 4건 OK, 모두 현장 미상 공내역서라 미적재). 거래처 표기 중복 8쌍 로컬 정리.
@@ -1158,7 +1164,7 @@
 
 ## 다음 세션 진입점 (2026-11-01 갱신)
 
-**Git 상태**: `main`은 PR #289 병합 `ddae48a`. `develop`은 PR #292 병합 `9083132`까지(그 뒤 기록 PR). PR 병합은 `scripts/agents/merge_pr.py <번호> --wait`로만. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
+**Git 상태**: `main`은 PR #289 병합 `ddae48a`. `develop`은 PR #300 병합 `1566d52`까지(그 뒤 기록 PR). PR 병합은 `scripts/agents/merge_pr.py <번호> --wait`로만. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
 
 **로컬 실데이터**: 로컬 스택은 `bf-audit`(origin/develop 작업 폴더)에서 `.local/local-gateway-port.yml` override(gateway 18080, redis 16379)로 기동, 프론트 http://localhost:3000. 적재 도구 `scripts/import/`, 백업·ledger는 저장소 밖 `Documents/Dev/build-flow-backups/`.
 
