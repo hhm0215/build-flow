@@ -5,6 +5,12 @@
 
 ## 현재 브랜치·PR: 실행 시 `git status --short --branch`와 열린 GitHub PR을 실측 (문서에 HEAD를 고정하지 않음)
 
+## 완료된 작업 — 배포 후 화면 캐시 오류·로컬 세금계산서/매입·2024 견적 적재 (2026-11-04, PR #302~#304)
+
+- #302 프론트 재배포 뒤 옛 index.html이 없는 청크를 요청해 "문제가 생겼습니다"로 막히던 결함(로컬 실측): index.html no-cache, `/assets` immutable·없는 자산 404(text/plain), 청크 실패 1회 자동 새로고침. 로컬 curl·브라우저 재확인.
+- #303 병합 가드 `--timeout`(GitHub 장애 중 푸시로 체크가 안 뜬 #301 무한 대기). #304 견적 가져오기 오독 방어(현장명·수신처가 숫자·단위·양식 제목·날짜만이면 ERROR), `--client-alias`, 회사 키 일치 활성 거래처 재사용 — 2024 실파일 오독 3건 ERROR 실측.
+- 로컬 적재(건수만): 매출 세금계산서 누적 29건 연결, 매입 165건 현장 미배정(대시보드·매입 화면 안내 확인), 2024 견적 8건(오독 3건 삭제·보관, 중복 거래처 2개 정리), 오독 현장 1곳 이름 표시 정리. 보류: 매출 47행·음수 계산서 든 매입 4파일·2024 다른 양식 99건.
+
 ## 완료된 작업 — 매입 미배정·세금계산서 가져오기 (2026-11-04, PR #295·#296·#299·#300)
 
 - 사용자 결정(2026-11-04): 현장 정보 없는 매입은 '미배정'으로 올리고 화면에서 현장 배정. #299 purchase `site_id` nullable(Flyway V3 + 기본 프로파일 기동 패치, 로컬 실사용 DB 적용 로그 확인·적용 전 백업), 미배정 중 손익 이벤트 없음·배정 시 `purchase.registered` 첫 발행, 다른 현장 이동 409, 목록 미배정 필터·일괄 배정·대시보드 안내. 전체 Gradle·프론트 lint/test/build PASS.
@@ -1164,7 +1170,7 @@
 
 ## 다음 세션 진입점 (2026-11-01 갱신)
 
-**Git 상태**: `main`은 PR #289 병합 `ddae48a`. `develop`은 PR #300 병합 `1566d52`까지(그 뒤 기록 PR). PR 병합은 `scripts/agents/merge_pr.py <번호> --wait`로만. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
+**Git 상태**: `main`은 PR #289 병합 `ddae48a`. `develop`은 PR #304 병합 `7f1e12e`까지(그 뒤 기록 PR). PR 병합은 `scripts/agents/merge_pr.py <번호> --wait`로만. 작업은 `origin/develop` 기준 기능 브랜치→`develop` PR(CI·SHA 대조 후 병합)로 진행한다. main 병합은 CI만 돌고 VPS 자동 배포는 없다.
 
 **로컬 실데이터**: 로컬 스택은 `bf-audit`(origin/develop 작업 폴더)에서 `.local/local-gateway-port.yml` override(gateway 18080, redis 16379)로 기동, 프론트 http://localhost:3000. 적재 도구 `scripts/import/`, 백업·ledger는 저장소 밖 `Documents/Dev/build-flow-backups/`.
 
