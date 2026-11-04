@@ -56,6 +56,34 @@ YEAR_PATTERN = re.compile(r"(?<!\d)((?:19|20)\d{2})\s*년")
 DATE_PATTERN = re.compile(r"(20\d{2}|19\d{2})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})")
 NUMBER_PATTERN = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
 
+# 열이 밀리거나 양식 제목을 읽은 현장명·수신처(실측 오독 패턴). 공백·기호를 지우고 대문자로 비교한다.
+FORM_TEXT_ERROR = "현장명/수신처 칸이 양식 글자·숫자로 읽힘 — 양식 확인"
+UNIT_WORDS = {
+    "EA", "SET", "M", "M2", "M3", "㎡", "㎥", "MM", "CM", "KG", "TON", "톤", "식", "개", "본", "매", "장", "롤",
+    "ROLL", "조", "대", "평", "통", "LOT", "BOX", "PCS", "헤베", "루베", "SQM", "LM", "L", "M²", "M³",
+}
+FORM_TITLE_WORDS = {
+    "견적", "견적서", "내역서", "공내역서", "견적내역서", "내역", "합계", "소계", "총계", "합계금액", "견적금액", "금액",
+    "공급가액", "부가세", "품명", "규격", "단위", "수량", "단가", "비고", "수신", "수신처", "현장", "현장명", "공사명",
+    "귀하", "귀중", "ESTIMATE", "QUOTATION",
+}
+AMOUNT_LIKE = re.compile(r"[₩\\]?-?\d[\d,]*(?:\.\d+)?원?")
+
+
+def form_text_reason(value: str) -> Optional[str]:
+    """현장명·수신처로 읽은 값이 숫자·금액, 단위 낱말, 양식 제목 글자뿐이면 그 종류. 정상 이름이면 None."""
+    raw = re.sub(r"\s+", "", str(value or ""))
+    if not raw:
+        return None
+    if AMOUNT_LIKE.fullmatch(raw):
+        return "숫자·금액"
+    compact = re.sub(r"[\s\W_]", "", raw).upper()
+    if compact in UNIT_WORDS or raw.upper() in UNIT_WORDS:
+        return "단위"
+    if compact in FORM_TITLE_WORDS:
+        return "양식 제목"
+    return None
+
 
 class SheetFormatError(Exception):
     """양식을 읽을 수 없음(파일 형식·시트 없음)."""
@@ -621,6 +649,10 @@ def _finish(sheet_name: str, client_name: str, site_name: str, cell_total: Optio
         errors.append(SITE_MISSING_ERROR)
     if not client_name:
         warnings.append(client_warning)
+    for label, value in (("현장명", site_name), ("수신처", client_name)):
+        reason = form_text_reason(value)
+        if reason:
+            errors.append(f"{FORM_TEXT_ERROR}({label} '{value[:30]}' = {reason})")
 
     parsed = ParsedEstimate(
         sheet=sheet_name, client_name=client_name, site_name=site_name, cell_total=cell_total,

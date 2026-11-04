@@ -5,7 +5,8 @@
   python -I -X utf8 scripts/import/estimates.py <현장폴더 또는 파일>... [--apply | --emit-plan <JSON>]
       [--base-url http://localhost:3000] [--ledger <저장소 밖 경로>]
       [--recursive] [--append-size] [--append-note] [--confirm-latest] [--complete-sites]
-      [--site-alias <CSV/JSON>] [--site-from-folder] [--lump-when-empty] [--allow-missing-total]
+      [--site-alias <CSV/JSON>] [--client-alias <CSV>] [--site-from-folder] [--lump-when-empty]
+      [--allow-missing-total]
   python -I -X utf8 scripts/import/estimates.py --record-result <브라우저 결과 JSON> [--ledger ...]
 
 - 기본은 미리보기(dry-run)이며 API를 호출하지 않는다. --apply일 때만 쓴다.
@@ -15,6 +16,12 @@
 - 미리보기에 ERROR가 하나라도 있으면 --apply/--emit-plan을 거부한다(강제 옵션 없음).
   "확인 필요"(계산값 없는 수식 합계, 미확정 같은 현장 후보)는 해당 옵션으로 확정해야 진행한다.
 - 같은 대상·파일 SHA-256·시트는 적재 기록(ledger)으로 다시 넣지 않는다.
+- 현장명·수신처가 숫자·금액, 단위 낱말(EA·M2·식 등), 양식 제목('견적서'·'합계' 등)만이면 ERROR(양식 확인).
+  --site-from-folder로 만든 현장명이 날짜만 남으면(앞에 붙일 폴더·거래처 이름 없음) --site-alias로 지정할 때까지 ERROR.
+- --client-alias `견적서 수신처,DB 거래처명`(저장소 밖 CSV)으로 수신처를 정식 거래처명으로 바꾼다. 회사 키
+  (㈜·(주)·주식회사·공백·기호 무시)가 같은데 표기가 다른 수신처가 한 번에 섞이면 경고한다.
+- 거래처는 이름이 정확히 같은 활성 거래처 → 없으면 회사 키가 같은 활성 거래처가 정확히 1곳일 때 그것을 쓴다.
+  키가 같은 거래처가 하나도 없을 때만 새로 만든다(보관 거래처와 키만 같으면 멈춤).
 - 토큰은 BUILDFLOW_ACCESS_TOKEN(+선택 BUILDFLOW_REFRESH_TOKEN) 환경변수로만 받고 출력하지 않는다.
 """
 
@@ -36,12 +43,14 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from estimate_sheet import (  # noqa: E402
-    SITE_MISSING_ERROR, ParsedEstimate, SheetFormatError, format_amount, parse_estimate,
+    FORM_TEXT_ERROR, SITE_MISSING_ERROR, ParsedEstimate, SheetFormatError, format_amount, form_text_reason,
+    parse_estimate,
 )
 from import_common import (  # noqa: E402
     DEFAULT_BASE_URL, ApiClient, ApiError, ImportSetupError, Ledger, SourceFile, collect_files,
     default_ledger_path, load_site_aliases, outside_repo, read_source, site_key, validate_base_url,
 )
+from taxes import company_key, load_client_aliases  # noqa: E402
 
 KIND = "estimate"
 SITE_STATUS_KIND = "site-status"
@@ -65,6 +74,7 @@ def folder_year_of(path: Path) -> Optional[int]:
 
 
 FOLDER_DATE = re.compile(r"(\d{4}\s*년\s*)?\d{1,2}\s*월\s*\d{1,2}\s*일|\d{4}[.\-]\d{1,2}[.\-]\d{1,2}|\d{1,2}[.\-]\d{1,2}")
+DATE_ONLY_SITE_ERROR = "폴더 이름에서 날짜만 남은 현장명 — --site-alias로 현장명을 지정"
 
 
 def _folder_name(folder: Path) -> str:
@@ -106,6 +116,8 @@ class Plan:
     raw_site_name: str = ""  # 셀 또는 폴더에서 읽은 이름(별칭 적용 전)
     site_source: str = "cell"  # cell | folder
     aliased: bool = False
+    client_name: str = ""  # 적재할 거래처명(--client-alias 적용 후)
+    client_aliased: bool = False
     blockers: list[str] = field(default_factory=list)  # ERROR는 아니지만 옵션 확정 전에는 적용 금지
 
     @property
@@ -122,7 +134,7 @@ class Plan:
 
 
 def build_plan(path: Path, ledger: Ledger, base_url: str, args: argparse.Namespace,
-               aliases: dict[str, tuple[str, str]]) -> Plan:
+               aliases: dict[str, tuple[str, str]], client_aliases: Optional[dict[str, str]] = None) -> Plan:
     try:
         source = read_source(path)
     except (OSError, ValueError) as exc:
@@ -142,8 +154,17 @@ def build_plan(path: Path, ledger: Ledger, base_url: str, args: argparse.Namespa
         plan.warnings.append(f"폴더 연도({folder_year})와 시트 표기 연도({parsed.sheet_year})가 다름")
 
     plan.raw_site_name = parsed.site_name
+    plan.client_name = parsed.client_name
+    client_alias = (client_aliases or {}).get(company_key(parsed.client_name)) if parsed.client_name else None
+    if client_alias:
+        plan.client_aliased = True
+        if client_alias != parsed.client_name:
+            plan.client_name = client_alias
+            plan.warnings.append(f"수신처 '{parsed.client_name}' → 거래처 '{client_alias}'(--client-alias)")
     if not parsed.site_name:
-        candidate = folder_site_candidate(path, parsed.client_name)
+        # 양식 글자·숫자로 읽힌 수신처(이미 ERROR)는 폴더 날짜 앞에 붙이지 않는다
+        prefix_client = "" if form_text_reason(parsed.client_name) else plan.client_name
+        candidate = folder_site_candidate(path, prefix_client)
         if candidate and args.site_from_folder:
             plan.raw_site_name, plan.site_source = candidate, "folder"
             plan.errors = [e for e in plan.errors if e != SITE_MISSING_ERROR]
@@ -157,6 +178,12 @@ def build_plan(path: Path, ledger: Ledger, base_url: str, args: argparse.Namespa
         if alias[1] != plan.raw_site_name:
             plan.site_name = alias[1]
             plan.warnings.append(f"현장명 '{plan.raw_site_name}' → '{alias[1]}'(--site-alias)")
+    if plan.site_source == "folder" and not plan.aliased:
+        reason = form_text_reason(plan.raw_site_name)
+        if reason:
+            plan.errors.append(f"{FORM_TEXT_ERROR}(폴더 현장명 '{plan.raw_site_name[:30]}' = {reason})")
+        elif FOLDER_DATE.fullmatch(plan.raw_site_name):
+            plan.errors.append(f"{DATE_ONLY_SITE_ERROR}('{plan.raw_site_name}')")
 
     if parsed.total_formula_uncached and not args.allow_missing_total:
         plan.blockers.append("합계 셀 계산값 없음 — 품목 합계로 넣으려면 --allow-missing-total")
@@ -181,6 +208,7 @@ def mark_duplicates(plans: list[Plan]) -> None:
 class SiteReport:
     groups: list[tuple[str, list[str], bool]]  # (키, 서로 다른 원래 이름들, 별칭으로 확정됐는지)
     similar: list[tuple[str, str]]
+    client_groups: list[list[str]] = field(default_factory=list)  # 회사 키가 같은데 표기가 다른 거래처명들
 
 
 def analyze_site_names(plans: list[Plan], aliases: dict[str, tuple[str, str]]) -> SiteReport:
@@ -206,8 +234,9 @@ def analyze_site_names(plans: list[Plan], aliases: dict[str, tuple[str, str]]) -
                         plan.blockers.append("같은 현장 후보(띄어쓰기·기호만 다름) 미확정 — --site-alias로 적재 이름 확정")
     clients_of: dict[str, set[str]] = {}
     for plan in plans:
-        if plan.parsed is not None and plan.site_name and not plan.duplicate_of and plan.parsed.client_name:
-            clients_of.setdefault(plan.site_name, set()).add(plan.parsed.client_name)
+        if plan.parsed is not None and plan.site_name and not plan.duplicate_of and plan.client_name:
+            # 표기만 다른 같은 회사(㈜·공백 등)는 한 거래처로 본다 — 적용 시에도 회사 키로 같은 거래처를 찾는다
+            clients_of.setdefault(plan.site_name, set()).add(company_key(plan.client_name) or plan.client_name)
     for plan in plans:
         if plan.parsed is not None and len(clients_of.get(plan.site_name, ())) > 1:
             plan.blockers.append("같은 현장명에 거래처가 여럿 — 다른 현장이면 --site-alias로 이름을 나눠 확정")
@@ -219,7 +248,19 @@ def analyze_site_names(plans: list[Plan], aliases: dict[str, tuple[str, str]]) -
                 continue
             if difflib.SequenceMatcher(None, left, right).ratio() >= SIMILAR_RATIO:
                 similar.append((by_key[left][0], by_key[right][0]))
-    return SiteReport(groups, similar)
+    return SiteReport(groups, similar, client_spelling_groups(plans))
+
+
+def client_spelling_groups(plans: list[Plan]) -> list[list[str]]:
+    """회사 키(㈜·(주)·주식회사·공백·기호 무시)가 같은데 적재할 거래처명 표기가 다른 묶음."""
+    by_key: dict[str, list[str]] = {}
+    for plan in plans:
+        if plan.parsed is None or plan.duplicate_of or not plan.client_name:
+            continue
+        names = by_key.setdefault(company_key(plan.client_name), [])
+        if plan.client_name not in names:
+            names.append(plan.client_name)
+    return [sorted(names) for key, names in by_key.items() if key and len(names) > 1]
 
 
 def print_preview(plans: list[Plan], report: SiteReport) -> None:
@@ -238,7 +279,7 @@ def print_preview(plans: list[Plan], report: SiteReport) -> None:
             if plan.site_source == "folder":
                 site += " (출처: 폴더 이름)"
             print(
-                f"[{index}] {plan.path.name} | 거래처 {parsed.client_name or '-'} | 현장 {site}"
+                f"[{index}] {plan.path.name} | 거래처 {plan.client_name or '-'} | 현장 {site}"
                 f" | 품목 {len(parsed.items)} | 계산 {format_amount(parsed.computed_total)}"
                 f" / 셀 {format_amount(parsed.cell_total)} | 견적일 {plan.estimate_date} ({plan.date_source})"
                 f" | 표기연도 {parsed.sheet_year or '-'}"
@@ -255,6 +296,9 @@ def print_preview(plans: list[Plan], report: SiteReport) -> None:
         print(f"{label}: " + " / ".join(f"'{n}'" for n in names))
     for left, right in report.similar:
         print(f"비슷한 현장명(자동으로 묶지 않음, 같은 현장이면 --site-alias): '{left}' / '{right}'")
+    for names in report.client_groups:
+        print("경고: 같은 회사로 보이는 수신처 표기가 섞임(정식명은 --client-alias로 지정): "
+              + " / ".join(f"'{n}'" for n in names))
 
 
 def estimate_body(plan: Plan) -> dict[str, Any]:
@@ -328,15 +372,28 @@ class Resolver:
             raise ApiError(409, f"보관된 {label}과 이름이 같음 — 복원하거나 이름을 바꾼 뒤 다시 실행")
         return None
 
-    def client_id(self, name: str) -> tuple[Optional[int], bool]:
+    def client_id(self, name: str) -> tuple[Optional[int], bool, Optional[str]]:
+        """(거래처 id, 새로 만들었는지, 찾은 규칙 exact|key|created). browser_apply.js clientIdOf와 같은 규칙."""
         if not name:
-            return None, False
-        found = self._match(self.clients, "companyName", name, "거래처")
-        if found:
-            return int(found["id"]), False
+            return None, False, None
+        exact = [row for row in self.clients if str(row.get("companyName") or "").strip() == name]
+        exact_active = [row for row in exact if not row.get("archivedAt")]
+        if len(exact_active) > 1:
+            raise ApiError(409, f"같은 이름의 거래처가 {len(exact_active)}개라 자동으로 고를 수 없음 — 이름을 정리 후 다시 실행")
+        if exact_active:
+            return int(exact_active[0]["id"]), False, "exact"
+        key = company_key(name)
+        keyed = [row for row in self.clients if key and company_key(str(row.get("companyName") or "")) == key]
+        keyed_active = [row for row in keyed if not row.get("archivedAt")]
+        if len(keyed_active) == 1:
+            return int(keyed_active[0]["id"]), False, "key"
+        if len(keyed_active) > 1:
+            raise ApiError(409, f"표기만 다른 활성 거래처가 {len(keyed_active)}곳 — --client-alias로 정식 거래처명을 지정해 다시 실행")
+        if keyed:
+            raise ApiError(409, "보관된 거래처와 이름(또는 표기만 다른 이름)이 같음 — 복원하거나 이름을 바꾼 뒤 다시 실행")
         created = self.api.request("POST", "/api/v1/clients", {"companyName": name[:200]})
         self.clients.append(created)
-        return int(created["id"]), True
+        return int(created["id"]), True, "created"
 
     def site_id(self, name: str, client_id: Optional[int],
                 sheet_year: Optional[int] = None) -> tuple[int, bool, Optional[str]]:
@@ -400,7 +457,7 @@ def apply_plans(plans: list[Plan], api: ApiClient, ledger: Ledger, confirm_lates
                 site_ids.append(int(plan.ledger_record["siteId"]))
             print(f"[{index}] 건너뜀: 이미 적재됨(견적 #{plan.ledger_record['estimateId']})")
             continue
-        client_id, client_new = resolver.client_id(parsed.client_name)
+        client_id, client_new, client_rule = resolver.client_id(plan.client_name)
         site_id, site_new, note = resolver.site_id(plan.site_name, client_id, parsed.sheet_year)
         existing = [
             row for row in (api.request("GET", f"/api/v1/estimates?siteId={site_id}") or [])
@@ -416,7 +473,7 @@ def apply_plans(plans: list[Plan], api: ApiClient, ledger: Ledger, confirm_lates
         record = {
             **ledger_fields(plan), "baseUrl": api.base_url, "estimateId": int(estimate["id"]), "siteId": site_id,
             "clientId": client_id, "createdSite": site_new, "createdClient": client_new,
-            "status": estimate.get("status"),
+            "clientRule": client_rule, "status": estimate.get("status"),
         }
         ledger.append(record)
         plan.ledger_record = record
@@ -425,7 +482,7 @@ def apply_plans(plans: list[Plan], api: ApiClient, ledger: Ledger, confirm_lates
         print(
             f"[{index}] {action}: 견적 #{estimate['id']} 합계 {format_amount(Decimal(str(estimate.get('totalAmount', '0'))))}"
             f" | 현장 #{site_id}({'신규' if site_new else '기존'})"
-            f" | 거래처 {('#' + str(client_id) + ('(신규)' if client_new else '(기존)')) if client_id else '없음'}"
+            f" | 거래처 {('#' + str(client_id) + ('(신규)' if client_new else '(기존·표기만 다름)' if client_rule == 'key' else '(기존)')) if client_id else '없음'}"
         )
         if note:
             print(f"    경고: {note}")
@@ -466,7 +523,7 @@ def build_browser_plan(plans: list[Plan], base_url: str, confirm_latest: bool, m
             continue
         entries.append({
             "entry": index, **ledger_fields(plan), "marker": plan.marker,
-            "clientName": parsed.client_name, "siteName": plan.site_name, "siteNameSource": plan.site_source,
+            "clientName": plan.client_name, "clientAliased": plan.client_aliased, "siteName": plan.site_name, "siteNameSource": plan.site_source,
             "siteAliased": plan.aliased, "newSiteMemo": new_site_memo(parsed.sheet_year),
             "estimate": estimate_body(plan), "confirm": index in confirm_indexes,
         })
@@ -524,7 +581,8 @@ def record_result(path: Path, ledger: Ledger) -> int:
             "rows": raw.get("rows"), "itemCount": raw.get("itemCount"), "total": raw.get("total"),
             "fileName": raw.get("fileName"), "estimateId": int(raw["estimateId"]), "siteId": int(raw["siteId"]),
             "clientId": raw.get("clientId"), "createdSite": bool(raw.get("createdSite")),
-            "createdClient": bool(raw.get("createdClient")), "status": raw.get("status"),
+            "createdClient": bool(raw.get("createdClient")), "clientRule": raw.get("clientRule"),
+            "status": raw.get("status"),
             "estimateDate": raw.get("estimateDate"), "dateSource": raw.get("dateSource"),
             "sheetYear": raw.get("sheetYear"), "appliedVia": "browser",
         }
@@ -577,6 +635,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--complete-sites", action="store_true", help="적재한 현장 상태를 완료(COMPLETED)로 변경")
     parser.add_argument("--site-alias", type=Path, default=None,
                         help="원본 현장명→적재 현장명 CSV(원본,적재) 또는 JSON 객체(저장소 밖)")
+    parser.add_argument("--client-alias", type=Path, default=None,
+                        help="견적서 수신처→DB 거래처명 CSV(`견적서 수신처,DB 거래처명`, 저장소 밖)")
     parser.add_argument("--site-from-folder", action="store_true", help="현장명 셀이 비면 폴더 이름을 현장명으로")
     parser.add_argument("--lump-when-empty", action="store_true", help="품목이 없으면 합계금액을 1식 품목으로")
     parser.add_argument("--allow-missing-total", action="store_true",
@@ -596,6 +656,7 @@ def main(argv: Optional[list[str]] = None, api_factory=ApiClient.from_env) -> in
             raise ImportSetupError("현장 폴더 또는 견적 파일 경로가 필요합니다")
         base_url = validate_base_url(args.base_url)
         aliases = load_site_aliases(args.site_alias) if args.site_alias else {}
+        client_aliases = load_client_aliases(args.client_alias) if args.client_alias else {}
         if args.emit_plan:
             outside_repo(args.emit_plan, "계획 JSON(--emit-plan)")
         files, hidden = collect_files(args.paths, SUFFIXES, args.recursive)
@@ -607,7 +668,7 @@ def main(argv: Optional[list[str]] = None, api_factory=ApiClient.from_env) -> in
     if not files:
         print("대상 견적 파일이 없습니다")
         return 0
-    plans = [build_plan(path, ledger, base_url, args, aliases) for path in files]
+    plans = [build_plan(path, ledger, base_url, args, aliases, client_aliases) for path in files]
     mark_duplicates(plans)
     report = analyze_site_names(plans, aliases)
     print_preview(plans, report)

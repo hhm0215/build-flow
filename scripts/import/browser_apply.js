@@ -8,6 +8,8 @@
  *   4) python -I -X utf8 scripts/import/estimates.py --record-result <그 파일>
  *
  * 규칙은 estimates.py --apply와 같다: 이름이 정확히 같은 기존 거래처·현장 재사용(둘 이상·보관 항목이면 멈춤),
+ * 거래처는 정확한 이름이 없으면 회사 키(companyKey)가 같은 활성 거래처가 정확히 1곳일 때 재사용(clientRule 'key'),
+ * 키가 같은 거래처가 하나도 없을 때만 새로 만든다(보관 거래처와 이름만 같아도 활성 키 일치가 있으면 그쪽 사용),
  * 띄어쓰기·기호만 다른 기존 현장이 있으면 멈춤, 견적 메모의 sha256 표식으로 중복 생성 방지,
  * 확정 대상만 DRAFT일 때 확정, 선택 시 현장 상태를 COMPLETED로 변경(수주 전·보관 현장은 건너뜀).
  *
@@ -181,13 +183,25 @@
       const clients = (await request('GET', '/api/v1/clients')) || []
       const sites = (await request('GET', '/api/v1/sites')) || []
 
+      // 거래처: 정확한 이름(활성) → 회사 키(주식회사·(주)·㈜·공백·기호 무시)가 같은 활성 거래처 정확히 1곳(clientRule 'key')
+      // → 키가 같은 거래처가 하나도 없을 때만 새로 만든다. 보관 거래처와 이름만 같아도 활성 키 일치가 있으면 그쪽을 쓴다.
       const clientIdOf = async (name) => {
-        if (!name) return [null, false]
-        const found = matchByName(clients, 'companyName', name, '거래처')
-        if (found) return [Number(found.id), false]
+        if (!name) return [null, false, null]
+        const exact = clients.filter((row) => String(row?.companyName ?? '').trim() === name)
+        const exactActive = exact.filter((row) => !row.archivedAt)
+        if (exactActive.length > 1) throw new StopError(`같은 이름의 거래처가 ${exactActive.length}개라 자동으로 고를 수 없음 — 이름을 정리 후 다시 실행`)
+        if (exactActive.length) return [Number(exactActive[0].id), false, 'exact']
+        const key = companyKey(name)
+        const keyed = key ? clients.filter((row) => companyKey(row?.companyName) === key) : []
+        const keyedActive = keyed.filter((row) => !row.archivedAt)
+        if (keyedActive.length === 1) return [Number(keyedActive[0].id), false, 'key']
+        if (keyedActive.length > 1) {
+          throw new StopError(`표기만 다른 활성 거래처가 ${keyedActive.length}곳 — --client-alias로 정식 거래처명을 지정해 다시 내보내세요`)
+        }
+        if (keyed.length) throw new StopError('보관된 거래처와 이름(또는 표기만 다른 이름)이 같음 — 복원하거나 이름을 바꾼 뒤 다시 실행')
         const created = await request('POST', '/api/v1/clients', { companyName: name.slice(0, 200) })
         clients.push(created)
-        return [Number(created.id), true]
+        return [Number(created.id), true, 'created']
       }
       const siteIdOf = async (entry, clientId) => {
         const name = entry.siteName
@@ -213,7 +227,7 @@
       const confirmIds = []
       for (const entry of plan.entries) {
         if (!entry || !entry.marker || !entry.siteName || !entry.estimate) throw new StopError('계획 항목 형식이 올바르지 않습니다')
-        const [clientId, createdClient] = await clientIdOf(entry.clientName)
+        const [clientId, createdClient, clientRule] = await clientIdOf(entry.clientName)
         const [siteId, createdSite] = await siteIdOf(entry, clientId)
         const rows = (await request('GET', `/api/v1/estimates?siteId=${encodeURIComponent(siteId)}`)) || []
         const existing = rows.find((row) => String(row?.memo ?? '').includes(entry.marker))
@@ -229,7 +243,7 @@
         const record = {}
         for (const field of LEDGER_FIELDS) record[field] = entry[field] ?? null
         Object.assign(record, {
-          estimateId: Number(estimate.id), siteId, clientId, createdSite, createdClient,
+          estimateId: Number(estimate.id), siteId, clientId, createdSite, createdClient, clientRule,
           status: estimate.status ?? null, action,
         })
         result.entries.push(record)
