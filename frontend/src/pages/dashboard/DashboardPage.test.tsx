@@ -71,6 +71,11 @@ const { summaryRefetch, summaryQuery } = vi.hoisted(() => ({
   summaryQuery: vi.fn(),
 }))
 
+const unassigned = vi.hoisted(() => ({ items: [] as { siteId: number | null, totalAmount: number }[] }))
+vi.mock('../../api/purchases.api', () => ({
+  usePurchases: () => ({ data: unassigned.items }),
+}))
+
 vi.mock('../../api/dashboard.api', () => ({
   useDashboardStats: () => ({ data: undefined, isLoading: true, isError: false, refetch: vi.fn() }),
   useDashboardSummary: summaryQuery,
@@ -121,5 +126,27 @@ describe('DashboardPage', () => {
 
     expect(screen.getByText('요약 데이터가 없습니다')).toBeInTheDocument()
     expect(screen.queryByText('AI 요약을 불러오지 못했습니다.')).not.toBeInTheDocument()
+  })
+
+  it('현장 미배정 매입이 있으면 건수·합계 안내를 보이고 매입 목록 미배정 필터로 이동한다', () => {
+    unassigned.items = [{ siteId: null, totalAmount: 1000 }, { siteId: null, totalAmount: 500.5 }]
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/purchases" element={<div>매입 목록 도착</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /현장 미배정 매입 2건 · ₩1,500.5/ }))
+    expect(screen.getByText('매입 목록 도착')).toBeInTheDocument()
+    unassigned.items = []
+  })
+
+  it('미배정 매입이 없으면 안내를 숨긴다', () => {
+    unassigned.items = []
+    render(<MemoryRouter><DashboardPage /></MemoryRouter>)
+    expect(screen.queryByText(/현장 미배정 매입/)).not.toBeInTheDocument()
   })
 })

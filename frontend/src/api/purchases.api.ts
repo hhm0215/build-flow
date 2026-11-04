@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { QueryClient } from '@tanstack/react-query'
 import axiosInstance from './axiosInstance'
 import {
-  ApiResponse, Purchase, PurchaseCreateRequest, PurchaseEvidenceSummary, PurchaseUpdateRequest,
+  ApiResponse, Purchase, PurchaseCreateRequest, PurchaseEvidenceSummary, PurchaseSiteAssignRequest,
+  PurchaseUpdateRequest,
 } from '../types'
 import { SITES_KEY } from './sites.api'
 import { DASHBOARD_KEY } from './dashboard.api'
@@ -33,11 +34,16 @@ const updatePurchase = async ({ id, ...body }: PurchaseUpdateRequest & { id: num
 
 interface DeletePurchaseVariables {
   id: number
-  siteId: number
+  siteId: number | null
 }
 
 const deletePurchase = async ({ id }: DeletePurchaseVariables) => {
   await axiosInstance.delete(`/purchases/${id}`)
+}
+
+export const assignPurchaseSite = async ({ id, siteId }: PurchaseSiteAssignRequest & { id: number }) => {
+  const res = await axiosInstance.patch<ApiResponse<Purchase>>(`/purchases/${id}/site`, { siteId })
+  return res.data.data
 }
 
 interface EvidenceVariables {
@@ -61,10 +67,13 @@ const fetchEvidenceSummary = async (siteId: number) => {
   return res.data.data
 }
 
-async function invalidatePurchaseDependents(queryClient: QueryClient, siteId: number) {
+async function invalidatePurchaseDependents(queryClient: QueryClient, siteId: number | null) {
   await queryClient.invalidateQueries({ queryKey: PURCHASES_KEY.all })
+  // 미배정 매입은 어느 현장 손익에도 속하지 않는다. 대시보드의 미배정 안내만 갱신한다.
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: SITES_KEY.profit(siteId), refetchType: 'none' }),
+    siteId != null
+      ? queryClient.invalidateQueries({ queryKey: SITES_KEY.profit(siteId), refetchType: 'none' })
+      : Promise.resolve(),
     queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY.all, refetchType: 'none' }),
   ])
 }
@@ -97,6 +106,15 @@ export function useDeletePurchase() {
   return useMutation({
     mutationFn: deletePurchase,
     onSuccess: (_data, variables) => invalidatePurchaseDependents(queryClient, variables.siteId),
+  })
+}
+
+/** 미배정 매입 현장 배정. 배정 시점에 처음 손익(purchase.registered)에 반영된다. */
+export function useAssignPurchaseSite() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: assignPurchaseSite,
+    onSuccess: (purchase) => invalidatePurchaseDependents(queryClient, purchase.siteId),
   })
 }
 

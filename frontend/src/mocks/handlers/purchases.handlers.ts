@@ -1,10 +1,10 @@
 import { http, HttpResponse } from 'msw'
-import { archivedSiteCreateError, archivedSiteLockError } from './sites.handlers'
+import { archivedSiteCreateError, archivedSiteLockError, mockSiteExists } from './sites.handlers'
 import { mockPurchases } from '../data/purchases.data'
 import { findMockTaxInvoice, listMockTaxInvoices } from './taxes.handlers'
 import {
   ApiResponse, Purchase, PurchaseCreateRequest, PurchaseEvidenceLinkRequest, PurchaseEvidenceSummary,
-  PurchaseInvoiceEvidence, PurchaseUpdateRequest,
+  PurchaseInvoiceEvidence, PurchaseSiteAssignRequest, PurchaseUpdateRequest,
 } from '../../types'
 
 let purchases = [...mockPurchases]
@@ -138,6 +138,7 @@ export const purchasesHandlers = [
     const id = Number(params.id)
     const current = purchases.find((purchase) => purchase.id === id)
     if (!current) return fail(404, '매입 내역을 찾을 수 없습니다.')
+    if (current.siteId == null) return fail(400, '현장을 먼저 배정한 매입만 증빙을 연결할 수 있습니다.')
     const locked = archivedSiteLockError(current.siteId)
     if (locked) return locked
     const body = await request.json()
@@ -164,12 +165,15 @@ export const purchasesHandlers = [
     return HttpResponse.json<ApiResponse<Purchase>>({ success: true, data: updated, error: null })
   }),
 
-  http.get('/api/v1/purchases', ({ request }) => {
+  http.get<never, never, ApiResponse<Purchase[] | null>>('/api/v1/purchases', ({ request }) => {
     const url = new URL(request.url)
     const siteId = url.searchParams.get('siteId')
+    const unassigned = url.searchParams.get('unassigned') === 'true'
+    if (unassigned && siteId) return fail(400, '현장 필터와 미배정 필터는 함께 쓸 수 없습니다.')
 
     let filtered = purchases
-    if (siteId) filtered = filtered.filter((p) => p.siteId === Number(siteId))
+    if (unassigned) filtered = filtered.filter((p) => p.siteId == null)
+    else if (siteId) filtered = filtered.filter((p) => p.siteId === Number(siteId))
 
     return HttpResponse.json<ApiResponse<Purchase[]>>({
       success: true,
@@ -191,6 +195,11 @@ export const purchasesHandlers = [
 
   http.post<never, PurchaseCreateRequest>('/api/v1/purchases', async ({ request }) => {
     const body = await request.json()
+    // siteId 생략 = 현장 미배정(서버는 site 조회·손익 이벤트를 생략)
+    if (body.siteId != null && (!Number.isInteger(body.siteId) || body.siteId <= 0)) {
+      return fail(400, 'siteId: 현장 ID는 양수여야 합니다.')
+    }
+    if (body.siteId != null && !mockSiteExists(body.siteId)) return fail(400, '유효한 현장을 찾을 수 없습니다.')
     const archived = archivedSiteCreateError(body.siteId)
     if (archived) return archived
     const amountError = purchaseRequestError(body.quantity, body.unitPrice)
@@ -202,7 +211,7 @@ export const purchasesHandlers = [
     }
     const newPurchase: Purchase = {
       id: Math.max(0, ...purchases.map((p) => p.id)) + 1,
-      siteId: body.siteId,
+      siteId: body.siteId ?? null,
       itemName: body.itemName.trim(),
       quantity: body.quantity,
       unitPrice: body.unitPrice,
@@ -252,6 +261,28 @@ export const purchasesHandlers = [
       memo: body.memo?.trim() || null,
       updatedAt: new Date().toISOString(),
     }
+    purchases = purchases.map((purchase) => purchase.id === id ? updated : purchase)
+    return HttpResponse.json<ApiResponse<Purchase>>({ success: true, data: updated, error: null })
+  }),
+
+  // 서버 PurchaseService.assignSite와 같은 규칙: 미배정→배정만, 같은 현장 재요청은 멱등, 다른 현장 이동 409
+  http.patch<{ id: string }, PurchaseSiteAssignRequest>('/api/v1/purchases/:id/site', async ({ params, request }) => {
+    const id = Number(params.id)
+    const body = await request.json()
+    if (body?.siteId == null) return fail(400, 'siteId: 현장 ID는 필수입니다.')
+    if (!Number.isInteger(body.siteId) || body.siteId <= 0) return fail(400, 'siteId: 현장 ID는 양수여야 합니다.')
+    const current = purchases.find((purchase) => purchase.id === id)
+    if (!current) return fail(404, '매입 내역을 찾을 수 없습니다.')
+    if (current.siteId != null) {
+      if (current.siteId === body.siteId) {
+        return HttpResponse.json<ApiResponse<Purchase>>({ success: true, data: current, error: null })
+      }
+      return fail(409, '이미 현장이 배정된 매입입니다. 다른 현장으로 옮기려면 삭제한 뒤 다시 등록해 주세요.')
+    }
+    if (!mockSiteExists(body.siteId)) return fail(400, '유효한 현장을 찾을 수 없습니다.')
+    const archived = archivedSiteCreateError(body.siteId)
+    if (archived) return archived
+    const updated: Purchase = { ...current, siteId: body.siteId, updatedAt: new Date().toISOString() }
     purchases = purchases.map((purchase) => purchase.id === id ? updated : purchase)
     return HttpResponse.json<ApiResponse<Purchase>>({ success: true, data: updated, error: null })
   }),

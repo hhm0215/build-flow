@@ -163,7 +163,8 @@ export interface ParseResult {
 // ── Purchase (매입) ───────────────────────────
 export interface Purchase {
   id: number
-  siteId: number
+  /** 현장 미배정(홈택스 매입 세금계산서 일괄 적재 등)이면 null — 손익에 아직 반영되지 않음 */
+  siteId: number | null
   itemName: string
   quantity: number
   unitPrice: number
@@ -216,13 +217,19 @@ export interface PurchaseEvidenceSummary {
 }
 
 export interface PurchaseCreateRequest {
-  siteId: number
+  /** 생략하면 현장 미배정 매입으로 저장(손익 미반영) */
+  siteId?: number
   itemName: string
   quantity: number
   unitPrice: number
   supplier?: string
   purchaseDate?: string
   memo?: string
+}
+
+/** PATCH /purchases/{id}/site — 미배정 매입에 현장 배정(다른 현장으로 이동은 409) */
+export interface PurchaseSiteAssignRequest {
+  siteId: number
 }
 
 export interface PurchaseUpdateRequest {
